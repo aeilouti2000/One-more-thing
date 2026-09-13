@@ -1,10 +1,13 @@
-import { Pressable, Text } from "react-native";
+import { ActivityIndicator, Pressable } from "react-native";
+import { AppText } from "@/components/ui/AppText";
+import { useTheme } from "@/providers/ThemeProvider";
 
 type AppButtonProps = {
   label: string;
   onPress?: () => void;
   variant?: "primary" | "secondary" | "ghost";
   disabled?: boolean;
+  loading?: boolean;
 };
 
 const variants = {
@@ -24,21 +27,28 @@ export function AppButton({
   onPress,
   variant = "primary",
   disabled = false,
+  loading = false,
 }: AppButtonProps) {
+  const { colors } = useTheme();
+  const isDisabled = disabled || loading;
+
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={isDisabled}
       className={`items-center rounded-2xl px-5 py-4 ${variants[variant]} ${
-        disabled ? "opacity-50" : "active:opacity-80"
+        isDisabled ? "opacity-50" : "active:opacity-80"
       }`}
     >
-      <Text
-        className={`text-base font-semibold ${labelVariants[variant]}`}
-        style={{ whiteSpace: "pre-wrap" } as object}
-      >
-        {label}
-      </Text>
+      {loading ? (
+        <ActivityIndicator
+          color={variant === "primary" ? colors.white : colors.accent}
+        />
+      ) : (
+        <AppText className={`text-base font-semibold ${labelVariants[variant]}`}>
+          {label}
+        </AppText>
+      )}
     </Pressable>
   );
 }

@@ -1,4 +1,5 @@
-import { Pressable, Text } from "react-native";
+import { Pressable } from "react-native";
+import { AppText } from "@/components/ui/AppText";
 
 type CategoryChipProps = {
   label: string;
@@ -18,13 +19,13 @@ export function CategoryChip({
         selected ? "bg-cove-accent" : "bg-cove-paper"
       }`}
     >
-      <Text
+      <AppText
         className={`text-sm font-medium ${
           selected ? "text-white" : "text-cove-ink"
         }`}
       >
         {label}
-      </Text>
+      </AppText>
     </Pressable>
   );
 }

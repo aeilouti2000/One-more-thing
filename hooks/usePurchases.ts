@@ -1,5 +1,19 @@
-import { MOCK_PURCHASES } from "@/constants/mock-data";
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import {
+  addItem as insertItem,
+  deleteItems,
+  fetchHomeItems,
+  markItemBought,
+  markItemsBought,
+  updateItemDetails,
+} from "@/lib/items";
+import type { NewItemInput, UpdateItemInput } from "@/lib/items";
+import { useHousehold } from "@/hooks/useHousehold";
+import { useAuth } from "@/providers/AuthProvider";
 import type { Purchase, PurchaseStatus } from "@/types/purchase";
+
+type AddItemValues = Omit<NewItemInput, "homeId" | "userId">;
 
 type UsePurchasesResult = {
   purchases: Purchase[];
@@ -7,18 +21,149 @@ type UsePurchasesResult = {
   bought: Purchase[];
   getById: (id: string) => Purchase | undefined;
   isLoading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  addItem: (values: AddItemValues) => Promise<{ error: string | null }>;
+  updateItem: (
+    id: string,
+    values: UpdateItemInput,
+  ) => Promise<{ error: string | null }>;
+  markBought: (id: string) => Promise<{ error: string | null }>;
+  markManyBought: (ids: string[]) => Promise<{ error: string | null }>;
+  deleteMany: (ids: string[]) => Promise<{ error: string | null }>;
 };
 
-/** Placeholder until a real data layer is added. */
 export function usePurchases(): UsePurchasesResult {
-  const purchases = MOCK_PURCHASES;
+  const { user } = useAuth();
+  const { household, isLoading: isHomeLoading } = useHousehold();
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!household) {
+      setPurchases([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    const { items, error: fetchError } = await fetchHomeItems(household.id);
+    setPurchases(items);
+    setError(fetchError);
+    setIsLoading(false);
+  }, [household]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isHomeLoading) return;
+      void refresh();
+    }, [isHomeLoading, refresh]),
+  );
+
+  const addItem = useCallback(
+    async (values: AddItemValues) => {
+      if (!household || !user) {
+        return { error: "You need a home before you can add items." };
+      }
+
+      const result = await insertItem({
+        ...values,
+        homeId: household.id,
+        userId: user.id,
+      });
+
+      if (!result.error) {
+        await refresh();
+      }
+
+      return result;
+    },
+    [household, refresh, user],
+  );
+
+  const markBought = useCallback(
+    async (id: string) => {
+      if (!user) {
+        return { error: "You need to log in first." };
+      }
+
+      const result = await markItemBought(id);
+      if (!result.error) {
+        await refresh();
+      }
+
+      return result;
+    },
+    [refresh, user],
+  );
+
+  const updateItem = useCallback(
+    async (id: string, values: UpdateItemInput) => {
+      if (!user) {
+        return { error: "You need to log in first." };
+      }
+
+      const result = await updateItemDetails(id, values);
+      if (!result.error) {
+        await refresh();
+      }
+
+      return result;
+    },
+    [refresh, user],
+  );
+
+  const markManyBought = useCallback(
+    async (ids: string[]) => {
+      if (!user) {
+        return { error: "You need to log in first." };
+      }
+
+      const result = await markItemsBought(ids);
+      if (!result.error) {
+        await refresh();
+      }
+
+      return result;
+    },
+    [refresh, user],
+  );
+
+  const deleteMany = useCallback(
+    async (ids: string[]) => {
+      if (!user) {
+        return { error: "You need to log in first." };
+      }
+
+      const result = await deleteItems(ids);
+      if (!result.error) {
+        await refresh();
+      }
+
+      return result;
+    },
+    [refresh, user],
+  );
+
+  const needed = purchases.filter((item) => item.status === "needed");
+  const bought = purchases
+    .filter((item) => item.status === "bought")
+    .sort((a, b) => (b.boughtAt ?? "").localeCompare(a.boughtAt ?? ""));
 
   return {
     purchases,
-    needed: purchases.filter((item) => item.status === "needed"),
-    bought: purchases.filter((item) => item.status === "bought"),
+    needed,
+    bought,
     getById: (id) => purchases.find((item) => item.id === id),
-    isLoading: false,
+    isLoading: isHomeLoading || isLoading,
+    error,
+    refresh,
+    addItem,
+    updateItem,
+    markBought,
+    markManyBought,
+    deleteMany,
   };
 }
 

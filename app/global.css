@@ -1,3 +1,41 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+  Visual tokens live in constants/theme.js.
+  NativeWind vars on the theme root swap these at runtime.
+*/
+
+:root {
+  --color-cove-ice: #e3f2fd;
+  --color-cove-paper: #ffffff;
+  --color-cove-mist: #bbdefb;
+  --color-cove-line: #90caf9;
+  --color-cove-muted: #1565c0;
+  --color-cove-ink: #0d47a1;
+  --color-cove-accent: #2196f3;
+  --color-cove-accent-deep: #0d47a1;
+  --color-cove-soft: #e3f2fd;
+  --color-cove-deep: #0d47a1;
+}
+
+.dark {
+  --color-cove-ice: #0b1526;
+  --color-cove-paper: #132238;
+  --color-cove-mist: #1e3a5f;
+  --color-cove-line: #2a4a73;
+  --color-cove-muted: #90caf9;
+  --color-cove-ink: #e3f2fd;
+  --color-cove-accent: #42a5f5;
+  --color-cove-accent-deep: #90caf9;
+  --color-cove-soft: #1a3050;
+  --color-cove-deep: #1565c0;
+}
+
+/* NativeWind on web drops spaces in Text unless white-space is forced. */
+[class*="css-text"],
+input,
+textarea {
+  white-space: pre-wrap !important;
+}
