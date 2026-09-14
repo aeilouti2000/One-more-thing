@@ -1,4 +1,4 @@
-import { translate } from "@/constants/i18n";
+import { translate, type Locale } from "@/constants/i18n";
 import type { PurchaseCategory } from "@/types/purchase";
 
 export const PURCHASE_CATEGORIES: {
@@ -12,7 +12,7 @@ export const PURCHASE_CATEGORIES: {
   { id: "other" },
 ];
 
-const categoryKeys = {
+export const categoryKeys = {
   vegetables: "categoryVegetables",
   meat: "categoryMeat",
   coffee: "categoryCoffee",
@@ -21,6 +21,6 @@ const categoryKeys = {
   other: "categoryOther",
 } as const;
 
-export function getCategoryLabel(category: PurchaseCategory) {
-  return translate(categoryKeys[category]);
+export function getCategoryLabel(category: PurchaseCategory, locale?: Locale) {
+  return translate(categoryKeys[category], undefined, locale);
 }

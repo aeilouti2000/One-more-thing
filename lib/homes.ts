@@ -1,4 +1,3 @@
-import type { User } from "@supabase/supabase-js";
 import { translate } from "@/constants/i18n";
 import { formatAppError, logError } from "@/lib/errors";
 import { ensureProfile, requireUser } from "@/lib/profile";
@@ -61,84 +60,6 @@ export async function fetchMyHousehold(): Promise<Household | null> {
   return toHousehold(home as HomeRow, user.id, (membership as { role: "owner" | "partner" }).role);
 }
 
-function generateInviteCode() {
-  const bytes = new Uint8Array(4);
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
-  } else {
-    for (let index = 0; index < bytes.length; index += 1) {
-      bytes[index] = Math.floor(Math.random() * 256);
-    }
-  }
-  const hex = Array.from(bytes, (value) =>
-    value.toString(16).padStart(2, "0"),
-  )
-    .join("")
-    .toUpperCase();
-  return `OMT-${hex}`;
-}
-
-function isRpcUnavailable(error: { code?: string; message?: string } | null) {
-  const message = error?.message?.toLowerCase() ?? "";
-  return (
-    error?.code === "PGRST202" ||
-    error?.code === "42883" ||
-    message.includes("could not find the function")
-  );
-}
-
-async function createHomeDirect(name: string, user: User) {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const inviteCode = generateInviteCode();
-    const { data, error } = await supabase
-      .from("homes")
-      .insert({ name, invite_code: inviteCode })
-      .select("id, name, invite_code, created_at")
-      .single();
-
-    if (error) {
-      if (error.code === "23505" && error.message.includes("invite_code")) {
-        continue;
-      }
-      logError("create_home_insert", error);
-      return { home: null, error: formatAppError(error) };
-    }
-
-    const { error: memberError } = await supabase.from("home_members").insert({
-      home_id: (data as HomeRow).id,
-      user_id: user.id,
-      role: "owner",
-    });
-
-    if (memberError) {
-      logError("create_home_member", memberError);
-      const message = formatAppError(memberError);
-      if (alreadyHasHome(message)) {
-        const existing = await fetchMyHousehold();
-        if (existing) {
-          return {
-            home: {
-              id: existing.id,
-              name: existing.name,
-              invite_code: existing.inviteCode,
-              created_at: new Date().toISOString(),
-            },
-            error: null,
-          };
-        }
-      }
-      return { home: null, error: message };
-    }
-
-    return { home: data as HomeRow, error: null };
-  }
-
-  return {
-    home: null,
-    error: translate("errorInviteCodeBusy"),
-  };
-}
-
 export async function createHome(name: string) {
   const homeName = name.trim();
   const { user, error: userError } = await requireUser();
@@ -171,12 +92,8 @@ export async function createHome(name: string) {
     }
   }
 
-  if (!isRpcUnavailable(rpc.error)) {
-    logError("create_home", rpc.error);
-    return { home: null, error: formatAppError(rpc.error) };
-  }
-
-  return createHomeDirect(homeName, user);
+  logError("create_home", rpc.error);
+  return { home: null, error: formatAppError(rpc.error) };
 }
 
 export async function joinHome(code: string) {

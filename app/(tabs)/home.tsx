@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { InviteCodeCard } from "@/components/household/InviteCodeCard";
 import { PartnerCard } from "@/components/household/PartnerCard";
@@ -40,10 +40,6 @@ export default function HomeScreen() {
   const isHost = household?.members.some(
     (member) => member.id === user?.id && member.role === "owner",
   );
-
-  useEffect(() => {
-    setFamilyName(household?.name ?? "");
-  }, [household?.name]);
 
   async function onRefresh() {
     setIsRefreshing(true);
@@ -157,6 +153,7 @@ export default function HomeScreen() {
                   </View>
                   <Pressable
                     onPress={() => {
+                      setFamilyName(household.name);
                       setIsEditingName(true);
                       setNameSuccess(null);
                     }}

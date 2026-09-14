@@ -22,6 +22,7 @@ function ThemedNavigation() {
         <Stack.Screen name="index" />
         <Stack.Screen name="welcome" />
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="auth/callback" />
         <Stack.Screen name="create-home" />
         <Stack.Screen name="join-home" />
         <Stack.Screen name="(tabs)" />

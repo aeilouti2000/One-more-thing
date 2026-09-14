@@ -12,7 +12,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
-import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
+import { PURCHASE_CATEGORIES } from "@/constants/categories";
 import { iconSize } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
@@ -31,7 +31,7 @@ export default function ItemsScreen() {
     deleteMany,
   } = usePurchases();
   const { colors } = useTheme();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [category, setCategory] = useState<PurchaseCategory | "all">("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -169,7 +169,7 @@ export default function ItemsScreen() {
         </View>
       ) : null}
 
-      <View className="mb-5 flex-row flex-wrap gap-2">
+      <View key={locale} className="mb-5 flex-row flex-wrap gap-2">
         <CategoryChip
           label={t("all")}
           selected={category === "all"}
@@ -181,8 +181,8 @@ export default function ItemsScreen() {
         />
         {PURCHASE_CATEGORIES.map((item) => (
           <CategoryChip
-            key={item.id}
-            label={getCategoryLabel(item.id)}
+            key={`${item.id}-${locale}`}
+            category={item.id}
             selected={category === item.id}
             onPress={() => {
               setCategory(item.id);

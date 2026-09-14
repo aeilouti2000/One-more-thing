@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, View } from "react-native";
 import { CategoryChip } from "@/components/purchases/CategoryChip";
@@ -23,7 +23,7 @@ import type { PurchaseCategory } from "@/types/purchase";
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getById, isLoading, markBought, updateItem } = usePurchases();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { colors } = useTheme();
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -34,13 +34,6 @@ export default function ItemDetailScreen() {
     useState<PurchaseCategory>("vegetables");
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const purchase = getById(id ?? "");
-
-  useEffect(() => {
-    if (!purchase) return;
-    setEditTitle(purchase.name);
-    setEditQuantity(String(purchase.quantity));
-    setEditCategory(purchase.category);
-  }, [purchase?.category, purchase?.id, purchase?.name, purchase?.quantity]);
 
   if (isLoading && !purchase) {
     return <LoadingScreen />;
@@ -125,6 +118,9 @@ export default function ItemDetailScreen() {
           !isEditing ? (
             <Pressable
               onPress={() => {
+                setEditTitle(item.name);
+                setEditQuantity(String(item.quantity));
+                setEditCategory(item.category);
                 setError(null);
                 setIsEditing(true);
               }}
@@ -168,11 +164,11 @@ export default function ItemDetailScreen() {
             />
             <View>
               <SectionHeader title={t("category")} />
-              <View className="flex-row flex-wrap gap-2">
+              <View key={locale} className="flex-row flex-wrap gap-2">
                 {PURCHASE_CATEGORIES.map((category) => (
                   <CategoryChip
-                    key={category.id}
-                    label={getCategoryLabel(category.id)}
+                    key={`${category.id}-${locale}`}
+                    category={category.id}
                     selected={editCategory === category.id}
                     onPress={() => setEditCategory(category.id)}
                   />
@@ -201,7 +197,7 @@ export default function ItemDetailScreen() {
               <DetailRow label={t("quantity")} value={quantityLabel} />
               <DetailRow
                 label={t("category")}
-                value={getCategoryLabel(item.category)}
+                value={getCategoryLabel(item.category, locale)}
               />
               <DetailRow label={t("addedBy")} value={item.addedByName} />
               {item.boughtByName ? (

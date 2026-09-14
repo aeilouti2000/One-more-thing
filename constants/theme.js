@@ -73,8 +73,8 @@ const iconSize = {
 };
 
 const logo = {
-  size: 64,
-  radius: 16,
+  size: 72,
+  radius: 999,
 };
 
 const tabBar = {

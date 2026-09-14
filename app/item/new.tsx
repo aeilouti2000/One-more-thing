@@ -8,7 +8,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
+import { PURCHASE_CATEGORIES } from "@/constants/categories";
 import { usePurchases } from "@/hooks/usePurchases";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -16,7 +16,7 @@ import type { PurchaseCategory } from "@/types/purchase";
 
 export default function NewItemScreen() {
   const { addItem } = usePurchases();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
@@ -85,11 +85,11 @@ export default function NewItemScreen() {
 
         <View>
           <SectionHeader title={t("category")} />
-          <View className="flex-row flex-wrap gap-2">
+          <View key={locale} className="flex-row flex-wrap gap-2">
             {PURCHASE_CATEGORIES.map((item) => (
               <CategoryChip
-                key={item.id}
-                label={getCategoryLabel(item.id)}
+                key={`${item.id}-${locale}`}
+                category={item.id}
                 selected={category === item.id}
                 onPress={() => setCategory(item.id)}
               />

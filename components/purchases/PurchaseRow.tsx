@@ -66,7 +66,7 @@ export function PurchaseRow({
           )}
         </View>
         <AppText className="mt-1 text-sm text-cove-muted">
-          {quantityLabel} · {getCategoryLabel(purchase.category)} ·{" "}
+          {quantityLabel} · {getCategoryLabel(purchase.category, locale)} ·{" "}
           {purchase.status === "bought"
             ? t("boughtByName", { name: purchase.boughtByName ?? "" })
             : t("addedByName", { name: purchase.addedByName })}

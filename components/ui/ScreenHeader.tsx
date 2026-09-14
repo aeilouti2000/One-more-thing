@@ -45,11 +45,6 @@ export function ScreenHeader({
           transform: [{ rotate: "32deg" }],
         }}
       />
-      <View
-        pointerEvents="none"
-        className="absolute bottom-0 left-5 right-5 h-px"
-        style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
-      />
 
       <View className="relative z-10 flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1 flex-row items-start gap-3">

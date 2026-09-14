@@ -1,5 +1,5 @@
--- Confirm every existing Auth user so they can log in
--- without checking email. Run once in SQL Editor.
+-- DEV ONLY. Do not run this on the production project.
+-- Production accounts must confirm email before signing in.
 
 update auth.users
 set email_confirmed_at = coalesce(email_confirmed_at, now())

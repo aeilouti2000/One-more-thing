@@ -9,11 +9,27 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import * as SplashScreen from "expo-splash-screen";
+import { Linking } from "react-native";
 import { translate } from "@/constants/i18n";
 import { formatAppError, logError } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
 
 void SplashScreen.preventAutoHideAsync();
+
+const AUTH_REDIRECT_URL = "onemorething://auth/callback";
+
+function getAuthTokens(url: string) {
+  if (!url.startsWith(AUTH_REDIRECT_URL)) return null;
+
+  const encodedParams = url.includes("#")
+    ? url.slice(url.indexOf("#") + 1)
+    : url.slice(url.indexOf("?") + 1);
+  const params = new URLSearchParams(encodedParams);
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+
+  return accessToken && refreshToken ? { accessToken, refreshToken } : null;
+}
 
 type AuthResult = {
   error: string | null;
@@ -42,30 +58,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    void supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!isMounted) return;
-        setSession(data.session);
-      })
-      .catch((error) => {
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+
+    async function handleAuthUrl(url: string | null) {
+      if (!url) return false;
+      const tokens = getAuthTokens(url);
+      if (!tokens) return false;
+
+      const { data: authData, error } = await supabase.auth.setSession({
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
+      });
+      if (error) {
+        logError("confirm_email", error);
+        return false;
+      }
+      if (isMounted) setSession(authData.session);
+      return true;
+    }
+
+    void (async () => {
+      try {
+        const handledRedirect = await handleAuthUrl(await Linking.getInitialURL());
+        if (!handledRedirect) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (isMounted) setSession(sessionData.session);
+        }
+      } catch (error) {
         logError("get_session", error);
-        if (!isMounted) return;
-        setSession(null);
-      })
-      .finally(() => {
+        if (isMounted) setSession(null);
+      } finally {
         if (!isMounted) return;
         setIsLoading(false);
         void SplashScreen.hideAsync();
-      });
+      }
+    })();
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
+    const linkingSubscription = Linking.addEventListener("url", ({ url }) => {
+      void handleAuthUrl(url);
     });
 
     return () => {
       isMounted = false;
       data.subscription.unsubscribe();
+      linkingSubscription.remove();
     };
   }, []);
 
@@ -89,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: {
         data: { name: name.trim() },
+        emailRedirectTo: AUTH_REDIRECT_URL,
       },
     });
 

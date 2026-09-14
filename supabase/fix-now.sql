@@ -1,4 +1,5 @@
--- Run this whole file once in Supabase → SQL Editor → Run.
+-- DEPRECATED: use setup.sql for new databases and production-hardening.sql
+-- for existing databases. Kept only for installations that previously used it.
 
 alter table public.home_members
   drop constraint if exists home_members_user_id_fkey;
@@ -87,7 +88,7 @@ declare
   code text;
 begin
   loop
-    code := 'OMT-' || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 4));
+    code := 'OMT-' || upper(encode(gen_random_bytes(4), 'hex'));
     exit when not exists (select 1 from public.homes where invite_code = code);
   end loop;
   return code;
@@ -182,5 +183,11 @@ end;
 $$;
 
 grant execute on function public.get_my_home() to authenticated;
+
+drop policy if exists "Signed-in users can look up homes" on public.homes;
+drop policy if exists "Signed-in users can create a home" on public.homes;
+drop policy if exists "Users can join a home" on public.home_members;
+revoke insert, update, delete on public.homes from authenticated;
+revoke insert, update, delete on public.home_members from authenticated;
 
 notify pgrst, 'reload schema';

@@ -1,7 +1,8 @@
 import { router, type Href } from "expo-router";
-import { Image, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { GuestOnly } from "@/components/auth/GuestOnly";
 import { AppButton } from "@/components/ui/AppButton";
+import { AppLogo } from "@/components/ui/AppLogo";
 import { AppText } from "@/components/ui/AppText";
 import { Screen } from "@/components/ui/Screen";
 import { logo } from "@/constants/theme";
@@ -44,15 +45,7 @@ export default function WelcomeScreen() {
             />
             <View className="relative z-10">
               <View className="mb-5 flex-row items-center gap-4">
-                <Image
-                  source={require("../assets/images/icon.png")}
-                  resizeMode="cover"
-                  style={{
-                    width: logo.size,
-                    height: logo.size,
-                    borderRadius: logo.radius,
-                  }}
-                />
+                <AppLogo size={logo.size} />
                 <AppText className="flex-1 text-3xl font-semibold text-white">
                   {t("appName")}
                 </AppText>

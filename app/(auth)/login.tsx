@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { Pressable, View } from "react-native";
 import { GuestOnly } from "@/components/auth/GuestOnly";
 import { AppButton } from "@/components/ui/AppButton";
+import { AppLogo } from "@/components/ui/AppLogo";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -49,6 +50,10 @@ export default function LoginScreen() {
           subtitle={t("loginSubtitle")}
           showBack
         />
+
+        <View className="mb-6 items-center">
+          <AppLogo size={88} />
+        </View>
 
         <View className="gap-6">
           <AppTextField
