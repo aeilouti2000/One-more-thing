@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import * as Crypto from "expo-crypto";
 import * as SplashScreen from "expo-splash-screen";
 import { Linking } from "react-native";
 import { translate } from "@/constants/i18n";
@@ -23,8 +24,7 @@ const AUTH_REDIRECT_URL = "onemorething://auth/callback";
 const PENDING_AUTH_STATE_KEY = "auth.pendingCallbackState";
 
 function createAuthState() {
-  const bytes = new Uint8Array(32);
-  globalThis.crypto.getRandomValues(bytes);
+  const bytes = Crypto.getRandomBytes(32);
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
