@@ -17,7 +17,7 @@ export function FormMessage({ message, tone = "default" }: FormMessageProps) {
   return (
     <AppText
       className={`text-base leading-6 ${
-        tone === "success" ? "text-cove-accent" : "text-cove-ink"
+        tone === "success" ? "text-cove-accent" : "text-red-600 dark:text-red-400"
       }`}
     >
       {localizeMessage(message)}

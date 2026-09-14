@@ -12,23 +12,63 @@ import * as SplashScreen from "expo-splash-screen";
 import { Linking } from "react-native";
 import { translate } from "@/constants/i18n";
 import { formatAppError, logError } from "@/lib/errors";
+import "@/lib/session-storage";
 import { supabase } from "@/lib/supabase";
 
 void SplashScreen.preventAutoHideAsync();
 
+// Allow this exact path plus query params in Supabase Auth redirect URLs,
+// e.g. onemorething://auth/callback and onemorething://auth/callback?state=*
 const AUTH_REDIRECT_URL = "onemorething://auth/callback";
+const PENDING_AUTH_STATE_KEY = "auth.pendingCallbackState";
+
+function createAuthState() {
+  const bytes = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function readPendingAuthState() {
+  try {
+    return globalThis.localStorage.getItem(PENDING_AUTH_STATE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writePendingAuthState(state: string) {
+  globalThis.localStorage.setItem(PENDING_AUTH_STATE_KEY, state);
+}
+
+function clearPendingAuthState() {
+  try {
+    globalThis.localStorage.removeItem(PENDING_AUTH_STATE_KEY);
+  } catch {
+    // Ignore storage failures while clearing a consumed nonce.
+  }
+}
 
 function getAuthTokens(url: string) {
   if (!url.startsWith(AUTH_REDIRECT_URL)) return null;
 
-  const encodedParams = url.includes("#")
-    ? url.slice(url.indexOf("#") + 1)
-    : url.slice(url.indexOf("?") + 1);
-  const params = new URLSearchParams(encodedParams);
-  const accessToken = params.get("access_token");
-  const refreshToken = params.get("refresh_token");
+  const hashIndex = url.indexOf("#");
+  const queryIndex = url.indexOf("?");
+  const query =
+    queryIndex >= 0 && (hashIndex < 0 || queryIndex < hashIndex)
+      ? url.slice(queryIndex + 1, hashIndex >= 0 ? hashIndex : undefined)
+      : "";
+  const fragment = hashIndex >= 0 ? url.slice(hashIndex + 1) : "";
+  const queryParams = new URLSearchParams(query);
+  const fragmentParams = new URLSearchParams(fragment);
+  const accessToken =
+    fragmentParams.get("access_token") ?? queryParams.get("access_token");
+  const refreshToken =
+    fragmentParams.get("refresh_token") ?? queryParams.get("refresh_token");
+  const state = queryParams.get("state") ?? fragmentParams.get("state");
 
-  return accessToken && refreshToken ? { accessToken, refreshToken } : null;
+  return accessToken && refreshToken
+    ? { accessToken, refreshToken, state }
+    : null;
 }
 
 type AuthResult = {
@@ -66,6 +106,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!url) return false;
       const tokens = getAuthTokens(url);
       if (!tokens) return false;
+
+      const pendingState = readPendingAuthState();
+      if (!pendingState || !tokens.state || tokens.state !== pendingState) {
+        return false;
+      }
+      clearPendingAuthState();
 
       const { data: authData, error } = await supabase.auth.setSession({
         access_token: tokens.accessToken,
@@ -122,25 +168,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (name: string, email: string, password: string) => {
+    const state = createAuthState();
+    writePendingAuthState(state);
+    const emailRedirectTo = `${AUTH_REDIRECT_URL}?state=${encodeURIComponent(state)}`;
+
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
         data: { name: name.trim() },
-        emailRedirectTo: AUTH_REDIRECT_URL,
+        emailRedirectTo,
       },
     });
 
     if (error) {
+      clearPendingAuthState();
       logError("sign_up", error);
       return { error: formatAppError(error) };
     }
 
     if (data.user?.identities && data.user.identities.length === 0) {
+      clearPendingAuthState();
       return { error: translate("errorEmailTaken") };
     }
 
     if (data.session) {
+      clearPendingAuthState();
       return { error: null };
     }
 
@@ -155,10 +208,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ) {
         return { error: null, requiresEmailConfirmation: true };
       }
+      clearPendingAuthState();
       logError("sign_up_auto_login", signInResult.error);
       return { error: formatAppError(signInResult.error) };
     }
 
+    clearPendingAuthState();
     return { error: null };
   }, []);
 

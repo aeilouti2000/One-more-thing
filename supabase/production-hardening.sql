@@ -2,6 +2,10 @@
 -- Safe to run repeatedly.
 
 drop policy if exists "Signed-in users can look up homes" on public.homes;
+drop policy if exists "Members can read their home" on public.homes;
+create policy "Members can read their home"
+  on public.homes for select
+  using (public.is_home_member(id));
 drop policy if exists "Signed-in users can create a home" on public.homes;
 drop policy if exists "Users can join a home" on public.home_members;
 drop policy if exists "Users manage own profile" on public.profiles;

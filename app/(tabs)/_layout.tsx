@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import { Tabs } from "expo-router";
-import { Pressable, View } from "react-native";
+import type { BottomTabBarButtonProps } from "expo-router/js-tabs";
+import { PlatformPressable } from "expo-router/react-navigation";
+import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RequireSession } from "@/components/auth/RequireSession";
 import { fontWeight, spacing, tabBar } from "@/constants/theme";
@@ -11,40 +12,17 @@ import { useTheme } from "@/providers/ThemeProvider";
 function TabBarButton({
   children,
   style,
-  onPress,
-  onLongPress,
-  accessibilityRole,
-  accessibilityState,
-  accessibilityLabel,
-  testID,
   focused,
   activeBackground,
   activeBorder,
-}: Pick<
-  BottomTabBarButtonProps,
-  | "children"
-  | "style"
-  | "onPress"
-  | "onLongPress"
-  | "accessibilityRole"
-  | "accessibilityState"
-  | "accessibilityLabel"
-  | "testID"
-> & {
+  ...props
+}: BottomTabBarButtonProps & {
   focused: boolean;
   activeBackground: string;
   activeBorder: string;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      accessibilityRole={accessibilityRole}
-      accessibilityState={accessibilityState}
-      accessibilityLabel={accessibilityLabel}
-      testID={testID}
-      style={[style, { flex: 1 }]}
-    >
+    <PlatformPressable {...props} style={[style, { flex: 1 }]}>
       <View
         className="mx-1 my-1.5 flex-1 items-center justify-center rounded-[22px]"
         style={{
@@ -55,7 +33,7 @@ function TabBarButton({
       >
         {children}
       </View>
-    </Pressable>
+    </PlatformPressable>
   );
 }
 
@@ -76,30 +54,13 @@ export default function TabsLayout() {
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.muted,
           tabBarHideOnKeyboard: true,
-          tabBarButton: ({
-            children,
-            style,
-            onPress,
-            onLongPress,
-            accessibilityRole,
-            accessibilityState,
-            accessibilityLabel,
-            testID,
-          }) => (
+          tabBarButton: (props) => (
             <TabBarButton
-              style={style}
-              onPress={onPress}
-              onLongPress={onLongPress}
-              accessibilityRole={accessibilityRole}
-              accessibilityState={accessibilityState}
-              accessibilityLabel={accessibilityLabel}
-              testID={testID}
-              focused={Boolean(accessibilityState?.selected)}
+              {...props}
+              focused={Boolean(props.accessibilityState?.selected)}
               activeBackground={activeBackground}
               activeBorder={activeBorder}
-            >
-              {children}
-            </TabBarButton>
+            />
           ),
           tabBarLabelStyle: {
             fontSize: tabBar.labelSize,
