@@ -1,4 +1,6 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { AppText } from "@/components/ui/AppText";
+import { useI18n } from "@/providers/LanguageProvider";
 import type { PurchaseStatus } from "@/types/purchase";
 
 type StatusBadgeProps = {
@@ -6,6 +8,7 @@ type StatusBadgeProps = {
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {
+  const { t, isRTL } = useI18n();
   const isBought = status === "bought";
 
   return (
@@ -14,13 +17,13 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         isBought ? "bg-cove-soft" : "bg-cove-mist"
       }`}
     >
-      <Text
-        className={`text-xs font-semibold uppercase tracking-wide ${
-          isBought ? "text-cove-ink" : "text-cove-accent"
-        }`}
+      <AppText
+        className={`text-xs font-semibold ${
+          isRTL ? "" : "uppercase tracking-wide"
+        } ${isBought ? "text-cove-ink" : "text-cove-accent"}`}
       >
-        {isBought ? "Bought" : "Needed"}
-      </Text>
+        {isBought ? t("bought") : t("needed")}
+      </AppText>
     </View>
   );
 }

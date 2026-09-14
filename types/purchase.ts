@@ -1,9 +1,11 @@
 export type PurchaseStatus = "needed" | "bought";
 
 export type PurchaseCategory =
-  | "market"
-  | "household"
-  | "personal"
+  | "vegetables"
+  | "meat"
+  | "supermarket"
+  | "pharmacy"
+  | "coffee"
   | "other";
 
 export type Purchase = {

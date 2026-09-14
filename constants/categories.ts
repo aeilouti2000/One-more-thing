@@ -1,17 +1,26 @@
+import { translate, type Locale } from "@/constants/i18n";
 import type { PurchaseCategory } from "@/types/purchase";
 
 export const PURCHASE_CATEGORIES: {
   id: PurchaseCategory;
-  label: string;
 }[] = [
-  { id: "market", label: "Market" },
-  { id: "household", label: "Home" },
-  { id: "personal", label: "Personal" },
-  { id: "other", label: "Other" },
+  { id: "supermarket" },
+  { id: "vegetables" },
+  { id: "meat" },
+  { id: "coffee" },
+  { id: "pharmacy" },
+  { id: "other" },
 ];
 
-export function getCategoryLabel(category: PurchaseCategory) {
-  return (
-    PURCHASE_CATEGORIES.find((item) => item.id === category)?.label ?? category
-  );
+export const categoryKeys = {
+  vegetables: "categoryVegetables",
+  meat: "categoryMeat",
+  coffee: "categoryCoffee",
+  supermarket: "categorySupermarket",
+  pharmacy: "categoryPharmacy",
+  other: "categoryOther",
+} as const;
+
+export function getCategoryLabel(category: PurchaseCategory, locale?: Locale) {
+  return translate(categoryKeys[category], undefined, locale);
 }
