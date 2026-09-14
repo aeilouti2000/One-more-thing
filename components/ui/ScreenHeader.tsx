@@ -21,7 +21,7 @@ export function ScreenHeader({
   right,
 }: ScreenHeaderProps) {
   const { colors, scheme } = useTheme();
-  const { isRTL } = useI18n();
+  const { isRTL, t } = useI18n();
 
   return (
     <View
@@ -56,6 +56,8 @@ export function ScreenHeader({
           {showBack ? (
             <Pressable
               onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel={t("back")}
               className="mt-0.5 h-10 w-10 items-center justify-center rounded-full bg-white"
             >
               <Ionicons

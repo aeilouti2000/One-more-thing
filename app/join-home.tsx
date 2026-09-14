@@ -38,6 +38,7 @@ export default function JoinHomeScreen() {
         inviteCode: result.home.invite_code,
         members: [],
       });
+      await refresh();
       router.replace("/items");
       return;
     }

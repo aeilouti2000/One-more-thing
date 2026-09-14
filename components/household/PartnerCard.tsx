@@ -32,7 +32,7 @@ export function PartnerCard({
           {member.role === "owner" ? t("host") : t("partner")}
         </AppText>
       </View>
-      {canRemove ? (
+      {canRemove && onRemove ? (
         <Pressable
           onPress={onRemove}
           accessibilityRole="button"

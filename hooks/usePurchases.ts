@@ -9,6 +9,7 @@ import {
   updateItemDetails,
 } from "@/lib/items";
 import type { NewItemInput, UpdateItemInput } from "@/lib/items";
+import { translate } from "@/constants/i18n";
 import { useHousehold } from "@/hooks/useHousehold";
 import { useAuth } from "@/providers/AuthProvider";
 import type { Purchase, PurchaseStatus } from "@/types/purchase";
@@ -64,7 +65,9 @@ export function usePurchases(): UsePurchasesResult {
   const addItem = useCallback(
     async (values: AddItemValues) => {
       if (!household || !user) {
-        return { error: "You need a home before you can add items." };
+        return {
+          error: translate(!user ? "errorNeedLogin" : "errorNeedHome"),
+        };
       }
 
       const result = await insertItem({
@@ -85,7 +88,7 @@ export function usePurchases(): UsePurchasesResult {
   const markBought = useCallback(
     async (id: string) => {
       if (!user) {
-        return { error: "You need to log in first." };
+        return { error: translate("errorNeedLogin") };
       }
 
       const result = await markItemBought(id);
@@ -101,7 +104,7 @@ export function usePurchases(): UsePurchasesResult {
   const updateItem = useCallback(
     async (id: string, values: UpdateItemInput) => {
       if (!user) {
-        return { error: "You need to log in first." };
+        return { error: translate("errorNeedLogin") };
       }
 
       const result = await updateItemDetails(id, values);
@@ -117,7 +120,7 @@ export function usePurchases(): UsePurchasesResult {
   const markManyBought = useCallback(
     async (ids: string[]) => {
       if (!user) {
-        return { error: "You need to log in first." };
+        return { error: translate("errorNeedLogin") };
       }
 
       const result = await markItemsBought(ids);
@@ -133,7 +136,7 @@ export function usePurchases(): UsePurchasesResult {
   const deleteMany = useCallback(
     async (ids: string[]) => {
       if (!user) {
-        return { error: "You need to log in first." };
+        return { error: translate("errorNeedLogin") };
       }
 
       const result = await deleteItems(ids);

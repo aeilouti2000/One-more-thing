@@ -104,7 +104,7 @@ declare
   code text;
 begin
   loop
-    code := 'OMT-' || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 4));
+    code := 'OMT-' || upper(encode(gen_random_bytes(4), 'hex'));
     exit when not exists (select 1 from public.homes where invite_code = code);
   end loop;
   return code;
@@ -467,12 +467,9 @@ create policy "Users manage own profile"
 drop policy if exists "Members can read their home" on public.homes;
 create policy "Members can read their home"
   on public.homes for select
-  using (public.is_home_member(id) or auth.uid() is not null);
+  using (public.is_home_member(id));
 
 drop policy if exists "Signed-in users can look up homes" on public.homes;
-create policy "Signed-in users can look up homes"
-  on public.homes for select
-  using (auth.uid() is not null);
 
 drop policy if exists "Signed-in users can create a home" on public.homes;
 create policy "Signed-in users can create a home"
@@ -518,7 +515,8 @@ create policy "Members can delete items"
 
 grant usage on schema public to anon, authenticated;
 grant select, insert, update on public.profiles to authenticated;
-grant select, insert, update on public.homes to authenticated;
+revoke update on public.homes from authenticated;
+grant select, insert on public.homes to authenticated;
 grant select, insert on public.home_members to authenticated;
 grant select, insert, update, delete on public.items to authenticated;
 grant execute on function public.ensure_profile() to authenticated;

@@ -17,6 +17,7 @@ void SplashScreen.preventAutoHideAsync();
 
 type AuthResult = {
   error: string | null;
+  requiresEmailConfirmation?: boolean;
 };
 
 type AuthContextValue = {
@@ -110,6 +111,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (signInResult.error) {
+      if (
+        signInResult.error.message.toLowerCase().includes("email not confirmed")
+      ) {
+        return { error: null, requiresEmailConfirmation: true };
+      }
       logError("sign_up_auto_login", signInResult.error);
       return { error: formatAppError(signInResult.error) };
     }

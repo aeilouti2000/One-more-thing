@@ -39,7 +39,7 @@ create policy "Members can update their home"
   using (public.is_home_member(id))
   with check (public.is_home_member(id));
 
-grant update on public.homes to authenticated;
+revoke update on public.homes from authenticated;
 grant execute on function public.update_home_name(uuid, text) to authenticated;
 
 notify pgrst, 'reload schema';

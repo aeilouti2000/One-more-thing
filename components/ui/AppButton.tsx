@@ -36,6 +36,9 @@ export function AppButton({
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       className={`items-center rounded-2xl px-5 py-4 ${variants[variant]} ${
         isDisabled ? "opacity-50" : "active:opacity-80"
       }`}

@@ -26,7 +26,9 @@ export function PurchaseRow({
     ? `${purchase.quantity} ${purchase.unit}`
     : `x${purchase.quantity}`;
   const timestamp =
-    purchase.status === "bought" ? purchase.boughtAt : purchase.createdAt;
+    purchase.status === "bought"
+      ? (purchase.boughtAt ?? purchase.createdAt)
+      : purchase.createdAt;
   const date = timestamp
     ? new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
         year: "numeric",

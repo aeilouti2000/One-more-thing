@@ -15,10 +15,18 @@ function storage() {
 }
 
 export function readStoredTheme(): ThemeScheme {
-  const value = storage()?.getItem(THEME_STORAGE_KEY);
-  return value === "dark" ? "dark" : "light";
+  try {
+    const value = storage()?.getItem(THEME_STORAGE_KEY);
+    return value === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
 }
 
 export function writeStoredTheme(scheme: ThemeScheme) {
-  storage()?.setItem(THEME_STORAGE_KEY, scheme);
+  try {
+    storage()?.setItem(THEME_STORAGE_KEY, scheme);
+  } catch {
+    // Keep the active in-memory theme when persistence is unavailable.
+  }
 }

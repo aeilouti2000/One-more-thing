@@ -19,6 +19,7 @@ export default function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canSubmit =
@@ -37,11 +38,17 @@ export default function SignupScreen() {
 
     setIsSubmitting(true);
     setError(null);
+    setSuccess(null);
     const result = await signUp(name, email, password);
     setIsSubmitting(false);
 
     if (result.error) {
       setError(result.error);
+      return;
+    }
+
+    if (result.requiresEmailConfirmation) {
+      setSuccess(t("signupCheckEmail"));
       return;
     }
 
@@ -85,6 +92,7 @@ export default function SignupScreen() {
             autoComplete="new-password"
           />
           <FormMessage message={error} />
+          <FormMessage message={success} tone="success" />
           <AppButton
             label={t("createAccount")}
             disabled={!canSubmit}

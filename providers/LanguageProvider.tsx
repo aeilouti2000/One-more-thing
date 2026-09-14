@@ -27,7 +27,11 @@ type LanguageContextValue = {
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    const storedLocale = readStoredLocale();
+    setActiveLocale(storedLocale);
+    return storedLocale;
+  });
   const isRTL = locale === "ar";
 
   useEffect(() => {

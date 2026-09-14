@@ -134,7 +134,14 @@ create policy "Members can read membership"
 drop policy if exists "Members can read their home" on public.homes;
 create policy "Members can read their home"
   on public.homes for select
-  using (auth.uid() is not null);
+  using (
+    exists (
+      select 1
+      from public.home_members
+      where home_id = homes.id
+        and user_id = auth.uid()
+    )
+  );
 
 create or replace function public.get_my_home()
 returns jsonb

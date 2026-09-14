@@ -12,6 +12,7 @@ const en = {
   howItWorksBody:
     "Start a home, invite your partner, add what you need, and mark things bought when you pick them up.",
   logIn: "Log in",
+  back: "Go back",
   createAccount: "Create an account",
   privacyPolicy: "Privacy Policy",
   terms: "Terms",
@@ -24,6 +25,8 @@ const en = {
   newHere: "New here? Create an account",
   signupTitle: "Create account",
   signupSubtitle: "Sign up so you and your partner can share items.",
+  signupCheckEmail:
+    "Account created. Check your email to confirm it, then log in.",
   yourName: "Your name",
   namePlaceholder: "Alex",
   passwordMinPlaceholder: "At least 6 characters",
@@ -39,7 +42,7 @@ const en = {
   joinHome: "Join a home",
   joinHomeSubtitle: "Enter the code your partner shared.",
   inviteCode: "Invite code",
-  inviteCodePlaceholder: "OMT-0000",
+  inviteCodePlaceholder: "OMT-00000000",
   joinHomeHint:
     "After you join, you will see the same items and can add or mark them as bought.",
   joinThisHome: "Join this home",
@@ -160,13 +163,14 @@ const en = {
   errorPasswordsMismatch: "New passwords do not match.",
   errorEmailTaken: "That email already has an account.",
   errorEmailNotConfirmed:
-    "This account is not confirmed yet. Run supabase/confirm-users.sql in the SQL Editor, then log in again.",
+    "Confirm your email, then try logging in again. Contact support if you need help.",
   errorAlreadyHasHome: "You already belong to a home.",
   errorUnknownInvite: "That invite code was not found.",
   errorNeedLogin: "You need to log in first.",
+  errorNeedHome: "You need a home before you can add items.",
   errorNetwork: "Check your connection and try again.",
   errorRepairSql:
-    "Could not save yet. Run supabase/repair.sql in the Supabase SQL Editor, then try again.",
+    "Could not save your changes. Try again, or contact support if the problem continues.",
   errorCurrentPasswordWrong: "Current password is wrong.",
   errorInvalidEmail: "Enter a valid email address.",
   errorEnterHomeName: "Enter a home name.",
@@ -184,6 +188,7 @@ const ar: { [K in keyof typeof en]: string } = {
   howItWorksBody:
     "أنشئ منزلاً، ادعُ شريكك، أضف ما تحتاجانه، وعلّم العناصر مشتراة عند شرائها.",
   logIn: "تسجيل الدخول",
+  back: "العودة",
   createAccount: "إنشاء حساب",
   privacyPolicy: "سياسة الخصوصية",
   terms: "الشروط",
@@ -196,6 +201,8 @@ const ar: { [K in keyof typeof en]: string } = {
   newHere: "جديد هنا؟ أنشئ حساباً",
   signupTitle: "إنشاء حساب",
   signupSubtitle: "سجّل حتى تتمكنا من مشاركة العناصر.",
+  signupCheckEmail:
+    "تم إنشاء الحساب. تحقّق من بريدك لتأكيده، ثم سجّل الدخول.",
   yourName: "اسمك",
   namePlaceholder: "أحمد",
   passwordMinPlaceholder: "٦ أحرف على الأقل",
@@ -211,7 +218,7 @@ const ar: { [K in keyof typeof en]: string } = {
   joinHome: "الانضمام إلى منزل",
   joinHomeSubtitle: "أدخل الرمز الذي شاركه شريكك.",
   inviteCode: "رمز الدعوة",
-  inviteCodePlaceholder: "OMT-0000",
+  inviteCodePlaceholder: "OMT-00000000",
   joinHomeHint:
     "بعد الانضمام سترى العناصر نفسها ويمكنك إضافتها أو تعليمها مشتراة.",
   joinThisHome: "الانضمام إلى هذا المنزل",
@@ -332,13 +339,14 @@ const ar: { [K in keyof typeof en]: string } = {
   errorPasswordsMismatch: "كلمتا المرور الجديدتان غير متطابقتين.",
   errorEmailTaken: "هذا البريد لديه حساب بالفعل.",
   errorEmailNotConfirmed:
-    "هذا الحساب غير مؤكد بعد. نفّذ supabase/confirm-users.sql في محرر SQL ثم سجّل الدخول مرة أخرى.",
+    "أكّد بريدك الإلكتروني ثم حاول تسجيل الدخول مجدداً. تواصل مع الدعم إذا احتجت إلى مساعدة.",
   errorAlreadyHasHome: "أنت تنتمي إلى منزل بالفعل.",
   errorUnknownInvite: "رمز الدعوة غير موجود.",
   errorNeedLogin: "يجب تسجيل الدخول أولاً.",
+  errorNeedHome: "يجب أن تنضم إلى منزل قبل إضافة العناصر.",
   errorNetwork: "تحقق من الاتصال وحاول مرة أخرى.",
   errorRepairSql:
-    "تعذّر الحفظ. نفّذ supabase/repair.sql في محرر SQL في Supabase ثم حاول مرة أخرى.",
+    "تعذّر حفظ التغييرات. حاول مجدداً أو تواصل مع الدعم إذا استمرت المشكلة.",
   errorCurrentPasswordWrong: "كلمة المرور الحالية غير صحيحة.",
   errorInvalidEmail: "أدخل بريداً إلكترونياً صالحاً.",
   errorEnterHomeName: "أدخل اسم المنزل.",
@@ -386,13 +394,14 @@ const englishToKey: Record<string, TranslationKey> = {
   "Password must be at least 6 characters.": "errorPasswordTooShort",
   "New passwords do not match.": "errorPasswordsMismatch",
   "That email already has an account.": "errorEmailTaken",
-  "This account is not confirmed yet. Run supabase/confirm-users.sql in the SQL Editor, then log in again.":
+  "Confirm your email, then try logging in again. Contact support if you need help.":
     "errorEmailNotConfirmed",
   "You already belong to a home.": "errorAlreadyHasHome",
   "That invite code was not found.": "errorUnknownInvite",
   "You need to log in first.": "errorNeedLogin",
+  "You need a home before you can add items.": "errorNeedHome",
   "Check your connection and try again.": "errorNetwork",
-  "Could not save yet. Run supabase/repair.sql in the Supabase SQL Editor, then try again.":
+  "Could not save your changes. Try again, or contact support if the problem continues.":
     "errorRepairSql",
   "Current password is wrong.": "errorCurrentPasswordWrong",
   "Enter a valid email address.": "errorInvalidEmail",

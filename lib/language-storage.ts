@@ -15,10 +15,18 @@ function storage() {
 }
 
 export function readStoredLocale(): Locale {
-  const value = storage()?.getItem(LANGUAGE_STORAGE_KEY);
-  return value === "ar" ? "ar" : "en";
+  try {
+    const value = storage()?.getItem(LANGUAGE_STORAGE_KEY);
+    return value === "ar" ? "ar" : "en";
+  } catch {
+    return "en";
+  }
 }
 
 export function writeStoredLocale(locale: Locale) {
-  storage()?.setItem(LANGUAGE_STORAGE_KEY, locale);
+  try {
+    storage()?.setItem(LANGUAGE_STORAGE_KEY, locale);
+  } catch {
+    // Keep the active in-memory locale when persistence is unavailable.
+  }
 }

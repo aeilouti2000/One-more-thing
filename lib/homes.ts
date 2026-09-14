@@ -27,7 +27,7 @@ export async function fetchMyHousehold(): Promise<Household | null> {
       id: string;
       name: string;
       invite_code: string;
-      members?: Array<{ id: string; role: "owner" | "partner"; name: string }>;
+      members?: { id: string; role: "owner" | "partner"; name: string }[];
     };
     if (row.id) {
       return {
@@ -62,12 +62,13 @@ export async function fetchMyHousehold(): Promise<Household | null> {
 }
 
 function generateInviteCode() {
-  const bytes = new Uint8Array(2);
+  const bytes = new Uint8Array(4);
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     crypto.getRandomValues(bytes);
   } else {
-    bytes[0] = Math.floor(Math.random() * 256);
-    bytes[1] = Math.floor(Math.random() * 256);
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
   }
   const hex = Array.from(bytes, (value) =>
     value.toString(16).padStart(2, "0"),
@@ -75,6 +76,15 @@ function generateInviteCode() {
     .join("")
     .toUpperCase();
   return `OMT-${hex}`;
+}
+
+function isRpcUnavailable(error: { code?: string; message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return (
+    error?.code === "PGRST202" ||
+    error?.code === "42883" ||
+    message.includes("could not find the function")
+  );
 }
 
 async function createHomeDirect(name: string, user: User) {
@@ -129,36 +139,6 @@ async function createHomeDirect(name: string, user: User) {
   };
 }
 
-async function joinHomeDirect(code: string, user: User) {
-  const { data, error } = await supabase
-    .from("homes")
-    .select("id, name, invite_code, created_at")
-    .eq("invite_code", code)
-    .maybeSingle();
-
-  if (error) {
-    logError("join_home_lookup", error);
-    return { home: null, error: formatAppError(error) };
-  }
-
-  if (!data) {
-    return { home: null, error: translate("errorUnknownInvite") };
-  }
-
-  const { error: memberError } = await supabase.from("home_members").insert({
-    home_id: (data as HomeRow).id,
-    user_id: user.id,
-    role: "partner",
-  });
-
-  if (memberError) {
-    logError("join_home_member", memberError);
-    return { home: null, error: formatAppError(memberError) };
-  }
-
-  return { home: data as HomeRow, error: null };
-}
-
 export async function createHome(name: string) {
   const homeName = name.trim();
   const { user, error: userError } = await requireUser();
@@ -169,6 +149,31 @@ export async function createHome(name: string) {
   const profileError = await ensureProfile(user);
   if (profileError) {
     return { home: null, error: profileError };
+  }
+
+  const rpc = await supabase.rpc("create_home", { p_name: homeName });
+  if (!rpc.error) {
+    return { home: rpc.data as HomeRow, error: null };
+  }
+
+  if (alreadyHasHome(rpc.error.message)) {
+    const existing = await fetchMyHousehold();
+    if (existing) {
+      return {
+        home: {
+          id: existing.id,
+          name: existing.name,
+          invite_code: existing.inviteCode,
+          created_at: new Date().toISOString(),
+        },
+        error: null,
+      };
+    }
+  }
+
+  if (!isRpcUnavailable(rpc.error)) {
+    logError("create_home", rpc.error);
+    return { home: null, error: formatAppError(rpc.error) };
   }
 
   return createHomeDirect(homeName, user);
@@ -191,7 +196,8 @@ export async function joinHome(code: string) {
     return { home: rpc.data as HomeRow, error: null };
   }
 
-  return joinHomeDirect(inviteCode, user);
+  logError("join_home", rpc.error);
+  return { home: null, error: formatAppError(rpc.error) };
 }
 
 export async function updateHomeName(homeId: string, name: string) {
@@ -210,18 +216,7 @@ export async function updateHomeName(homeId: string, name: string) {
   }
 
   logError("update_home_name", rpc.error);
-
-  const { error } = await supabase
-    .from("homes")
-    .update({ name: homeName })
-    .eq("id", homeId);
-
-  if (error) {
-    logError("update_home_name_direct", error);
-    return { error: formatAppError(error) };
-  }
-
-  return { error: null };
+  return { error: formatAppError(rpc.error) };
 }
 
 export async function removeHomeMember(homeId: string, userId: string) {
