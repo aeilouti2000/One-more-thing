@@ -61,7 +61,7 @@ export function AppTextField({
         } ${multiline ? "min-h-[96px] py-3" : "h-14"}`}
       />
       {error ? (
-        <AppText className="text-sm text-cove-ink">{error}</AppText>
+        <AppText className="text-sm text-red-600 dark:text-red-400">{error}</AppText>
       ) : null}
     </View>
   );
