@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, View } from "react-native";
 import { GuestOnly } from "@/components/auth/GuestOnly";
 import { AppButton } from "@/components/ui/AppButton";
@@ -9,6 +9,7 @@ import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
+import { formatAppError } from "@/lib/errors";
 import { isValidEmail } from "@/lib/validation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -16,7 +17,9 @@ import { useI18n } from "@/providers/LanguageProvider";
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const { t } = useI18n();
-  const [email, setEmail] = useState("");
+  const params = useLocalSearchParams<{ email?: string | string[] }>();
+  const emailFromSignup = typeof params.email === "string" ? params.email : "";
+  const [email, setEmail] = useState(emailFromSignup);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,15 +34,19 @@ export default function LoginScreen() {
 
     setIsSubmitting(true);
     setError(null);
-    const result = await signIn(email, password);
-    setIsSubmitting(false);
+    try {
+      const result = await signIn(email, password);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
 
-    if (result.error) {
-      setError(result.error);
-      return;
+      router.replace("/");
+    } catch (submitError) {
+      setError(formatAppError(submitError));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    router.replace("/");
   }
 
   return (

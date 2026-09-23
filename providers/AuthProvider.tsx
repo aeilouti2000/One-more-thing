@@ -37,7 +37,11 @@ function readPendingAuthState() {
 }
 
 function writePendingAuthState(state: string) {
-  globalThis.localStorage.setItem(PENDING_AUTH_STATE_KEY, state);
+  try {
+    globalThis.localStorage.setItem(PENDING_AUTH_STATE_KEY, state);
+  } catch {
+    // Confirmation can still complete if the nonce cannot be stored.
+  }
 }
 
 function clearPendingAuthState() {
@@ -48,8 +52,17 @@ function clearPendingAuthState() {
   }
 }
 
-function getAuthTokens(url: string) {
-  if (!url.startsWith(AUTH_REDIRECT_URL)) return null;
+function isAuthCallbackUrl(url: string) {
+  const [withoutHash] = url.split("#");
+  return (
+    withoutHash.startsWith(AUTH_REDIRECT_URL) ||
+    withoutHash.includes("/auth/callback") ||
+    withoutHash.includes("/--/auth/callback")
+  );
+}
+
+function parseAuthCallback(url: string) {
+  if (!isAuthCallbackUrl(url)) return null;
 
   const hashIndex = url.indexOf("#");
   const queryIndex = url.indexOf("?");
@@ -60,15 +73,16 @@ function getAuthTokens(url: string) {
   const fragment = hashIndex >= 0 ? url.slice(hashIndex + 1) : "";
   const queryParams = new URLSearchParams(query);
   const fragmentParams = new URLSearchParams(fragment);
-  const accessToken =
-    fragmentParams.get("access_token") ?? queryParams.get("access_token");
-  const refreshToken =
-    fragmentParams.get("refresh_token") ?? queryParams.get("refresh_token");
-  const state = queryParams.get("state") ?? fragmentParams.get("state");
+  const read = (key: string) => fragmentParams.get(key) ?? queryParams.get(key);
 
-  return accessToken && refreshToken
-    ? { accessToken, refreshToken, state }
-    : null;
+  return {
+    accessToken: read("access_token"),
+    refreshToken: read("refresh_token"),
+    code: read("code"),
+    tokenHash: read("token_hash") ?? read("token"),
+    type: read("type"),
+    state: read("state"),
+  };
 }
 
 type AuthResult = {
@@ -104,24 +118,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function handleAuthUrl(url: string | null) {
       if (!url) return false;
-      const tokens = getAuthTokens(url);
-      if (!tokens) return false;
+      const callback = parseAuthCallback(url);
+      if (!callback) return false;
 
       const pendingState = readPendingAuthState();
-      if (!pendingState || !tokens.state || tokens.state !== pendingState) {
+      if (
+        callback.state &&
+        pendingState &&
+        callback.state !== pendingState
+      ) {
         return false;
       }
-      clearPendingAuthState();
 
-      const { data: authData, error } = await supabase.auth.setSession({
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
-      });
-      if (error) {
-        logError("confirm_email", error);
+      let nextSession: Session | null = null;
+      if (callback.accessToken && callback.refreshToken) {
+        const { data: authData, error } = await supabase.auth.setSession({
+          access_token: callback.accessToken,
+          refresh_token: callback.refreshToken,
+        });
+        if (error) {
+          logError("confirm_email", error);
+          return false;
+        }
+        nextSession = authData.session;
+      } else if (callback.code) {
+        const { data: authData, error } =
+          await supabase.auth.exchangeCodeForSession(callback.code);
+        if (error) {
+          logError("confirm_email", error);
+          return false;
+        }
+        nextSession = authData.session;
+      } else if (callback.tokenHash) {
+        const { data: authData, error } = await supabase.auth.verifyOtp({
+          token_hash: callback.tokenHash,
+          type: callback.type === "recovery" ? "recovery" : "signup",
+        });
+        if (error) {
+          logError("confirm_email", error);
+          return false;
+        }
+        nextSession = authData.session;
+      } else {
         return false;
       }
-      if (isMounted) setSession(authData.session);
+
+      clearPendingAuthState();
+      if (isMounted) setSession(nextSession);
       return true;
     }
 
@@ -154,67 +197,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    if (error) {
+      if (error) {
+        logError("sign_in", error);
+        return { error: formatAppError(error) };
+      }
+
+      return { error: null };
+    } catch (error) {
       logError("sign_in", error);
       return { error: formatAppError(error) };
     }
-
-    return { error: null };
   }, []);
 
   const signUp = useCallback(async (name: string, email: string, password: string) => {
-    const state = createAuthState();
-    writePendingAuthState(state);
-    const emailRedirectTo = `${AUTH_REDIRECT_URL}?state=${encodeURIComponent(state)}`;
+    try {
+      const state = createAuthState();
+      writePendingAuthState(state);
+      const emailRedirectTo = `${AUTH_REDIRECT_URL}?state=${encodeURIComponent(state)}`;
 
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: { name: name.trim() },
-        emailRedirectTo,
-      },
-    });
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { name: name.trim() },
+          emailRedirectTo,
+        },
+      });
 
-    if (error) {
+      if (error) {
+        clearPendingAuthState();
+        logError("sign_up", error);
+        return { error: formatAppError(error) };
+      }
+
+      if (data.user?.identities && data.user.identities.length === 0) {
+        clearPendingAuthState();
+        return { error: translate("errorEmailTaken") };
+      }
+
+      if (data.session) {
+        clearPendingAuthState();
+        return { error: null };
+      }
+
+      return { error: null, requiresEmailConfirmation: true };
+    } catch (error) {
       clearPendingAuthState();
       logError("sign_up", error);
       return { error: formatAppError(error) };
     }
-
-    if (data.user?.identities && data.user.identities.length === 0) {
-      clearPendingAuthState();
-      return { error: translate("errorEmailTaken") };
-    }
-
-    if (data.session) {
-      clearPendingAuthState();
-      return { error: null };
-    }
-
-    const signInResult = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (signInResult.error) {
-      if (
-        signInResult.error.message.toLowerCase().includes("email not confirmed")
-      ) {
-        return { error: null, requiresEmailConfirmation: true };
-      }
-      clearPendingAuthState();
-      logError("sign_up_auto_login", signInResult.error);
-      return { error: formatAppError(signInResult.error) };
-    }
-
-    clearPendingAuthState();
-    return { error: null };
   }, []);
 
   const changePassword = useCallback(

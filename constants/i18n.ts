@@ -25,8 +25,10 @@ const en = {
   newHere: "New here? Create an account",
   signupTitle: "Create account",
   signupSubtitle: "Sign up so you and your partner can share items.",
+  signupConfirmTitle: "Check your email",
+  signupConfirmSubtitle: "Your account is ready to confirm.",
   signupCheckEmail:
-    "Account created. Check your email to confirm it, then log in.",
+    "We sent a confirmation link to {{email}}. Open it, then log in.",
   yourName: "Your name",
   namePlaceholder: "Alex",
   passwordMinPlaceholder: "At least 6 characters",
@@ -179,6 +181,7 @@ const en = {
   errorEnterItemName: "Enter a name for this item.",
   errorQuantityMin: "Quantity must be at least 1.",
   errorInviteCodeBusy: "Could not create a unique invite code. Try again.",
+  errorTryAgainSoon: "Wait a moment, then try again.",
 } as const;
 
 const ar: { [K in keyof typeof en]: string } = {
@@ -201,8 +204,10 @@ const ar: { [K in keyof typeof en]: string } = {
   newHere: "جديد هنا؟ أنشئ حساباً",
   signupTitle: "إنشاء حساب",
   signupSubtitle: "سجّل حتى تتمكنا من مشاركة العناصر.",
+  signupConfirmTitle: "تحقّق من بريدك",
+  signupConfirmSubtitle: "حسابك جاهز للتأكيد.",
   signupCheckEmail:
-    "تم إنشاء الحساب. تحقّق من بريدك لتأكيده، ثم سجّل الدخول.",
+    "أرسلنا رابط التأكيد إلى {{email}}. افتحه، ثم سجّل الدخول.",
   yourName: "اسمك",
   namePlaceholder: "أحمد",
   passwordMinPlaceholder: "٦ أحرف على الأقل",
@@ -355,6 +360,7 @@ const ar: { [K in keyof typeof en]: string } = {
   errorEnterItemName: "أدخل اسماً لهذا العنصر.",
   errorQuantityMin: "يجب أن تكون الكمية ١ على الأقل.",
   errorInviteCodeBusy: "تعذّر إنشاء رمز دعوة فريد. حاول مرة أخرى.",
+  errorTryAgainSoon: "انتظر قليلاً ثم حاول مرة أخرى.",
 };
 
 export const messages = { en, ar };
@@ -410,6 +416,7 @@ const englishToKey: Record<string, TranslationKey> = {
   "Enter a name for this item.": "errorEnterItemName",
   "Quantity must be at least 1.": "errorQuantityMin",
   "Could not create a unique invite code. Try again.": "errorInviteCodeBusy",
+  "Wait a moment, then try again.": "errorTryAgainSoon",
   "Password updated.": "passwordUpdated",
 };
 

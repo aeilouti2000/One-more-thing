@@ -17,9 +17,22 @@ export function formatAppError(
           typeof error.message === "string"
         ? error.message
         : fallback;
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String(error.code)
+      : "";
 
   const lower = message.toLowerCase();
 
+  if (code === "email_exists" || code === "user_already_exists") {
+    return translate("errorEmailTaken");
+  }
+  if (code === "over_email_send_rate_limit" || lower.includes("rate limit") || lower.includes("for security purposes")) {
+    return translate("errorTryAgainSoon");
+  }
+  if (code === "weak_password") {
+    return translate("errorPasswordTooShort");
+  }
   if (lower.includes("invalid login")) {
     return translate("errorWrongEmailOrPassword");
   }

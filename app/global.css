@@ -35,7 +35,10 @@
 
 /* NativeWind on web drops spaces in Text unless white-space is forced. */
 [class*="css-text"],
-input,
 textarea {
   white-space: pre-wrap !important;
+}
+
+input {
+  white-space: nowrap !important;
 }
