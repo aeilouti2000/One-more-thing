@@ -15,7 +15,7 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { iconSize } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
-import { removeHomeMember, updateHomeName } from "@/lib/homes";
+import { joinHome, leaveHome, removeHomeMember, switchHome, updateHomeName } from "@/lib/homes";
 import { useAuth } from "@/providers/AuthProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -23,7 +23,7 @@ import type { HouseholdMember } from "@/types/household";
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { household, isLoading, error, refresh } = useHousehold();
+  const { household, homes, isLoading, error, refresh, adoptHome } = useHousehold();
   const { t } = useI18n();
   const { colors } = useTheme();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -36,6 +36,13 @@ export default function HomeScreen() {
     useState<HouseholdMember | null>(null);
   const [isRemovingMember, setIsRemovingMember] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState("");
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
 
   const isHost = household?.members.some(
     (member) => member.id === user?.id && member.role === "owner",
@@ -95,6 +102,56 @@ export default function HomeScreen() {
     await refresh();
     setIsRemovingMember(false);
     setMemberToRemove(null);
+  }
+
+  async function joinAnotherHome() {
+    const code = inviteCode.trim();
+    if (!code) {
+      setJoinError(t("errorEnterInviteCode"));
+      return;
+    }
+
+    setIsJoining(true);
+    setJoinError(null);
+    const result = await joinHome(code);
+    setIsJoining(false);
+
+    if (result.error || !result.home) {
+      setJoinError(result.error);
+      return;
+    }
+
+    adoptHome(result.home);
+    setInviteCode("");
+    await refresh();
+  }
+
+  async function openHome(homeId: string) {
+    if (!household || homeId === household.id) return;
+    setSwitchingId(homeId);
+    const result = await switchHome(homeId);
+    setSwitchingId(null);
+    if (result.home) {
+      adoptHome(result.home);
+      await refresh();
+    }
+  }
+
+  async function leaveCurrentHome() {
+    if (!household) return;
+    setIsLeaving(true);
+    setLeaveError(null);
+    const result = await leaveHome(household.id);
+    setIsLeaving(false);
+
+    if (result.error) {
+      setLeaveError(result.error);
+      return;
+    }
+
+    setIsConfirmingLeave(false);
+    if (result.home) adoptHome(result.home);
+    await refresh();
   }
 
   if (isLoading && !household && !error) {
@@ -201,8 +258,67 @@ export default function HomeScreen() {
                 />
               ))}
             </View>
-
           </View>
+
+          <View>
+            <SectionHeader title={t("yourHomes")} />
+            <View className="gap-3">
+              {homes.map((home) => {
+                const selected = home.id === household.id;
+                return (
+                  <Pressable
+                    key={home.id}
+                    disabled={selected || switchingId !== null}
+                    onPress={() => void openHome(home.id)}
+                    className="flex-row items-center justify-between gap-3 rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
+                  >
+                    <View className="min-w-0 flex-1">
+                      <AppText className="text-base font-semibold text-cove-ink">{home.name}</AppText>
+                      <AppText className="text-sm text-cove-muted">
+                        {home.role === "owner" ? t("host") : t("partner")}
+                      </AppText>
+                    </View>
+                    {selected ? (
+                      <AppText className="text-sm font-semibold text-cove-accent">{t("currentHome")}</AppText>
+                    ) : (
+                      <Ionicons name="chevron-forward" size={iconSize.sm} color={colors.muted} />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View>
+            <SectionHeader title={t("joinAnotherHome")} />
+            <View className="gap-4 rounded-3xl bg-cove-paper p-4">
+              <AppText className="text-sm text-cove-muted">{t("joinAnotherHomeHint")}</AppText>
+              <AppTextField
+                label={t("inviteCode")}
+                value={inviteCode}
+                onChangeText={(value) => setInviteCode(value.toUpperCase())}
+                placeholder={t("inviteCodePlaceholder")}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              <FormMessage message={joinError} />
+              <AppButton
+                label={t("joinThisHome")}
+                disabled={!inviteCode.trim()}
+                loading={isJoining}
+                onPress={() => void joinAnotherHome()}
+              />
+            </View>
+          </View>
+
+          <AppButton
+            label={t("leaveHome")}
+            variant="secondary"
+            onPress={() => {
+              setLeaveError(null);
+              setIsConfirmingLeave(true);
+            }}
+          />
         </View>
       ) : (
         <EmptyState
@@ -225,6 +341,20 @@ export default function HomeScreen() {
         onCancel={() => {
           setMemberToRemove(null);
           setMemberError(null);
+        }}
+      />
+      <ConfirmModal
+        visible={isConfirmingLeave}
+        title={t("leaveHomeTitle", { name: household?.name ?? "" })}
+        message={t("leaveHomeMessage")}
+        confirmLabel={t("leaveHome")}
+        cancelLabel={t("cancel")}
+        error={leaveError}
+        loading={isLeaving}
+        onConfirm={() => void leaveCurrentHome()}
+        onCancel={() => {
+          setIsConfirmingLeave(false);
+          setLeaveError(null);
         }}
       />
     </Screen>

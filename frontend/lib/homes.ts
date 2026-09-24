@@ -1,6 +1,6 @@
 import { api, ApiError } from "@/lib/api";
 import { formatAppError } from "@/lib/errors";
-import type { Household } from "@/types/household";
+import type { HomeSummary, Household } from "@/types/household";
 
 export function alreadyHasHome(message: string | null | undefined) {
   const value = (message ?? "").toLowerCase();
@@ -53,6 +53,33 @@ export async function updateHomeName(homeId: string, name: string) {
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
+  }
+}
+
+export async function fetchMyHomes() {
+  try {
+    const homes = await api.get<HomeSummary[]>("/homes");
+    return { homes, error: null };
+  } catch (error) {
+    return { homes: [] as HomeSummary[], error: formatAppError(error) };
+  }
+}
+
+export async function switchHome(homeId: string) {
+  try {
+    const home = await api.post<Household>(`/homes/${homeId}/switch`);
+    return { home, error: null };
+  } catch (error) {
+    return { home: null, error: formatAppError(error) };
+  }
+}
+
+export async function leaveHome(homeId: string) {
+  try {
+    const result = await api.post<{ home: Household | null }>(`/homes/${homeId}/leave`);
+    return { home: result.home, error: null };
+  } catch (error) {
+    return { home: null, error: formatAppError(error) };
   }
 }
 

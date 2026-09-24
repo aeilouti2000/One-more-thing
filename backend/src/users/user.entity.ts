@@ -20,6 +20,9 @@ export class User {
   @Column()
   name: string;
 
+  @Column({ name: "active_home_id", type: "uuid", nullable: true })
+  activeHomeId: string | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
 

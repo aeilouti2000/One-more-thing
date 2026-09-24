@@ -10,3 +10,9 @@ export type Household = {
   inviteCode: string;
   members: HouseholdMember[];
 };
+
+export type HomeSummary = {
+  id: string;
+  name: string;
+  role: "owner" | "partner";
+};

@@ -146,7 +146,7 @@ export default function SettingsScreen() {
               {name}
             </AppText>
           </SettingsCard>
-          <SettingsCard label={t("email")}>
+          <SettingsCard label={t("username")}>
             <AppText className="text-base font-semibold text-cove-ink">
               {email}
             </AppText>

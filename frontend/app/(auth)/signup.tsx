@@ -10,41 +10,45 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { formatAppError } from "@/lib/errors";
-import { isValidEmail } from "@/lib/validation";
+import { isValidUsername } from "@/lib/validation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 
 export default function SignupScreen() {
   const { signUp } = useAuth();
   const { t } = useI18n();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{
-    email?: string;
+    username?: string;
     password?: string;
+    confirmPassword?: string;
   }>({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canSubmit =
-    name.trim().length > 0 && email.trim().length > 0 && password.length >= 6;
+    username.trim().length > 0 && password.length >= 6 && confirmPassword.length > 0;
 
-  function clearFieldError(field: "email" | "password") {
+  function clearFieldError(field: "username" | "password" | "confirmPassword") {
     if (fieldErrors[field]) {
       setFieldErrors((current) => ({ ...current, [field]: undefined }));
     }
   }
 
   async function onSubmit() {
-    const nextFieldErrors: { email?: string; password?: string } = {};
-    if (!isValidEmail(email)) {
-      nextFieldErrors.email = t("errorInvalidEmail");
+    const nextFieldErrors: { username?: string; password?: string; confirmPassword?: string } = {};
+    if (!isValidUsername(username)) {
+      nextFieldErrors.username = t("errorInvalidEmail");
     }
     if (password.length < 6) {
       nextFieldErrors.password = t("errorPasswordTooShort");
     }
-    if (nextFieldErrors.email || nextFieldErrors.password) {
+    if (password !== confirmPassword) {
+      nextFieldErrors.confirmPassword = t("errorConfirmPassword");
+    }
+    if (nextFieldErrors.username || nextFieldErrors.password || nextFieldErrors.confirmPassword) {
       setFieldErrors(nextFieldErrors);
       setError(null);
       return;
@@ -54,7 +58,7 @@ export default function SignupScreen() {
     setError(null);
     setFieldErrors({});
     try {
-      const result = await signUp(name, email, password);
+      const result = await signUp(username.trim(), username, password);
       if (result.error) {
         setError(result.error);
         return;
@@ -79,25 +83,17 @@ export default function SignupScreen() {
 
             <View className="gap-6">
               <AppTextField
-                label={t("yourName")}
-                value={name}
-                onChangeText={setName}
-                placeholder={t("namePlaceholder")}
-                autoComplete="name"
-              />
-              <AppTextField
-                label={t("email")}
-                value={email}
+                label={t("username")}
+                value={username}
                 onChangeText={(value) => {
-                  setEmail(value);
-                  clearFieldError("email");
+                  setUsername(value);
+                  clearFieldError("username");
                 }}
-                placeholder={t("emailPlaceholder")}
-                keyboardType="email-address"
+                placeholder={t("usernamePlaceholder")}
                 autoCapitalize="none"
-                autoComplete="email"
+                autoComplete="username"
                 autoCorrect={false}
-                error={fieldErrors.email}
+                error={fieldErrors.username}
               />
               <AppTextField
                 label={t("password")}
@@ -111,6 +107,19 @@ export default function SignupScreen() {
                 autoCapitalize="none"
                 autoComplete="new-password"
                 error={fieldErrors.password}
+              />
+              <AppTextField
+                label={t("confirmPassword")}
+                value={confirmPassword}
+                onChangeText={(value) => {
+                  setConfirmPassword(value);
+                  clearFieldError("confirmPassword");
+                }}
+                placeholder={t("confirmPasswordHint")}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="new-password"
+                error={fieldErrors.confirmPassword}
               />
               <FormMessage message={error} />
               <AppButton

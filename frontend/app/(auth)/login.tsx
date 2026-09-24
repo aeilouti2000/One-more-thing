@@ -10,22 +10,22 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { formatAppError } from "@/lib/errors";
-import { isValidEmail } from "@/lib/validation";
+import { isValidLoginName } from "@/lib/validation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const { t } = useI18n();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const canSubmit = email.trim().length > 0 && password.length > 0;
+  const canSubmit = username.trim().length > 0 && password.length > 0;
 
   async function onSubmit() {
-    if (!isValidEmail(email)) {
+    if (!isValidLoginName(username)) {
       setError(t("errorInvalidEmail"));
       return;
     }
@@ -33,7 +33,7 @@ export default function LoginScreen() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const result = await signIn(email, password);
+      const result = await signIn(username, password);
       if (result.error) {
         setError(result.error);
         return;
@@ -62,13 +62,12 @@ export default function LoginScreen() {
 
         <View className="gap-6">
           <AppTextField
-            label={t("email")}
-            value={email}
-            onChangeText={setEmail}
-            placeholder={t("emailPlaceholder")}
-            keyboardType="email-address"
+            label={t("username")}
+            value={username}
+            onChangeText={setUsername}
+            placeholder={t("usernamePlaceholder")}
             autoCapitalize="none"
-            autoComplete="email"
+            autoComplete="username"
             autoCorrect={false}
           />
           <AppTextField

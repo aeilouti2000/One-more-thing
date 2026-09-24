@@ -73,7 +73,12 @@ export function formatAppError(
   if (lower.includes("password should be at least") || lower.includes("password is too short")) {
     return translate("errorPasswordTooShort");
   }
-  if (lower.includes("already registered") || lower.includes("already been registered")) {
+  if (
+    lower.includes("already registered") ||
+    lower.includes("already been registered") ||
+    lower.includes("email is already in use") ||
+    lower.includes("username is already taken")
+  ) {
     return translate("errorEmailTaken");
   }
   if (lower.includes("already belong to a home")) {

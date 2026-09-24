@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import * as Haptics from "expo-haptics";
@@ -32,7 +32,7 @@ export default function ItemsScreen() {
     deleteMany,
   } = usePurchases();
   const { colors } = useTheme();
-  const { t, locale } = useI18n();
+  const { t, locale, isRTL } = useI18n();
   const [category, setCategory] = useState<PurchaseCategory | "all">("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -125,6 +125,74 @@ export default function ItemsScreen() {
     return <LoadingScreen />;
   }
 
+  const listEmpty = needed.length === 0;
+
+  function listActions() {
+    if (isSelecting) return null;
+
+    return (
+      <View className="mb-5 flex-row overflow-hidden rounded-2xl bg-cove-paper">
+        <Pressable
+          disabled={listEmpty}
+          onPress={() => router.push("/trip")}
+          accessibilityRole="button"
+          accessibilityLabel={t("startTrip")}
+          className={`min-h-16 flex-1 items-center justify-center gap-1 px-1.5 py-2 ${
+            listEmpty ? "opacity-45" : "active:opacity-80"
+          }`}
+        >
+          <View className="h-7 w-7 items-center justify-center rounded-full bg-cove-accent">
+            <Ionicons name="storefront" size={16} color={colors.white} />
+          </View>
+          <AppText
+            numberOfLines={2}
+            className="text-center text-[11px] font-semibold leading-4 text-cove-ink"
+          >
+            {t("startTrip")}
+          </AppText>
+        </Pressable>
+        <Pressable
+          disabled={listEmpty}
+          onPress={() => void shareList()}
+          accessibilityRole="button"
+          accessibilityLabel={t("shareList")}
+          className={`min-h-16 flex-1 items-center justify-center gap-1 px-1.5 py-2 ${
+            listEmpty ? "opacity-45" : "active:opacity-80"
+          }`}
+        >
+          <View className="h-7 w-7 items-center justify-center rounded-full bg-cove-mist">
+            <Ionicons name="share-social" size={16} color={colors.accent} />
+          </View>
+          <AppText
+            numberOfLines={2}
+            className="text-center text-[11px] font-semibold leading-4 text-cove-ink"
+          >
+            {t("shareList")}
+          </AppText>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push("/staples")}
+          accessibilityRole="button"
+          accessibilityLabel={t("manageStaples")}
+          className="min-h-16 flex-1 items-center justify-center gap-1 px-1.5 py-2 active:opacity-80"
+        >
+          <View
+            className="h-7 w-7 items-center justify-center rounded-full bg-cove-mist"
+            style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}
+          >
+            <MaterialCommunityIcons name="pin" size={16} color={colors.accent} />
+          </View>
+          <AppText
+            numberOfLines={2}
+            className="text-center text-[11px] font-semibold leading-4 text-cove-ink"
+          >
+            {t("staplesTitle")}
+          </AppText>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <Screen
       tabBarInset
@@ -186,50 +254,11 @@ export default function ItemsScreen() {
             </AppText>
           </Pressable>
         </View>
-      ) : (
-        <View className="mb-5 gap-3">
-          <View className="flex-row gap-3">
-            <Pressable
-              disabled={needed.length === 0}
-              onPress={() => router.push("/trip")}
-              accessibilityRole="button"
-              accessibilityLabel={t("startTrip")}
-              className={`flex-1 items-center rounded-2xl bg-cove-accent px-3 py-3 ${
-                needed.length === 0 ? "opacity-50" : "active:opacity-80"
-              }`}
-            >
-              <AppText className="text-sm font-semibold text-white">{t("startTrip")}</AppText>
-            </Pressable>
-            <Pressable
-              disabled={needed.length === 0}
-              onPress={() => void shareList()}
-              accessibilityRole="button"
-              accessibilityLabel={t("shareList")}
-              className={`flex-1 items-center rounded-2xl border border-cove-line bg-cove-paper px-3 py-3 ${
-                needed.length === 0 ? "opacity-50" : "active:opacity-80"
-              }`}
-            >
-              <AppText className="text-sm font-semibold text-cove-ink">{t("shareList")}</AppText>
-            </Pressable>
-          </View>
-          <Pressable
-            onPress={() => router.push("/staples")}
-            accessibilityRole="button"
-            accessibilityLabel={t("manageStaples")}
-            className="flex-row items-center gap-3 rounded-2xl border border-cove-line bg-cove-paper px-4 py-3 active:opacity-80"
-          >
-            <View className="h-10 w-10 items-center justify-center rounded-full bg-cove-mist">
-              <Ionicons name="pin" size={iconSize.sm} color={colors.accent} />
-            </View>
-            <View className="min-w-0 flex-1">
-              <AppText className="text-base font-semibold text-cove-ink">{t("staplesTitle")}</AppText>
-              <AppText className="mt-0.5 text-sm text-cove-muted">{t("staplesSubtitle")}</AppText>
-            </View>
-            <Ionicons name="chevron-forward" size={iconSize.sm} color={colors.muted} />
-          </Pressable>
-          {shareNotice ? <FormMessage message={shareNotice} tone="success" /> : null}
+      ) : shareNotice ? (
+        <View className="mb-5">
+          <FormMessage message={shareNotice} tone="success" />
         </View>
-      )}
+      ) : null}
 
       <View key={locale} className="mb-5 flex-row flex-wrap gap-2">
         <CategoryChip
@@ -254,6 +283,8 @@ export default function ItemsScreen() {
           />
         ))}
       </View>
+
+      {listActions()}
 
       <FormMessage
         message={isConfirmingDelete ? error : actionError ?? error}

@@ -38,7 +38,7 @@ export class AuthService {
     const normalizedEmail = email.trim().toLowerCase();
     const existing = await this.users.findOne({ where: { email: normalizedEmail } });
     if (existing) {
-      throw new DomainError("EMAIL_TAKEN", "Email is already in use", HttpStatus.CONFLICT);
+      throw new DomainError("EMAIL_TAKEN", "That username is already taken", HttpStatus.CONFLICT);
     }
 
     const user = await this.users.save(
@@ -49,7 +49,7 @@ export class AuthService {
       }),
     ).catch((error: unknown) => {
       if (isUniqueViolation(error)) {
-        throw new DomainError("EMAIL_TAKEN", "Email is already in use", HttpStatus.CONFLICT);
+        throw new DomainError("EMAIL_TAKEN", "That username is already taken", HttpStatus.CONFLICT);
       }
       throw error;
     });
@@ -63,7 +63,7 @@ export class AuthService {
     });
     const matches = user ? await bcrypt.compare(password, user.passwordHash) : false;
     if (!user || !matches) {
-      throw new DomainError("INVALID_CREDENTIALS", "Wrong email or password", HttpStatus.UNAUTHORIZED);
+      throw new DomainError("INVALID_CREDENTIALS", "Wrong username or password", HttpStatus.UNAUTHORIZED);
     }
     return this.createSession(user);
   }

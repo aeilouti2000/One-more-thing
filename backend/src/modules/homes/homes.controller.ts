@@ -26,9 +26,24 @@ export class HomesController {
     return this.homes.create(user.id, body.name);
   }
 
+  @Get()
+  list(@CurrentUser() user: User) {
+    return this.homes.list(user.id);
+  }
+
   @Post("join")
   join(@CurrentUser() user: User, @Body() body: JoinHomeDto) {
     return this.homes.join(user.id, body.code);
+  }
+
+  @Post(":homeId/switch")
+  switchHome(@CurrentUser() user: User, @Param("homeId", ParseUUIDPipe) homeId: string) {
+    return this.homes.switchHome(user.id, homeId);
+  }
+
+  @Post(":homeId/leave")
+  leave(@CurrentUser() user: User, @Param("homeId", ParseUUIDPipe) homeId: string) {
+    return this.homes.leave(user.id, homeId);
   }
 
   @Patch(":homeId")

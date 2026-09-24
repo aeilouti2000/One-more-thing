@@ -1,4 +1,7 @@
-import { IsEmail, IsString, MaxLength, MinLength } from "class-validator";
+import { IsString, Matches, MaxLength, MinLength } from "class-validator";
+
+const usernamePattern = /^[a-zA-Z0-9._]{3,32}$/;
+const loginNamePattern = /^[a-zA-Z0-9._@+-]{3,64}$/;
 
 export class SignUpDto {
   @IsString()
@@ -6,8 +9,11 @@ export class SignUpDto {
   @MaxLength(80)
   name: string;
 
-  @IsEmail()
-  @MaxLength(254)
+  @IsString()
+  @Matches(usernamePattern, {
+    message: "Use 3–32 letters, numbers, dots, or underscores.",
+  })
+  @MaxLength(64)
   email: string;
 
   @IsString()
@@ -17,7 +23,11 @@ export class SignUpDto {
 }
 
 export class LoginDto {
-  @IsEmail()
+  @IsString()
+  @Matches(loginNamePattern, {
+    message: "Enter your username.",
+  })
+  @MaxLength(64)
   email: string;
 
   @IsString()

@@ -9,12 +9,13 @@ import {
   type ReactNode,
 } from "react";
 import { formatAppError } from "@/lib/errors";
-import { fetchMyHousehold } from "@/lib/homes";
+import { fetchMyHomes, fetchMyHousehold } from "@/lib/homes";
 import { useAuth } from "@/providers/AuthProvider";
-import type { Household } from "@/types/household";
+import type { HomeSummary, Household } from "@/types/household";
 
 type HouseholdContextValue = {
   household: Household | null;
+  homes: HomeSummary[];
   hasHousehold: boolean;
   isLoading: boolean;
   error: string | null;
@@ -27,6 +28,7 @@ const HouseholdContext = createContext<HouseholdContextValue | null>(null);
 export function HouseholdProvider({ children }: { children: ReactNode }) {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [household, setHousehold] = useState<Household | null>(null);
+  const [homes, setHomes] = useState<HomeSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const currentUserIdRef = useRef(user?.id ?? null);
@@ -45,13 +47,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
     if (!user) {
       setHousehold(null);
+      setHomes([]);
       setError(null);
       setIsLoading(false);
       return null;
     }
 
     try {
-      const next = await fetchMyHousehold();
+      const [next, listed] = await Promise.all([fetchMyHousehold(), fetchMyHomes()]);
       if (
         currentUserIdRef.current !== initiatingUserId ||
         requestSequenceRef.current !== requestSequence
@@ -59,7 +62,8 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         return null;
       }
       setHousehold(next);
-      setError(null);
+      setHomes(next ? listed.homes : []);
+      setError(listed.error);
       setIsLoading(false);
       return next;
     } catch (error) {
@@ -91,13 +95,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       household,
+      homes,
       hasHousehold: household !== null,
       isLoading: isAuthLoading || isLoading,
       error,
       refresh,
       adoptHome,
     }),
-    [adoptHome, error, household, isAuthLoading, isLoading, refresh],
+    [adoptHome, error, homes, household, isAuthLoading, isLoading, refresh],
   );
 
   return (

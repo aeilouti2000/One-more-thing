@@ -6,6 +6,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RefreshToken } from "./modules/auth/refresh-token.entity";
 import { type AppConfig, validateEnv } from "./config/env";
+import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
 import { ShoppingTrip1740000000004 } from "./database/migrations/1740000000004-ShoppingTrip";
 import { AddPushTokens1740000000003 } from "./database/migrations/1740000000003-AddPushTokens";
 import { AddItemUrgent1740000000002 } from "./database/migrations/1740000000002-AddItemUrgent";
@@ -46,6 +47,7 @@ import { User } from "./users/user.entity";
             AddItemUrgent1740000000002,
             AddPushTokens1740000000003,
             ShoppingTrip1740000000004,
+            ManyHomes1740000000005,
           ],
           migrationsRun: true,
         };
