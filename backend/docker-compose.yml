@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: omt
+      POSTGRES_PASSWORD: omt
+      POSTGRES_DB: omt
+    ports:
+      - "5432:5432"
+    volumes:
+      - omt_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omt -d omt"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgres://omt:omt@db:5432/omt
+      JWT_ACCESS_SECRET: local-dev-access-secret-change-me
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL_DAYS: 30
+      EMAIL_TOKEN_TTL_HOURS: 24
+      APP_PUBLIC_URL: http://localhost:3000
+      CORS_ORIGINS: http://localhost:8081,http://localhost:19006
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  omt_pg:
