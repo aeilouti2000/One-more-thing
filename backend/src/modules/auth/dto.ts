@@ -10,7 +10,7 @@ export class SignUpDto {
   name: string;
 
   @IsString()
-  @Matches(usernamePattern, {
+  @Matches(loginNamePattern, {
     message: "Use 3–32 letters, numbers, dots, or underscores.",
   })
   @MaxLength(64)
