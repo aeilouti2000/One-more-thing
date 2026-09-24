@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   addItem as insertItem,
@@ -6,10 +6,12 @@ import {
   fetchHomeItems,
   markItemBought,
   markItemsBought,
+  undoItemBought,
   updateItemDetails,
 } from "@/lib/items";
 import type { NewItemInput, UpdateItemInput } from "@/lib/items";
 import { translate } from "@/constants/i18n";
+import { onListChanged } from "@/lib/list-sync";
 import { useHousehold } from "@/hooks/useHousehold";
 import { useAuth } from "@/providers/AuthProvider";
 import type { Purchase, PurchaseStatus } from "@/types/purchase";
@@ -30,6 +32,7 @@ type UsePurchasesResult = {
     values: UpdateItemInput,
   ) => Promise<{ error: string | null }>;
   markBought: (id: string) => Promise<{ error: string | null }>;
+  undoBought: (id: string) => Promise<{ error: string | null }>;
   markManyBought: (ids: string[]) => Promise<{ error: string | null }>;
   deleteMany: (ids: string[]) => Promise<{ error: string | null }>;
 };
@@ -61,6 +64,8 @@ export function usePurchases(): UsePurchasesResult {
       void refresh();
     }, [isHomeLoading, refresh]),
   );
+
+  useEffect(() => onListChanged(() => void refresh()), [refresh]);
 
   const addItem = useCallback(
     async (values: AddItemValues) => {
@@ -108,6 +113,22 @@ export function usePurchases(): UsePurchasesResult {
       }
 
       const result = await updateItemDetails(id, values);
+      if (!result.error) {
+        await refresh();
+      }
+
+      return result;
+    },
+    [refresh, user],
+  );
+
+  const undoBought = useCallback(
+    async (id: string) => {
+      if (!user) {
+        return { error: translate("errorNeedLogin") };
+      }
+
+      const result = await undoItemBought(id);
       if (!result.error) {
         await refresh();
       }
@@ -165,6 +186,7 @@ export function usePurchases(): UsePurchasesResult {
     addItem,
     updateItem,
     markBought,
+    undoBought,
     markManyBought,
     deleteMany,
   };

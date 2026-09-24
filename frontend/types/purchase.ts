@@ -16,6 +16,7 @@ export type Purchase = {
   category: PurchaseCategory;
   notes?: string;
   status: PurchaseStatus;
+  urgent: boolean;
   addedByName: string;
   boughtByName?: string;
   createdAt: string;

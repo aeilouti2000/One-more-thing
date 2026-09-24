@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { Pressable, View } from "react-native";
 import { GuestOnly } from "@/components/auth/GuestOnly";
 import { AppButton } from "@/components/ui/AppButton";
@@ -17,9 +17,7 @@ import { useI18n } from "@/providers/LanguageProvider";
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const { t } = useI18n();
-  const params = useLocalSearchParams<{ email?: string | string[] }>();
-  const emailFromSignup = typeof params.email === "string" ? params.email : "";
-  const [email, setEmail] = useState(emailFromSignup);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

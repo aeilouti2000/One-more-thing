@@ -34,12 +34,7 @@ export default function CreateHomeScreen() {
     const result = await createHome(homeName);
 
     if (result.home) {
-      adoptHome({
-        id: result.home.id,
-        name: result.home.name,
-        inviteCode: result.home.invite_code,
-        members: [],
-      });
+      adoptHome(result.home);
       setIsSubmitting(false);
       router.replace("/items");
       return;

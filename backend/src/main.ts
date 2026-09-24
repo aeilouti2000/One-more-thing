@@ -27,7 +27,8 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(config.get("PORT", { infer: true }));
+  const port = config.get("PORT", { infer: true });
+  await app.listen(port, "0.0.0.0");
 }
 
 void bootstrap();

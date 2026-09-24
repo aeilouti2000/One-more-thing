@@ -7,6 +7,21 @@ type StatusBadgeProps = {
   status: PurchaseStatus;
 };
 
+export function UrgentBadge() {
+  const { t, isRTL } = useI18n();
+
+  return (
+    <View className="rounded-full px-3 py-1" style={{ backgroundColor: "#FEE2E2" }}>
+      <AppText
+        className={`text-xs font-semibold ${isRTL ? "" : "uppercase tracking-wide"}`}
+        style={{ color: "#B91C1C" }}
+      >
+        {t("urgent")}
+      </AppText>
+    </View>
+  );
+}
+
 export function StatusBadge({ status }: StatusBadgeProps) {
   const { t, isRTL } = useI18n();
   const isBought = status === "bought";

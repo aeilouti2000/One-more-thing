@@ -13,6 +13,7 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { PURCHASE_CATEGORIES } from "@/constants/categories";
+import { formatNeededShare, shareNeededText } from "@/lib/share-list";
 import { iconSize } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
@@ -38,6 +39,7 @@ export default function ItemsScreen() {
   const [isApplyingAction, setIsApplyingAction] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [shareNotice, setShareNotice] = useState<string | null>(null);
 
   const visibleItems =
     category === "all"
@@ -85,6 +87,23 @@ export default function ItemsScreen() {
 
     setSelectedIds(new Set());
     setIsConfirmingDelete(false);
+  }
+
+  async function shareList() {
+    if (needed.length === 0) return;
+    setShareNotice(null);
+    setActionError(null);
+    const message = formatNeededShare(needed, {
+      title: t("shareListTitle"),
+      urgent: t("urgent"),
+    });
+    try {
+      const result = await shareNeededText(message);
+      if (result === "copied") setShareNotice(t("sharedCopied"));
+    } catch (shareError) {
+      if (shareError instanceof Error && shareError.name === "AbortError") return;
+      setActionError(t("errorGeneric"));
+    }
   }
 
   async function deleteSelection() {
@@ -167,7 +186,50 @@ export default function ItemsScreen() {
             </AppText>
           </Pressable>
         </View>
-      ) : null}
+      ) : (
+        <View className="mb-5 gap-3">
+          <View className="flex-row gap-3">
+            <Pressable
+              disabled={needed.length === 0}
+              onPress={() => router.push("/trip")}
+              accessibilityRole="button"
+              accessibilityLabel={t("startTrip")}
+              className={`flex-1 items-center rounded-2xl bg-cove-accent px-3 py-3 ${
+                needed.length === 0 ? "opacity-50" : "active:opacity-80"
+              }`}
+            >
+              <AppText className="text-sm font-semibold text-white">{t("startTrip")}</AppText>
+            </Pressable>
+            <Pressable
+              disabled={needed.length === 0}
+              onPress={() => void shareList()}
+              accessibilityRole="button"
+              accessibilityLabel={t("shareList")}
+              className={`flex-1 items-center rounded-2xl border border-cove-line bg-cove-paper px-3 py-3 ${
+                needed.length === 0 ? "opacity-50" : "active:opacity-80"
+              }`}
+            >
+              <AppText className="text-sm font-semibold text-cove-ink">{t("shareList")}</AppText>
+            </Pressable>
+          </View>
+          <Pressable
+            onPress={() => router.push("/staples")}
+            accessibilityRole="button"
+            accessibilityLabel={t("manageStaples")}
+            className="flex-row items-center gap-3 rounded-2xl border border-cove-line bg-cove-paper px-4 py-3 active:opacity-80"
+          >
+            <View className="h-10 w-10 items-center justify-center rounded-full bg-cove-mist">
+              <Ionicons name="pin" size={iconSize.sm} color={colors.accent} />
+            </View>
+            <View className="min-w-0 flex-1">
+              <AppText className="text-base font-semibold text-cove-ink">{t("staplesTitle")}</AppText>
+              <AppText className="mt-0.5 text-sm text-cove-muted">{t("staplesSubtitle")}</AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={iconSize.sm} color={colors.muted} />
+          </Pressable>
+          {shareNotice ? <FormMessage message={shareNotice} tone="success" /> : null}
+        </View>
+      )}
 
       <View key={locale} className="mb-5 flex-row flex-wrap gap-2">
         <CategoryChip

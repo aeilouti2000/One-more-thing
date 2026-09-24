@@ -13,7 +13,10 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN apk add --no-cache python3 make g++ \
+  && npm ci --omit=dev \
+  && apk del python3 make g++ \
+  && npm cache clean --force
 COPY --from=build /app/dist ./dist
 EXPOSE 3000
 USER node

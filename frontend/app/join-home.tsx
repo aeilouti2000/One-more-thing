@@ -32,12 +32,7 @@ export default function JoinHomeScreen() {
     setIsSubmitting(false);
 
     if (result.home) {
-      adoptHome({
-        id: result.home.id,
-        name: result.home.name,
-        inviteCode: result.home.invite_code,
-        members: [],
-      });
+      adoptHome(result.home);
       await refresh();
       router.replace("/items");
       return;

@@ -1,14 +1,5 @@
-import { plainToInstance } from "class-transformer";
-import {
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-  MinLength,
-  validateSync,
-} from "class-validator";
+import { plainToInstance, Type } from "class-transformer";
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength, validateSync } from "class-validator";
 
 enum NodeEnv {
   Development = "development",
@@ -20,6 +11,7 @@ class EnvironmentVariables {
   @IsEnum(NodeEnv)
   NODE_ENV: NodeEnv = NodeEnv.Development;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(65535)
@@ -36,41 +28,18 @@ class EnvironmentVariables {
   @IsString()
   JWT_ACCESS_TTL = "15m";
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(365)
   JWT_REFRESH_TTL_DAYS = 30;
 
-  @IsInt()
-  @Min(1)
-  @Max(168)
-  EMAIL_TOKEN_TTL_HOURS = 24;
-
-  @IsString()
-  APP_PUBLIC_URL = "http://localhost:3000";
-
   @IsString()
   CORS_ORIGINS = "";
 
   @IsOptional()
-  @IsString()
-  SMTP_HOST = "";
-
-  @IsInt()
-  @Min(1)
-  @Max(65535)
-  SMTP_PORT = 587;
-
-  @IsOptional()
-  @IsString()
-  SMTP_USER = "";
-
-  @IsOptional()
-  @IsString()
-  SMTP_PASS = "";
-
-  @IsString()
-  SMTP_FROM = "One More Thing <noreply@localhost>";
+  @IsIn(["true", "false"])
+  DATABASE_SSL = "false";
 }
 
 export function validateEnv(config: Record<string, unknown>) {

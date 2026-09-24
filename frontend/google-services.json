@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "210910217936",
+    "project_id": "one-more-thing-c2ebd",
+    "storage_bucket": "one-more-thing-c2ebd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:210910217936:android:922adcfc8d0fbde88140d5",
+        "android_client_info": {
+          "package_name": "com.onemorething.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBp4eQBRfnezdUixQskRixu0mgV4gA74as"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

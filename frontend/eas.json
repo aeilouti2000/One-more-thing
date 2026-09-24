@@ -7,6 +7,9 @@
     "apk": {
       "distribution": "internal",
       "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://one-more-thing-api.onrender.com/api"
+      },
       "android": {
         "buildType": "apk"
       }

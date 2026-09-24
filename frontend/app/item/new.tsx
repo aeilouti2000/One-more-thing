@@ -2,6 +2,7 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { View } from "react-native";
 import { CategoryChip } from "@/components/purchases/CategoryChip";
+import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -21,6 +22,7 @@ export default function NewItemScreen() {
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
   const [category, setCategory] = useState<PurchaseCategory>("vegetables");
+  const [urgent, setUrgent] = useState(false);
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,6 +46,7 @@ export default function NewItemScreen() {
       quantity: parsedQuantity,
       category,
       notes,
+      urgent,
     });
     setIsSubmitting(false);
 
@@ -96,6 +99,8 @@ export default function NewItemScreen() {
             ))}
           </View>
         </View>
+
+        <UrgentToggle value={urgent} onValueChange={setUrgent} />
 
         <AppTextField
           label={t("notes")}

@@ -3,7 +3,8 @@ import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, View } from "react-native";
 import { CategoryChip } from "@/components/purchases/CategoryChip";
-import { StatusBadge } from "@/components/purchases/StatusBadge";
+import { UrgentToggle } from "@/components/purchases/UrgentToggle";
+import { StatusBadge, UrgentBadge } from "@/components/purchases/StatusBadge";
 import { AppText } from "@/components/ui/AppText";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -32,6 +33,7 @@ export default function ItemDetailScreen() {
   const [editQuantity, setEditQuantity] = useState("1");
   const [editCategory, setEditCategory] =
     useState<PurchaseCategory>("vegetables");
+  const [editUrgent, setEditUrgent] = useState(false);
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const purchase = getById(id ?? "");
 
@@ -89,6 +91,7 @@ export default function ItemDetailScreen() {
       name: editTitle,
       quantity,
       category: editCategory,
+      urgent: editUrgent,
     });
     setIsSaving(false);
 
@@ -104,6 +107,7 @@ export default function ItemDetailScreen() {
     setEditTitle(item.name);
     setEditQuantity(String(item.quantity));
     setEditCategory(item.category);
+    setEditUrgent(item.urgent);
     setQuantityError(undefined);
     setError(null);
     setIsEditing(false);
@@ -121,6 +125,7 @@ export default function ItemDetailScreen() {
                 setEditTitle(item.name);
                 setEditQuantity(String(item.quantity));
                 setEditCategory(item.category);
+                setEditUrgent(item.urgent);
                 setError(null);
                 setIsEditing(true);
               }}
@@ -141,7 +146,10 @@ export default function ItemDetailScreen() {
       <View className="gap-4">
         <View className="flex-row items-center justify-between rounded-3xl bg-cove-paper px-5 py-4">
           <AppText className="text-base text-cove-muted">{t("status")}</AppText>
-          <StatusBadge status={item.status} />
+          <View className="flex-row items-center gap-2">
+            {item.urgent && item.status !== "bought" ? <UrgentBadge /> : null}
+            <StatusBadge status={item.status} />
+          </View>
         </View>
 
         {isEditing ? (
@@ -175,6 +183,7 @@ export default function ItemDetailScreen() {
                 ))}
               </View>
             </View>
+            <UrgentToggle value={editUrgent} onValueChange={setEditUrgent} />
             <FormMessage message={error} />
             <View className="gap-2">
               <AppButton

@@ -25,7 +25,6 @@ export default function SignupScreen() {
     password?: string;
   }>({});
   const [error, setError] = useState<string | null>(null);
-  const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canSubmit =
@@ -61,11 +60,6 @@ export default function SignupScreen() {
         return;
       }
 
-      if (result.requiresEmailConfirmation) {
-        setNeedsConfirmation(true);
-        return;
-      }
-
       router.replace("/");
     } catch (submitError) {
       setError(formatAppError(submitError));
@@ -77,34 +71,9 @@ export default function SignupScreen() {
   return (
     <GuestOnly>
       <Screen>
-        <ScreenHeader
-          title={needsConfirmation ? t("signupConfirmTitle") : t("signupTitle")}
-          subtitle={
-            needsConfirmation ? t("signupConfirmSubtitle") : t("signupSubtitle")
-          }
-          showBack
-        />
+        <ScreenHeader title={t("signupTitle")} subtitle={t("signupSubtitle")} showBack />
 
-        {needsConfirmation ? (
-          <View className="gap-6">
-            <View className="rounded-3xl bg-cove-paper p-5">
-              <AppText className="text-base leading-6 text-cove-ink">
-                {t("signupCheckEmail", { email: email.trim() })}
-              </AppText>
-            </View>
-            <AppButton
-              label={t("logIn")}
-              onPress={() =>
-                router.replace({
-                  pathname: "/login",
-                  params: { email: email.trim() },
-                })
-              }
-            />
-          </View>
-        ) : (
-          <>
-            <View className="mb-6 items-center">
+        <View className="mb-6 items-center">
               <AppLogo size={88} />
             </View>
 
@@ -164,8 +133,6 @@ export default function SignupScreen() {
                 </Pressable>
               </View>
             </View>
-          </>
-        )}
       </Screen>
     </GuestOnly>
   );

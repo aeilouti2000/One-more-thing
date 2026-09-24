@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Linking, Platform, Pressable, Switch, View } from "react-native";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -11,7 +11,13 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { LOCALES } from "@/constants/i18n";
 import { iconSize, type ThemeScheme } from "@/constants/theme";
-import { supabase } from "@/lib/supabase";
+import {
+  readPushEnabled,
+  syncPushRegistration,
+  unregisterPushDevice,
+  writePushEnabled,
+  type PushStatus,
+} from "@/lib/push";
 import { isValidPassword } from "@/lib/validation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -37,9 +43,7 @@ export default function SettingsScreen() {
   const { colors, scheme, setScheme } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
-  const [name, setName] = useState(
-    typeof user?.user_metadata?.name === "string" ? user.user_metadata.name : t("member"),
-  );
+  const [name, setName] = useState(user?.name?.trim() || t("member"));
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -48,21 +52,32 @@ export default function SettingsScreen() {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [pushStatus, setPushStatus] = useState<PushStatus>(
+    Platform.OS === "web" ? "unsupported" : readPushEnabled() ? "on" : "off",
+  );
+  const [isUpdatingPush, setIsUpdatingPush] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-
-    void supabase
-      .from("profiles")
-      .select("name")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data && typeof data.name === "string" && data.name.trim()) {
-          setName(data.name);
-        }
-      });
+    if (user?.name?.trim()) setName(user.name);
   }, [user]);
+
+  useEffect(() => {
+    if (!user || Platform.OS === "web" || !readPushEnabled()) return;
+    void syncPushRegistration(locale).then(setPushStatus);
+  }, [locale, user]);
+
+  async function onTogglePush(enabled: boolean) {
+    setIsUpdatingPush(true);
+    writePushEnabled(enabled);
+    if (!enabled) {
+      await unregisterPushDevice();
+      setPushStatus("off");
+      setIsUpdatingPush(false);
+      return;
+    }
+    setPushStatus(await syncPushRegistration(locale));
+    setIsUpdatingPush(false);
+  }
 
   const canUpdatePassword =
     currentPassword.length > 0 &&
@@ -197,6 +212,51 @@ export default function SettingsScreen() {
               </View>
             ) : null}
           </View>
+        </View>
+
+        <View>
+          <SectionHeader title={t("notifications")} />
+          <View className="rounded-3xl bg-cove-paper px-4 py-4">
+            <View className="flex-row items-center justify-between gap-3">
+              <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+                {t("listAlerts")}
+              </AppText>
+              {pushStatus === "unsupported" ? null : (
+                <Switch
+                  value={pushStatus !== "off"}
+                  disabled={isUpdatingPush}
+                  onValueChange={(enabled) => void onTogglePush(enabled)}
+                  trackColor={{ false: colors.mist, true: colors.accent }}
+                  thumbColor={colors.white}
+                />
+              )}
+            </View>
+            <AppText className="mt-2 text-sm text-cove-muted">
+              {pushStatus === "unsupported"
+                ? t("notificationsPhoneOnly")
+                : pushStatus === "denied"
+                  ? t("notificationsDenied")
+                  : t("listAlertsBody")}
+            </AppText>
+            {pushStatus === "denied" ? (
+              <Pressable onPress={() => void Linking.openSettings()} className="mt-3 active:opacity-80">
+                <AppText className="text-sm font-semibold text-cove-accent">
+                  {t("openPhoneSettings")}
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+
+        <View>
+          <SectionHeader title={t("manageStaples")} />
+          <Pressable
+            onPress={() => router.push("/staples")}
+            className="rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
+          >
+            <AppText className="text-base font-semibold text-cove-ink">{t("staplesTitle")}</AppText>
+            <AppText className="mt-1 text-sm text-cove-muted">{t("staplesSubtitle")}</AppText>
+          </Pressable>
         </View>
 
         <View>

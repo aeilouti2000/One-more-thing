@@ -24,8 +24,35 @@ export function formatAppError(
 
   const lower = message.toLowerCase();
 
-  if (code === "email_exists" || code === "user_already_exists") {
+  if (code === "email_exists" || code === "user_already_exists" || code === "EMAIL_TAKEN") {
     return translate("errorEmailTaken");
+  }
+  if (code === "INVALID_CREDENTIALS") {
+    return translate("errorWrongEmailOrPassword");
+  }
+  if (code === "ALREADY_IN_HOME") {
+    return translate("errorAlreadyHasHome");
+  }
+  if (code === "UNKNOWN_INVITE_CODE") {
+    return translate("errorUnknownInvite");
+  }
+  if (code === "CURRENT_PASSWORD_WRONG") {
+    return translate("errorCurrentPasswordWrong");
+  }
+  if (code === "PASSWORD_UNCHANGED") {
+    return translate("errorNewPasswordDifferent");
+  }
+  if (code === "NOT_SIGNED_IN" || code === "NO_HOME") {
+    return translate(code === "NO_HOME" ? "errorNeedHome" : "errorNeedLogin");
+  }
+  if (code === "FAMILY_NAME_REQUIRED") {
+    return translate("errorEnterFamilyName");
+  }
+  if (code === "UNDO_EXPIRED") {
+    return translate("errorUndoExpired");
+  }
+  if (code === "STAPLE_LIMIT") {
+    return translate("errorStapleLimit");
   }
   if (code === "over_email_send_rate_limit" || lower.includes("rate limit") || lower.includes("for security purposes")) {
     return translate("errorTryAgainSoon");
@@ -48,9 +75,6 @@ export function formatAppError(
   }
   if (lower.includes("already registered") || lower.includes("already been registered")) {
     return translate("errorEmailTaken");
-  }
-  if (lower.includes("email not confirmed")) {
-    return translate("errorEmailNotConfirmed");
   }
   if (lower.includes("already belong to a home")) {
     return translate("errorAlreadyHasHome");

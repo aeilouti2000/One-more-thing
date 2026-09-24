@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { formatAppError } from "@/lib/errors";
 import { fetchMyHousehold } from "@/lib/homes";
 import { useAuth } from "@/providers/AuthProvider";
 import type { Household } from "@/types/household";
@@ -49,17 +50,29 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
-    const next = await fetchMyHousehold();
-    if (
-      currentUserIdRef.current !== initiatingUserId ||
-      requestSequenceRef.current !== requestSequence
-    ) {
+    try {
+      const next = await fetchMyHousehold();
+      if (
+        currentUserIdRef.current !== initiatingUserId ||
+        requestSequenceRef.current !== requestSequence
+      ) {
+        return null;
+      }
+      setHousehold(next);
+      setError(null);
+      setIsLoading(false);
+      return next;
+    } catch (error) {
+      if (
+        currentUserIdRef.current !== initiatingUserId ||
+        requestSequenceRef.current !== requestSequence
+      ) {
+        return null;
+      }
+      setError(formatAppError(error));
+      setIsLoading(false);
       return null;
     }
-    setHousehold(next);
-    setError(null);
-    setIsLoading(false);
-    return next;
   }, [user]);
 
   useEffect(() => {

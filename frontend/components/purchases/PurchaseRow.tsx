@@ -5,12 +5,14 @@ import { getCategoryLabel } from "@/constants/categories";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/types/purchase";
-import { StatusBadge } from "./StatusBadge";
+import { StatusBadge, UrgentBadge } from "./StatusBadge";
 
 type PurchaseRowProps = {
   purchase: Purchase;
   onPress?: () => void;
   onLongPress?: () => void;
+  onUndo?: () => void;
+  onBuyAgain?: () => void;
   selected?: boolean;
 };
 
@@ -18,6 +20,8 @@ export function PurchaseRow({
   purchase,
   onPress,
   onLongPress,
+  onUndo,
+  onBuyAgain,
   selected = false,
 }: PurchaseRowProps) {
   const { t, locale } = useI18n();
@@ -38,19 +42,21 @@ export function PurchaseRow({
     : null;
 
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={350}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      className={`rounded-3xl border-2 px-4 py-4 active:opacity-80 ${
+    <View
+      className={`rounded-3xl border-2 px-4 py-4 ${
         selected
           ? "border-cove-accent bg-cove-mist"
           : "border-transparent bg-cove-paper"
       }`}
     >
-      <View className="min-w-0">
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={350}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        className="min-w-0 active:opacity-80"
+      >
         <View className="flex-row items-start justify-between gap-3">
           <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
             {purchase.name}
@@ -62,7 +68,10 @@ export function PurchaseRow({
               color={colors.accent}
             />
           ) : (
-            <StatusBadge status={purchase.status} />
+            <View className="flex-row items-center gap-2">
+              {purchase.urgent && purchase.status !== "bought" ? <UrgentBadge /> : null}
+              <StatusBadge status={purchase.status} />
+            </View>
           )}
         </View>
         <AppText className="mt-1 text-sm text-cove-muted">
@@ -85,7 +94,26 @@ export function PurchaseRow({
             </AppText>
           </View>
         ) : null}
-      </View>
-    </Pressable>
+      </Pressable>
+      {onUndo || onBuyAgain ? (
+        <View className="mt-3 flex-row flex-wrap gap-4">
+          {onUndo ? (
+            <Pressable onPress={onUndo} className="active:opacity-80">
+              <AppText className="text-sm font-semibold text-cove-accent">{t("undoBought")}</AppText>
+            </Pressable>
+          ) : null}
+          {onBuyAgain ? (
+            <Pressable
+              onPress={onBuyAgain}
+              accessibilityRole="button"
+              accessibilityLabel={t("buyAgain")}
+              className="active:opacity-80"
+            >
+              <AppText className="text-sm font-semibold text-cove-accent">{t("buyAgain")}</AppText>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
   );
 }
