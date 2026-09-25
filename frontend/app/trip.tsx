@@ -203,6 +203,9 @@ function TripCheckRow({
       )}
       <View className="min-w-0 flex-1">
         <AppText className="text-base font-semibold text-cove-ink">{item.name}</AppText>
+        {item.notes ? (
+          <AppText className="mt-1 text-sm text-cove-muted">{item.notes}</AppText>
+        ) : null}
         <AppText className="mt-1 text-sm text-cove-muted">{quantity}</AppText>
       </View>
     </Pressable>

@@ -6,19 +6,21 @@ import { useTheme } from "@/providers/ThemeProvider";
 type UrgentToggleProps = {
   value: boolean;
   onValueChange: (value: boolean) => void;
+  label?: string;
 };
 
-export function UrgentToggle({ value, onValueChange }: UrgentToggleProps) {
+export function UrgentToggle({ value, onValueChange, label }: UrgentToggleProps) {
   const { t } = useI18n();
   const { colors } = useTheme();
+  const title = label ?? t("urgent");
 
   return (
     <View className="items-start">
-      <SectionHeader title={t("urgent")} />
+      <SectionHeader title={title} />
       <Pressable
         accessibilityRole="switch"
         accessibilityState={{ checked: value }}
-        accessibilityLabel={t("urgent")}
+        accessibilityLabel={title}
         onPress={() => onValueChange(!value)}
         className="h-7 w-12 justify-center rounded-full px-0.5"
         style={{ backgroundColor: value ? colors.accent : colors.line }}

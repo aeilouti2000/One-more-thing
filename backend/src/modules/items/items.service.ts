@@ -86,7 +86,7 @@ export class ItemsService {
   async updateDetails(
     userId: string,
     itemId: string,
-    input: { name: string; quantity: number; category: ItemCategory; urgent: boolean },
+    input: { name: string; quantity: number; category: ItemCategory; urgent: boolean; notes?: string },
   ) {
     const item = await this.requireItem(userId, itemId);
     const becameUrgent = !item.urgent && input.urgent && item.status === "needed";
@@ -94,6 +94,7 @@ export class ItemsService {
     item.quantity = input.quantity;
     item.category = input.category;
     item.urgent = input.urgent;
+    item.notes = blankToNull(input.notes);
     const saved = await this.items.save(item);
     const [view] = await this.withNames([saved]);
     if (becameUrgent) {

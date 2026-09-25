@@ -65,6 +65,7 @@ function StaplesBody() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [listCounts, setListCounts] = useState<Record<string, number>>({});
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     if (!household) {
@@ -185,16 +186,39 @@ function StaplesBody() {
     return <LoadingScreen />;
   }
 
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleStaples = normalizedQuery
+    ? staples.filter((staple) => staple.name.toLowerCase().includes(normalizedQuery))
+    : staples;
+
   return (
     <Screen>
       <ScreenHeader title={t("staplesTitle")} subtitle={t("staplesSubtitle")} showBack />
       <FormMessage message={error} />
 
+      {staples.length > 0 ? (
+        <View className="mb-4">
+          <AppTextField
+            label={t("searchPinned")}
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t("searchPinnedPlaceholder")}
+            autoCapitalize="none"
+            autoCorrect={false}
+            userText
+          />
+        </View>
+      ) : null}
+
       {staples.length === 0 ? (
         <EmptyState title={t("staplesEmpty")} message={t("staplesEmptyBody")} />
+      ) : visibleStaples.length === 0 ? (
+        <View className="mb-8">
+          <EmptyState title={t("searchPinnedEmpty")} message={t("searchPinnedEmptyBody")} />
+        </View>
       ) : (
         <View className="mb-8 gap-3">
-          {staples.map((staple) => {
+          {visibleStaples.map((staple) => {
             const quantityLabel = staple.unit ? `${staple.quantity} ${staple.unit}` : `x${staple.quantity}`;
             const due = new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
               month: "short",

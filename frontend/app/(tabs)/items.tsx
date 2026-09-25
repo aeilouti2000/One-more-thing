@@ -1,18 +1,18 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import * as Haptics from "expo-haptics";
 import { ActivityIndicator, Pressable, View } from "react-native";
-import { CategoryChip } from "@/components/purchases/CategoryChip";
+import { CategoryFilter } from "@/components/purchases/CategoryFilter";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
 import { AppText } from "@/components/ui/AppText";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
-import { PURCHASE_CATEGORIES } from "@/constants/categories";
 import { formatNeededShare, shareNeededText } from "@/lib/share-list";
 import { createStaple, fetchStaples } from "@/lib/staples";
 import { iconSize } from "@/constants/theme";
@@ -34,8 +34,9 @@ export default function ItemsScreen() {
     updateItem,
   } = usePurchases();
   const { colors } = useTheme();
-  const { t, locale, isRTL } = useI18n();
+  const { t, isRTL } = useI18n();
   const [category, setCategory] = useState<PurchaseCategory | "all">("all");
+  const [isChoosingCategory, setIsChoosingCategory] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busyAction, setBusyAction] = useState<"pin" | "bought" | "delete" | null>(null);
@@ -43,6 +44,7 @@ export default function ItemsScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
+  const [floatMessage, setFloatMessage] = useState<string | null>(null);
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
 
   const visibleItems =
@@ -100,7 +102,9 @@ export default function ItemsScreen() {
     );
     if (toPin.length === 0) {
       setBusyAction(null);
-      setActionError(t("alreadyPinned"));
+      setFloatMessage(
+        selected.length === 1 ? t("alreadyPinnedOne") : t("alreadyPinned"),
+      );
       return;
     }
 
@@ -188,6 +192,12 @@ export default function ItemsScreen() {
     setIsConfirmingDelete(false);
   }
 
+  useEffect(() => {
+    if (!floatMessage) return;
+    const timer = setTimeout(() => setFloatMessage(null), 2500);
+    return () => clearTimeout(timer);
+  }, [floatMessage]);
+
   if (isLoading && needed.length === 0 && !error) {
     return <LoadingScreen />;
   }
@@ -198,14 +208,14 @@ export default function ItemsScreen() {
     if (isSelecting) return null;
 
     return (
-      <View className="mb-5 flex-row gap-2.5">
+      <View className="mb-5 flex-row gap-2">
         <ListAction
           label={t("startTrip")}
           disabled={listEmpty}
           onPress={() => router.push("/trip")}
           icon={
             <View className="h-11 w-11 items-center justify-center rounded-2xl bg-cove-accent">
-              <Ionicons name="storefront" size={22} color={colors.white} />
+              <Ionicons name="storefront" size={20} color={colors.white} />
             </View>
           }
         />
@@ -231,6 +241,17 @@ export default function ItemsScreen() {
             </View>
           }
         />
+        <CategoryFilter
+          value={category}
+          open={isChoosingCategory}
+          onOpen={() => setIsChoosingCategory(true)}
+          onClose={() => setIsChoosingCategory(false)}
+          onChange={(next) => {
+            setCategory(next);
+            setSelectedIds(new Set());
+            setIsConfirmingDelete(false);
+          }}
+        />
       </View>
     );
   }
@@ -240,6 +261,7 @@ export default function ItemsScreen() {
       tabBarInset
       refreshing={isRefreshing}
       onRefresh={() => void onRefresh()}
+      floating={floatMessage ? <FloatMessage message={floatMessage} /> : null}
     >
       <ScreenHeader
         title={
@@ -324,30 +346,6 @@ export default function ItemsScreen() {
         </View>
       ) : null}
 
-      <View key={locale} className="mb-5 flex-row flex-wrap gap-2">
-        <CategoryChip
-          label={t("all")}
-          selected={category === "all"}
-          onPress={() => {
-            setCategory("all");
-            setSelectedIds(new Set());
-            setIsConfirmingDelete(false);
-          }}
-        />
-        {PURCHASE_CATEGORIES.map((item) => (
-          <CategoryChip
-            key={`${item.id}-${locale}`}
-            category={item.id}
-            selected={category === item.id}
-            onPress={() => {
-              setCategory(item.id);
-              setSelectedIds(new Set());
-              setIsConfirmingDelete(false);
-            }}
-          />
-        ))}
-      </View>
-
       {listActions()}
 
       <FormMessage
@@ -421,7 +419,7 @@ function ListAction({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className={`min-h-[92px] flex-1 items-center justify-center gap-2 rounded-3xl bg-cove-paper px-2 py-3 ${
+      className={`min-h-[92px] flex-1 items-center justify-center gap-2 rounded-3xl bg-cove-paper px-1 py-3 ${
         disabled ? "opacity-45" : "active:opacity-80"
       }`}
     >

@@ -15,6 +15,8 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
 import { usePurchases } from "@/hooks/usePurchases";
+import { useHousehold } from "@/hooks/useHousehold";
+import { createStaple, deleteStaple, fetchStaples } from "@/lib/staples";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
 import type { PurchaseCategory } from "@/types/purchase";
@@ -22,6 +24,7 @@ import type { PurchaseCategory } from "@/types/purchase";
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getById, isLoading, markBought, updateItem } = usePurchases();
+  const { household } = useHousehold();
   const { t, locale } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -31,6 +34,9 @@ export default function ItemDetailScreen() {
   const [editCategory, setEditCategory] =
     useState<PurchaseCategory>("vegetables");
   const [editUrgent, setEditUrgent] = useState(false);
+  const [editNotes, setEditNotes] = useState("");
+  const [editPinned, setEditPinned] = useState(false);
+  const [pinnedStapleId, setPinnedStapleId] = useState<string | null>(null);
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const purchase = getById(id ?? "");
 
@@ -89,14 +95,41 @@ export default function ItemDetailScreen() {
       quantity,
       category: editCategory,
       urgent: editUrgent,
+      notes: editNotes,
     });
-    setIsSaving(false);
 
     if (result.error) {
+      setIsSaving(false);
       setError(result.error);
       return;
     }
 
+    if (household) {
+      if (editPinned && !pinnedStapleId) {
+        const pinResult = await createStaple(household.id, {
+          name: editTitle.trim(),
+          quantity,
+          category: editCategory,
+          urgent: editUrgent,
+          intervalDays: 7,
+          addNow: false,
+        });
+        if (pinResult.error) {
+          setIsSaving(false);
+          setError(pinResult.error);
+          return;
+        }
+      } else if (!editPinned && pinnedStapleId) {
+        const pinResult = await deleteStaple(pinnedStapleId);
+        if (pinResult.error) {
+          setIsSaving(false);
+          setError(pinResult.error);
+          return;
+        }
+      }
+    }
+
+    setIsSaving(false);
     setIsEditing(false);
   }
 
@@ -105,9 +138,33 @@ export default function ItemDetailScreen() {
     setEditQuantity(String(item.quantity));
     setEditCategory(item.category);
     setEditUrgent(item.urgent);
+    setEditNotes(item.notes ?? "");
+    setEditPinned(false);
+    setPinnedStapleId(null);
     setQuantityError(undefined);
     setError(null);
     setIsEditing(false);
+  }
+
+  async function beginEditing() {
+    setEditTitle(item.name);
+    setEditQuantity(String(item.quantity));
+    setEditCategory(item.category);
+    setEditUrgent(item.urgent);
+    setEditNotes(item.notes ?? "");
+    setEditPinned(false);
+    setPinnedStapleId(null);
+    setError(null);
+    setIsEditing(true);
+
+    if (!household) return;
+    const existing = await fetchStaples(household.id);
+    if (existing.error) return;
+    const match = existing.staples.find(
+      (staple) => staple.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
+    );
+    setPinnedStapleId(match?.id ?? null);
+    setEditPinned(Boolean(match));
   }
 
   return (
@@ -120,14 +177,7 @@ export default function ItemDetailScreen() {
             <EditButton
               variant="paper"
               accessibilityLabel={t("editItemLabel")}
-              onPress={() => {
-                setEditTitle(item.name);
-                setEditQuantity(String(item.quantity));
-                setEditCategory(item.category);
-                setEditUrgent(item.urgent);
-                setError(null);
-                setIsEditing(true);
-              }}
+              onPress={() => void beginEditing()}
             />
           ) : null
         }
@@ -173,7 +223,22 @@ export default function ItemDetailScreen() {
                 ))}
               </View>
             </View>
-            <UrgentToggle value={editUrgent} onValueChange={setEditUrgent} />
+            <AppTextField
+              label={t("notes")}
+              value={editNotes}
+              onChangeText={setEditNotes}
+              placeholder={t("notesPlaceholder")}
+              multiline
+              userText
+            />
+            <View className="flex-row gap-6">
+              <UrgentToggle value={editUrgent} onValueChange={setEditUrgent} />
+              <UrgentToggle
+                label={t("pinSelected")}
+                value={editPinned}
+                onValueChange={setEditPinned}
+              />
+            </View>
             <FormMessage message={error} />
             <View className="gap-2">
               <AppButton

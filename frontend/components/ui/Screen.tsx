@@ -9,6 +9,7 @@ type ScreenProps = {
   tabBarInset?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
+  floating?: ReactNode;
 };
 
 export function Screen({
@@ -17,6 +18,7 @@ export function Screen({
   tabBarInset = false,
   refreshing = false,
   onRefresh,
+  floating,
 }: ScreenProps) {
   const { colors } = useTheme();
   const padding = tabBarInset
@@ -51,6 +53,14 @@ export function Screen({
       ) : (
         <View className={`flex-1 ${padding}`}>{children}</View>
       )}
+      {floating ? (
+        <View
+          pointerEvents="box-none"
+          className="absolute inset-x-0 bottom-28 items-center px-5"
+        >
+          {floating}
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }

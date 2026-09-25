@@ -47,6 +47,11 @@ export class UpdateItemDto {
 
   @IsBoolean()
   urgent: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
 }
 
 export class CreateStapleDto extends CreateItemDto {

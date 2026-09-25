@@ -13,7 +13,10 @@ export type NewItemInput = {
   urgent?: boolean;
 };
 
-export type UpdateItemInput = Pick<NewItemInput, "name" | "quantity" | "category" | "urgent">;
+export type UpdateItemInput = Pick<
+  NewItemInput,
+  "name" | "quantity" | "category" | "urgent" | "notes"
+>;
 
 type ItemResponse = {
   id: string;
@@ -79,6 +82,7 @@ export async function updateItemDetails(itemId: string, input: UpdateItemInput) 
       name: input.name.trim(),
       quantity: input.quantity,
       category: input.category,
+      notes: input.notes?.trim() || "",
       urgent: input.urgent === true,
     });
     return { error: null };
