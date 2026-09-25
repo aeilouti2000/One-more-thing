@@ -6,10 +6,10 @@ import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { LanguagePicker } from "@/components/ui/LanguagePicker";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { LOCALES } from "@/constants/i18n";
 import { iconSize, type ThemeScheme } from "@/constants/theme";
 import {
   readPushEnabled,
@@ -41,7 +41,7 @@ function SettingsCard({
 export default function SettingsScreen() {
   const { user, signOut, changePassword } = useAuth();
   const { colors, scheme, setScheme } = useTheme();
-  const { t, locale, setLocale } = useI18n();
+  const { t, locale } = useI18n();
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [name, setName] = useState(user?.name?.trim() || t("member"));
   const [currentPassword, setCurrentPassword] = useState("");
@@ -296,27 +296,8 @@ export default function SettingsScreen() {
             <AppText className="text-sm font-medium text-cove-muted">
               {t("languageLabel")}
             </AppText>
-            <View className="mt-3 flex-row gap-2">
-              {LOCALES.map((option) => {
-                const selected = locale === option.id;
-                return (
-                  <Pressable
-                    key={option.id}
-                    onPress={() => setLocale(option.id)}
-                    className={`flex-1 items-center rounded-2xl px-4 py-3 ${
-                      selected ? "bg-cove-accent" : "bg-cove-mist"
-                    }`}
-                  >
-                    <AppText
-                      className={`text-base font-semibold ${
-                        selected ? "text-white" : "text-cove-ink"
-                      }`}
-                    >
-                      {option.label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
+            <View className="mt-3">
+              <LanguagePicker />
             </View>
           </View>
         </View>

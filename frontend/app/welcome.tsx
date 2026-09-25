@@ -4,6 +4,7 @@ import { GuestOnly } from "@/components/auth/GuestOnly";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppLogo } from "@/components/ui/AppLogo";
 import { AppText } from "@/components/ui/AppText";
+import { LanguagePicker } from "@/components/ui/LanguagePicker";
 import { Screen } from "@/components/ui/Screen";
 import { logo } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -37,11 +38,6 @@ export default function WelcomeScreen() {
                 backgroundColor: "rgba(255,255,255,0.1)",
                 transform: [{ rotate: "32deg" }],
               }}
-            />
-            <View
-              pointerEvents="none"
-              className="absolute bottom-0 left-5 right-5 h-px"
-              style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
             />
             <View className="relative z-10">
               <View className="mb-5 flex-row items-center gap-4">
@@ -89,6 +85,8 @@ export default function WelcomeScreen() {
                 <AppText className="text-sm text-cove-muted">{t("terms")}</AppText>
               </Pressable>
             </View>
+
+            <LanguagePicker size="compact" />
           </View>
         </View>
       </Screen>
