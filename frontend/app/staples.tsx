@@ -15,6 +15,8 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
 import { useHousehold } from "@/hooks/useHousehold";
+import { addItem, fetchHomeItems, updateItemDetails } from "@/lib/items";
+import { emitListChanged } from "@/lib/list-sync";
 import { parseQuantity } from "@/lib/validation";
 import {
   createStaple,
@@ -24,6 +26,7 @@ import {
   type Staple,
   type StapleInterval,
 } from "@/lib/staples";
+import { useAuth } from "@/providers/AuthProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import type { TranslationKey } from "@/constants/i18n";
 import type { PurchaseCategory } from "@/types/purchase";
@@ -44,6 +47,7 @@ export default function StaplesScreen() {
 }
 
 function StaplesBody() {
+  const { user } = useAuth();
   const { household } = useHousehold();
   const { t, locale } = useI18n();
   const [staples, setStaples] = useState<Staple[]>([]);
@@ -59,6 +63,8 @@ function StaplesBody() {
   const [isSaving, setIsSaving] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const [listCounts, setListCounts] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
     if (!household) {
@@ -118,6 +124,51 @@ function StaplesBody() {
     setQuantityError(undefined);
   }
 
+  async function onAddToList(staple: Staple) {
+    if (!household || !user || addingId) return;
+    setAddingId(staple.id);
+    setError(null);
+    const listed = await fetchHomeItems(household.id);
+    if (listed.error) {
+      setAddingId(null);
+      setError(listed.error);
+      return;
+    }
+
+    const match = listed.items.find(
+      (item) =>
+        item.status === "needed" &&
+        item.name.trim().toLowerCase() === staple.name.trim().toLowerCase(),
+    );
+    const nextQuantity = match ? match.quantity + staple.quantity : staple.quantity;
+    const result = match
+      ? await updateItemDetails(match.id, {
+          name: match.name,
+          quantity: nextQuantity,
+          category: match.category,
+          urgent: match.urgent,
+        })
+      : await addItem({
+          homeId: household.id,
+          userId: user.id,
+          name: staple.name,
+          quantity: staple.quantity,
+          category: staple.category,
+          unit: staple.unit,
+          urgent: staple.urgent,
+        });
+
+    setAddingId(null);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    const copies = Math.max(1, Math.round(nextQuantity / staple.quantity));
+    setListCounts((current) => ({ ...current, [staple.id]: copies }));
+    emitListChanged();
+  }
+
   async function onRemove(id: string) {
     setRemovingId(id);
     setError(null);
@@ -156,13 +207,31 @@ function StaplesBody() {
                   {quantityLabel} · {getCategoryLabel(staple.category, locale)} · {t(intervalKeys[staple.intervalDays])}
                 </AppText>
                 <AppText className="mt-1 text-sm text-cove-muted">{t("nextDue", { date: due })}</AppText>
-                <Pressable
-                  disabled={removingId === staple.id}
-                  onPress={() => void onRemove(staple.id)}
-                  className="mt-3 self-start active:opacity-80"
-                >
-                  <AppText className="text-sm font-semibold text-red-600">{t("removeStaple")}</AppText>
-                </Pressable>
+                {listCounts[staple.id] ? (
+                  <AppText className="mt-2 text-sm font-semibold text-cove-accent">
+                    {t("pinnedOnList", { count: listCounts[staple.id] })}
+                  </AppText>
+                ) : null}
+                <View className="mt-3 flex-row items-center gap-5">
+                  <Pressable
+                    disabled={addingId === staple.id}
+                    onPress={() => void onAddToList(staple)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("addPinnedToList")}
+                    className={addingId === staple.id ? "opacity-40" : "active:opacity-80"}
+                  >
+                    <AppText className="text-sm font-semibold text-cove-accent">
+                      {t("addPinnedToList")}
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    disabled={removingId === staple.id}
+                    onPress={() => void onRemove(staple.id)}
+                    className="active:opacity-80"
+                  >
+                    <AppText className="text-sm font-semibold text-red-600">{t("removeStaple")}</AppText>
+                  </Pressable>
+                </View>
               </View>
             );
           })}

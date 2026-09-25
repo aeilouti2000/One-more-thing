@@ -13,6 +13,8 @@ type PurchaseRowProps = {
   onLongPress?: () => void;
   onUndo?: () => void;
   onBuyAgain?: () => void;
+  onChangeQuantity?: (quantity: number) => void;
+  quantityBusy?: boolean;
   selected?: boolean;
 };
 
@@ -22,6 +24,8 @@ export function PurchaseRow({
   onLongPress,
   onUndo,
   onBuyAgain,
+  onChangeQuantity,
+  quantityBusy = false,
   selected = false,
 }: PurchaseRowProps) {
   const { t, locale } = useI18n();
@@ -49,52 +53,86 @@ export function PurchaseRow({
           : "border-transparent bg-cove-paper"
       }`}
     >
-      <Pressable
-        onPress={onPress}
-        onLongPress={onLongPress}
-        delayLongPress={350}
-        accessibilityRole="button"
-        accessibilityState={{ selected }}
-        className="min-w-0 active:opacity-80"
-      >
-        <View className="flex-row items-start justify-between gap-3">
-          <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+      <View className="flex-row items-start gap-3">
+        <Pressable
+          onPress={onPress}
+          onLongPress={onLongPress}
+          delayLongPress={350}
+          accessibilityRole="button"
+          accessibilityState={{ selected }}
+          className="min-w-0 flex-1 active:opacity-80"
+        >
+          <AppText className="text-base font-semibold text-cove-ink">
             {purchase.name}
           </AppText>
-          {selected ? (
-            <Ionicons
-              name="checkmark-circle"
-              size={28}
-              color={colors.accent}
-            />
-          ) : (
+          <AppText className="mt-1 text-sm text-cove-muted">
+            {quantityLabel} · {getCategoryLabel(purchase.category, locale)} ·{" "}
+            {purchase.status === "bought"
+              ? t("boughtByName", { name: purchase.boughtByName ?? "" })
+              : t("addedByName", { name: purchase.addedByName })}
+          </AppText>
+          {date ? (
+            <View className="mt-2 flex-row items-center gap-1.5">
+              <Ionicons
+                name="calendar-outline"
+                size={14}
+                color={colors.muted}
+              />
+              <AppText className="text-xs text-cove-muted">
+                {purchase.status === "bought"
+                  ? t("boughtOn", { date })
+                  : t("addedOn", { date })}
+              </AppText>
+            </View>
+          ) : null}
+        </Pressable>
+        {selected ? (
+          <Ionicons
+            name="checkmark-circle"
+            size={28}
+            color={colors.accent}
+          />
+        ) : (
+          <View className="items-end gap-2">
             <View className="flex-row items-center gap-2">
               {purchase.urgent && purchase.status !== "bought" ? <UrgentBadge /> : null}
               <StatusBadge status={purchase.status} />
             </View>
-          )}
-        </View>
-        <AppText className="mt-1 text-sm text-cove-muted">
-          {quantityLabel} · {getCategoryLabel(purchase.category, locale)} ·{" "}
-          {purchase.status === "bought"
-            ? t("boughtByName", { name: purchase.boughtByName ?? "" })
-            : t("addedByName", { name: purchase.addedByName })}
-        </AppText>
-        {date ? (
-          <View className="mt-2 flex-row items-center gap-1.5">
-            <Ionicons
-              name="calendar-outline"
-              size={14}
-              color={colors.muted}
-            />
-            <AppText className="text-xs text-cove-muted">
-              {purchase.status === "bought"
-                ? t("boughtOn", { date })
-                : t("addedOn", { date })}
-            </AppText>
+            {onChangeQuantity && purchase.status === "needed" ? (
+              <View className="flex-row items-center gap-1">
+                <Pressable
+                  disabled={quantityBusy || purchase.quantity <= 1}
+                  onPress={() => {
+                    const next = purchase.quantity - 1;
+                    onChangeQuantity(next < 1 ? 1 : next);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("decreaseQuantity")}
+                  className={`h-7 w-7 items-center justify-center rounded-full bg-cove-mist ${
+                    quantityBusy || purchase.quantity <= 1 ? "opacity-40" : "active:opacity-80"
+                  }`}
+                >
+                  <Ionicons name="remove" size={16} color={colors.accent} />
+                </Pressable>
+                <AppText className="min-w-6 text-center text-sm font-semibold text-cove-ink">
+                  {quantityLabel}
+                </AppText>
+                <Pressable
+                  disabled={quantityBusy}
+                  onPress={() => onChangeQuantity(purchase.quantity + 1)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("increaseQuantity")}
+                  className={`h-7 w-7 items-center justify-center rounded-full bg-cove-mist ${
+                    quantityBusy ? "opacity-40" : "active:opacity-80"
+                  }`}
+                >
+                  <Ionicons name="add" size={16} color={colors.accent} />
+                </Pressable>
+              </View>
+            ) : null}
           </View>
-        ) : null}
-      </Pressable>
+        )}
+      </View>
       {onUndo || onBuyAgain ? (
         <View className="mt-3 flex-row flex-wrap gap-4">
           {onUndo ? (

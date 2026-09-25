@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import * as Haptics from "expo-haptics";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { CategoryChip } from "@/components/purchases/CategoryChip";
@@ -31,6 +31,7 @@ export default function ItemsScreen() {
     refresh,
     markManyBought,
     deleteMany,
+    updateItem,
   } = usePurchases();
   const { colors } = useTheme();
   const { t, locale, isRTL } = useI18n();
@@ -42,6 +43,7 @@ export default function ItemsScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
+  const [adjustingId, setAdjustingId] = useState<string | null>(null);
 
   const visibleItems =
     category === "all"
@@ -156,6 +158,21 @@ export default function ItemsScreen() {
     }
   }
 
+  async function changeQuantity(id: string, quantity: number) {
+    const item = needed.find((purchase) => purchase.id === id);
+    if (!item || quantity < 1) return;
+    setAdjustingId(id);
+    setActionError(null);
+    const result = await updateItem(id, {
+      name: item.name,
+      quantity,
+      category: item.category,
+      urgent: item.urgent,
+    });
+    setAdjustingId(null);
+    if (result.error) setActionError(result.error);
+  }
+
   async function deleteSelection() {
     setBusyAction("delete");
     setActionError(null);
@@ -181,64 +198,39 @@ export default function ItemsScreen() {
     if (isSelecting) return null;
 
     return (
-      <View className="mb-5 flex-row overflow-hidden rounded-2xl bg-cove-paper">
-        <Pressable
+      <View className="mb-5 flex-row gap-2.5">
+        <ListAction
+          label={t("startTrip")}
           disabled={listEmpty}
           onPress={() => router.push("/trip")}
-          accessibilityRole="button"
-          accessibilityLabel={t("startTrip")}
-          className={`min-h-16 flex-1 items-center justify-center gap-1 px-1.5 py-2 ${
-            listEmpty ? "opacity-45" : "active:opacity-80"
-          }`}
-        >
-          <View className="h-7 w-7 items-center justify-center rounded-full bg-cove-accent">
-            <Ionicons name="storefront" size={16} color={colors.white} />
-          </View>
-          <AppText
-            numberOfLines={2}
-            className="text-center text-[11px] font-semibold leading-4 text-cove-ink"
-          >
-            {t("startTrip")}
-          </AppText>
-        </Pressable>
-        <Pressable
+          icon={
+            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-cove-accent">
+              <Ionicons name="storefront" size={22} color={colors.white} />
+            </View>
+          }
+        />
+        <ListAction
+          label={t("shareList")}
           disabled={listEmpty}
           onPress={() => void shareList()}
-          accessibilityRole="button"
-          accessibilityLabel={t("shareList")}
-          className={`min-h-16 flex-1 items-center justify-center gap-1 px-1.5 py-2 ${
-            listEmpty ? "opacity-45" : "active:opacity-80"
-          }`}
-        >
-          <View className="h-7 w-7 items-center justify-center rounded-full bg-cove-mist">
-            <Ionicons name="share-social" size={16} color={colors.accent} />
-          </View>
-          <AppText
-            numberOfLines={2}
-            className="text-center text-[11px] font-semibold leading-4 text-cove-ink"
-          >
-            {t("shareList")}
-          </AppText>
-        </Pressable>
-        <Pressable
+          icon={
+            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-cove-mist">
+              <Ionicons name="share-social" size={20} color={colors.accent} />
+            </View>
+          }
+        />
+        <ListAction
+          label={t("staplesTitle")}
           onPress={() => router.push("/staples")}
-          accessibilityRole="button"
-          accessibilityLabel={t("manageStaples")}
-          className="min-h-16 flex-1 items-center justify-center gap-1 px-1.5 py-2 active:opacity-80"
-        >
-          <View
-            className="h-7 w-7 items-center justify-center rounded-full bg-cove-mist"
-            style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}
-          >
-            <MaterialCommunityIcons name="pin" size={16} color={colors.accent} />
-          </View>
-          <AppText
-            numberOfLines={2}
-            className="text-center text-[11px] font-semibold leading-4 text-cove-ink"
-          >
-            {t("staplesTitle")}
-          </AppText>
-        </Pressable>
+          icon={
+            <View
+              className="h-11 w-11 items-center justify-center rounded-2xl bg-cove-mist"
+              style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}
+            >
+              <MaterialCommunityIcons name="pin" size={20} color={colors.accent} />
+            </View>
+          }
+        />
       </View>
     );
   }
@@ -383,6 +375,12 @@ export default function ItemsScreen() {
                       params: { id: purchase.id },
                     })
               }
+              quantityBusy={adjustingId === purchase.id}
+              onChangeQuantity={
+                isSelecting
+                  ? undefined
+                  : (quantity) => void changeQuantity(purchase.id, quantity)
+              }
             />
           ))}
         </View>
@@ -403,5 +401,37 @@ export default function ItemsScreen() {
         }}
       />
     </Screen>
+  );
+}
+
+function ListAction({
+  label,
+  icon,
+  onPress,
+  disabled = false,
+}: {
+  label: string;
+  icon: ReactNode;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className={`min-h-[92px] flex-1 items-center justify-center gap-2 rounded-3xl bg-cove-paper px-2 py-3 ${
+        disabled ? "opacity-45" : "active:opacity-80"
+      }`}
+    >
+      {icon}
+      <AppText
+        numberOfLines={2}
+        className="text-center text-xs font-semibold leading-4 text-cove-ink"
+      >
+        {label}
+      </AppText>
+    </Pressable>
   );
 }
