@@ -14,6 +14,7 @@ import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { PURCHASE_CATEGORIES } from "@/constants/categories";
 import { formatNeededShare, shareNeededText } from "@/lib/share-list";
+import { createStaple, fetchStaples } from "@/lib/staples";
 import { iconSize } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
@@ -36,7 +37,8 @@ export default function ItemsScreen() {
   const [category, setCategory] = useState<PurchaseCategory | "all">("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isApplyingAction, setIsApplyingAction] = useState(false);
+  const [busyAction, setBusyAction] = useState<"pin" | "bought" | "delete" | null>(null);
+  const isApplyingAction = busyAction !== null;
   const [actionError, setActionError] = useState<string | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
@@ -74,11 +76,59 @@ export default function ItemsScreen() {
     toggleSelection(id);
   }
 
+  async function pinSelection() {
+    if (!household) return;
+    setBusyAction("pin");
+    setActionError(null);
+    setShareNotice(null);
+
+    const selected = needed.filter((item) => selectedIds.has(item.id));
+    const existing = await fetchStaples(household.id);
+    if (existing.error) {
+      setBusyAction(null);
+      setActionError(existing.error);
+      return;
+    }
+
+    const pinnedNames = new Set(
+      existing.staples.map((staple) => staple.name.trim().toLowerCase()),
+    );
+    const toPin = selected.filter(
+      (item) => !pinnedNames.has(item.name.trim().toLowerCase()),
+    );
+    if (toPin.length === 0) {
+      setBusyAction(null);
+      setActionError(t("alreadyPinned"));
+      return;
+    }
+
+    for (const item of toPin) {
+      const result = await createStaple(household.id, {
+        name: item.name,
+        quantity: item.quantity,
+        category: item.category,
+        urgent: item.urgent,
+        intervalDays: 7,
+        addNow: false,
+      });
+      if (result.error) {
+        setBusyAction(null);
+        setActionError(result.error);
+        return;
+      }
+    }
+
+    setBusyAction(null);
+    setSelectedIds(new Set());
+    setIsConfirmingDelete(false);
+    setShareNotice(t("pinnedNotice"));
+  }
+
   async function markSelectionBought() {
-    setIsApplyingAction(true);
+    setBusyAction("bought");
     setActionError(null);
     const result = await markManyBought([...selectedIds]);
-    setIsApplyingAction(false);
+    setBusyAction(null);
 
     if (result.error) {
       setActionError(result.error);
@@ -107,10 +157,10 @@ export default function ItemsScreen() {
   }
 
   async function deleteSelection() {
-    setIsApplyingAction(true);
+    setBusyAction("delete");
     setActionError(null);
     const result = await deleteMany([...selectedIds]);
-    setIsApplyingAction(false);
+    setBusyAction(null);
 
     if (result.error) {
       setActionError(result.error);
@@ -229,13 +279,34 @@ export default function ItemsScreen() {
       />
 
       {isSelecting ? (
-        <View className="mb-5 flex-row gap-3 rounded-3xl bg-cove-paper p-3">
+        <View className="mb-5 gap-3 rounded-3xl bg-cove-paper p-3">
+          <Pressable
+            disabled={isApplyingAction}
+            onPress={() => void pinSelection()}
+            accessibilityRole="button"
+            accessibilityLabel={t("pinSelected")}
+            className="flex-row items-center justify-center gap-2 rounded-2xl bg-cove-mist px-3 py-3 active:opacity-80"
+          >
+            {busyAction === "pin" ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : (
+              <>
+                <View style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}>
+                  <MaterialCommunityIcons name="pin" size={iconSize.sm} color={colors.accent} />
+                </View>
+                <AppText className="text-sm font-semibold text-cove-ink">
+                  {t("pinSelected")}
+                </AppText>
+              </>
+            )}
+          </Pressable>
+          <View className="flex-row gap-3">
           <Pressable
             disabled={isApplyingAction}
             onPress={() => void markSelectionBought()}
             className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-cove-accent px-3 py-3 active:opacity-80"
           >
-            {isApplyingAction ? (
+            {busyAction === "bought" ? (
               <ActivityIndicator color={colors.white} />
             ) : (
               <AppText className="text-sm font-semibold text-white">
@@ -253,6 +324,7 @@ export default function ItemsScreen() {
               {t("delete")}
             </AppText>
           </Pressable>
+          </View>
         </View>
       ) : shareNotice ? (
         <View className="mb-5">

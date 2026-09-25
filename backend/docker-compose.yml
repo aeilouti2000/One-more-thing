@@ -25,7 +25,7 @@ services:
       DATABASE_URL: postgres://omt:omt@db:5432/omt
       JWT_ACCESS_SECRET: local-dev-access-secret-change-me
       JWT_ACCESS_TTL: 15m
-      JWT_REFRESH_TTL_DAYS: 30
+      JWT_REFRESH_TTL_DAYS: 90
       CORS_ORIGINS: http://localhost:8081,http://localhost:19006
     depends_on:
       db:

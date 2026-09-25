@@ -107,16 +107,23 @@ async function refreshSession() {
   const current = readSession();
   if (!current) return false;
 
-  const response = await fetch(`${API_URL}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ refreshToken: current.refreshToken }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ refreshToken: current.refreshToken }),
+    });
+  } catch {
+    return false;
+  }
 
-  if (!response.ok) {
+  if (response.status === 401) {
     clearSession();
     return false;
   }
+
+  if (!response.ok) return false;
 
   writeSession((await response.json()) as AuthSession);
   return true;
@@ -145,7 +152,8 @@ async function request<T>(path: string, init: RequestInit = {}, auth = true, all
     });
     const refreshed = await refreshTask;
     if (refreshed) return request<T>(path, init, true, false);
-    throw new ApiError("Sign in required", "NOT_SIGNED_IN");
+    if (!readSession()) throw new ApiError("Sign in required", "NOT_SIGNED_IN");
+    throw new ApiError("Request failed", "NETWORK");
   }
 
   if (response.status === 204) return undefined as T;

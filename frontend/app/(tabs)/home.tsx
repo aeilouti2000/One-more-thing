@@ -4,6 +4,7 @@ import { Pressable, View } from "react-native";
 import { InviteCodeCard } from "@/components/household/InviteCodeCard";
 import { PartnerCard } from "@/components/household/PartnerCard";
 import { AppButton } from "@/components/ui/AppButton";
+import { EditButton } from "@/components/ui/EditButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -208,22 +209,15 @@ export default function HomeScreen() {
                       {household.name}
                     </AppText>
                   </View>
-                  <Pressable
+                  <EditButton
+                    variant="mist"
+                    accessibilityLabel={t("editFamilyName")}
                     onPress={() => {
                       setFamilyName(household.name);
                       setIsEditingName(true);
                       setNameSuccess(null);
                     }}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("editFamilyName")}
-                    className="h-11 w-11 items-center justify-center rounded-full bg-cove-mist active:opacity-80"
-                  >
-                    <Ionicons
-                      name="pencil-outline"
-                      size={iconSize.sm}
-                      color={colors.ink}
-                    />
-                  </Pressable>
+                  />
                 </View>
               )}
               {!isEditingName ? (

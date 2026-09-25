@@ -1,11 +1,11 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { CategoryChip } from "@/components/purchases/CategoryChip";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { StatusBadge, UrgentBadge } from "@/components/purchases/StatusBadge";
 import { AppText } from "@/components/ui/AppText";
+import { EditButton } from "@/components/ui/EditButton";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -14,18 +14,15 @@ import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
-import { iconSize } from "@/constants/theme";
 import { usePurchases } from "@/hooks/usePurchases";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
-import { useTheme } from "@/providers/ThemeProvider";
 import type { PurchaseCategory } from "@/types/purchase";
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getById, isLoading, markBought, updateItem } = usePurchases();
   const { t, locale } = useI18n();
-  const { colors } = useTheme();
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -120,7 +117,9 @@ export default function ItemDetailScreen() {
         showBack
         right={
           !isEditing ? (
-            <Pressable
+            <EditButton
+              variant="paper"
+              accessibilityLabel={t("editItemLabel")}
               onPress={() => {
                 setEditTitle(item.name);
                 setEditQuantity(String(item.quantity));
@@ -129,16 +128,7 @@ export default function ItemDetailScreen() {
                 setError(null);
                 setIsEditing(true);
               }}
-              accessibilityRole="button"
-              accessibilityLabel={t("editItemLabel")}
-              className="h-11 w-11 items-center justify-center rounded-full bg-white active:opacity-80"
-            >
-              <Ionicons
-                name="pencil-outline"
-                size={iconSize.sm}
-                color={colors.accent}
-              />
-            </Pressable>
+            />
           ) : null
         }
       />

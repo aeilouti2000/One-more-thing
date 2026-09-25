@@ -32,7 +32,7 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   @Max(365)
-  JWT_REFRESH_TTL_DAYS = 30;
+  JWT_REFRESH_TTL_DAYS = 90;
 
   @IsString()
   CORS_ORIGINS = "";

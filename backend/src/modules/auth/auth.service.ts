@@ -75,21 +75,19 @@ export class AuthService {
       throw new DomainError("INVALID_TOKEN", "Refresh token is invalid", HttpStatus.UNAUTHORIZED);
     }
     if (stored.revokedAt) {
-      await this.refreshTokens.update({ userId: stored.userId, revokedAt: IsNull() }, { revokedAt: new Date() });
       throw new DomainError("INVALID_TOKEN", "Refresh token is invalid", HttpStatus.UNAUTHORIZED);
     }
     if (stored.expiresAt.getTime() < Date.now()) {
       throw new DomainError("INVALID_TOKEN", "Refresh token is expired", HttpStatus.UNAUTHORIZED);
     }
 
-    stored.revokedAt = new Date();
-    await this.refreshTokens.save(stored);
-
     const user = await this.users.findOne({ where: { id: stored.userId } });
     if (!user) {
       throw new DomainError("INVALID_TOKEN", "Refresh token is invalid", HttpStatus.UNAUTHORIZED);
     }
-    return this.createSession(user);
+
+    const accessToken = await this.signAccessToken(user);
+    return { accessToken, refreshToken, user: this.toPublicUser(user) };
   }
 
   async logout(refreshToken: string) {
@@ -134,14 +132,18 @@ export class AuthService {
     };
   }
 
-  private async createSession(user: User): Promise<AuthSession> {
-    const accessToken = await this.jwt.signAsync(
+  private signAccessToken(user: User) {
+    return this.jwt.signAsync(
       { sub: user.id, email: user.email },
       {
         secret: this.config.get("JWT_ACCESS_SECRET", { infer: true }),
         expiresIn: this.config.get("JWT_ACCESS_TTL", { infer: true }),
       },
     );
+  }
+
+  private async createSession(user: User): Promise<AuthSession> {
+    const accessToken = await this.signAccessToken(user);
     const refreshToken = randomToken(48);
     const days = this.config.get("JWT_REFRESH_TTL_DAYS", { infer: true });
     await this.refreshTokens.save(

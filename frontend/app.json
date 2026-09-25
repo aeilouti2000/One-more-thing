@@ -15,7 +15,7 @@
       "googleServicesFile": "./google-services.json",
       "versionCode": 7,
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#071633",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false
@@ -33,10 +33,10 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 240,
           "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF",
+          "backgroundColor": "#071633",
           "dark": {
             "image": "./assets/images/splash-icon.png",
-            "backgroundColor": "#0B1526"
+            "backgroundColor": "#071633"
           }
         }
       ],
