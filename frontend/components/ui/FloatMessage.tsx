@@ -2,8 +2,20 @@ import { View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { useTheme } from "@/providers/ThemeProvider";
 
-export function FloatMessage({ message }: { message: string }) {
+export function FloatMessage({
+  message,
+  tone = "error",
+}: {
+  message: string;
+  tone?: "error" | "success";
+}) {
   const { colors, scheme } = useTheme();
+  const color =
+    tone === "success"
+      ? colors.accent
+      : scheme === "dark"
+        ? "#F87171"
+        : "#DC2626";
 
   return (
     <View
@@ -19,7 +31,7 @@ export function FloatMessage({ message }: { message: string }) {
     >
       <AppText
         className="text-center text-sm font-semibold"
-        style={{ color: scheme === "dark" ? "#F87171" : "#DC2626" }}
+        style={{ color }}
       >
         {message}
       </AppText>

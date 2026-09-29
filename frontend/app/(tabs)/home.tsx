@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { InviteCodeCard } from "@/components/household/InviteCodeCard";
 import { PartnerCard } from "@/components/household/PartnerCard";
 import { AppButton } from "@/components/ui/AppButton";
 import { EditButton } from "@/components/ui/EditButton";
 import { AppText } from "@/components/ui/AppText";
+import { FloatMessage } from "@/components/ui/FloatMessage";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -38,12 +39,14 @@ export default function HomeScreen() {
   const [isRemovingMember, setIsRemovingMember] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState("");
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [floatMessage, setFloatMessage] = useState<string | null>(null);
 
   const isHost = household?.members.some(
     (member) => member.id === user?.id && member.role === "owner",
@@ -155,6 +158,12 @@ export default function HomeScreen() {
     await refresh();
   }
 
+  useEffect(() => {
+    if (!floatMessage) return;
+    const timer = setTimeout(() => setFloatMessage(null), 2500);
+    return () => clearTimeout(timer);
+  }, [floatMessage]);
+
   if (isLoading && !household && !error) {
     return <LoadingScreen />;
   }
@@ -164,6 +173,7 @@ export default function HomeScreen() {
       tabBarInset
       refreshing={isRefreshing}
       onRefresh={() => void onRefresh()}
+      floating={floatMessage ? <FloatMessage message={floatMessage} tone="success" /> : null}
     >
       <ScreenHeader title={t("homeTitle")} subtitle={t("homeSubtitle")} />
 
@@ -228,7 +238,10 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <InviteCodeCard code={household.inviteCode} />
+          <InviteCodeCard
+            code={household.inviteCode}
+            onCopied={() => setFloatMessage(t("inviteCopied"))}
+          />
 
           <View>
             <SectionHeader
@@ -248,6 +261,11 @@ export default function HomeScreen() {
                   onRemove={() => {
                     setMemberToRemove(member);
                     setMemberError(null);
+                  }}
+                  canLeave={member.id === user?.id && member.role !== "owner"}
+                  onLeave={() => {
+                    setLeaveError(null);
+                    setIsConfirmingLeave(true);
                   }}
                 />
               ))}
@@ -283,36 +301,43 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View>
-            <SectionHeader title={t("joinAnotherHome")} />
-            <View className="gap-4 rounded-3xl bg-cove-paper p-4">
-              <AppText className="text-sm text-cove-muted">{t("joinAnotherHomeHint")}</AppText>
-              <AppTextField
-                label={t("inviteCode")}
-                value={inviteCode}
-                onChangeText={(value) => setInviteCode(value.toUpperCase())}
-                placeholder={t("inviteCodePlaceholder")}
-                autoCapitalize="characters"
-                autoCorrect={false}
+          <View className="rounded-3xl bg-cove-paper px-4 py-4">
+            <Pressable
+              onPress={() => setIsJoinOpen((open) => !open)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: isJoinOpen }}
+              className="flex-row items-center justify-between gap-3 active:opacity-80"
+            >
+              <AppText className="text-base font-semibold text-cove-ink">
+                {t("joinAnotherHome")}
+              </AppText>
+              <Ionicons
+                name={isJoinOpen ? "chevron-up" : "chevron-down"}
+                size={iconSize.sm}
+                color={colors.muted}
               />
-              <FormMessage message={joinError} />
-              <AppButton
-                label={t("joinThisHome")}
-                disabled={!inviteCode.trim()}
-                loading={isJoining}
-                onPress={() => void joinAnotherHome()}
-              />
-            </View>
+            </Pressable>
+            {isJoinOpen ? (
+              <View className="mt-4 gap-4">
+                <AppText className="text-sm text-cove-muted">{t("joinAnotherHomeHint")}</AppText>
+                <AppTextField
+                  label={t("inviteCode")}
+                  value={inviteCode}
+                  onChangeText={(value) => setInviteCode(value.toUpperCase())}
+                  placeholder={t("inviteCodePlaceholder")}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <FormMessage message={joinError} />
+                <AppButton
+                  label={t("joinThisHome")}
+                  disabled={!inviteCode.trim()}
+                  loading={isJoining}
+                  onPress={() => void joinAnotherHome()}
+                />
+              </View>
+            ) : null}
           </View>
-
-          <AppButton
-            label={t("leaveHome")}
-            variant="secondary"
-            onPress={() => {
-              setLeaveError(null);
-              setIsConfirmingLeave(true);
-            }}
-          />
         </View>
       ) : (
         <EmptyState

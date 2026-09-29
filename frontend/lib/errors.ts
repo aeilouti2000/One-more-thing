@@ -33,6 +33,12 @@ export function formatAppError(
   if (code === "ALREADY_IN_HOME") {
     return translate("errorAlreadyHasHome");
   }
+  if (code === "ALREADY_HOME_MEMBER") {
+    return translate("errorAlreadyHomeMember");
+  }
+  if (code === "HOST_CANNOT_LEAVE") {
+    return translate("errorHostCannotLeave");
+  }
   if (code === "UNKNOWN_INVITE_CODE") {
     return translate("errorUnknownInvite");
   }
@@ -83,6 +89,9 @@ export function formatAppError(
   }
   if (lower.includes("already belong to a home")) {
     return translate("errorAlreadyHasHome");
+  }
+  if (lower.includes("already in this home")) {
+    return translate("errorAlreadyHomeMember");
   }
   if (lower.includes("unknown invite code")) {
     return translate("errorUnknownInvite");

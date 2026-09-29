@@ -6,17 +6,21 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RefreshToken } from "./modules/auth/refresh-token.entity";
 import { type AppConfig, validateEnv } from "./config/env";
+import { ItemSortOrder1740000000006 } from "./database/migrations/1740000000006-ItemSortOrder";
+import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
 import { ShoppingTrip1740000000004 } from "./database/migrations/1740000000004-ShoppingTrip";
 import { AddPushTokens1740000000003 } from "./database/migrations/1740000000003-AddPushTokens";
 import { AddItemUrgent1740000000002 } from "./database/migrations/1740000000002-AddItemUrgent";
 import { DropEmailConfirmation1740000000001 } from "./database/migrations/1740000000001-DropEmailConfirmation";
 import { Init1740000000000 } from "./database/migrations/1740000000000-Init";
+import { AppReleaseController } from "./app-release.controller";
 import { HealthController } from "./health.controller";
 import { HomeMember } from "./modules/homes/home-member.entity";
 import { Home } from "./modules/homes/home.entity";
 import { HomesModule } from "./modules/homes/homes.module";
 import { Item } from "./modules/items/item.entity";
+import { ShoppingList } from "./modules/items/shopping-list.entity";
 import { Staple } from "./modules/items/staple.entity";
 import { ItemsModule } from "./modules/items/items.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
@@ -40,7 +44,7 @@ import { User } from "./users/user.entity";
           type: "postgres" as const,
           url,
           ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
-          entities: [User, RefreshToken, Home, HomeMember, Item, Staple, PushToken],
+          entities: [User, RefreshToken, Home, HomeMember, Item, ShoppingList, Staple, PushToken],
           migrations: [
             Init1740000000000,
             DropEmailConfirmation1740000000001,
@@ -48,6 +52,8 @@ import { User } from "./users/user.entity";
             AddPushTokens1740000000003,
             ShoppingTrip1740000000004,
             ManyHomes1740000000005,
+            ItemSortOrder1740000000006,
+            ShoppingLists1740000000007,
           ],
           migrationsRun: true,
         };
@@ -58,7 +64,7 @@ import { User } from "./users/user.entity";
     ItemsModule,
     NotificationsModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, AppReleaseController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

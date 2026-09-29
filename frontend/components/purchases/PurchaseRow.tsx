@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, View } from "react-native";
+import { Pressable, View, type ReactNode } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { getCategoryLabel } from "@/constants/categories";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -16,6 +16,7 @@ type PurchaseRowProps = {
   onChangeQuantity?: (quantity: number) => void;
   quantityBusy?: boolean;
   selected?: boolean;
+  leading?: ReactNode;
 };
 
 export function PurchaseRow({
@@ -27,6 +28,7 @@ export function PurchaseRow({
   onChangeQuantity,
   quantityBusy = false,
   selected = false,
+  leading,
 }: PurchaseRowProps) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
@@ -54,6 +56,7 @@ export function PurchaseRow({
       }`}
     >
       <View className="flex-row items-start gap-3">
+        {leading}
         <Pressable
           onPress={onPress}
           onLongPress={onLongPress}
@@ -87,13 +90,25 @@ export function PurchaseRow({
           ) : null}
         </Pressable>
         {selected ? (
-          <Ionicons
-            name="checkmark-circle"
-            size={28}
-            color={colors.accent}
-          />
+          <Pressable
+            onPress={onPress}
+            onLongPress={onLongPress}
+            delayLongPress={350}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+          >
+            <Ionicons
+              name="checkmark-circle"
+              size={28}
+              color={colors.accent}
+            />
+          </Pressable>
         ) : (
-          <View className="items-end gap-2">
+          <Pressable
+            onLongPress={onLongPress}
+            delayLongPress={350}
+            className="items-end gap-2"
+          >
             <View className="flex-row items-center gap-2">
               {purchase.urgent && purchase.status !== "bought" ? <UrgentBadge /> : null}
               <StatusBadge status={purchase.status} />
@@ -106,6 +121,8 @@ export function PurchaseRow({
                     const next = purchase.quantity - 1;
                     onChangeQuantity(next < 1 ? 1 : next);
                   }}
+                  onLongPress={onLongPress}
+                  delayLongPress={350}
                   accessibilityRole="button"
                   accessibilityLabel={t("decreaseQuantity")}
                   className={`h-7 w-7 items-center justify-center rounded-full bg-cove-mist ${
@@ -120,6 +137,8 @@ export function PurchaseRow({
                 <Pressable
                   disabled={quantityBusy}
                   onPress={() => onChangeQuantity(purchase.quantity + 1)}
+                  onLongPress={onLongPress}
+                  delayLongPress={350}
                   accessibilityRole="button"
                   accessibilityLabel={t("increaseQuantity")}
                   className={`h-7 w-7 items-center justify-center rounded-full bg-cove-mist ${
@@ -130,7 +149,7 @@ export function PurchaseRow({
                 </Pressable>
               </View>
             ) : null}
-          </View>
+          </Pressable>
         )}
       </View>
       {onUndo || onBuyAgain ? (

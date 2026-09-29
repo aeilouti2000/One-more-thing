@@ -53,27 +53,27 @@ export function ConfirmModal({
           className="w-full max-w-md gap-4 rounded-3xl p-5"
           style={{ backgroundColor: colors.paper }}
         >
-          <View
-            className="h-12 w-12 items-center justify-center rounded-full"
-            style={{ backgroundColor: "#FEE2E2" }}
-          >
-            <AppText style={{ color: "#DC2626", fontSize: 22 }}>!</AppText>
-          </View>
-
-          <View className="gap-2">
+          <View className="flex-row items-center gap-3">
+            <View
+              className="h-12 w-12 items-center justify-center rounded-full"
+              style={{ backgroundColor: "#FEE2E2" }}
+            >
+              <AppText style={{ color: "#DC2626", fontSize: 22 }}>!</AppText>
+            </View>
             <AppText
-              className="text-xl font-semibold"
+              className="min-w-0 flex-1 text-xl font-semibold"
               style={{ color: colors.ink }}
             >
               {title}
             </AppText>
-            <AppText
-              className="text-sm leading-5"
-              style={{ color: colors.muted }}
-            >
-              {message}
-            </AppText>
           </View>
+
+          <AppText
+            className="text-sm leading-5"
+            style={{ color: colors.muted }}
+          >
+            {message}
+          </AppText>
 
           <FormMessage message={error} />
 

@@ -1,6 +1,11 @@
 import "./global.css";
+import { useEffect, useState } from "react";
 import { Stack } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
+import { ForceUpdate } from "@/components/ui/ForceUpdate";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import { requiredAppUpdate } from "@/lib/app-release";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { HouseholdProvider } from "@/providers/HouseholdProvider";
 import { NotificationsProvider } from "@/providers/NotificationsProvider";
@@ -35,6 +40,27 @@ function ThemedNavigation() {
   );
 }
 
+function UpdateGate() {
+  const [release, setRelease] = useState<"checking" | "ok" | { downloadUrl: string | null }>(
+    "checking",
+  );
+
+  useEffect(() => {
+    let active = true;
+    void requiredAppUpdate().then((update) => {
+      if (!active) return;
+      setRelease(update ?? "ok");
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (release === "checking") return <LoadingScreen />;
+  if (release !== "ok") return <ForceUpdate downloadUrl={release.downloadUrl} />;
+  return <ThemedNavigation />;
+}
+
 export default function RootLayout() {
   return (
     <LanguageProvider>
@@ -42,7 +68,9 @@ export default function RootLayout() {
         <AuthProvider>
           <NotificationsProvider>
             <HouseholdProvider>
-              <ThemedNavigation />
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <UpdateGate />
+              </GestureHandlerRootView>
             </HouseholdProvider>
           </NotificationsProvider>
         </AuthProvider>

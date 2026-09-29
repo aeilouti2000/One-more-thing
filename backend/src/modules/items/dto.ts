@@ -29,6 +29,10 @@ export class CreateItemDto {
   @IsOptional()
   @IsBoolean()
   urgent?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  listId?: string;
 }
 
 export class UpdateItemDto {
@@ -68,4 +72,11 @@ export class ItemIdsDto {
   @ArrayNotEmpty()
   @IsUUID("all", { each: true })
   ids: string[];
+}
+
+export class CreateListDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  name: string;
 }

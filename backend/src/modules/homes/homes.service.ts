@@ -4,6 +4,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { DomainError } from "../../common/domain.error";
 import { User } from "../../users/user.entity";
+import { ShoppingList } from "../items/shopping-list.entity";
 import { HomeMember, type MemberRole } from "./home-member.entity";
 import { Home } from "./home.entity";
 
@@ -80,6 +81,7 @@ export class HomesService {
         }),
       );
       await manager.getRepository(User).update(userId, { activeHomeId: home.id });
+      await manager.getRepository(ShoppingList).save({ homeId: home.id, name: "List" });
       return this.loadHousehold(home.id, manager);
     });
   }
@@ -95,15 +97,20 @@ export class HomesService {
       }
 
       const alreadyThere = await members.findOne({ where: { userId, homeId: home.id } });
-      if (!alreadyThere) {
-        await members.save(
-          members.create({
-            homeId: home.id,
-            userId,
-            role: "partner",
-          }),
+      if (alreadyThere) {
+        throw new DomainError(
+          "ALREADY_HOME_MEMBER",
+          "You are already in this home.",
+          HttpStatus.CONFLICT,
         );
       }
+      await members.save(
+        members.create({
+          homeId: home.id,
+          userId,
+          role: "partner",
+        }),
+      );
       await manager.getRepository(User).update(userId, { activeHomeId: home.id });
       return this.loadHousehold(home.id, manager);
     });
@@ -134,6 +141,14 @@ export class HomesService {
         throw new DomainError("NOT_HOME_MEMBER", "You do not belong to this home", HttpStatus.FORBIDDEN);
       }
 
+      if (membership.role === "owner") {
+        throw new DomainError(
+          "HOST_CANNOT_LEAVE",
+          "The host cannot leave this home.",
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       const replacement = await members
         .createQueryBuilder("member")
         .where("member.homeId = :homeId", { homeId })
@@ -144,9 +159,6 @@ export class HomesService {
       if (!replacement) {
         await manager.getRepository(Home).delete(homeId);
       } else {
-        if (membership.role === "owner") {
-          await members.update({ homeId, userId: replacement.userId }, { role: "owner" });
-        }
         await members.delete({ homeId, userId });
       }
 

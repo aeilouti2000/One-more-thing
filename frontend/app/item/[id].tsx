@@ -173,7 +173,7 @@ export default function ItemDetailScreen() {
         title={isEditing ? t("editItem") : item.name}
         showBack
         right={
-          !isEditing ? (
+          !isEditing && item.status !== "bought" ? (
             <EditButton
               variant="paper"
               accessibilityLabel={t("editItemLabel")}

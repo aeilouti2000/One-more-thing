@@ -8,6 +8,7 @@ import {
 } from "typeorm";
 import { User } from "../../users/user.entity";
 import { Home } from "../homes/home.entity";
+import { ShoppingList } from "./shopping-list.entity";
 
 export const ITEM_CATEGORIES = [
   "vegetables",
@@ -38,6 +39,13 @@ export class Item {
   @JoinColumn({ name: "home_id" })
   home: Home;
 
+  @Column({ name: "list_id", type: "uuid" })
+  listId: string;
+
+  @ManyToOne(() => ShoppingList, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "list_id" })
+  list: ShoppingList;
+
   @Column()
   name: string;
 
@@ -63,6 +71,9 @@ export class Item {
 
   @Column({ type: "boolean", default: false })
   urgent: boolean;
+
+  @Column({ name: "sort_order", type: "int", default: 0 })
+  sortOrder: number;
 
   @Column({ name: "urgent_before_bought", type: "boolean", default: false })
   urgentBeforeBought: boolean;

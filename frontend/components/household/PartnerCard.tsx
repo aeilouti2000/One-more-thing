@@ -9,12 +9,16 @@ type PartnerCardProps = {
   member: HouseholdMember;
   canRemove?: boolean;
   onRemove?: () => void;
+  canLeave?: boolean;
+  onLeave?: () => void;
 };
 
 export function PartnerCard({
   member,
   canRemove = false,
   onRemove,
+  canLeave = false,
+  onLeave,
 }: PartnerCardProps) {
   const { t } = useI18n();
   const initial = member.name.charAt(0).toUpperCase();
@@ -40,6 +44,16 @@ export function PartnerCard({
           className="h-11 w-11 items-center justify-center rounded-full bg-red-50 active:opacity-80"
         >
           <Ionicons name="trash-outline" size={iconSize.sm} color="#DC2626" />
+        </Pressable>
+      ) : null}
+      {canLeave && onLeave ? (
+        <Pressable
+          onPress={onLeave}
+          accessibilityRole="button"
+          accessibilityLabel={t("leaveHome")}
+          className="h-11 w-11 items-center justify-center rounded-full bg-red-50 active:opacity-80"
+        >
+          <Ionicons name="exit-outline" size={iconSize.sm} color="#DC2626" />
         </Pressable>
       ) : null}
     </View>

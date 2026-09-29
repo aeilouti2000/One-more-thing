@@ -6,13 +6,17 @@ import { HomesService } from "../homes/homes.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { User } from "../../users/user.entity";
 import type { ItemCategory } from "./item.entity";
+import { ShoppingList } from "./shopping-list.entity";
 import { Item } from "./item.entity";
+import { applyNeededOrder, placeNeededItem } from "./item-order";
 import { undoDeadline } from "./shopping";
 import { StaplesService } from "./staples.service";
 
 export type ItemView = {
   id: string;
   homeId: string;
+  listId: string;
+  listName: string;
   name: string;
   quantity: number;
   unit: string | null;
@@ -32,6 +36,7 @@ export type ItemView = {
 export class ItemsService {
   constructor(
     @InjectRepository(Item) private readonly items: Repository<Item>,
+    @InjectRepository(ShoppingList) private readonly shoppingLists: Repository<ShoppingList>,
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly homes: HomesService,
     private readonly notifications: NotificationsService,
@@ -43,7 +48,7 @@ export class ItemsService {
     await this.staples.materializeDue(homeId, userId);
     const rows = await this.items.find({
       where: { homeId },
-      order: { createdAt: "DESC" },
+      order: { sortOrder: "ASC", createdAt: "DESC" },
     });
     return this.withNames(rows);
   }
@@ -51,13 +56,15 @@ export class ItemsService {
   async add(
     userId: string,
     homeId: string,
-    input: { name: string; quantity: number; category: ItemCategory; unit?: string; notes?: string; urgent?: boolean },
+    input: { name: string; quantity: number; category: ItemCategory; unit?: string; notes?: string; urgent?: boolean; listId?: string },
     options?: { notify?: boolean },
   ) {
     await this.homes.requireMembership(userId, homeId);
+    const list = await this.resolveList(homeId, input.listId);
     const item = await this.items.save(
       this.items.create({
         homeId,
+        listId: list.id,
         name: input.name.trim(),
         quantity: input.quantity,
         category: input.category,
@@ -70,6 +77,7 @@ export class ItemsService {
         boughtAt: null,
       }),
     );
+    await placeNeededItem(this.items, homeId, item.id, item.urgent ? "top" : "after-urgent", item.listId);
     const [view] = await this.withNames([item]);
     if (options?.notify !== false) {
       await this.notifications.notifyItemAdded({
@@ -96,6 +104,9 @@ export class ItemsService {
     item.urgent = input.urgent;
     item.notes = blankToNull(input.notes);
     const saved = await this.items.save(item);
+    if (becameUrgent) {
+      await placeNeededItem(this.items, saved.homeId, saved.id, "top", saved.listId);
+    }
     const [view] = await this.withNames([saved]);
     if (becameUrgent) {
       const actor = await this.users.findOne({ where: { id: userId }, select: { id: true, name: true } });
@@ -136,8 +147,24 @@ export class ItemsService {
     item.boughtBy = null;
     item.boughtAt = null;
     const saved = await this.items.save(item);
+    await placeNeededItem(
+      this.items,
+      saved.homeId,
+      saved.id,
+      saved.urgent ? "top" : "after-urgent",
+      saved.listId,
+    );
     const [view] = await this.withNames([saved]);
     return view;
+  }
+
+  async reorder(userId: string, ids: string[]) {
+    const membership = await this.homes.requireMembership(userId);
+    const applied = await applyNeededOrder(this.items, membership.homeId, ids);
+    if (!applied) {
+      throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
+    }
+    return { updated: ids.length };
   }
 
   async markManyBought(userId: string, ids: string[]) {
@@ -175,6 +202,37 @@ export class ItemsService {
     return { deleted: uniqueIds.length };
   }
 
+  async lists(userId: string, homeId: string) {
+    await this.homes.requireMembership(userId, homeId);
+    const rows = await this.shoppingLists.find({
+      where: { homeId },
+      order: { createdAt: "ASC" },
+    });
+    return rows.map((row) => ({ id: row.id, homeId: row.homeId, name: row.name }));
+  }
+
+  async createList(userId: string, homeId: string, name: string) {
+    await this.homes.requireMembership(userId, homeId);
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new DomainError("LIST_NAME_REQUIRED", "Enter a list name.", HttpStatus.BAD_REQUEST);
+    }
+    const row = await this.shoppingLists.save(
+      this.shoppingLists.create({ homeId, name: trimmed }),
+    );
+    return { id: row.id, homeId: row.homeId, name: row.name };
+  }
+
+  private async resolveList(homeId: string, listId?: string) {
+    const list = listId
+      ? await this.shoppingLists.findOne({ where: { id: listId, homeId } })
+      : await this.shoppingLists.findOne({ where: { homeId }, order: { createdAt: "ASC" } });
+    if (!list) {
+      throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
+    }
+    return list;
+  }
+
   private async requireItem(userId: string, itemId: string) {
     const membership = await this.homes.requireMembership(userId);
     const item = await this.items.findOne({ where: { id: itemId, homeId: membership.homeId } });
@@ -190,10 +248,17 @@ export class ItemsService {
       ? await this.users.find({ where: { id: In(ids) }, select: { id: true, name: true } })
       : [];
     const names = new Map(people.map((person) => [person.id, person.name]));
+    const listIds = [...new Set(rows.map((row) => row.listId).filter(Boolean))];
+    const lists = listIds.length
+      ? await this.shoppingLists.find({ where: { id: In(listIds) } })
+      : [];
+    const listNames = new Map(lists.map((list) => [list.id, list.name]));
 
     return rows.map((row) => ({
       id: row.id,
       homeId: row.homeId,
+      listId: row.listId,
+      listName: listNames.get(row.listId) ?? "List",
       name: row.name,
       quantity: Number(row.quantity),
       unit: row.unit,

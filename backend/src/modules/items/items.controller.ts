@@ -2,13 +2,27 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } f
 import { AuthGuard } from "@nestjs/passport";
 import { CurrentUser } from "../../common/current-user.decorator";
 import { User } from "../../users/user.entity";
-import { CreateItemDto, ItemIdsDto, UpdateItemDto } from "./dto";
+import { CreateItemDto, CreateListDto, ItemIdsDto, UpdateItemDto } from "./dto";
 import { ItemsService } from "./items.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
 export class ItemsController {
   constructor(private readonly items: ItemsService) {}
+
+  @Get("homes/:homeId/lists")
+  lists(@CurrentUser() user: User, @Param("homeId", ParseUUIDPipe) homeId: string) {
+    return this.items.lists(user.id, homeId);
+  }
+
+  @Post("homes/:homeId/lists")
+  createList(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Body() body: CreateListDto,
+  ) {
+    return this.items.createList(user.id, homeId, body.name);
+  }
 
   @Get("homes/:homeId/items")
   list(@CurrentUser() user: User, @Param("homeId", ParseUUIDPipe) homeId: string) {
@@ -41,6 +55,11 @@ export class ItemsController {
   @Post("items/:itemId/needed")
   undoBought(@CurrentUser() user: User, @Param("itemId", ParseUUIDPipe) itemId: string) {
     return this.items.undoBought(user.id, itemId);
+  }
+
+  @Post("items/order")
+  reorder(@CurrentUser() user: User, @Body() body: ItemIdsDto) {
+    return this.items.reorder(user.id, body.ids);
   }
 
   @Post("items/bought")

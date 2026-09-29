@@ -8,10 +8,12 @@ import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 type ScreenHeaderProps = {
-  title: string;
+  title?: string;
   subtitle?: string;
   showBack?: boolean;
   right?: ReactNode;
+  footer?: ReactNode;
+  children?: ReactNode;
 };
 
 export function ScreenHeader({
@@ -19,6 +21,8 @@ export function ScreenHeader({
   subtitle,
   showBack = false,
   right,
+  footer,
+  children,
 }: ScreenHeaderProps) {
   const { colors, scheme } = useTheme();
   const { isRTL, t } = useI18n();
@@ -46,7 +50,11 @@ export function ScreenHeader({
         }}
       />
 
-      <View className="relative z-10 flex-row items-start justify-between gap-3">
+      <View
+        className={`relative z-10 flex-row justify-between gap-3 ${
+          children ? "items-center" : "items-start"
+        }`}
+      >
         <View className="min-w-0 flex-1 flex-row items-start gap-3">
           {showBack ? (
             <Pressable
@@ -63,21 +71,28 @@ export function ScreenHeader({
             </Pressable>
           ) : null}
           <View className="min-w-0 flex-1">
-            <AppText className="text-3xl font-semibold tracking-tight text-white">
-              {title}
-            </AppText>
-            {subtitle ? (
-              <AppText
-                className="mt-1 text-base text-white"
-                style={{ opacity: 0.88 }}
-              >
-                {subtitle}
-              </AppText>
-            ) : null}
+            {children ?? (
+              <>
+                {title ? (
+                  <AppText className="text-3xl font-semibold tracking-tight text-white">
+                    {title}
+                  </AppText>
+                ) : null}
+                {subtitle ? (
+                  <AppText
+                    className="mt-1 text-base text-white"
+                    style={{ opacity: 0.88 }}
+                  >
+                    {subtitle}
+                  </AppText>
+                ) : null}
+              </>
+            )}
           </View>
         </View>
         {right}
       </View>
+      {footer ? <View className="relative z-10 mt-4">{footer}</View> : null}
     </View>
   );
 }

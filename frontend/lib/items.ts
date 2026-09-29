@@ -11,6 +11,7 @@ export type NewItemInput = {
   notes?: string;
   unit?: string;
   urgent?: boolean;
+  listId?: string;
 };
 
 export type UpdateItemInput = Pick<
@@ -27,6 +28,8 @@ type ItemResponse = {
   notes: string | null;
   status: Purchase["status"];
   urgent: boolean;
+  listId?: string;
+  listName?: string;
   addedByName: string;
   boughtByName: string | null;
   createdAt: string;
@@ -44,6 +47,8 @@ function toPurchase(item: ItemResponse): Purchase {
     notes: item.notes ?? undefined,
     status: item.status,
     urgent: Boolean(item.urgent),
+    listId: item.listId,
+    listName: item.listName,
     addedByName: item.addedByName,
     boughtByName: item.boughtByName ?? undefined,
     createdAt: item.createdAt,
@@ -69,6 +74,7 @@ export async function addItem(input: NewItemInput) {
       notes: input.notes?.trim() || undefined,
       unit: input.unit?.trim() || undefined,
       urgent: input.urgent === true,
+      listId: input.listId,
     });
     return { error: null };
   } catch (error) {
@@ -113,6 +119,16 @@ export async function markItemsBought(itemIds: string[]) {
   if (itemIds.length === 0) return { error: null };
   try {
     await api.post("/items/bought", { ids: itemIds });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}
+
+export async function reorderItems(itemIds: string[]) {
+  if (itemIds.length === 0) return { error: null };
+  try {
+    await api.post("/items/order", { ids: itemIds });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };

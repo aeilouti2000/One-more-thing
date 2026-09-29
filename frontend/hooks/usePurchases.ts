@@ -3,6 +3,7 @@ import { useFocusEffect } from "expo-router";
 import {
   addItem as insertItem,
   deleteItems,
+  reorderItems,
   fetchHomeItems,
   markItemBought,
   markItemsBought,
@@ -11,7 +12,7 @@ import {
 } from "@/lib/items";
 import type { NewItemInput, UpdateItemInput } from "@/lib/items";
 import { translate } from "@/constants/i18n";
-import { onListChanged } from "@/lib/list-sync";
+import { emitListChanged, onListChanged } from "@/lib/list-sync";
 import { useHousehold } from "@/hooks/useHousehold";
 import { useAuth } from "@/providers/AuthProvider";
 import type { Purchase, PurchaseStatus } from "@/types/purchase";
@@ -35,6 +36,7 @@ type UsePurchasesResult = {
   undoBought: (id: string) => Promise<{ error: string | null }>;
   markManyBought: (ids: string[]) => Promise<{ error: string | null }>;
   deleteMany: (ids: string[]) => Promise<{ error: string | null }>;
+  reorderNeeded: (ids: string[]) => Promise<{ error: string | null }>;
 };
 
 export function usePurchases(): UsePurchasesResult {
@@ -82,12 +84,12 @@ export function usePurchases(): UsePurchasesResult {
       });
 
       if (!result.error) {
-        await refresh();
+        emitListChanged();
       }
 
       return result;
     },
-    [household, refresh, user],
+    [household, user],
   );
 
   const markBought = useCallback(
@@ -98,12 +100,12 @@ export function usePurchases(): UsePurchasesResult {
 
       const result = await markItemBought(id);
       if (!result.error) {
-        await refresh();
+        emitListChanged();
       }
 
       return result;
     },
-    [refresh, user],
+    [user],
   );
 
   const updateItem = useCallback(
@@ -114,12 +116,12 @@ export function usePurchases(): UsePurchasesResult {
 
       const result = await updateItemDetails(id, values);
       if (!result.error) {
-        await refresh();
+        emitListChanged();
       }
 
       return result;
     },
-    [refresh, user],
+    [user],
   );
 
   const undoBought = useCallback(
@@ -130,12 +132,12 @@ export function usePurchases(): UsePurchasesResult {
 
       const result = await undoItemBought(id);
       if (!result.error) {
-        await refresh();
+        emitListChanged();
       }
 
       return result;
     },
-    [refresh, user],
+    [user],
   );
 
   const markManyBought = useCallback(
@@ -146,12 +148,12 @@ export function usePurchases(): UsePurchasesResult {
 
       const result = await markItemsBought(ids);
       if (!result.error) {
-        await refresh();
+        emitListChanged();
       }
 
       return result;
     },
-    [refresh, user],
+    [user],
   );
 
   const deleteMany = useCallback(
@@ -162,9 +164,37 @@ export function usePurchases(): UsePurchasesResult {
 
       const result = await deleteItems(ids);
       if (!result.error) {
-        await refresh();
+        emitListChanged();
       }
 
+      return result;
+    },
+    [user],
+  );
+
+  const reorderNeeded = useCallback(
+    async (ids: string[]) => {
+      if (!user) {
+        return { error: translate("errorNeedLogin") };
+      }
+
+      setPurchases((current) => {
+        const needed = current.filter((item) => item.status === "needed");
+        const bought = current.filter((item) => item.status === "bought");
+        const byId = new Map(needed.map((item) => [item.id, item]));
+        const moving = new Set(ids);
+        const queue = ids.filter((id) => byId.has(id));
+        const nextNeeded = needed.map((item) => {
+          if (!moving.has(item.id)) return item;
+          const id = queue.shift();
+          return (id && byId.get(id)) || item;
+        });
+        return [...nextNeeded, ...bought];
+      });
+
+      const result = await reorderItems(ids);
+      if (result.error) await refresh();
+      else emitListChanged();
       return result;
     },
     [refresh, user],
@@ -189,6 +219,7 @@ export function usePurchases(): UsePurchasesResult {
     undoBought,
     markManyBought,
     deleteMany,
+    reorderNeeded,
   };
 }
 

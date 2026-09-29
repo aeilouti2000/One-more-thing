@@ -5,6 +5,8 @@ import { DomainError } from "../../common/domain.error";
 import { HomesService } from "../homes/homes.service";
 import type { ItemCategory } from "./item.entity";
 import { Item } from "./item.entity";
+import { placeNeededItem } from "./item-order";
+import { ShoppingList } from "./shopping-list.entity";
 import { advanceDue } from "./shopping";
 import { STAPLE_LIMIT, Staple, type StapleInterval } from "./staple.entity";
 
@@ -24,6 +26,7 @@ export class StaplesService {
   constructor(
     @InjectRepository(Staple) private readonly staples: Repository<Staple>,
     @InjectRepository(Item) private readonly items: Repository<Item>,
+    @InjectRepository(ShoppingList) private readonly shoppingLists: Repository<ShoppingList>,
     private readonly homes: HomesService,
   ) {}
 
@@ -95,9 +98,15 @@ export class StaplesService {
     for (const staple of due) {
       const key = staple.name.trim().toLowerCase();
       if (!names.has(key)) {
-        await this.items.save(
+        const list = await this.shoppingLists.findOne({
+          where: { homeId },
+          order: { createdAt: "ASC" },
+        });
+        if (!list) continue;
+        const created = await this.items.save(
           this.items.create({
             homeId,
+            listId: list.id,
             name: staple.name,
             quantity: staple.quantity,
             unit: staple.unit,
@@ -110,6 +119,13 @@ export class StaplesService {
             boughtBy: null,
             boughtAt: null,
           }),
+        );
+        await placeNeededItem(
+          this.items,
+          homeId,
+          created.id,
+          staple.urgent ? "top" : "after-urgent",
+          created.listId,
         );
         names.add(key);
       }

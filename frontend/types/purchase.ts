@@ -17,6 +17,8 @@ export type Purchase = {
   notes?: string;
   status: PurchaseStatus;
   urgent: boolean;
+  listId?: string;
+  listName?: string;
   addedByName: string;
   boughtByName?: string;
   createdAt: string;

@@ -40,6 +40,14 @@ class EnvironmentVariables {
   @IsOptional()
   @IsIn(["true", "false"])
   DATABASE_SSL = "false";
+
+  @IsOptional()
+  @IsString()
+  APP_MIN_VERSION = "";
+
+  @IsOptional()
+  @IsString()
+  APP_DOWNLOAD_URL = "";
 }
 
 export function validateEnv(config: Record<string, unknown>) {
