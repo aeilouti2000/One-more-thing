@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, View, type ReactNode } from "react-native";
+import type { ReactNode } from "react";
+import { Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { getCategoryLabel } from "@/constants/categories";
 import { useI18n } from "@/providers/LanguageProvider";
