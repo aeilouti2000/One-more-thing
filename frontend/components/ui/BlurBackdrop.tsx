@@ -26,12 +26,28 @@ export function FrostedBlur({ style }: { style?: StyleProp<ViewStyle> }) {
   const { scheme } = useTheme();
   const blurTarget = useContext(BlurTargetContext);
 
+  // Android's blur view crashes if it is drawn inside the screen it blurs.
+  // The tab bar and cards mount that way, so use a solid frost there instead.
+  if (Platform.OS === "android") {
+    return (
+      <View
+        pointerEvents="none"
+        style={[
+          style,
+          {
+            backgroundColor:
+              scheme === "dark" ? "rgba(19, 34, 56, 0.94)" : "rgba(255, 255, 255, 0.94)",
+          },
+        ]}
+      />
+    );
+  }
+
   return (
     <BlurView
       intensity={scheme === "dark" ? 80 : 56}
       tint={scheme === "dark" ? "dark" : "light"}
       blurTarget={blurTarget ?? undefined}
-      blurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
       blurReductionFactor={2}
       pointerEvents="none"
       style={style}

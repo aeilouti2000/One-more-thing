@@ -70,14 +70,14 @@ function UpdateGate() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     ReadexPro_400Regular,
     ReadexPro_500Medium,
     ReadexPro_600SemiBold,
     ReadexPro_700Bold,
   });
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <LanguageProvider>
