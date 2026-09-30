@@ -8,6 +8,10 @@ const BlurTargetContext = createContext<RefObject<View | null> | null>(null);
 export function BlurScreen({ children }: { children: ReactNode }) {
   const target = useRef<View>(null);
 
+  if (Platform.OS === "android") {
+    return <View style={styles.fill}>{children}</View>;
+  }
+
   return (
     <BlurTargetContext.Provider value={target}>
       <BlurTargetView ref={target} style={styles.fill}>
