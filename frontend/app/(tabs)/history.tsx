@@ -6,7 +6,7 @@ import { HistoryDateField } from "@/components/purchases/HistoryDateField";
 import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
 import { AppText } from "@/components/ui/AppText";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, FrostedFill } from "@/components/ui/BlurBackdrop";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
@@ -287,7 +287,8 @@ function OptionMenu({
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <View className="flex-1 items-center justify-center px-6">
         <BlurBackdrop onPress={onClose} />
-        <View className="w-full max-w-md gap-1 rounded-3xl p-3" style={{ backgroundColor: colors.paper }}>
+        <View className="w-full max-w-md gap-1 overflow-hidden rounded-3xl border border-cove-line p-3">
+          <FrostedFill />
           {options.map((option) => {
             const selected = option.id === selectedId;
             return (

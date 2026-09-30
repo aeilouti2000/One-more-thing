@@ -7,7 +7,7 @@ import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, FrostedFill } from "@/components/ui/BlurBackdrop";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
@@ -287,14 +287,14 @@ function StaplesBody() {
         <View className="flex-1 items-center justify-center px-5">
           <BlurBackdrop onPress={closeForm} disabled={isSaving} />
           <View
-            className="w-full max-w-md rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
-            style={{ backgroundColor: colors.paper }}
+            className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
           >
+            <FrostedFill />
             <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">
               <AppText className="text-lg font-semibold text-cove-ink">{t("addStaple")}</AppText>
             </View>
             <View className="gap-4">
-            <View className="flex-row items-start gap-3">
+            <View className="flex-row items-stretch gap-3">
                   <View className="min-w-0 flex-1">
                     <AppTextField
                       compact

@@ -1,5 +1,5 @@
 import { ActivityIndicator, Modal, Pressable, View } from "react-native";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, FrostedFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -44,10 +44,8 @@ export function ConfirmModal({
       <View className="flex-1 items-center justify-center px-6">
         <BlurBackdrop onPress={onCancel} disabled={loading} />
 
-        <View
-          className="w-full max-w-md gap-4 rounded-3xl p-5"
-          style={{ backgroundColor: colors.paper }}
-        >
+        <View className="w-full max-w-md gap-4 overflow-hidden rounded-3xl border border-cove-line p-5">
+          <FrostedFill />
           <View className="flex-row items-center gap-3">
             <View
               className="h-12 w-12 items-center justify-center rounded-full"

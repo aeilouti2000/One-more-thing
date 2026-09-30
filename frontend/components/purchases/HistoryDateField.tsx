@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { FrostedFill } from "@/components/ui/BlurBackdrop";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -64,14 +65,14 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
       </View>
       {open ? (
         <View
-          className="rounded-3xl px-3 py-3"
+          className="overflow-hidden rounded-3xl px-3 py-3"
           style={{
             width: "100%",
-            backgroundColor: colors.paper,
             borderWidth: 1,
             borderColor: colors.line,
           }}
         >
+          <FrostedFill />
           <View className="mb-3 flex-row items-center justify-between">
             <Pressable
               onPress={() => setCursor(shiftMonth(cursor, -1))}

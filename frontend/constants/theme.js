@@ -64,7 +64,10 @@ const fontWeight = {
 };
 
 const fonts = {
-  sans: "System",
+  sans: "ReadexPro_400Regular",
+  medium: "ReadexPro_500Medium",
+  semibold: "ReadexPro_600SemiBold",
+  bold: "ReadexPro_700Bold",
 };
 
 const iconSize = {

@@ -1,5 +1,12 @@
 import "./global.css";
 import { useEffect, useState } from "react";
+import {
+  ReadexPro_400Regular,
+  ReadexPro_500Medium,
+  ReadexPro_600SemiBold,
+  ReadexPro_700Bold,
+  useFonts,
+} from "@expo-google-fonts/readex-pro";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
@@ -63,6 +70,15 @@ function UpdateGate() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    ReadexPro_400Regular,
+    ReadexPro_500Medium,
+    ReadexPro_600SemiBold,
+    ReadexPro_700Bold,
+  });
+
+  if (!fontsLoaded) return null;
+
   return (
     <LanguageProvider>
       <ThemeProvider>

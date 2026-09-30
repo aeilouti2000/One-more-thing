@@ -84,10 +84,7 @@ export function PurchaseRow({
                 <Ionicons name="checkmark-circle" size={26} color={colors.accent} />
               </Pressable>
             ) : showsStepper && onChangeQuantity ? (
-              <View
-                className="flex-row items-center rounded-full px-1 py-0.5"
-                style={{ backgroundColor: colors.mist }}
-              >
+              <View className="flex-row items-center gap-1.5">
                 <Pressable
                   disabled={quantityBusy || purchase.quantity <= 1}
                   onPress={() => {
@@ -98,13 +95,14 @@ export function PurchaseRow({
                   delayLongPress={350}
                   accessibilityRole="button"
                   accessibilityLabel={t("decreaseQuantity")}
-                  className={`h-8 w-8 items-center justify-center ${
+                  className={`h-8 w-8 items-center justify-center rounded-full border border-cove-line ${
                     quantityBusy || purchase.quantity <= 1 ? "opacity-40" : "active:opacity-80"
                   }`}
+                  style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.paper }}
                 >
                   <Ionicons name="remove" size={16} color={colors.accent} />
                 </Pressable>
-                <AppText className="min-w-5 text-center text-base font-semibold text-cove-ink">
+                <AppText className="min-w-6 text-center text-base font-semibold text-cove-ink">
                   {quantityLabel}
                 </AppText>
                 <Pressable
@@ -114,11 +112,11 @@ export function PurchaseRow({
                   delayLongPress={350}
                   accessibilityRole="button"
                   accessibilityLabel={t("increaseQuantity")}
-                  className={`h-8 w-8 items-center justify-center ${
+                  className={`h-8 w-8 items-center justify-center rounded-full bg-cove-accent ${
                     quantityBusy ? "opacity-40" : "active:opacity-80"
                   }`}
                 >
-                  <Ionicons name="add" size={16} color={colors.accent} />
+                  <Ionicons name="add" size={16} color={colors.white} />
                 </Pressable>
               </View>
             ) : (

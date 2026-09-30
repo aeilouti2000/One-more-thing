@@ -1,5 +1,6 @@
 import { View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { FrostedFill } from "@/components/ui/BlurBackdrop";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export function FloatMessage({
@@ -19,9 +20,8 @@ export function FloatMessage({
 
   return (
     <View
-      className="max-w-full rounded-full px-4 py-3"
+      className="max-w-full overflow-hidden rounded-full border border-cove-line px-4 py-3"
       style={{
-        backgroundColor: colors.paper,
         elevation: 8,
         shadowColor: "#000000",
         shadowOffset: { width: 0, height: 6 },
@@ -29,6 +29,7 @@ export function FloatMessage({
         shadowRadius: 12,
       }}
     >
+      <FrostedFill />
       <AppText
         className="text-center text-sm font-semibold"
         style={{ color }}

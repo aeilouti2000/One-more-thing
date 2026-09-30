@@ -2,14 +2,14 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import * as Haptics from "expo-haptics";
-import { ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import { ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { CategoryFilter } from "@/components/purchases/CategoryFilter";
 import { AddItemCard } from "@/components/purchases/AddItemCard";
 import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
 import { ReorderableList } from "@/components/purchases/ReorderableList";
 import { AppText } from "@/components/ui/AppText";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, FrostedBlur, FrostedFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
@@ -21,6 +21,7 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { createList, deleteList, fetchLists, listLabel, renameList, type HomeList } from "@/lib/lists";
 import { formatNeededShare, shareNeededText } from "@/lib/share-list";
 import { createStaple, fetchStaples } from "@/lib/staples";
+import { appFont } from "@/constants/font";
 import { iconSize } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
@@ -485,9 +486,20 @@ export default function ItemsScreen() {
               onPress={openListMenu}
               accessibilityRole="button"
               accessibilityLabel={t("chooseList")}
-              className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
-              style={{ backgroundColor: headerButton.backgroundColor }}
+              className="h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-white/25 active:opacity-80"
+              style={{ backgroundColor: "transparent" }}
             >
+              <FrostedBlur style={StyleSheet.absoluteFill} />
+              <View
+                pointerEvents="none"
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    backgroundColor:
+                      scheme === "dark" ? "rgba(66, 165, 245, 0.35)" : "rgba(255, 255, 255, 0.45)",
+                  },
+                ]}
+              />
               <Ionicons name="list" size={22} color={headerButton.icon} />
             </Pressable>
           </View>
@@ -567,7 +579,9 @@ export default function ItemsScreen() {
       {listActions()}
 
       {isSelecting ? null : (
-        <View className="mb-3 flex-row items-center gap-2 rounded-3xl bg-cove-paper px-4 py-2">
+        <View className="mb-3 overflow-hidden rounded-3xl border border-cove-line">
+          <FrostedFill />
+          <View className="flex-row items-center gap-2 px-4 py-2">
           <TextInput
             value={quickName}
             onChangeText={setQuickName}
@@ -577,6 +591,7 @@ export default function ItemsScreen() {
             returnKeyType="done"
             editable={!isQuickAdding}
             textAlign={isRTL ? "right" : "left"}
+            style={{ fontFamily: appFont.regular }}
             className="h-11 min-w-0 flex-1 text-base text-cove-ink"
           />
           <Pressable
@@ -608,6 +623,7 @@ export default function ItemsScreen() {
               <Ionicons name="add" size={20} color="#FFFFFF" />
             )}
           </Pressable>
+          </View>
         </View>
       )}
 
@@ -700,7 +716,8 @@ export default function ItemsScreen() {
       >
         <View className="flex-1 items-center justify-center px-6">
           <BlurBackdrop onPress={closeListForm} disabled={isSavingList} />
-          <View className="w-full max-w-md gap-4 rounded-3xl bg-cove-paper p-5">
+          <View className="w-full max-w-md gap-4 overflow-hidden rounded-3xl border border-cove-line p-5">
+            <FrostedFill />
             <AppText className="text-xl font-semibold text-cove-ink">
               {editingListId ? t("editList") : t("newList")}
             </AppText>
@@ -711,6 +728,7 @@ export default function ItemsScreen() {
               placeholderTextColor={colors.muted}
               textAlign={isRTL ? "right" : "left"}
               autoFocus
+              style={{ fontFamily: appFont.regular }}
               className="h-12 rounded-2xl border border-cove-line bg-cove-ice px-4 text-base text-cove-ink"
             />
             <FormMessage message={listFormError} />
@@ -743,9 +761,10 @@ export default function ItemsScreen() {
         <View className="flex-1">
           <BlurBackdrop onPress={() => setIsChoosingList(false)} />
           <View
-            className="absolute overflow-hidden rounded-3xl bg-cove-paper p-3"
+            className="absolute overflow-hidden rounded-3xl border border-cove-line p-3"
             style={listMenuStyle()}
           >
+            <FrostedFill />
             <AppText className="mb-2 px-1 text-base font-semibold text-cove-ink">
               {t("yourLists")}
             </AppText>
@@ -852,15 +871,26 @@ function SelectionBar({
         onPress={onBought}
         accessibilityRole="button"
         accessibilityLabel={t("markSelectedBought")}
-        className={`h-14 min-w-0 flex-1 items-center justify-center rounded-full bg-cove-accent ${
+        className={`h-14 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full border border-cove-line ${
           disabled ? "opacity-50" : "active:opacity-80"
         }`}
-        style={buttonShadow}
+        style={[buttonShadow, { backgroundColor: "transparent" }]}
       >
+        <FrostedBlur style={StyleSheet.absoluteFill} />
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor:
+                scheme === "dark" ? "rgba(66, 165, 245, 0.42)" : "rgba(33, 150, 243, 0.48)",
+            },
+          ]}
+        />
         {busyAction === "bought" ? (
-          <ActivityIndicator color={colors.white} />
+          <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Ionicons name="bag-check" size={24} color={colors.white} />
+          <Ionicons name="bag-check" size={24} color="#FFFFFF" />
         )}
       </Pressable>
       <Pressable
@@ -868,11 +898,22 @@ function SelectionBar({
         onPress={onPin}
         accessibilityRole="button"
         accessibilityLabel={t("pinSelected")}
-        className={`h-14 min-w-0 flex-1 items-center justify-center rounded-full bg-cove-paper ${
+        className={`h-14 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full border border-cove-line ${
           disabled ? "opacity-50" : "active:opacity-80"
         }`}
-        style={buttonShadow}
+        style={[buttonShadow, { backgroundColor: "transparent" }]}
       >
+        <FrostedBlur style={StyleSheet.absoluteFill} />
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor:
+                scheme === "dark" ? "rgba(19, 34, 56, 0.28)" : "rgba(255, 255, 255, 0.32)",
+            },
+          ]}
+        />
         {busyAction === "pin" ? (
           <ActivityIndicator color={colors.accent} />
         ) : (
@@ -884,11 +925,22 @@ function SelectionBar({
         onPress={onDelete}
         accessibilityRole="button"
         accessibilityLabel={t("delete")}
-        className={`h-14 min-w-0 flex-1 items-center justify-center rounded-full bg-cove-paper ${
+        className={`h-14 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full border border-cove-line ${
           disabled ? "opacity-50" : "active:opacity-80"
         }`}
-        style={buttonShadow}
+        style={[buttonShadow, { backgroundColor: "transparent" }]}
       >
+        <FrostedBlur style={StyleSheet.absoluteFill} />
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor:
+                scheme === "dark" ? "rgba(19, 34, 56, 0.28)" : "rgba(255, 255, 255, 0.32)",
+            },
+          ]}
+        />
         {busyAction === "delete" ? (
           <ActivityIndicator color={danger} />
         ) : (
@@ -916,10 +968,11 @@ function ListAction({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className={`min-h-[76px] flex-1 items-center justify-center gap-1.5 rounded-3xl bg-cove-paper px-1 py-2 ${
+      className={`min-h-[76px] flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-3xl border border-cove-line px-1 py-2 ${
         disabled ? "opacity-45" : "active:opacity-80"
       }`}
     >
+      <FrostedFill />
       {icon}
       <AppText
         numberOfLines={1}

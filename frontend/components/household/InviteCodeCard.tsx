@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { FrostedBlur } from "@/components/ui/BlurBackdrop";
 import { shareNeededText } from "@/lib/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useTheme } from "@/providers/ThemeProvider";
 
 type InviteCodeCardProps = {
   code: string;
@@ -13,6 +15,7 @@ type InviteCodeCardProps = {
 
 export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
   const { t } = useI18n();
+  const { scheme } = useTheme();
 
   async function copyCode() {
     await Clipboard.setStringAsync(code);
@@ -30,7 +33,23 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
   }
 
   return (
-    <View className="rounded-3xl bg-cove-accent px-5 py-5">
+    <View className="overflow-hidden rounded-[28px] border border-white/30 px-6 py-6">
+      <FrostedBlur style={StyleSheet.absoluteFill} />
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor:
+              scheme === "dark" ? "rgba(66, 165, 245, 0.55)" : "rgba(33, 150, 243, 0.72)",
+          },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        className="absolute -right-8 -top-16 h-36 w-16 rounded-full bg-white/20"
+        style={{ transform: [{ rotate: "28deg" }] }}
+      />
       <View className="flex-row items-start justify-between gap-3">
         <Pressable
           onPress={() => void copyCode()}
@@ -47,12 +66,17 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
           onPress={() => void shareCode()}
           accessibilityRole="button"
           accessibilityLabel={t("shareInvite")}
-          className="h-11 w-11 items-center justify-center rounded-2xl bg-white/20 active:opacity-80"
+          className="h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-white/30 active:opacity-80"
         >
+          <FrostedBlur style={StyleSheet.absoluteFill} />
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255, 255, 255, 0.22)" }]}
+          />
           <Ionicons name="share-social" size={20} color="#FFFFFF" />
         </Pressable>
       </View>
-      <AppText className="mt-2 text-sm leading-5 text-white">
+      <AppText className="mt-3 text-sm leading-5 text-white/90">
         {t("inviteCodeHint")}
       </AppText>
     </View>

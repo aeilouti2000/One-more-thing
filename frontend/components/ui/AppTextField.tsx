@@ -2,6 +2,7 @@ import { TextInput, View, type TextInputProps } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { appFont } from "@/constants/font";
 import { preserveSpaces } from "@/constants/text";
 
 type AppTextFieldProps = {
@@ -59,16 +60,22 @@ export function AppTextField({
         editable={editable}
         textAlign={userText ? undefined : isRTL ? "right" : "left"}
         textAlignVertical={multiline ? "top" : "center"}
-        style={preserveSpaces}
+        style={[
+          preserveSpaces,
+          { fontFamily: appFont.regular },
+          !multiline && compact
+            ? { height: 40, paddingVertical: 0, includeFontPadding: false, fontSize: 16, lineHeight: 40 }
+            : null,
+        ]}
         className={`rounded-2xl border bg-cove-paper text-cove-ink ${
-          compact ? "px-3 text-sm" : "px-4 text-base"
+          compact ? "px-3" : "px-4 text-base"
         } ${error ? "border-cove-ink" : "border-cove-line"} ${
           multiline
             ? compact
-              ? "min-h-[52px] py-2"
+              ? "min-h-[52px] py-2 text-sm"
               : "min-h-[96px] py-3"
             : compact
-              ? "h-10"
+              ? "h-10 py-0"
               : "h-14"
         }`}
       />

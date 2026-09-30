@@ -2,11 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import type { BottomTabBarButtonProps } from "expo-router/js-tabs";
 import { PlatformPressable } from "expo-router/react-navigation";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RequireSession } from "@/components/auth/RequireSession";
+import { FrostedBlur } from "@/components/ui/BlurBackdrop";
 import { TabBarVisibility, useTabBarVisibility } from "@/components/ui/TabBarVisibility";
-import { fontWeight, spacing, tabBar } from "@/constants/theme";
+import { appFont } from "@/constants/font";
+import { spacing, tabBar } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -64,6 +66,9 @@ function TabScreens() {
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.muted,
           tabBarHideOnKeyboard: true,
+          tabBarBackground: () => (
+            <FrostedBlur style={[StyleSheet.absoluteFill, { overflow: "hidden" }]} />
+          ),
           tabBarButton: (props) => (
             <TabBarButton
               {...props}
@@ -74,7 +79,7 @@ function TabScreens() {
           ),
           tabBarLabelStyle: {
             fontSize: tabBar.labelSize,
-            fontWeight: fontWeight.semibold,
+            fontFamily: appFont.semibold,
             marginTop: 2,
           },
           tabBarIconStyle: {
@@ -96,7 +101,8 @@ function TabScreens() {
                 paddingTop: 0,
                 paddingBottom: 0,
                 borderRadius: tabBar.radius,
-                backgroundColor: colors.paper,
+                backgroundColor: "transparent",
+                overflow: "hidden",
                 borderTopWidth: tabBar.borderWidth,
                 borderWidth: tabBar.borderWidth,
                 borderColor: colors.line,

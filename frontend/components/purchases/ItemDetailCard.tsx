@@ -4,7 +4,7 @@ import { CategoryField } from "@/components/purchases/CategoryField";
 import { StatusBadge, UrgentBadge } from "@/components/purchases/StatusBadge";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, FrostedFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -157,9 +157,9 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
           <HistoryItemCard purchase={purchase} onClose={close} />
         ) : (
         <View
-          className="w-full max-w-md rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
-          style={{ backgroundColor: colors.paper }}
+          className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
         >
+          <FrostedFill />
           <View className="-mx-7 mb-6 flex-row items-start justify-between gap-4 border-b border-cove-line px-7 pb-5">
             <AppText className="shrink-0 text-lg font-semibold text-cove-ink">{t("editItem")}</AppText>
             {purchase ? (
@@ -187,7 +187,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
           </View>
           {purchase && editable ? (
             <View className="gap-4">
-              <View className="flex-row items-start gap-3">
+              <View className="flex-row items-stretch gap-3">
                 <View className="min-w-0 flex-1">
                   <AppTextField
                     compact
@@ -318,9 +318,9 @@ function HistoryItemCard({
 
   return (
     <View
-      className="w-full max-w-md gap-6 rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
-      style={{ backgroundColor: colors.paper }}
+      className="w-full max-w-md gap-6 overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
     >
+      <FrostedFill />
       <View className="-mx-7 flex-row items-center gap-3 border-b border-cove-line px-7 pb-5">
         <AppText
           className="min-w-0 flex-1 text-3xl font-semibold tracking-tight text-cove-ink"

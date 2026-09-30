@@ -57,6 +57,9 @@ export const fontWeight: {
 
 export const fonts: {
   sans: string;
+  medium: string;
+  semibold: string;
+  bold: string;
 };
 
 export const iconSize: {

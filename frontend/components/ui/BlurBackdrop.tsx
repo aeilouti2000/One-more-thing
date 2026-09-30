@@ -1,6 +1,6 @@
 import { BlurTargetView, BlurView } from "expo-blur";
 import { createContext, useContext, useRef, type ReactNode, type RefObject } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useTheme } from "@/providers/ThemeProvider";
 
 const BlurTargetContext = createContext<RefObject<View | null> | null>(null);
@@ -22,25 +22,51 @@ type BlurBackdropProps = {
   disabled?: boolean;
 };
 
-export function BlurBackdrop({ onPress, disabled = false }: BlurBackdropProps) {
+export function FrostedBlur({ style }: { style?: StyleProp<ViewStyle> }) {
   const { scheme } = useTheme();
   const blurTarget = useContext(BlurTargetContext);
 
+  return (
+    <BlurView
+      intensity={scheme === "dark" ? 80 : 56}
+      tint={scheme === "dark" ? "dark" : "light"}
+      blurTarget={blurTarget ?? undefined}
+      blurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+      blurReductionFactor={2}
+      pointerEvents="none"
+      style={style}
+    />
+  );
+}
+
+export function FrostedFill() {
+  const { scheme } = useTheme();
+
+  return (
+    <>
+      <FrostedBlur style={StyleSheet.absoluteFill} />
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor:
+              scheme === "dark" ? "rgba(19, 34, 56, 0.58)" : "rgba(255, 255, 255, 0.5)",
+          },
+        ]}
+      />
+    </>
+  );
+}
+
+export function BlurBackdrop({ onPress, disabled = false }: BlurBackdropProps) {
   return (
     <Pressable
       disabled={disabled || !onPress}
       onPress={onPress}
       style={StyleSheet.absoluteFill}
     >
-      <BlurView
-        intensity={80}
-        tint={scheme === "dark" ? "dark" : "light"}
-        blurTarget={blurTarget ?? undefined}
-        blurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-        blurReductionFactor={2}
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-      />
+      <FrostedBlur style={StyleSheet.absoluteFill} />
     </Pressable>
   );
 }

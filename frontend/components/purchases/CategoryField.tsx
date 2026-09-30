@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Modal, Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, FrostedFill } from "@/components/ui/BlurBackdrop";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -42,7 +42,8 @@ export function CategoryField({ value, onChange }: CategoryFieldProps) {
       >
         <View className="flex-1 items-center justify-center px-6">
           <BlurBackdrop onPress={() => setOpen(false)} />
-          <View className="w-full max-w-md gap-1 rounded-3xl p-3" style={{ backgroundColor: colors.paper }}>
+          <View className="w-full max-w-md gap-1 overflow-hidden rounded-3xl border border-cove-line p-3">
+            <FrostedFill />
             <AppText className="px-2 pb-1 text-base font-semibold text-cove-ink">{t("category")}</AppText>
             {PURCHASE_CATEGORIES.map((item) => {
               const selected = item.id === value;
