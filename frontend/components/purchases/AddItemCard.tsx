@@ -97,10 +97,13 @@ export function AddItemCard({
       <View className="flex-1 items-center justify-center px-5">
         <BlurBackdrop onPress={close} />
         <View
-          className="w-full max-w-md gap-4 rounded-[28px] p-4"
+          className="w-full max-w-md rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
           style={{ backgroundColor: colors.paper }}
         >
-          <AppText className="text-lg font-semibold text-cove-ink">{t("addItem")}</AppText>
+          <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">
+            <AppText className="text-lg font-semibold text-cove-ink">{t("addItem")}</AppText>
+          </View>
+          <View className="gap-4">
           <View className="flex-row items-start gap-3">
             <View className="min-w-0 flex-1">
               <AppTextField
@@ -139,14 +142,17 @@ export function AddItemCard({
             userText
           />
           <FormMessage message={error} />
-          <AppButton
-            compact
-            label={t("saveItem")}
-            disabled={!name.trim() || !listId}
-            loading={isSubmitting}
-            onPress={() => void onSubmit()}
-          />
-          <AppButton compact label={t("cancel")} variant="ghost" disabled={isSubmitting} onPress={close} />
+          </View>
+          <View className="mt-8 gap-3">
+            <AppButton
+              compact
+              label={t("saveItem")}
+              disabled={!name.trim() || !listId}
+              loading={isSubmitting}
+              onPress={() => void onSubmit()}
+            />
+            <AppButton compact label={t("cancel")} variant="ghost" disabled={isSubmitting} onPress={close} />
+          </View>
         </View>
       </View>
     </Modal>

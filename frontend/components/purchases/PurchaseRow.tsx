@@ -137,12 +137,19 @@ export function PurchaseRow({
                   {getCategoryLabel(purchase.category, locale)}
                 </AppText>
               </View>
+              {purchase.notes?.trim() ? (
+                <View
+                  accessibilityLabel={t("notes")}
+                  className="h-6 w-6 items-center justify-center rounded-full bg-cove-mist"
+                >
+                  <Ionicons name="document-text-outline" size={14} color={colors.accent} />
+                </View>
+              ) : null}
               {purchase.urgent && purchase.status !== "bought" ? (
                 <View
-                  className="flex-row items-center gap-1 rounded-full px-2.5 py-1"
+                  className="rounded-full px-2.5 py-1"
                   style={{ backgroundColor: scheme === "dark" ? "rgba(220,38,38,0.22)" : "#FEE2E2" }}
                 >
-                  <Ionicons name="flame" size={12} color="#DC2626" />
                   <AppText className="text-xs font-semibold" style={{ color: "#DC2626" }}>
                     {t("urgent")}
                   </AppText>

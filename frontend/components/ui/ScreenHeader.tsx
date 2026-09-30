@@ -14,6 +14,7 @@ type ScreenHeaderProps = {
   right?: ReactNode;
   footer?: ReactNode;
   children?: ReactNode;
+  flush?: boolean;
 };
 
 export function ScreenHeader({
@@ -23,13 +24,16 @@ export function ScreenHeader({
   right,
   footer,
   children,
+  flush = true,
 }: ScreenHeaderProps) {
   const { colors, scheme } = useTheme();
   const { isRTL, t } = useI18n();
 
   return (
     <View
-      className={`-mx-5 -mt-2 mb-6 overflow-hidden rounded-b-3xl px-5 pb-7 pt-5 ${
+      className={`mb-6 overflow-hidden rounded-b-3xl px-5 pb-7 pt-5 ${
+        flush ? "-mx-5 -mt-2" : ""
+      } ${
         scheme === "dark" ? "bg-cove-deep" : "bg-cove-accent"
       }`}
     >

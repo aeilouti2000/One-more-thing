@@ -5,6 +5,7 @@ import { PlatformPressable } from "expo-router/react-navigation";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RequireSession } from "@/components/auth/RequireSession";
+import { TabBarVisibility, useTabBarVisibility } from "@/components/ui/TabBarVisibility";
 import { fontWeight, spacing, tabBar } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -38,7 +39,16 @@ function TabBarButton({
 }
 
 export default function TabsLayout() {
+  return (
+    <TabBarVisibility>
+      <TabScreens />
+    </TabBarVisibility>
+  );
+}
+
+function TabScreens() {
   const insets = useSafeAreaInsets();
+  const { hidden } = useTabBarVisibility();
   const { colors, scheme, shadow } = useTheme();
   const { t } = useI18n();
   const activeBackground =
@@ -75,26 +85,28 @@ export default function TabsLayout() {
             paddingTop: 0,
             paddingBottom: 0,
           },
-          tabBarStyle: {
-            position: "absolute",
-            left: spacing.xl,
-            right: spacing.xl,
-            bottom: Math.max(insets.bottom, spacing.md) + spacing.sm,
-            height: tabBar.height,
-            paddingTop: 0,
-            paddingBottom: 0,
-            borderRadius: tabBar.radius,
-            backgroundColor: colors.paper,
-            borderTopWidth: tabBar.borderWidth,
-            borderWidth: tabBar.borderWidth,
-            borderColor: colors.line,
-            shadowColor: shadow.color,
-            shadowOffset: shadow.offset,
-            shadowOpacity: scheme === "dark" ? 0.42 : 0.18,
-            shadowRadius: 24,
-            elevation: shadow.elevation,
-            marginHorizontal: tabBar.inset,
-          },
+          tabBarStyle: hidden
+            ? { display: "none" }
+            : {
+                position: "absolute",
+                left: spacing.xl,
+                right: spacing.xl,
+                bottom: Math.max(insets.bottom, spacing.md) + spacing.sm,
+                height: tabBar.height,
+                paddingTop: 0,
+                paddingBottom: 0,
+                borderRadius: tabBar.radius,
+                backgroundColor: colors.paper,
+                borderTopWidth: tabBar.borderWidth,
+                borderWidth: tabBar.borderWidth,
+                borderColor: colors.line,
+                shadowColor: shadow.color,
+                shadowOffset: shadow.offset,
+                shadowOpacity: scheme === "dark" ? 0.42 : 0.18,
+                shadowRadius: 24,
+                elevation: shadow.elevation,
+                marginHorizontal: tabBar.inset,
+              },
         }}
       >
         <Tabs.Screen

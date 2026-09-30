@@ -287,10 +287,13 @@ function StaplesBody() {
         <View className="flex-1 items-center justify-center px-5">
           <BlurBackdrop onPress={closeForm} disabled={isSaving} />
           <View
-            className="w-full max-w-md gap-4 rounded-[28px] p-4"
+            className="w-full max-w-md rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
             style={{ backgroundColor: colors.paper }}
           >
-            <AppText className="text-lg font-semibold text-cove-ink">{t("addStaple")}</AppText>
+            <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">
+              <AppText className="text-lg font-semibold text-cove-ink">{t("addStaple")}</AppText>
+            </View>
+            <View className="gap-4">
             <View className="flex-row items-start gap-3">
                   <View className="min-w-0 flex-1">
                     <AppTextField
@@ -357,20 +360,23 @@ function StaplesBody() {
                   <AppText className="text-base text-cove-ink">{t("addToListNow")}</AppText>
                 </Pressable>
             <FormMessage message={error} />
-            <AppButton
-              compact
-              label={t("addStaple")}
-              disabled={!name.trim()}
-              loading={isSaving}
-              onPress={() => void onSave()}
-            />
-            <AppButton
-              compact
-              label={t("cancel")}
-              variant="ghost"
-              disabled={isSaving}
-              onPress={closeForm}
-            />
+            </View>
+            <View className="mt-8 gap-3">
+              <AppButton
+                compact
+                label={t("addStaple")}
+                disabled={!name.trim()}
+                loading={isSaving}
+                onPress={() => void onSave()}
+              />
+              <AppButton
+                compact
+                label={t("cancel")}
+                variant="ghost"
+                disabled={isSaving}
+                onPress={closeForm}
+              />
+            </View>
           </View>
         </View>
       </Modal>

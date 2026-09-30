@@ -157,10 +157,10 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
           <HistoryItemCard purchase={purchase} onClose={close} />
         ) : (
         <View
-          className="w-full max-w-md rounded-[28px] p-4"
+          className="w-full max-w-md rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
           style={{ backgroundColor: colors.paper }}
         >
-          <View className="mb-6 flex-row items-start justify-between gap-3">
+          <View className="-mx-7 mb-6 flex-row items-start justify-between gap-4 border-b border-cove-line px-7 pb-5">
             <AppText className="shrink-0 text-lg font-semibold text-cove-ink">{t("editItem")}</AppText>
             {purchase ? (
               <View className="min-w-0 flex-1 items-end">
@@ -233,12 +233,12 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
                 userText
               />
               <FormMessage message={error} />
-              <View className="mt-2 flex-row items-stretch gap-2">
+              <View className="mt-6 flex-row items-stretch gap-3">
                 <Pressable
                   disabled={isSubmitting || !name.trim()}
                   onPress={() => void onSubmit()}
                   accessibilityRole="button"
-                  className={`h-11 min-w-0 flex-1 items-center justify-center rounded-2xl bg-cove-accent px-2 ${
+                  className={`h-12 min-w-0 flex-1 items-center justify-center rounded-2xl bg-cove-accent px-3 ${
                     isSubmitting || !name.trim() ? "opacity-50" : "active:opacity-80"
                   }`}
                 >
@@ -249,7 +249,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
                       numberOfLines={1}
                       adjustsFontSizeToFit
                       minimumFontScale={0.8}
-                      className="text-xs font-semibold text-white"
+                      className="text-sm font-semibold text-white"
                     >
                       {t("saveChanges")}
                     </AppText>
@@ -259,7 +259,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
                   disabled={isSubmitting}
                   onPress={() => void onMarkBought()}
                   accessibilityRole="button"
-                  className={`h-11 min-w-0 flex-1 items-center justify-center rounded-2xl px-2 ${
+                  className={`h-12 min-w-0 flex-1 items-center justify-center rounded-2xl px-3 ${
                     isSubmitting ? "opacity-50" : "active:opacity-80"
                   }`}
                   style={{ backgroundColor: colors.mist }}
@@ -268,27 +268,9 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.8}
-                    className="text-xs font-semibold text-cove-accent"
+                    className="text-sm font-semibold text-cove-accent"
                   >
                     {t("markBought")}
-                  </AppText>
-                </Pressable>
-                <Pressable
-                  disabled={isSubmitting}
-                  onPress={close}
-                  accessibilityRole="button"
-                  className={`h-11 min-w-0 flex-1 items-center justify-center rounded-2xl border px-2 ${
-                    isSubmitting ? "opacity-50" : "active:opacity-80"
-                  }`}
-                  style={{ borderColor: colors.line }}
-                >
-                  <AppText
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
-                    className="text-xs font-semibold text-cove-ink"
-                  >
-                    {t("cancel")}
                   </AppText>
                 </Pressable>
               </View>
@@ -336,10 +318,10 @@ function HistoryItemCard({
 
   return (
     <View
-      className="w-full max-w-md gap-5 rounded-[28px] p-5"
+      className="w-full max-w-md gap-6 rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
       style={{ backgroundColor: colors.paper }}
     >
-      <View className="flex-row items-center gap-3">
+      <View className="-mx-7 flex-row items-center gap-3 border-b border-cove-line px-7 pb-5">
         <AppText
           className="min-w-0 flex-1 text-3xl font-semibold tracking-tight text-cove-ink"
           numberOfLines={2}
@@ -385,7 +367,9 @@ function HistoryItemCard({
         </View>
       ) : null}
 
-      <AppButton label={t("close")} variant="secondary" onPress={onClose} />
+      <View className="mt-2">
+        <AppButton label={t("close")} variant="secondary" onPress={onClose} />
+      </View>
     </View>
   );
 }

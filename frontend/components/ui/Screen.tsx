@@ -5,7 +5,8 @@ import {
   GestureDetector,
   ScrollView as GestureScrollView,
 } from "react-native-gesture-handler";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { spacing } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
 type ScreenProps = {
@@ -16,6 +17,8 @@ type ScreenProps = {
   refreshing?: boolean;
   onRefresh?: () => void;
   floating?: ReactNode;
+  top?: ReactNode;
+  dock?: ReactNode;
   onSwipe?: (direction: "next" | "previous") => void;
 };
 
@@ -27,14 +30,22 @@ export function Screen({
   refreshing = false,
   onRefresh,
   floating,
+  top,
+  dock,
   onSwipe,
 }: ScreenProps) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const dockBottom = Math.max(insets.bottom, spacing.md) + spacing.sm;
   const swipeRef = useRef(onSwipe);
   swipeRef.current = onSwipe;
   const padding = tabBarInset
-    ? "px-5 pb-32 pt-2"
-    : "px-5 pb-10 pt-2";
+    ? top
+      ? "px-5 pb-32 pt-4"
+      : "px-5 pb-32 pt-2"
+    : top
+      ? "px-5 pb-10 pt-4"
+      : "px-5 pb-10 pt-2";
   const swipe = useMemo(() => {
     const native = Gesture.Native();
     const pan = Gesture.Pan()
@@ -54,15 +65,19 @@ export function Screen({
       style={{ backgroundColor: colors.ice }}
       edges={["top"]}
     >
+      {top ? (
+        <View style={{ backgroundColor: colors.ice, zIndex: 2 }}>{top}</View>
+      ) : null}
       {scroll ? (
         onSwipe ? (
           <GestureDetector gesture={swipe}>
             <GestureScrollView
               style={{ flex: 1 }}
               scrollEnabled={scrollEnabled}
+              removeClippedSubviews={false}
               contentContainerStyle={{
                 paddingHorizontal: 20,
-                paddingTop: 8,
+                paddingTop: top ? 16 : 8,
                 paddingBottom: tabBarInset ? 128 : 40,
               }}
               keyboardShouldPersistTaps="handled"
@@ -85,6 +100,7 @@ export function Screen({
         <ScrollView
           className="flex-1"
           scrollEnabled={scrollEnabled}
+          removeClippedSubviews={false}
           contentContainerClassName={padding}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -111,6 +127,15 @@ export function Screen({
           className="absolute inset-x-0 bottom-28 items-center px-5"
         >
           {floating}
+        </View>
+      ) : null}
+      {dock ? (
+        <View
+          pointerEvents="box-none"
+          className="absolute inset-x-5"
+          style={{ bottom: dockBottom, zIndex: 30 }}
+        >
+          {dock}
         </View>
       ) : null}
     </SafeAreaView>

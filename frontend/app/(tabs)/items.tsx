@@ -1,8 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import * as Haptics from "expo-haptics";
-import { ActivityIndicator, Animated, Dimensions, Easing, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import { ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
 import { CategoryFilter } from "@/components/purchases/CategoryFilter";
 import { AddItemCard } from "@/components/purchases/AddItemCard";
 import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
@@ -16,6 +16,7 @@ import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
+import { useTabBarVisibility } from "@/components/ui/TabBarVisibility";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { createList, deleteList, fetchLists, listLabel, renameList, type HomeList } from "@/lib/lists";
 import { formatNeededShare, shareNeededText } from "@/lib/share-list";
@@ -41,6 +42,7 @@ export default function ItemsScreen() {
     addItem,
   } = usePurchases();
   const { colors, scheme } = useTheme();
+  const { setHidden: setTabBarHidden } = useTabBarVisibility();
   const { t, isRTL } = useI18n();
   const [category, setCategory] = useState<PurchaseCategory | "all">("all");
   const [isChoosingCategory, setIsChoosingCategory] = useState(false);
@@ -244,6 +246,11 @@ export default function ItemsScreen() {
     }
     void loadLists(household.id);
   }, [household?.id]);
+
+  useLayoutEffect(() => {
+    setTabBarHidden(isSelecting);
+    return () => setTabBarHidden(false);
+  }, [isSelecting, setTabBarHidden]);
 
   if (isLoading && needed.length === 0 && !error) {
     return <LoadingScreen />;
@@ -452,6 +459,67 @@ export default function ItemsScreen() {
     };
   }
 
+  const header = (
+    <ScreenHeader
+      flush={!isSelecting}
+      title={
+        isSelecting ? t("selectedCount", { count: selectedIds.size }) : undefined
+      }
+      subtitle={isSelecting ? t("selectMoreItems") : undefined}
+      right={
+        isSelecting ? (
+          <Pressable
+            onPress={() => {
+              setSelectedIds(new Set());
+              setIsConfirmingDelete(false);
+            }}
+            accessibilityRole="button"
+            className="h-11 w-11 items-center justify-center self-center rounded-full"
+            style={{ backgroundColor: headerButton.backgroundColor }}
+          >
+            <Ionicons name="close" size={iconSize.md} color={headerButton.icon} />
+          </Pressable>
+        ) : (
+          <View ref={listButtonRef} collapsable={false}>
+            <Pressable
+              onPress={openListMenu}
+              accessibilityRole="button"
+              accessibilityLabel={t("chooseList")}
+              className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
+              style={{ backgroundColor: headerButton.backgroundColor }}
+            >
+              <Ionicons name="list" size={22} color={headerButton.icon} />
+            </Pressable>
+          </View>
+        )
+      }
+    >
+      {isSelecting ? null : (
+        <View className="min-w-0 flex-1">
+          <AppText
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+            className="text-3xl font-semibold tracking-tight text-white"
+          >
+            {household?.name ?? t("yourItems")}
+          </AppText>
+          <AppText
+            numberOfLines={1}
+            className="mt-1 text-base"
+            style={{ color: scheme === "dark" ? colors.muted : "rgba(255,255,255,0.92)" }}
+            accessibilityLabel={t("stillToGet", { count: listItems.length })}
+          >
+            {t("stillToGet", { count: listItems.length })}
+            {currentList
+              ? ` · ${listLabel(currentList.name, t("defaultList"))}`
+              : ""}
+          </AppText>
+        </View>
+      )}
+    </ScreenHeader>
+  );
+
   return (
     <Screen
       tabBarInset
@@ -461,6 +529,18 @@ export default function ItemsScreen() {
       floating={
         floatMessage ? (
           <FloatMessage message={floatMessage} tone={floatTone} />
+        ) : null
+      }
+      top={isSelecting ? header : null}
+      dock={
+        isSelecting ? (
+          <SelectionBar
+            busyAction={busyAction}
+            disabled={isApplyingAction}
+            onBought={() => void markSelectionBought()}
+            onPin={() => void pinSelection()}
+            onDelete={() => setIsConfirmingDelete(true)}
+          />
         ) : null
       }
       onSwipe={(direction) => {
@@ -476,140 +556,9 @@ export default function ItemsScreen() {
         void Haptics.selectionAsync();
       }}
     >
-      <ScreenHeader
-        title={
-          isSelecting ? t("selectedCount", { count: selectedIds.size }) : undefined
-        }
-        subtitle={isSelecting ? t("selectMoreItems") : undefined}
-        right={
-          isSelecting ? (
-            <Pressable
-              onPress={() => {
-                setSelectedIds(new Set());
-                setIsConfirmingDelete(false);
-              }}
-              accessibilityRole="button"
-              className="h-11 w-11 items-center justify-center rounded-full"
-              style={{ backgroundColor: headerButton.backgroundColor }}
-            >
-              <Ionicons name="close" size={iconSize.md} color={headerButton.icon} />
-            </Pressable>
-          ) : (
-            <View ref={listButtonRef} collapsable={false}>
-              <Pressable
-                onPress={openListMenu}
-                accessibilityRole="button"
-                accessibilityLabel={t("chooseList")}
-                className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
-                style={{ backgroundColor: headerButton.backgroundColor }}
-              >
-                <Ionicons name="list" size={22} color={headerButton.icon} />
-              </Pressable>
-            </View>
-          )
-        }
-      >
-        {isSelecting ? null : (
-          <View className="min-w-0 flex-1">
-            <AppText
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.65}
-              className="text-3xl font-semibold tracking-tight text-white"
-            >
-              {household?.name ?? t("yourItems")}
-            </AppText>
-            <AppText
-              numberOfLines={1}
-              className="mt-1 text-base"
-              style={{ color: scheme === "dark" ? colors.muted : "rgba(255,255,255,0.92)" }}
-              accessibilityLabel={t("stillToGet", { count: listItems.length })}
-            >
-              {t("stillToGet", { count: listItems.length })}
-              {currentList
-                ? ` · ${listLabel(currentList.name, t("defaultList"))}`
-                : ""}
-            </AppText>
-          </View>
-        )}
-      </ScreenHeader>
+      {isSelecting ? null : header}
 
-      {isSelecting ? (
-        <Bobbing>
-          <View className="mb-5 flex-row items-stretch gap-2">
-            <Pressable
-              disabled={isApplyingAction}
-              onPress={() => void markSelectionBought()}
-              accessibilityRole="button"
-              accessibilityLabel={t("markSelectedBought")}
-              className={`min-h-[76px] min-w-0 flex-[1.7] flex-row items-center justify-center gap-2 rounded-3xl bg-cove-accent px-3 py-2 ${
-                isApplyingAction ? "opacity-50" : "active:opacity-80"
-              }`}
-            >
-              {busyAction === "bought" ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <>
-                  <Ionicons name="checkmark" size={18} color={colors.white} />
-                  <AppText numberOfLines={1} className="text-sm font-semibold text-white">
-                    {t("markSelectedBought")}
-                  </AppText>
-                </>
-              )}
-            </Pressable>
-            <Pressable
-              disabled={isApplyingAction}
-              onPress={() => void pinSelection()}
-              accessibilityRole="button"
-              accessibilityLabel={t("pinSelected")}
-              className={`min-h-[76px] flex-1 items-center justify-center gap-1.5 rounded-3xl bg-cove-paper px-1 py-2 ${
-                isApplyingAction ? "opacity-50" : "active:opacity-80"
-              }`}
-            >
-              {busyAction === "pin" ? (
-                <ActivityIndicator color={colors.accent} />
-              ) : (
-                <>
-                  <View
-                    className="h-9 w-9 items-center justify-center rounded-2xl bg-cove-mist"
-                    style={{ transform: [{ rotate: isRTL ? "24deg" : "-24deg" }] }}
-                  >
-                    <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
-                  </View>
-                  <AppText numberOfLines={1} className="text-xs font-semibold text-cove-ink">
-                    {t("pin")}
-                  </AppText>
-                </>
-              )}
-            </Pressable>
-            <Pressable
-              disabled={isApplyingAction}
-              onPress={() => setIsConfirmingDelete(true)}
-              accessibilityRole="button"
-              accessibilityLabel={t("delete")}
-              className={`min-h-[76px] flex-1 items-center justify-center gap-1.5 rounded-3xl border border-red-400 bg-cove-paper px-1 py-2 ${
-                isApplyingAction ? "opacity-50" : "active:opacity-80"
-              }`}
-            >
-              {busyAction === "delete" ? (
-                <ActivityIndicator color="#DC2626" />
-              ) : (
-                <>
-                  <View
-                    className="h-9 w-9 items-center justify-center rounded-2xl"
-                    style={{ backgroundColor: "rgba(220,38,38,0.12)" }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#DC2626" />
-                  </View>
-                  <AppText numberOfLines={1} className="text-xs font-semibold text-red-600">
-                    {t("delete")}
-                  </AppText>
-                </>
-              )}
-            </Pressable>
-          </View>
-        </Bobbing>
-      ) : shareNotice ? (
+      {shareNotice && !isSelecting ? (
         <View className="mb-5">
           <FormMessage message={shareNotice} tone="success" />
         </View>
@@ -643,18 +592,20 @@ export default function ItemsScreen() {
             onPress={() => void quickAdd()}
             accessibilityRole="button"
             accessibilityLabel={t("addItem")}
-            className={`h-9 w-9 items-center justify-center rounded-full bg-cove-accent ${
-              !quickName.trim() || isQuickAdding
-                ? scheme === "dark"
-                  ? "opacity-45"
-                  : ""
-                : "active:opacity-80"
+            className={`h-9 w-9 items-center justify-center rounded-full ${
+              !quickName.trim() || isQuickAdding ? "" : "active:opacity-80"
             }`}
+            style={{
+              backgroundColor:
+                scheme === "dark" && (!quickName.trim() || isQuickAdding)
+                  ? "rgba(66, 165, 245, 0.45)"
+                  : colors.accent,
+            }}
           >
             {isQuickAdding ? (
-              <ActivityIndicator color={colors.white} size="small" />
+              <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Ionicons name="add" size={20} color={colors.white} />
+              <Ionicons name="add" size={20} color="#FFFFFF" />
             )}
           </Pressable>
         </View>
@@ -870,34 +821,81 @@ export default function ItemsScreen() {
   );
 }
 
-function Bobbing({ children }: { children: ReactNode }) {
-  const shift = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const motion = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shift, {
-          toValue: -5,
-          duration: 240,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(shift, {
-          toValue: 5,
-          duration: 240,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    motion.start();
-    return () => motion.stop();
-  }, [shift]);
+function SelectionBar({
+  busyAction,
+  disabled,
+  onBought,
+  onPin,
+  onDelete,
+}: {
+  busyAction: "pin" | "bought" | "delete" | null;
+  disabled: boolean;
+  onBought: () => void;
+  onPin: () => void;
+  onDelete: () => void;
+}) {
+  const { colors, scheme, shadow } = useTheme();
+  const { t } = useI18n();
+  const danger = scheme === "dark" ? "#F87171" : "#DC2626";
+  const buttonShadow = {
+    shadowColor: shadow.color,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: scheme === "dark" ? 0.45 : shadow.opacity,
+    shadowRadius: 16,
+    elevation: 8,
+  };
 
   return (
-    <Animated.View style={{ transform: [{ translateY: shift }] }}>
-      {children}
-    </Animated.View>
+    <View className="flex-row items-center gap-2">
+      <Pressable
+        disabled={disabled}
+        onPress={onBought}
+        accessibilityRole="button"
+        accessibilityLabel={t("markSelectedBought")}
+        className={`h-14 min-w-0 flex-1 items-center justify-center rounded-full bg-cove-accent ${
+          disabled ? "opacity-50" : "active:opacity-80"
+        }`}
+        style={buttonShadow}
+      >
+        {busyAction === "bought" ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <Ionicons name="bag-check" size={24} color={colors.white} />
+        )}
+      </Pressable>
+      <Pressable
+        disabled={disabled}
+        onPress={onPin}
+        accessibilityRole="button"
+        accessibilityLabel={t("pinSelected")}
+        className={`h-14 min-w-0 flex-1 items-center justify-center rounded-full bg-cove-paper ${
+          disabled ? "opacity-50" : "active:opacity-80"
+        }`}
+        style={buttonShadow}
+      >
+        {busyAction === "pin" ? (
+          <ActivityIndicator color={colors.accent} />
+        ) : (
+          <MaterialCommunityIcons name="pin" size={22} color={colors.accent} />
+        )}
+      </Pressable>
+      <Pressable
+        disabled={disabled}
+        onPress={onDelete}
+        accessibilityRole="button"
+        accessibilityLabel={t("delete")}
+        className={`h-14 min-w-0 flex-1 items-center justify-center rounded-full bg-cove-paper ${
+          disabled ? "opacity-50" : "active:opacity-80"
+        }`}
+        style={buttonShadow}
+      >
+        {busyAction === "delete" ? (
+          <ActivityIndicator color={danger} />
+        ) : (
+          <Ionicons name="trash-outline" size={22} color={danger} />
+        )}
+      </Pressable>
+    </View>
   );
 }
 
