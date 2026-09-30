@@ -18,6 +18,7 @@ type AppTextFieldProps = {
   error?: string;
   editable?: boolean;
   userText?: boolean;
+  compact?: boolean;
 };
 
 export function AppTextField({
@@ -34,13 +35,16 @@ export function AppTextField({
   error,
   editable = true,
   userText = false,
+  compact = false,
 }: AppTextFieldProps) {
   const { colors } = useTheme();
   const { isRTL } = useI18n();
 
   return (
-    <View className="gap-2">
-      <AppText className="text-sm font-medium text-cove-muted">{label}</AppText>
+    <View className={compact ? "gap-1.5" : "gap-2"}>
+      <AppText className={`font-medium text-cove-muted ${compact ? "text-xs" : "text-sm"}`}>
+        {label}
+      </AppText>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -56,9 +60,17 @@ export function AppTextField({
         textAlign={userText ? undefined : isRTL ? "right" : "left"}
         textAlignVertical={multiline ? "top" : "center"}
         style={preserveSpaces}
-        className={`rounded-2xl border bg-cove-paper px-4 text-base text-cove-ink ${
-          error ? "border-cove-ink" : "border-cove-line"
-        } ${multiline ? "min-h-[96px] py-3" : "h-14"}`}
+        className={`rounded-2xl border bg-cove-paper text-cove-ink ${
+          compact ? "px-3 text-sm" : "px-4 text-base"
+        } ${error ? "border-cove-ink" : "border-cove-line"} ${
+          multiline
+            ? compact
+              ? "min-h-[52px] py-2"
+              : "min-h-[96px] py-3"
+            : compact
+              ? "h-10"
+              : "h-14"
+        }`}
       />
       {error ? (
         <AppText className="text-sm text-red-600 dark:text-red-400">{error}</AppText>

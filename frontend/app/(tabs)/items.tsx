@@ -9,6 +9,7 @@ import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
 import { ReorderableList } from "@/components/purchases/ReorderableList";
 import { AppText } from "@/components/ui/AppText";
+import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
@@ -16,7 +17,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
-import { createList, fetchLists, listLabel, type HomeList } from "@/lib/lists";
+import { createList, deleteList, fetchLists, listLabel, renameList, type HomeList } from "@/lib/lists";
 import { formatNeededShare, shareNeededText } from "@/lib/share-list";
 import { createStaple, fetchStaples } from "@/lib/staples";
 import { iconSize } from "@/constants/theme";
@@ -62,8 +63,12 @@ export default function ItemsScreen() {
   const [listMenuFrame, setListMenuFrame] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const listButtonRef = useRef<View>(null);
   const [isCreatingList, setIsCreatingList] = useState(false);
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [listPendingDelete, setListPendingDelete] = useState<HomeList | null>(null);
   const [listName, setListName] = useState("");
+  const [listFormError, setListFormError] = useState<string | null>(null);
   const [isSavingList, setIsSavingList] = useState(false);
+  const [isDeletingList, setIsDeletingList] = useState(false);
   const [isAddingDetails, setIsAddingDetails] = useState(false);
   const [openItem, setOpenItem] = useState<Purchase | null>(null);
 
@@ -280,21 +285,88 @@ export default function ItemsScreen() {
     );
   }
 
+  function closeListForm() {
+    if (isSavingList) return;
+    setIsCreatingList(false);
+    setEditingListId(null);
+    setListName("");
+    setListFormError(null);
+  }
+
+  function openCreateList() {
+    setEditingListId(null);
+    setListName("");
+    setListFormError(null);
+    setIsChoosingList(false);
+    setIsCreatingList(true);
+  }
+
+  function openRenameList(list: HomeList) {
+    setEditingListId(list.id);
+    setListName(listLabel(list.name, t("defaultList")));
+    setListFormError(null);
+    setIsChoosingList(false);
+    setIsCreatingList(true);
+  }
+
+  function askDeleteList(list: HomeList) {
+    if (lists.length < 2) {
+      setFloatTone("error");
+      setFloatMessage(t("errorKeepOneList"));
+      return;
+    }
+    setActionError(null);
+    setIsChoosingList(false);
+    setListPendingDelete(list);
+  }
+
   async function saveList() {
     if (!household || !listName.trim() || isSavingList) return;
     setIsSavingList(true);
-    setActionError(null);
-    const result = await createList(household.id, listName);
+    setListFormError(null);
+    const result = editingListId
+      ? await renameList(household.id, editingListId, listName)
+      : await createList(household.id, listName);
     setIsSavingList(false);
     if (result.error || !result.list) {
+      setListFormError(result.error);
+      return;
+    }
+    if (editingListId) {
+      setLists((current) =>
+        current.map((list) => (list.id === result.list!.id ? result.list! : list)),
+      );
+    } else {
+      setLists((current) => [...current, result.list!]);
+      setSelectedListId(result.list.id);
+      setCategory("all");
+    }
+    setListName("");
+    setEditingListId(null);
+    setIsCreatingList(false);
+  }
+
+  async function confirmDeleteList() {
+    if (!household || !listPendingDelete || isDeletingList) return;
+    setIsDeletingList(true);
+    setActionError(null);
+    const result = await deleteList(household.id, listPendingDelete.id);
+    setIsDeletingList(false);
+    if (result.error) {
       setActionError(result.error);
       return;
     }
-    setLists((current) => [...current, result.list!]);
-    setSelectedListId(result.list.id);
+    const removedId = listPendingDelete.id;
+    const remaining = lists.filter((list) => list.id !== removedId);
+    setLists(remaining);
+    setSelectedListId((current) =>
+      current === removedId ? (remaining[0]?.id ?? null) : current,
+    );
     setCategory("all");
-    setListName("");
-    setIsCreatingList(false);
+    setSelectedIds(new Set());
+    setIsConfirmingDelete(false);
+    setListPendingDelete(null);
+    void refresh();
   }
 
   const currentList = lists.find((list) => list.id === selectedListId) ?? null;
@@ -305,34 +377,34 @@ export default function ItemsScreen() {
     return (
       <View className="mb-5 flex-row gap-2">
         <ListAction
-          label={t("startTrip")}
+          label={t("shop")}
           disabled={listEmpty}
           onPress={() => router.push("/trip")}
           icon={
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-cove-accent">
-              <Ionicons name="storefront" size={20} color={colors.white} />
+            <View className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-accent">
+              <Ionicons name="storefront" size={18} color={colors.white} />
             </View>
           }
         />
         <ListAction
-          label={t("shareList")}
+          label={t("share")}
           disabled={listEmpty}
           onPress={() => void shareList()}
           icon={
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-cove-mist">
-              <Ionicons name="share-social" size={20} color={colors.accent} />
+            <View className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-mist">
+              <Ionicons name="share-social" size={18} color={colors.accent} />
             </View>
           }
         />
         <ListAction
-          label={t("staplesTitle")}
+          label={t("pin")}
           onPress={() => router.push("/staples")}
           icon={
             <View
-              className="h-11 w-11 items-center justify-center rounded-2xl bg-cove-mist"
+              className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-mist"
               style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}
             >
-              <MaterialCommunityIcons name="pin" size={20} color={colors.accent} />
+              <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
             </View>
           }
         />
@@ -365,17 +437,17 @@ export default function ItemsScreen() {
 
   function listMenuStyle() {
     const screen = Dimensions.get("window");
-    const width = Math.min(220, screen.width - 24);
-    const top = listMenuFrame.height ? listMenuFrame.y + listMenuFrame.height + 8 : 88;
+    const width = Math.min(screen.width - 32, 420);
+    const top = listMenuFrame.height ? listMenuFrame.y + listMenuFrame.height + 10 : 88;
     const aligned = listMenuFrame.width
       ? listMenuFrame.x + listMenuFrame.width - width
       : screen.width - width - 16;
-    const left = Math.max(12, Math.min(aligned, screen.width - width - 12));
+    const left = Math.max(16, Math.min(aligned, screen.width - width - 16));
     return {
       top,
       left,
       width,
-      maxHeight: Math.max(120, screen.height - top - 24),
+      maxHeight: Math.max(220, screen.height - top - 24),
       zIndex: 1,
     };
   }
@@ -423,29 +495,15 @@ export default function ItemsScreen() {
               <Ionicons name="close" size={iconSize.md} color={headerButton.icon} />
             </Pressable>
           ) : (
-            <View className="flex-row items-center gap-2">
-              {currentList ? (
-                <View ref={listButtonRef} collapsable={false}>
-                  <Pressable
-                    onPress={openListMenu}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("chooseList")}
-                    className="h-11 flex-row items-center gap-0.5 rounded-full px-2.5 active:opacity-80"
-                    style={{ backgroundColor: headerButton.backgroundColor }}
-                  >
-                    <Ionicons name="list" size={20} color={headerButton.icon} />
-                    <Ionicons name="chevron-down" size={14} color={headerButton.icon} />
-                  </Pressable>
-                </View>
-              ) : null}
+            <View ref={listButtonRef} collapsable={false}>
               <Pressable
-                onPress={() => setIsCreatingList(true)}
+                onPress={openListMenu}
                 accessibilityRole="button"
-                accessibilityLabel={t("newList")}
+                accessibilityLabel={t("chooseList")}
                 className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
                 style={{ backgroundColor: headerButton.backgroundColor }}
               >
-                <Ionicons name="add" size={iconSize.md} color={headerButton.icon} />
+                <Ionicons name="list" size={22} color={headerButton.icon} />
               </Pressable>
             </View>
           )
@@ -455,8 +513,9 @@ export default function ItemsScreen() {
           <View className="min-w-0 flex-1">
             <AppText
               numberOfLines={1}
-              className="font-semibold text-white"
-              style={{ fontSize: 34, lineHeight: 40 }}
+              adjustsFontSizeToFit
+              minimumFontScale={0.65}
+              className="text-3xl font-semibold tracking-tight text-white"
             >
               {household?.name ?? t("yourItems")}
             </AppText>
@@ -477,20 +536,22 @@ export default function ItemsScreen() {
 
       {isSelecting ? (
         <Bobbing>
-          <View className="mb-5 flex-row items-stretch gap-2 rounded-3xl bg-cove-paper p-2.5">
+          <View className="mb-5 flex-row items-stretch gap-2">
             <Pressable
               disabled={isApplyingAction}
               onPress={() => void markSelectionBought()}
               accessibilityRole="button"
               accessibilityLabel={t("markSelectedBought")}
-              className="h-16 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-cove-accent px-3 active:opacity-80"
+              className={`min-h-[76px] min-w-0 flex-[1.7] flex-row items-center justify-center gap-2 rounded-3xl bg-cove-accent px-3 py-2 ${
+                isApplyingAction ? "opacity-50" : "active:opacity-80"
+              }`}
             >
               {busyAction === "bought" ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <>
                   <Ionicons name="checkmark" size={18} color={colors.white} />
-                  <AppText className="text-sm font-semibold text-white">
+                  <AppText numberOfLines={1} className="text-sm font-semibold text-white">
                     {t("markSelectedBought")}
                   </AppText>
                 </>
@@ -501,17 +562,22 @@ export default function ItemsScreen() {
               onPress={() => void pinSelection()}
               accessibilityRole="button"
               accessibilityLabel={t("pinSelected")}
-              className="h-16 w-16 items-center justify-center gap-0.5 rounded-2xl bg-cove-mist px-1 active:opacity-80"
+              className={`min-h-[76px] flex-1 items-center justify-center gap-1.5 rounded-3xl bg-cove-paper px-1 py-2 ${
+                isApplyingAction ? "opacity-50" : "active:opacity-80"
+              }`}
             >
               {busyAction === "pin" ? (
                 <ActivityIndicator color={colors.accent} />
               ) : (
                 <>
-                  <View style={{ transform: [{ rotate: isRTL ? "24deg" : "-24deg" }] }}>
+                  <View
+                    className="h-9 w-9 items-center justify-center rounded-2xl bg-cove-mist"
+                    style={{ transform: [{ rotate: isRTL ? "24deg" : "-24deg" }] }}
+                  >
                     <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
                   </View>
-                  <AppText className="text-[11px] font-semibold" style={{ color: colors.accent }}>
-                    {t("pinSelected")}
+                  <AppText numberOfLines={1} className="text-xs font-semibold text-cove-ink">
+                    {t("pin")}
                   </AppText>
                 </>
               )}
@@ -521,14 +587,21 @@ export default function ItemsScreen() {
               onPress={() => setIsConfirmingDelete(true)}
               accessibilityRole="button"
               accessibilityLabel={t("delete")}
-              className="h-16 w-16 items-center justify-center gap-0.5 rounded-2xl border border-red-400 px-1 active:opacity-80"
+              className={`min-h-[76px] flex-1 items-center justify-center gap-1.5 rounded-3xl border border-red-400 bg-cove-paper px-1 py-2 ${
+                isApplyingAction ? "opacity-50" : "active:opacity-80"
+              }`}
             >
               {busyAction === "delete" ? (
                 <ActivityIndicator color="#DC2626" />
               ) : (
                 <>
-                  <Ionicons name="trash-outline" size={18} color="#DC2626" />
-                  <AppText className="text-[11px] font-semibold text-red-600">
+                  <View
+                    className="h-9 w-9 items-center justify-center rounded-2xl"
+                    style={{ backgroundColor: "rgba(220,38,38,0.12)" }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                  </View>
+                  <AppText numberOfLines={1} className="text-xs font-semibold text-red-600">
                     {t("delete")}
                   </AppText>
                 </>
@@ -571,7 +644,11 @@ export default function ItemsScreen() {
             accessibilityRole="button"
             accessibilityLabel={t("addItem")}
             className={`h-9 w-9 items-center justify-center rounded-full bg-cove-accent ${
-              !quickName.trim() || isQuickAdding ? "opacity-45" : "active:opacity-80"
+              !quickName.trim() || isQuickAdding
+                ? scheme === "dark"
+                  ? "opacity-45"
+                  : ""
+                : "active:opacity-80"
             }`}
           >
             {isQuickAdding ? (
@@ -645,29 +722,47 @@ export default function ItemsScreen() {
         onClose={() => setOpenItem(null)}
       />
 
+      <ConfirmModal
+        visible={listPendingDelete !== null}
+        title={t("deleteListTitle")}
+        message={t("deleteListMessage", {
+          name: listLabel(listPendingDelete?.name ?? "", t("defaultList")),
+        })}
+        confirmLabel={t("delete")}
+        cancelLabel={t("cancel")}
+        error={actionError}
+        loading={isDeletingList}
+        onConfirm={() => void confirmDeleteList()}
+        onCancel={() => {
+          if (isDeletingList) return;
+          setListPendingDelete(null);
+          setActionError(null);
+        }}
+      />
+
       <Modal
         visible={isCreatingList}
         transparent
         animationType="fade"
         statusBarTranslucent
-        onRequestClose={() => setIsCreatingList(false)}
+        onRequestClose={closeListForm}
       >
         <View className="flex-1 items-center justify-center px-6">
-          <Pressable
-            onPress={() => setIsCreatingList(false)}
-            className="absolute inset-0"
-            style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-          />
+          <BlurBackdrop onPress={closeListForm} disabled={isSavingList} />
           <View className="w-full max-w-md gap-4 rounded-3xl bg-cove-paper p-5">
-            <AppText className="text-xl font-semibold text-cove-ink">{t("newList")}</AppText>
+            <AppText className="text-xl font-semibold text-cove-ink">
+              {editingListId ? t("editList") : t("newList")}
+            </AppText>
             <TextInput
               value={listName}
               onChangeText={setListName}
               placeholder={t("listNamePlaceholder")}
               placeholderTextColor={colors.muted}
               textAlign={isRTL ? "right" : "left"}
+              autoFocus
               className="h-12 rounded-2xl border border-cove-line bg-cove-ice px-4 text-base text-cove-ink"
             />
+            <FormMessage message={listFormError} />
             <Pressable
               disabled={!listName.trim() || isSavingList}
               onPress={() => void saveList()}
@@ -678,7 +773,9 @@ export default function ItemsScreen() {
               {isSavingList ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <AppText className="text-sm font-semibold text-white">{t("createList")}</AppText>
+                <AppText className="text-sm font-semibold text-white">
+                  {editingListId ? t("saveChanges") : t("createList")}
+                </AppText>
               )}
             </Pressable>
           </View>
@@ -693,40 +790,79 @@ export default function ItemsScreen() {
         onRequestClose={() => setIsChoosingList(false)}
       >
         <View className="flex-1">
-          <Pressable
-            onPress={() => setIsChoosingList(false)}
-            className="absolute inset-0"
-          />
+          <BlurBackdrop onPress={() => setIsChoosingList(false)} />
           <View
-            className="absolute overflow-hidden rounded-2xl bg-cove-paper p-1.5"
+            className="absolute overflow-hidden rounded-3xl bg-cove-paper p-3"
             style={listMenuStyle()}
           >
-            <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+            <AppText className="mb-2 px-1 text-base font-semibold text-cove-ink">
+              {t("yourLists")}
+            </AppText>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+              style={{ flexGrow: 0, maxHeight: Math.max(96, listMenuStyle().maxHeight - 132) }}
+            >
               {lists.map((list) => {
                 const selected = list.id === selectedListId;
+                const label = listLabel(list.name, t("defaultList"));
                 return (
-                  <Pressable
+                  <View
                     key={list.id}
-                    onPress={() => {
-                      setSelectedListId(list.id);
-                      setCategory("all");
-                      setSelectedIds(new Set());
-                      setIsChoosingList(false);
-                    }}
-                    className="rounded-xl px-3 py-2.5 active:opacity-80"
-                    style={{ backgroundColor: selected ? colors.accent : "transparent" }}
+                    className="mb-1 flex-row items-center rounded-2xl px-2"
+                    style={{ backgroundColor: selected ? colors.mist : "transparent" }}
                   >
-                    <AppText
-                      numberOfLines={1}
-                      className="text-sm font-medium"
-                      style={{ color: selected ? colors.white : colors.ink }}
+                    <Pressable
+                      onPress={() => {
+                        setSelectedListId(list.id);
+                        setCategory("all");
+                        setSelectedIds(new Set());
+                        setIsChoosingList(false);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      className="h-12 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-80"
                     >
-                      {listLabel(list.name, t("defaultList"))}
-                    </AppText>
-                  </Pressable>
+                      <Ionicons
+                        name={selected ? "checkmark-circle" : "ellipse-outline"}
+                        size={22}
+                        color={selected ? colors.accent : colors.muted}
+                      />
+                      <AppText numberOfLines={1} className="min-w-0 flex-1 text-base text-cove-ink">
+                        {label}
+                      </AppText>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => openRenameList(list)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("editListName")}
+                      hitSlop={8}
+                      className="h-10 w-10 items-center justify-center active:opacity-70"
+                    >
+                      <Ionicons name="pencil" size={18} color={colors.accent} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => askDeleteList(list)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("deleteList")}
+                      hitSlop={8}
+                      className="h-10 w-10 items-center justify-center active:opacity-70"
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    </Pressable>
+                  </View>
                 );
               })}
             </ScrollView>
+            <Pressable
+              onPress={openCreateList}
+              accessibilityRole="button"
+              accessibilityLabel={t("newList")}
+              className="mt-2 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-cove-accent active:opacity-80"
+            >
+              <Ionicons name="add" size={20} color={colors.white} />
+              <AppText className="text-base font-semibold text-white">{t("newList")}</AppText>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -782,13 +918,13 @@ function ListAction({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className={`min-h-[92px] flex-1 items-center justify-center gap-2 rounded-3xl bg-cove-paper px-1 py-3 ${
+      className={`min-h-[76px] flex-1 items-center justify-center gap-1.5 rounded-3xl bg-cove-paper px-1 py-2 ${
         disabled ? "opacity-45" : "active:opacity-80"
       }`}
     >
       {icon}
       <AppText
-        numberOfLines={2}
+        numberOfLines={1}
         className="text-center text-xs font-semibold leading-4 text-cove-ink"
       >
         {label}

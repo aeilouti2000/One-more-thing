@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { CurrentUser } from "../../common/current-user.decorator";
 import { User } from "../../users/user.entity";
@@ -22,6 +22,25 @@ export class ItemsController {
     @Body() body: CreateListDto,
   ) {
     return this.items.createList(user.id, homeId, body.name);
+  }
+
+  @Patch("homes/:homeId/lists/:listId")
+  renameList(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Param("listId", ParseUUIDPipe) listId: string,
+    @Body() body: CreateListDto,
+  ) {
+    return this.items.renameList(user.id, homeId, listId, body.name);
+  }
+
+  @Delete("homes/:homeId/lists/:listId")
+  deleteList(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Param("listId", ParseUUIDPipe) listId: string,
+  ) {
+    return this.items.deleteList(user.id, homeId, listId);
   }
 
   @Get("homes/:homeId/items")

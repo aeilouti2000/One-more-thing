@@ -1,19 +1,19 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { Pressable, View } from "react-native";
+import { Modal, Pressable, View } from "react-native";
 import { RequireSession } from "@/components/auth/RequireSession";
-import { CategoryChip } from "@/components/purchases/CategoryChip";
+import { CategoryField } from "@/components/purchases/CategoryField";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
+import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
+import { getCategoryLabel } from "@/constants/categories";
 import { useHousehold } from "@/hooks/useHousehold";
 import { addItem, fetchHomeItems, updateItemDetails } from "@/lib/items";
 import { emitListChanged } from "@/lib/list-sync";
@@ -28,6 +28,7 @@ import {
 } from "@/lib/staples";
 import { useAuth } from "@/providers/AuthProvider";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useTheme } from "@/providers/ThemeProvider";
 import type { TranslationKey } from "@/constants/i18n";
 import type { PurchaseCategory } from "@/types/purchase";
 
@@ -50,6 +51,7 @@ function StaplesBody() {
   const { user } = useAuth();
   const { household } = useHousehold();
   const { t, locale } = useI18n();
+  const { colors } = useTheme();
   const [staples, setStaples] = useState<Staple[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -194,7 +196,7 @@ function StaplesBody() {
   return (
     <Screen>
       <ScreenHeader title={t("staplesTitle")} subtitle={t("staplesSubtitle")} showBack />
-      <FormMessage message={error} />
+      {isAdding ? null : <FormMessage message={error} />}
 
       {staples.length > 0 ? (
         <View className="mb-4">
@@ -262,74 +264,116 @@ function StaplesBody() {
         </View>
       )}
 
-      {isAdding ? (
-      <View className="mt-6 gap-5">
-        <SectionHeader title={t("addStaple")} />
-        <AppTextField
-          label={t("itemNameLabel")}
-          value={name}
-          onChangeText={setName}
-          placeholder={t("itemNamePlaceholder")}
-          userText
-        />
-        <AppTextField
-          label={t("quantity")}
-          value={quantity}
-          onChangeText={(value) => {
-            setQuantity(value);
-            setQuantityError(undefined);
-          }}
-          keyboardType="decimal-pad"
-          error={quantityError}
-        />
-        <View>
-          <SectionHeader title={t("category")} />
-          <View key={locale} className="flex-row flex-wrap gap-2">
-            {PURCHASE_CATEGORIES.map((item) => (
-              <CategoryChip
-                key={`${item.id}-${locale}`}
-                category={item.id}
-                selected={category === item.id}
-                onPress={() => setCategory(item.id)}
-              />
-            ))}
-          </View>
-        </View>
-        <View>
-          <SectionHeader title={t("stapleInterval")} />
-          <View className="flex-row flex-wrap gap-2">
-            {STAPLE_INTERVALS.map((days) => (
-              <CategoryChip
-                key={days}
-                label={t(intervalKeys[days])}
-                selected={intervalDays === days}
-                onPress={() => setIntervalDays(days)}
-              />
-            ))}
-          </View>
-        </View>
-        <UrgentToggle value={urgent} onValueChange={setUrgent} />
-        <Pressable onPress={() => setAddNow((value) => !value)} className="flex-row items-center gap-3">
-          <View
-            className={`h-6 w-6 items-center justify-center rounded-md ${addNow ? "bg-cove-accent" : "bg-cove-line"}`}
-          >
-            {addNow ? <AppText className="text-xs font-semibold text-white">✓</AppText> : null}
-          </View>
-          <AppText className="text-base text-cove-ink">{t("addToListNow")}</AppText>
-        </Pressable>
+      <View className="mt-6">
         <AppButton
           label={t("addStaple")}
-          disabled={!name.trim()}
-          loading={isSaving}
-          onPress={() => void onSave()}
+          onPress={() => {
+            setError(null);
+            setQuantityError(undefined);
+            setIsAdding(true);
+          }}
         />
-        <AppButton label={t("cancel")} variant="secondary" onPress={closeForm} />
       </View>
-      ) : (
-        <View className="mt-6">
-          <AppButton label={t("addStaple")} onPress={() => setIsAdding(true)} />
+
+      <Modal
+        visible={isAdding}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (!isSaving) closeForm();
+        }}
+      >
+        <View className="flex-1 items-center justify-center px-5">
+          <BlurBackdrop onPress={closeForm} disabled={isSaving} />
+          <View
+            className="w-full max-w-md gap-4 rounded-[28px] p-4"
+            style={{ backgroundColor: colors.paper }}
+          >
+            <AppText className="text-lg font-semibold text-cove-ink">{t("addStaple")}</AppText>
+            <View className="flex-row items-start gap-3">
+                  <View className="min-w-0 flex-1">
+                    <AppTextField
+                      compact
+                      label={t("itemNameLabel")}
+                      value={name}
+                      onChangeText={setName}
+                      placeholder={t("itemNamePlaceholder")}
+                      userText
+                    />
+                  </View>
+                  <View className="w-20">
+                    <AppTextField
+                      compact
+                      label={t("quantity")}
+                      value={quantity}
+                      onChangeText={(value) => {
+                        setQuantity(value);
+                        setQuantityError(undefined);
+                      }}
+                      placeholder="1"
+                      keyboardType="decimal-pad"
+                      error={quantityError}
+                    />
+                  </View>
+                </View>
+                <CategoryField value={category} onChange={setCategory} />
+                <View className="gap-1.5">
+                  <AppText className="text-xs font-medium text-cove-muted">{t("stapleInterval")}</AppText>
+                  <View className="flex-row flex-wrap gap-2">
+                    {STAPLE_INTERVALS.map((days) => {
+                      const selected = intervalDays === days;
+                      return (
+                        <Pressable
+                          key={days}
+                          onPress={() => setIntervalDays(days)}
+                          accessibilityRole="button"
+                          className="rounded-full px-3 py-1.5 active:opacity-80"
+                          style={{ backgroundColor: selected ? colors.accent : colors.mist }}
+                        >
+                          <AppText
+                            className="text-xs font-medium"
+                            style={{ color: selected ? colors.white : colors.ink }}
+                          >
+                            {t(intervalKeys[days])}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+                <UrgentToggle compact value={urgent} onValueChange={setUrgent} />
+                <Pressable
+                  onPress={() => setAddNow((value) => !value)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: addNow }}
+                  className="flex-row items-center gap-3"
+                >
+                  <View
+                    className={`h-6 w-6 items-center justify-center rounded-md ${addNow ? "bg-cove-accent" : "bg-cove-line"}`}
+                  >
+                    {addNow ? <AppText className="text-xs font-semibold text-white">✓</AppText> : null}
+                  </View>
+                  <AppText className="text-base text-cove-ink">{t("addToListNow")}</AppText>
+                </Pressable>
+            <FormMessage message={error} />
+            <AppButton
+              compact
+              label={t("addStaple")}
+              disabled={!name.trim()}
+              loading={isSaving}
+              onPress={() => void onSave()}
+            />
+            <AppButton
+              compact
+              label={t("cancel")}
+              variant="ghost"
+              disabled={isSaving}
+              onPress={closeForm}
+            />
+          </View>
         </View>
-      )}
+      </Modal>
     </Screen>
   );
 }

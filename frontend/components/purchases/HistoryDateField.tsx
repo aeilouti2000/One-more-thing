@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -8,9 +8,10 @@ import { useTheme } from "@/providers/ThemeProvider";
 type HistoryDateFieldProps = {
   value: Date | null;
   onChange: (date: Date | null) => void;
+  leading?: ReactNode;
 };
 
-export function HistoryDateField({ value, onChange }: HistoryDateFieldProps) {
+export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldProps) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
@@ -34,32 +35,36 @@ export function HistoryDateField({ value, onChange }: HistoryDateFieldProps) {
   }
 
   return (
-    <>
-      <Pressable
-        onPress={() => {
-          setCursor(startOfMonth(value ?? new Date()));
-          setOpen((current) => !current);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={t("historyPickDate")}
-        className="flex-row items-center gap-2 self-start rounded-full px-4 py-2"
-        style={{ backgroundColor: selected ? colors.accent : colors.paper }}
-      >
-        <Ionicons
-          name="calendar-outline"
-          size={16}
-          color={selected ? colors.white : colors.ink}
-        />
-        <AppText
-          className="text-sm font-medium"
-          style={{ color: selected ? colors.white : colors.ink }}
+    <View className="mb-5 gap-2">
+      <View className="flex-row flex-nowrap items-center gap-1.5">
+        {leading}
+        <Pressable
+          onPress={() => {
+            setCursor(startOfMonth(value ?? new Date()));
+            setOpen((current) => !current);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t("historyPickDate")}
+          className="min-w-0 flex-1 flex-row items-center gap-1 rounded-full px-2 py-2"
+          style={{ backgroundColor: selected ? colors.accent : colors.paper }}
         >
-          {label}
-        </AppText>
-      </Pressable>
+          <Ionicons
+            name="calendar-outline"
+            size={14}
+            color={selected ? colors.white : colors.ink}
+          />
+          <AppText
+            numberOfLines={1}
+            className="min-w-0 flex-1 text-xs font-medium"
+            style={{ color: selected ? colors.white : colors.ink }}
+          >
+            {label}
+          </AppText>
+        </Pressable>
+      </View>
       {open ? (
         <View
-          className="mt-1 rounded-3xl px-3 py-3"
+          className="rounded-3xl px-3 py-3"
           style={{
             width: "100%",
             backgroundColor: colors.paper,
@@ -146,7 +151,7 @@ export function HistoryDateField({ value, onChange }: HistoryDateFieldProps) {
           </View>
         </View>
       ) : null}
-    </>
+    </View>
   );
 }
 

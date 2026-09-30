@@ -60,6 +60,12 @@ export function formatAppError(
   if (code === "STAPLE_LIMIT") {
     return translate("errorStapleLimit");
   }
+  if (code === "LIST_NAME_REQUIRED") {
+    return translate("errorEnterListName");
+  }
+  if (code === "LAST_LIST") {
+    return translate("errorKeepOneList");
+  }
   if (code === "over_email_send_rate_limit" || lower.includes("rate limit") || lower.includes("for security purposes")) {
     return translate("errorTryAgainSoon");
   }

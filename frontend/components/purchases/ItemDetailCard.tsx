@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, View } from "react-native";
-import { CategoryChip } from "@/components/purchases/CategoryChip";
+import { ActivityIndicator, Modal, Pressable, View } from "react-native";
+import { CategoryField } from "@/components/purchases/CategoryField";
 import { StatusBadge, UrgentBadge } from "@/components/purchases/StatusBadge";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
+import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
+import { getCategoryLabel } from "@/constants/categories";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
 import { createStaple, deleteStaple, fetchStaples } from "@/lib/staples";
@@ -27,7 +27,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
   const { updateItem, markBought } = usePurchases();
   const { household } = useHousehold();
   const { t, locale } = useI18n();
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
@@ -152,65 +152,79 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
       onRequestClose={close}
     >
       <View className="flex-1 items-center justify-center px-5">
-        <Pressable
-          onPress={close}
-          className="absolute inset-0"
-          style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-        />
+        <BlurBackdrop onPress={close} />
         {purchase && !editable ? (
           <HistoryItemCard purchase={purchase} onClose={close} />
         ) : (
-        <ScrollView
-          className="w-full max-w-md"
-          style={{ maxHeight: "82%", flexGrow: 0, backgroundColor: colors.paper, borderRadius: 28 }}
-          contentContainerClassName="gap-5 p-5"
-          keyboardShouldPersistTaps="handled"
+        <View
+          className="w-full max-w-md rounded-[28px] p-4"
+          style={{ backgroundColor: colors.paper }}
         >
-          <AppText className="text-xl font-semibold text-cove-ink">
-            {t("editItem")}
-          </AppText>
+          <View className="mb-6 flex-row items-start justify-between gap-3">
+            <AppText className="shrink-0 text-lg font-semibold text-cove-ink">{t("editItem")}</AppText>
+            {purchase ? (
+              <View className="min-w-0 flex-1 items-end">
+                <AppText
+                  numberOfLines={1}
+                  className="text-xs"
+                  style={{ color: scheme === "dark" ? "#FFFFFF" : colors.ink }}
+                >
+                  {t("addedByName", { name: purchase.addedByName })}
+                </AppText>
+                <AppText
+                  numberOfLines={1}
+                  className="text-xs"
+                  style={{ color: scheme === "dark" ? "#FFFFFF" : colors.ink }}
+                >
+                  {new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  }).format(new Date(purchase.createdAt))}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
           {purchase && editable ? (
-            <>
-              <AppTextField
-                label={t("itemNameLabel")}
-                value={name}
-                onChangeText={setName}
-                placeholder={t("itemNamePlaceholder")}
-                userText
-              />
-              <AppTextField
-                label={t("quantity")}
-                value={quantity}
-                onChangeText={(value) => {
-                  setQuantity(value);
-                  setQuantityError(undefined);
-                }}
-                placeholder="1"
-                keyboardType="decimal-pad"
-                error={quantityError}
-              />
-              <View>
-                <SectionHeader title={t("category")} />
-                <View key={locale} className="flex-row flex-wrap gap-2">
-                  {PURCHASE_CATEGORIES.map((item) => (
-                    <CategoryChip
-                      key={`${item.id}-${locale}`}
-                      category={item.id}
-                      selected={category === item.id}
-                      onPress={() => setCategory(item.id)}
-                    />
-                  ))}
+            <View className="gap-4">
+              <View className="flex-row items-start gap-3">
+                <View className="min-w-0 flex-1">
+                  <AppTextField
+                    compact
+                    label={t("itemNameLabel")}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={t("itemNamePlaceholder")}
+                    userText
+                  />
+                </View>
+                <View className="w-20">
+                  <AppTextField
+                    compact
+                    label={t("quantity")}
+                    value={quantity}
+                    onChangeText={(value) => {
+                      setQuantity(value);
+                      setQuantityError(undefined);
+                    }}
+                    placeholder="1"
+                    keyboardType="decimal-pad"
+                    error={quantityError}
+                  />
                 </View>
               </View>
-              <View className="flex-row gap-6">
-                <UrgentToggle value={urgent} onValueChange={setUrgent} />
+              <CategoryField value={category} onChange={setCategory} />
+              <View className="flex-row flex-wrap gap-4">
+                <UrgentToggle compact value={urgent} onValueChange={setUrgent} />
                 <UrgentToggle
+                  compact
                   label={t("pinSelected")}
                   value={pinned}
                   onValueChange={setPinned}
                 />
               </View>
               <AppTextField
+                compact
                 label={t("notes")}
                 value={notes}
                 onChangeText={setNotes}
@@ -219,22 +233,68 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
                 userText
               />
               <FormMessage message={error} />
-              <AppButton
-                label={t("saveChanges")}
-                disabled={!name.trim()}
-                loading={isSubmitting}
-                onPress={() => void onSubmit()}
-              />
-              <AppButton
-                label={t("markBought")}
-                variant="secondary"
-                disabled={isSubmitting}
-                onPress={() => void onMarkBought()}
-              />
-              <AppButton label={t("cancel")} variant="ghost" disabled={isSubmitting} onPress={close} />
-            </>
+              <View className="mt-2 flex-row items-stretch gap-2">
+                <Pressable
+                  disabled={isSubmitting || !name.trim()}
+                  onPress={() => void onSubmit()}
+                  accessibilityRole="button"
+                  className={`h-11 min-w-0 flex-1 items-center justify-center rounded-2xl bg-cove-accent px-2 ${
+                    isSubmitting || !name.trim() ? "opacity-50" : "active:opacity-80"
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color={colors.white} />
+                  ) : (
+                    <AppText
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                      className="text-xs font-semibold text-white"
+                    >
+                      {t("saveChanges")}
+                    </AppText>
+                  )}
+                </Pressable>
+                <Pressable
+                  disabled={isSubmitting}
+                  onPress={() => void onMarkBought()}
+                  accessibilityRole="button"
+                  className={`h-11 min-w-0 flex-1 items-center justify-center rounded-2xl px-2 ${
+                    isSubmitting ? "opacity-50" : "active:opacity-80"
+                  }`}
+                  style={{ backgroundColor: colors.mist }}
+                >
+                  <AppText
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    className="text-xs font-semibold text-cove-accent"
+                  >
+                    {t("markBought")}
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  disabled={isSubmitting}
+                  onPress={close}
+                  accessibilityRole="button"
+                  className={`h-11 min-w-0 flex-1 items-center justify-center rounded-2xl border px-2 ${
+                    isSubmitting ? "opacity-50" : "active:opacity-80"
+                  }`}
+                  style={{ borderColor: colors.line }}
+                >
+                  <AppText
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    className="text-xs font-semibold text-cove-ink"
+                  >
+                    {t("cancel")}
+                  </AppText>
+                </Pressable>
+              </View>
+            </View>
           ) : null}
-        </ScrollView>
+        </View>
         )}
       </View>
     </Modal>

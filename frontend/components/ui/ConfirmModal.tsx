@@ -1,4 +1,5 @@
 import { ActivityIndicator, Modal, Pressable, View } from "react-native";
+import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -41,13 +42,7 @@ export function ConfirmModal({
       }}
     >
       <View className="flex-1 items-center justify-center px-6">
-        <Pressable
-          onPress={() => {
-            if (!loading) onCancel();
-          }}
-          className="absolute inset-0"
-          style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-        />
+        <BlurBackdrop onPress={onCancel} disabled={loading} />
 
         <View
           className="w-full max-w-md gap-4 rounded-3xl p-5"

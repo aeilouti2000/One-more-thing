@@ -28,3 +28,21 @@ export async function createList(homeId: string, name: string) {
     return { list: null, error: formatAppError(error) };
   }
 }
+
+export async function renameList(homeId: string, listId: string, name: string) {
+  try {
+    const list = await api.patch<HomeList>(`/homes/${homeId}/lists/${listId}`, { name: name.trim() });
+    return { list, error: null };
+  } catch (error) {
+    return { list: null, error: formatAppError(error) };
+  }
+}
+
+export async function deleteList(homeId: string, listId: string) {
+  try {
+    await api.delete(`/homes/${homeId}/lists/${listId}`);
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}

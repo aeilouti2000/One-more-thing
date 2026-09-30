@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, View } from "react-native";
-import { CategoryChip } from "@/components/purchases/CategoryChip";
+import { Modal, View } from "react-native";
+import { CategoryField } from "@/components/purchases/CategoryField";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
+import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PURCHASE_CATEGORIES } from "@/constants/categories";
 import { usePurchases } from "@/hooks/usePurchases";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -28,7 +27,7 @@ export function AddItemCard({
   onClose,
 }: AddItemCardProps) {
   const { addItem } = usePurchases();
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const { colors } = useTheme();
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -96,51 +95,42 @@ export function AddItemCard({
       onRequestClose={close}
     >
       <View className="flex-1 items-center justify-center px-5">
-        <Pressable
-          onPress={close}
-          className="absolute inset-0"
-          style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-        />
-        <ScrollView
-          className="w-full max-w-md"
-          style={{ maxHeight: "82%", backgroundColor: colors.paper, borderRadius: 28 }}
-          contentContainerClassName="gap-5 p-5"
-          keyboardShouldPersistTaps="handled"
+        <BlurBackdrop onPress={close} />
+        <View
+          className="w-full max-w-md gap-4 rounded-[28px] p-4"
+          style={{ backgroundColor: colors.paper }}
         >
-          <AppText className="text-xl font-semibold text-cove-ink">{t("addItem")}</AppText>
-          <AppTextField
-            label={t("itemNameLabel")}
-            value={name}
-            onChangeText={setName}
-            placeholder={t("itemNamePlaceholder")}
-            userText
-          />
-          <AppTextField
-            label={t("quantity")}
-            value={quantity}
-            onChangeText={(value) => {
-              setQuantity(value);
-              setQuantityError(undefined);
-            }}
-            placeholder="1"
-            keyboardType="decimal-pad"
-            error={quantityError}
-          />
-          <View>
-            <SectionHeader title={t("category")} />
-            <View key={locale} className="flex-row flex-wrap gap-2">
-              {PURCHASE_CATEGORIES.map((item) => (
-                <CategoryChip
-                  key={`${item.id}-${locale}`}
-                  category={item.id}
-                  selected={category === item.id}
-                  onPress={() => setCategory(item.id)}
-                />
-              ))}
+          <AppText className="text-lg font-semibold text-cove-ink">{t("addItem")}</AppText>
+          <View className="flex-row items-start gap-3">
+            <View className="min-w-0 flex-1">
+              <AppTextField
+                compact
+                label={t("itemNameLabel")}
+                value={name}
+                onChangeText={setName}
+                placeholder={t("itemNamePlaceholder")}
+                userText
+              />
+            </View>
+            <View className="w-20">
+              <AppTextField
+                compact
+                label={t("quantity")}
+                value={quantity}
+                onChangeText={(value) => {
+                  setQuantity(value);
+                  setQuantityError(undefined);
+                }}
+                placeholder="1"
+                keyboardType="decimal-pad"
+                error={quantityError}
+              />
             </View>
           </View>
-          <UrgentToggle value={urgent} onValueChange={setUrgent} />
+          <CategoryField value={category} onChange={setCategory} />
+          <UrgentToggle compact value={urgent} onValueChange={setUrgent} />
           <AppTextField
+            compact
             label={t("notes")}
             value={notes}
             onChangeText={setNotes}
@@ -150,13 +140,14 @@ export function AddItemCard({
           />
           <FormMessage message={error} />
           <AppButton
+            compact
             label={t("saveItem")}
             disabled={!name.trim() || !listId}
             loading={isSubmitting}
             onPress={() => void onSubmit()}
           />
-          <AppButton label={t("cancel")} variant="ghost" disabled={isSubmitting} onPress={close} />
-        </ScrollView>
+          <AppButton compact label={t("cancel")} variant="ghost" disabled={isSubmitting} onPress={close} />
+        </View>
       </View>
     </Modal>
   );

@@ -6,6 +6,7 @@ import { HistoryDateField } from "@/components/purchases/HistoryDateField";
 import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
 import { AppText } from "@/components/ui/AppText";
+import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
@@ -139,28 +140,30 @@ export default function HistoryScreen() {
       />
 
       {bought.length > 0 ? (
-        <View className="mb-5 flex-row flex-wrap items-center gap-2">
-          <ChoiceButton
-            icon="list-outline"
-            selected={listId !== "all"}
-            label={
-              listId === "all"
-                ? t("allLists")
-                : listLabel(lists.find((list) => list.id === listId)?.name ?? "", t("defaultList"))
-            }
-            onPress={() => setIsChoosingList(true)}
-          />
-          <ChoiceButton
-            icon="time-outline"
-            selected={pickedDate !== null || range !== "all"}
-            label={pickedLabel ?? rangeLabel[range]}
-            onPress={() => setIsChoosingRange(true)}
-          />
-          <HistoryDateField
-            value={pickedDate}
-            onChange={(date) => setPickedDate(date)}
-          />
-        </View>
+        <HistoryDateField
+          value={pickedDate}
+          onChange={(date) => setPickedDate(date)}
+          leading={
+            <>
+              <ChoiceButton
+                icon="list-outline"
+                selected={listId !== "all"}
+                label={
+                  listId === "all"
+                    ? t("allLists")
+                    : listLabel(lists.find((list) => list.id === listId)?.name ?? "", t("defaultList"))
+                }
+                onPress={() => setIsChoosingList(true)}
+              />
+              <ChoiceButton
+                icon="time-outline"
+                selected={pickedDate !== null || range !== "all"}
+                label={pickedLabel ?? rangeLabel[range]}
+                onPress={() => setIsChoosingRange(true)}
+              />
+            </>
+          }
+        />
       ) : null}
 
       <FormMessage message={undoError ?? error} />
@@ -250,12 +253,13 @@ function ChoiceButton({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="flex-row items-center gap-2 self-start rounded-full px-4 py-2"
+      className="min-w-0 flex-1 flex-row items-center gap-1 rounded-full px-2 py-2"
       style={{ backgroundColor: selected ? colors.accent : colors.paper }}
     >
-      <Ionicons name={icon} size={16} color={selected ? colors.white : colors.ink} />
+      <Ionicons name={icon} size={14} color={selected ? colors.white : colors.ink} />
       <AppText
-        className="text-sm font-medium"
+        numberOfLines={1}
+        className="min-w-0 flex-1 text-xs font-medium"
         style={{ color: selected ? colors.white : colors.ink }}
       >
         {label}
@@ -282,11 +286,7 @@ function OptionMenu({
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <View className="flex-1 items-center justify-center px-6">
-        <Pressable
-          onPress={onClose}
-          className="absolute inset-0"
-          style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-        />
+        <BlurBackdrop onPress={onClose} />
         <View className="w-full max-w-md gap-1 rounded-3xl p-3" style={{ backgroundColor: colors.paper }}>
           {options.map((option) => {
             const selected = option.id === selectedId;

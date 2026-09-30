@@ -10,6 +10,7 @@ type CategoryChipProps = {
   label?: string;
   selected?: boolean;
   onPress?: () => void;
+  dense?: boolean;
 };
 
 export function CategoryChip({
@@ -17,6 +18,7 @@ export function CategoryChip({
   label,
   selected = false,
   onPress,
+  dense = false,
 }: CategoryChipProps) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
@@ -25,12 +27,12 @@ export function CategoryChip({
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-full px-4 py-2"
+      className={dense ? "rounded-full px-2.5 py-1" : "rounded-full px-4 py-2"}
       style={{ backgroundColor: selected ? colors.accent : colors.paper }}
     >
       <AppText
         key={locale}
-        className="text-sm font-medium"
+        className={dense ? "text-xs font-medium" : "text-sm font-medium"}
         style={{ color: selected ? colors.white : colors.ink }}
       >
         {text}

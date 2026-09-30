@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
 import { iconSize } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -41,10 +42,10 @@ export function CategoryFilter({
         accessibilityLabel={
           filtered ? `${t("categories")}, ${selectedLabel}` : t("categories")
         }
-        className="min-h-[92px] flex-1 items-center justify-center gap-2 rounded-3xl bg-cove-paper px-1 py-3 active:opacity-80"
+        className="min-h-[76px] flex-1 items-center justify-center gap-1.5 rounded-3xl bg-cove-paper px-1 py-2 active:opacity-80"
       >
         <View
-          className="h-11 w-11 items-center justify-center rounded-2xl"
+          className="h-10 w-10 items-center justify-center rounded-2xl"
           style={{ backgroundColor: filtered ? colors.accent : colors.mist }}
         >
           <Ionicons
@@ -54,7 +55,7 @@ export function CategoryFilter({
           />
         </View>
         <AppText
-          numberOfLines={2}
+          numberOfLines={1}
           className="text-center text-xs font-semibold leading-4 text-cove-ink"
         >
           {filtered ? selectedLabel : t("categories")}
@@ -69,11 +70,7 @@ export function CategoryFilter({
         onRequestClose={onClose}
       >
         <View className="flex-1 items-center justify-center px-6">
-          <Pressable
-            onPress={onClose}
-            className="absolute inset-0"
-            style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-          />
+          <BlurBackdrop onPress={onClose} />
           <View
             className="w-full max-w-md gap-2 rounded-3xl p-4"
             style={{ backgroundColor: colors.paper }}

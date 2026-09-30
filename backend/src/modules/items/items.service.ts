@@ -223,6 +223,35 @@ export class ItemsService {
     return { id: row.id, homeId: row.homeId, name: row.name };
   }
 
+  async renameList(userId: string, homeId: string, listId: string, name: string) {
+    await this.homes.requireMembership(userId, homeId);
+    const list = await this.shoppingLists.findOne({ where: { id: listId, homeId } });
+    if (!list) {
+      throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
+    }
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new DomainError("LIST_NAME_REQUIRED", "Enter a list name.", HttpStatus.BAD_REQUEST);
+    }
+    list.name = trimmed;
+    const row = await this.shoppingLists.save(list);
+    return { id: row.id, homeId: row.homeId, name: row.name };
+  }
+
+  async deleteList(userId: string, homeId: string, listId: string) {
+    await this.homes.requireMembership(userId, homeId);
+    const count = await this.shoppingLists.count({ where: { homeId } });
+    if (count <= 1) {
+      throw new DomainError("LAST_LIST", "Keep at least one list.", HttpStatus.BAD_REQUEST);
+    }
+    const list = await this.shoppingLists.findOne({ where: { id: listId, homeId } });
+    if (!list) {
+      throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
+    }
+    await this.shoppingLists.delete({ id: listId, homeId });
+    return { deleted: true };
+  }
+
   private async resolveList(homeId: string, listId?: string) {
     const list = listId
       ? await this.shoppingLists.findOne({ where: { id: listId, homeId } })

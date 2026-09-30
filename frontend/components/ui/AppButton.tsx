@@ -8,6 +8,7 @@ type AppButtonProps = {
   variant?: "primary" | "secondary" | "ghost";
   disabled?: boolean;
   loading?: boolean;
+  compact?: boolean;
 };
 
 const variants = {
@@ -28,6 +29,7 @@ export function AppButton({
   variant = "primary",
   disabled = false,
   loading = false,
+  compact = false,
 }: AppButtonProps) {
   const { colors } = useTheme();
   const isDisabled = disabled || loading;
@@ -39,7 +41,7 @@ export function AppButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
-      className={`items-center rounded-2xl px-5 py-4 ${variants[variant]} ${
+      className={`items-center rounded-2xl px-5 ${compact ? "py-2.5" : "py-4"} ${variants[variant]} ${
         isDisabled ? "opacity-50" : "active:opacity-80"
       }`}
     >
@@ -48,7 +50,7 @@ export function AppButton({
           color={variant === "primary" ? colors.white : colors.accent}
         />
       ) : (
-        <AppText className={`text-base font-semibold ${labelVariants[variant]}`}>
+        <AppText className={`font-semibold ${compact ? "text-sm" : "text-base"} ${labelVariants[variant]}`}>
           {label}
         </AppText>
       )}

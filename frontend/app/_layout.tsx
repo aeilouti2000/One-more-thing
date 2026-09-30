@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
+import { BlurScreen } from "@/components/ui/BlurBackdrop";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { requiredAppUpdate } from "@/lib/app-release";
@@ -69,7 +70,9 @@ export default function RootLayout() {
           <NotificationsProvider>
             <HouseholdProvider>
               <GestureHandlerRootView style={{ flex: 1 }}>
-                <UpdateGate />
+                <BlurScreen>
+                  <UpdateGate />
+                </BlurScreen>
               </GestureHandlerRootView>
             </HouseholdProvider>
           </NotificationsProvider>
