@@ -13,7 +13,7 @@
     "android": {
       "package": "com.onemorething.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 13,
+      "versionCode": 14,
       "adaptiveIcon": {
         "backgroundColor": "#071633",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
