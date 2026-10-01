@@ -32,6 +32,9 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
     }
   }
 
+  const cardTint =
+    scheme === "dark" ? "rgba(66, 165, 245, 0.55)" : "rgba(33, 150, 243, 0.72)";
+
   return (
     <View className="overflow-hidden rounded-[28px] border border-white/30 px-6 py-6">
       <FrostedBlur style={StyleSheet.absoluteFill} />
@@ -40,8 +43,7 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor:
-              scheme === "dark" ? "rgba(66, 165, 245, 0.55)" : "rgba(33, 150, 243, 0.72)",
+            backgroundColor: cardTint,
           },
         ]}
       />
@@ -71,7 +73,7 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
           <FrostedBlur style={StyleSheet.absoluteFill} />
           <View
             pointerEvents="none"
-            style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255, 255, 255, 0.22)" }]}
+            style={[StyleSheet.absoluteFill, { backgroundColor: cardTint }]}
           />
           <Ionicons name="share-social" size={20} color="#FFFFFF" />
         </Pressable>

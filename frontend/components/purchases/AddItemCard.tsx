@@ -3,7 +3,7 @@ import { Modal, View } from "react-native";
 import { CategoryField } from "@/components/purchases/CategoryField";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
-import { BlurBackdrop, FrostedFill } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -97,7 +97,7 @@ export function AddItemCard({
         <View
           className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
         >
-          <FrostedFill />
+          <GlassFill soft />
           <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">
             <AppText className="text-lg font-semibold text-cove-ink">{t("addItem")}</AppText>
           </View>

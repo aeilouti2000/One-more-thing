@@ -9,7 +9,7 @@ import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
 import { ReorderableList } from "@/components/purchases/ReorderableList";
 import { AppText } from "@/components/ui/AppText";
-import { BlurBackdrop, FrostedBlur, FrostedFill } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, FrostedBlur, FrostedFill, GlassFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
@@ -21,7 +21,8 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { createList, deleteList, fetchLists, listLabel, renameList, type HomeList } from "@/lib/lists";
 import { formatNeededShare, shareNeededText } from "@/lib/share-list";
 import { createStaple, fetchStaples } from "@/lib/staples";
-import { appFont } from "@/constants/font";
+import { scaleFontSize, singleLineInput } from "@/constants/font";
+import { useFontScale } from "@/providers/FontScaleProvider";
 import { iconSize } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
@@ -45,6 +46,11 @@ export default function ItemsScreen() {
   const { colors, scheme } = useTheme();
   const { setHidden: setTabBarHidden } = useTabBarVisibility();
   const { t, isRTL } = useI18n();
+  const { scale } = useFontScale();
+  const quickInputStyle = {
+    ...singleLineInput,
+    fontSize: scaleFontSize(Number(singleLineInput.fontSize), scale),
+  };
   const [category, setCategory] = useState<PurchaseCategory | "all">("all");
   const [isChoosingCategory, setIsChoosingCategory] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -591,8 +597,10 @@ export default function ItemsScreen() {
             returnKeyType="done"
             editable={!isQuickAdding}
             textAlign={isRTL ? "right" : "left"}
-            style={{ fontFamily: appFont.regular }}
-            className="h-11 min-w-0 flex-1 text-base text-cove-ink"
+            textAlignVertical="center"
+            allowFontScaling={false}
+            style={quickInputStyle}
+            className="h-11 min-w-0 flex-1 text-cove-ink"
           />
           <Pressable
             onPress={() => setIsAddingDetails(true)}
@@ -717,7 +725,7 @@ export default function ItemsScreen() {
         <View className="flex-1 items-center justify-center px-6">
           <BlurBackdrop onPress={closeListForm} disabled={isSavingList} />
           <View className="w-full max-w-md gap-4 overflow-hidden rounded-3xl border border-cove-line p-5">
-            <FrostedFill />
+            <GlassFill soft />
             <AppText className="text-xl font-semibold text-cove-ink">
               {editingListId ? t("editList") : t("newList")}
             </AppText>
@@ -727,9 +735,11 @@ export default function ItemsScreen() {
               placeholder={t("listNamePlaceholder")}
               placeholderTextColor={colors.muted}
               textAlign={isRTL ? "right" : "left"}
+              textAlignVertical="center"
+              allowFontScaling={false}
               autoFocus
-              style={{ fontFamily: appFont.regular }}
-              className="h-12 rounded-2xl border border-cove-line bg-cove-ice px-4 text-base text-cove-ink"
+              style={quickInputStyle}
+              className="h-12 rounded-2xl border border-cove-line bg-cove-ice px-4 text-cove-ink"
             />
             <FormMessage message={listFormError} />
             <Pressable
@@ -764,7 +774,7 @@ export default function ItemsScreen() {
             className="absolute overflow-hidden rounded-3xl border border-cove-line p-3"
             style={listMenuStyle()}
           >
-            <FrostedFill />
+            <GlassFill soft />
             <AppText className="mb-2 px-1 text-base font-semibold text-cove-ink">
               {t("yourLists")}
             </AppText>
@@ -780,7 +790,13 @@ export default function ItemsScreen() {
                   <View
                     key={list.id}
                     className="mb-1 flex-row items-center rounded-2xl px-2"
-                    style={{ backgroundColor: selected ? colors.mist : "transparent" }}
+                    style={{
+                      backgroundColor: selected
+                        ? scheme === "dark"
+                          ? "rgba(144, 202, 249, 0.12)"
+                          : "rgba(33, 150, 243, 0.08)"
+                        : "transparent",
+                    }}
                   >
                     <Pressable
                       onPress={() => {
@@ -876,7 +892,7 @@ function SelectionBar({
         }`}
         style={[buttonShadow, { backgroundColor: "transparent" }]}
       >
-        <FrostedBlur style={StyleSheet.absoluteFill} />
+        <GlassFill />
         <View
           pointerEvents="none"
           style={[
@@ -903,7 +919,7 @@ function SelectionBar({
         }`}
         style={[buttonShadow, { backgroundColor: "transparent" }]}
       >
-        <FrostedBlur style={StyleSheet.absoluteFill} />
+        <GlassFill />
         <View
           pointerEvents="none"
           style={[
@@ -930,7 +946,7 @@ function SelectionBar({
         }`}
         style={[buttonShadow, { backgroundColor: "transparent" }]}
       >
-        <FrostedBlur style={StyleSheet.absoluteFill} />
+        <GlassFill />
         <View
           pointerEvents="none"
           style={[

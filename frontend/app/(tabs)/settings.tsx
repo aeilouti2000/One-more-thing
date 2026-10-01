@@ -1,17 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Linking, Platform, Pressable, Switch, View } from "react-native";
+import { Linking, Pressable, Switch, View } from "react-native";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { FontSizeBar } from "@/components/ui/FontSizeBar";
 import { LanguagePicker } from "@/components/ui/LanguagePicker";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { iconSize, type ThemeScheme } from "@/constants/theme";
 import {
+  canUsePush,
   readPushEnabled,
   syncPushRegistration,
   unregisterPushDevice,
@@ -53,7 +55,7 @@ export default function SettingsScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [pushStatus, setPushStatus] = useState<PushStatus>(
-    Platform.OS === "web" ? "unsupported" : readPushEnabled() ? "on" : "off",
+    canUsePush() ? (readPushEnabled() ? "on" : "off") : "unsupported",
   );
   const [isUpdatingPush, setIsUpdatingPush] = useState(false);
 
@@ -62,7 +64,7 @@ export default function SettingsScreen() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || Platform.OS === "web" || !readPushEnabled()) return;
+    if (!user || !canUsePush() || !readPushEnabled()) return;
     void syncPushRegistration(locale).then(setPushStatus);
   }, [locale, user]);
 
@@ -287,6 +289,13 @@ export default function SettingsScreen() {
                 );
               })}
             </View>
+          </View>
+        </View>
+
+        <View>
+          <SectionHeader title={t("textSize")} />
+          <View className="rounded-3xl bg-cove-paper px-4 py-3">
+            <FontSizeBar />
           </View>
         </View>
 

@@ -9,7 +9,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PURCHASE_CATEGORIES } from "@/constants/categories";
+import { useCategories } from "@/providers/CategoriesProvider";
 import { usePurchases } from "@/hooks/usePurchases";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -17,6 +17,7 @@ import type { PurchaseCategory } from "@/types/purchase";
 
 export default function NewItemScreen() {
   const { addItem } = usePurchases();
+  const { categories } = useCategories();
   const { t, locale } = useI18n();
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -89,7 +90,7 @@ export default function NewItemScreen() {
         <View>
           <SectionHeader title={t("category")} />
           <View key={locale} className="flex-row flex-wrap gap-2">
-            {PURCHASE_CATEGORIES.map((item) => (
+            {categories.map((item) => (
               <CategoryChip
                 key={`${item.id}-${locale}`}
                 category={item.id}

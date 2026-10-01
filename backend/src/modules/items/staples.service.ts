@@ -8,6 +8,7 @@ import { Item } from "./item.entity";
 import { placeNeededItem } from "./item-order";
 import { ShoppingList } from "./shopping-list.entity";
 import { advanceDue } from "./shopping";
+import { CategoriesService } from "./categories.service";
 import { STAPLE_LIMIT, Staple, type StapleInterval } from "./staple.entity";
 
 export type StapleView = {
@@ -28,6 +29,7 @@ export class StaplesService {
     @InjectRepository(Item) private readonly items: Repository<Item>,
     @InjectRepository(ShoppingList) private readonly shoppingLists: Repository<ShoppingList>,
     private readonly homes: HomesService,
+    private readonly categories: CategoriesService,
   ) {}
 
   async list(userId: string, homeId: string) {
@@ -50,6 +52,7 @@ export class StaplesService {
     createItem: (notify: boolean) => Promise<unknown>,
   ) {
     await this.homes.requireMembership(userId, homeId);
+    await this.categories.assertUsable(homeId, input.category);
     const count = await this.staples.count({ where: { homeId } });
     if (count >= STAPLE_LIMIT) {
       throw new DomainError("STAPLE_LIMIT", "You can pin up to 12 items.", HttpStatus.CONFLICT);

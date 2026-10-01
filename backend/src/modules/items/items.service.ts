@@ -10,6 +10,7 @@ import { ShoppingList } from "./shopping-list.entity";
 import { Item } from "./item.entity";
 import { applyNeededOrder, placeNeededItem } from "./item-order";
 import { undoDeadline } from "./shopping";
+import { CategoriesService } from "./categories.service";
 import { StaplesService } from "./staples.service";
 
 export type ItemView = {
@@ -41,6 +42,7 @@ export class ItemsService {
     private readonly homes: HomesService,
     private readonly notifications: NotificationsService,
     private readonly staples: StaplesService,
+    private readonly categories: CategoriesService,
   ) {}
 
   async list(userId: string, homeId: string) {
@@ -60,6 +62,7 @@ export class ItemsService {
     options?: { notify?: boolean },
   ) {
     await this.homes.requireMembership(userId, homeId);
+    await this.categories.assertUsable(homeId, input.category);
     const list = await this.resolveList(homeId, input.listId);
     const item = await this.items.save(
       this.items.create({
@@ -97,6 +100,7 @@ export class ItemsService {
     input: { name: string; quantity: number; category: ItemCategory; urgent: boolean; notes?: string },
   ) {
     const item = await this.requireItem(userId, itemId);
+    await this.categories.assertUsable(item.homeId, input.category);
     const becameUrgent = !item.urgent && input.urgent && item.status === "needed";
     item.name = input.name.trim();
     item.quantity = input.quantity;

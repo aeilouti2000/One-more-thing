@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { getCategoryLabel } from "@/constants/categories";
+import { useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/types/purchase";
@@ -31,7 +31,8 @@ export function PurchaseRow({
   selected = false,
   leading,
 }: PurchaseRowProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
+  const categoryLabel = useCategoryLabel(purchase.category);
   const { colors, scheme } = useTheme();
   const showsStepper = !selected && Boolean(onChangeQuantity) && purchase.status === "needed";
   const quantityLabel = purchase.unit
@@ -69,7 +70,7 @@ export function PurchaseRow({
               accessibilityState={{ selected }}
               className="min-w-0 flex-1 active:opacity-80"
             >
-              <AppText numberOfLines={1} className="text-xl font-semibold text-cove-ink">
+              <AppText numberOfLines={1} className="text-base font-semibold text-cove-ink">
                 {purchase.name}
               </AppText>
             </Pressable>
@@ -102,7 +103,7 @@ export function PurchaseRow({
                 >
                   <Ionicons name="remove" size={16} color={colors.accent} />
                 </Pressable>
-                <AppText className="min-w-6 text-center text-base font-semibold text-cove-ink">
+                <AppText className="min-w-6 text-center text-sm font-semibold text-cove-ink">
                   {quantityLabel}
                 </AppText>
                 <Pressable
@@ -132,7 +133,7 @@ export function PurchaseRow({
             >
               <View className="min-w-0 overflow-hidden rounded-full bg-cove-mist px-2.5 py-1">
                 <AppText numberOfLines={1} className="text-xs font-semibold text-cove-accent">
-                  {getCategoryLabel(purchase.category, locale)}
+                  {categoryLabel}
                 </AppText>
               </View>
               {purchase.notes?.trim() ? (

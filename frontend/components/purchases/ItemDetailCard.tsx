@@ -4,11 +4,11 @@ import { CategoryField } from "@/components/purchases/CategoryField";
 import { StatusBadge, UrgentBadge } from "@/components/purchases/StatusBadge";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
-import { BlurBackdrop, FrostedFill } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { getCategoryLabel } from "@/constants/categories";
+import { useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
 import { createStaple, deleteStaple, fetchStaples } from "@/lib/staples";
@@ -159,7 +159,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
         <View
           className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
         >
-          <FrostedFill />
+          <GlassFill soft />
           <View className="-mx-7 mb-6 flex-row items-start justify-between gap-4 border-b border-cove-line px-7 pb-5">
             <AppText className="shrink-0 text-lg font-semibold text-cove-ink">{t("editItem")}</AppText>
             {purchase ? (
@@ -292,6 +292,7 @@ function HistoryItemCard({
 }) {
   const { t, locale, isRTL } = useI18n();
   const { colors } = useTheme();
+  const categoryLabel = useCategoryLabel(purchase.category);
   const quantityLabel = purchase.unit
     ? `${purchase.quantity} ${purchase.unit}`
     : `${purchase.quantity}`;
@@ -305,7 +306,7 @@ function HistoryItemCard({
     : null;
   const facts = [
     { label: t("quantity"), value: quantityLabel },
-    { label: t("category"), value: getCategoryLabel(purchase.category, locale) },
+    { label: t("category"), value: categoryLabel },
     { label: t("addedBy"), value: purchase.addedByName },
     purchase.boughtByName ? { label: t("boughtBy"), value: purchase.boughtByName } : null,
     dateLabel
@@ -320,10 +321,10 @@ function HistoryItemCard({
     <View
       className="w-full max-w-md gap-6 overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
     >
-      <FrostedFill />
+      <GlassFill soft />
       <View className="-mx-7 flex-row items-center gap-3 border-b border-cove-line px-7 pb-5">
         <AppText
-          className="min-w-0 flex-1 text-3xl font-semibold tracking-tight text-cove-ink"
+          className="min-w-0 flex-1 text-xl font-semibold tracking-tight text-cove-ink"
           numberOfLines={2}
         >
           {purchase.name}

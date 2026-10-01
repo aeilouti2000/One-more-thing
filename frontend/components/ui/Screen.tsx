@@ -6,6 +6,7 @@ import {
   ScrollView as GestureScrollView,
 } from "react-native-gesture-handler";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { TabBlurSurface } from "@/components/ui/TabBlurTarget";
 import { spacing } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -59,7 +60,7 @@ export function Screen({
     return Gesture.Simultaneous(pan, native);
   }, []);
 
-  return (
+  const body = (
     <SafeAreaView
       className="flex-1 bg-cove-ice"
       style={{ backgroundColor: colors.ice }}
@@ -121,6 +122,11 @@ export function Screen({
       ) : (
         <View className={`flex-1 ${padding}`}>{children}</View>
       )}
+    </SafeAreaView>
+  );
+
+  const overlay = (
+    <>
       {floating ? (
         <View
           pointerEvents="box-none"
@@ -138,6 +144,13 @@ export function Screen({
           {dock}
         </View>
       ) : null}
-    </SafeAreaView>
+    </>
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      <TabBlurSurface>{body}</TabBlurSurface>
+      {overlay}
+    </View>
   );
 }

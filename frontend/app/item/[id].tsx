@@ -13,7 +13,7 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
+import { useCategories, useCategoryLabel } from "@/providers/CategoriesProvider";
 import { usePurchases } from "@/hooks/usePurchases";
 import { useHousehold } from "@/hooks/useHousehold";
 import { createStaple, deleteStaple, fetchStaples } from "@/lib/staples";
@@ -26,6 +26,7 @@ export default function ItemDetailScreen() {
   const { getById, isLoading, markBought, updateItem } = usePurchases();
   const { household } = useHousehold();
   const { t, locale } = useI18n();
+  const { categories } = useCategories();
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -39,6 +40,7 @@ export default function ItemDetailScreen() {
   const [pinnedStapleId, setPinnedStapleId] = useState<string | null>(null);
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const purchase = getById(id ?? "");
+  const categoryLabel = useCategoryLabel(purchase?.category ?? "");
 
   if (isLoading && !purchase) {
     return <LoadingScreen />;
@@ -213,7 +215,7 @@ export default function ItemDetailScreen() {
             <View>
               <SectionHeader title={t("category")} />
               <View key={locale} className="flex-row flex-wrap gap-2">
-                {PURCHASE_CATEGORIES.map((category) => (
+                {categories.map((category) => (
                   <CategoryChip
                     key={`${category.id}-${locale}`}
                     category={category.id}
@@ -261,7 +263,7 @@ export default function ItemDetailScreen() {
               <DetailRow label={t("quantity")} value={quantityLabel} />
               <DetailRow
                 label={t("category")}
-                value={getCategoryLabel(item.category, locale)}
+                value={categoryLabel}
               />
               <DetailRow label={t("addedBy")} value={item.addedByName} />
               {item.boughtByName ? (

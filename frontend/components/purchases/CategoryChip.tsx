@@ -1,6 +1,6 @@
 import { Pressable } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { categoryKeys } from "@/constants/categories";
+import { useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { PurchaseCategory } from "@/types/purchase";
@@ -20,9 +20,10 @@ export function CategoryChip({
   onPress,
   dense = false,
 }: CategoryChipProps) {
-  const { t, locale } = useI18n();
+  const { locale } = useI18n();
   const { colors } = useTheme();
-  const text = label ?? (category ? t(categoryKeys[category]) : "");
+  const categoryLabel = useCategoryLabel(category ?? "");
+  const text = label ?? (category ? categoryLabel : "");
 
   return (
     <Pressable

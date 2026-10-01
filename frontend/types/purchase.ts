@@ -1,12 +1,6 @@
 export type PurchaseStatus = "needed" | "bought";
 
-export type PurchaseCategory =
-  | "vegetables"
-  | "meat"
-  | "supermarket"
-  | "pharmacy"
-  | "coffee"
-  | "other";
+export type PurchaseCategory = string;
 
 export type Purchase = {
   id: string;

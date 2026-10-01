@@ -66,6 +66,15 @@ export function formatAppError(
   if (code === "LAST_LIST") {
     return translate("errorKeepOneList");
   }
+  if (code === "CATEGORY_NAME_REQUIRED") {
+    return translate("errorCategoryName");
+  }
+  if (code === "CATEGORY_EXISTS") {
+    return translate("errorCategoryExists");
+  }
+  if (code === "CATEGORY_OTHER") {
+    return translate("errorCategoryOther");
+  }
   if (code === "over_email_send_rate_limit" || lower.includes("rate limit") || lower.includes("for security purposes")) {
     return translate("errorTryAgainSoon");
   }

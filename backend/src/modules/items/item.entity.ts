@@ -19,7 +19,7 @@ export const ITEM_CATEGORIES = [
   "other",
 ] as const;
 
-export type ItemCategory = (typeof ITEM_CATEGORIES)[number];
+export type ItemCategory = string;
 export type ItemStatus = "needed" | "bought";
 
 const quantityTransformer = {

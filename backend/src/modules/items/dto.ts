@@ -1,5 +1,5 @@
 import { ArrayNotEmpty, IsArray, IsBoolean, IsIn, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
-import { ITEM_CATEGORIES, type ItemCategory } from "./item.entity";
+import type { ItemCategory } from "./item.entity";
 import { STAPLE_INTERVALS, type StapleInterval } from "./staple.entity";
 
 export class CreateItemDto {
@@ -13,7 +13,9 @@ export class CreateItemDto {
   @Max(9999)
   quantity: number;
 
-  @IsIn(ITEM_CATEGORIES)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
   category: ItemCategory;
 
   @IsOptional()
@@ -46,7 +48,9 @@ export class UpdateItemDto {
   @Max(9999)
   quantity: number;
 
-  @IsIn(ITEM_CATEGORIES)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
   category: ItemCategory;
 
   @IsBoolean()
@@ -72,6 +76,13 @@ export class ItemIdsDto {
   @ArrayNotEmpty()
   @IsUUID("all", { each: true })
   ids: string[];
+}
+
+export class CreateCategoryDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  name: string;
 }
 
 export class CreateListDto {

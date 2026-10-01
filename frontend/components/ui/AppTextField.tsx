@@ -2,7 +2,8 @@ import { TextInput, View, type TextInputProps } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { appFont } from "@/constants/font";
+import { appFont, scaleFontSize, singleLineInput } from "@/constants/font";
+import { useFontScale } from "@/providers/FontScaleProvider";
 import { preserveSpaces } from "@/constants/text";
 
 type AppTextFieldProps = {
@@ -40,6 +41,8 @@ export function AppTextField({
 }: AppTextFieldProps) {
   const { colors } = useTheme();
   const { isRTL } = useI18n();
+  const { scale } = useFontScale();
+  const inputSize = scaleFontSize(Number(singleLineInput.fontSize), scale);
 
   return (
     <View className={compact ? "gap-1.5" : "gap-2"}>
@@ -60,19 +63,19 @@ export function AppTextField({
         editable={editable}
         textAlign={userText ? undefined : isRTL ? "right" : "left"}
         textAlignVertical={multiline ? "top" : "center"}
+        allowFontScaling={false}
         style={[
           preserveSpaces,
-          { fontFamily: appFont.regular },
-          !multiline && compact
-            ? { height: 40, paddingVertical: 0, includeFontPadding: false, fontSize: 16, lineHeight: 40 }
-            : null,
+          multiline
+            ? { fontFamily: appFont.regular, fontSize: inputSize, includeFontPadding: false }
+            : { ...singleLineInput, fontSize: inputSize },
         ]}
         className={`rounded-2xl border bg-cove-paper text-cove-ink ${
-          compact ? "px-3" : "px-4 text-base"
+          compact ? "px-3" : "px-4"
         } ${error ? "border-cove-ink" : "border-cove-line"} ${
           multiline
             ? compact
-              ? "min-h-[52px] py-2 text-sm"
+              ? "min-h-[52px] py-2"
               : "min-h-[96px] py-3"
             : compact
               ? "h-10 py-0"

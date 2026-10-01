@@ -7,6 +7,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { RefreshToken } from "./modules/auth/refresh-token.entity";
 import { type AppConfig, validateEnv } from "./config/env";
 import { ItemSortOrder1740000000006 } from "./database/migrations/1740000000006-ItemSortOrder";
+import { CustomCategories1740000000008 } from "./database/migrations/1740000000008-CustomCategories";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
 import { ShoppingTrip1740000000004 } from "./database/migrations/1740000000004-ShoppingTrip";
@@ -19,6 +20,8 @@ import { HealthController } from "./health.controller";
 import { HomeMember } from "./modules/homes/home-member.entity";
 import { Home } from "./modules/homes/home.entity";
 import { HomesModule } from "./modules/homes/homes.module";
+import { CustomCategory } from "./modules/items/custom-category.entity";
+import { HiddenCategory } from "./modules/items/hidden-category.entity";
 import { Item } from "./modules/items/item.entity";
 import { ShoppingList } from "./modules/items/shopping-list.entity";
 import { Staple } from "./modules/items/staple.entity";
@@ -44,7 +47,18 @@ import { User } from "./users/user.entity";
           type: "postgres" as const,
           url,
           ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
-          entities: [User, RefreshToken, Home, HomeMember, Item, ShoppingList, Staple, PushToken],
+          entities: [
+            User,
+            RefreshToken,
+            Home,
+            HomeMember,
+            Item,
+            ShoppingList,
+            Staple,
+            PushToken,
+            CustomCategory,
+            HiddenCategory,
+          ],
           migrations: [
             Init1740000000000,
             DropEmailConfirmation1740000000001,
@@ -54,6 +68,7 @@ import { User } from "./users/user.entity";
             ManyHomes1740000000005,
             ItemSortOrder1740000000006,
             ShoppingLists1740000000007,
+            CustomCategories1740000000008,
           ],
           migrationsRun: true,
         };

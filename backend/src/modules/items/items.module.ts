@@ -3,6 +3,9 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { HomesModule } from "../homes/homes.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { User } from "../../users/user.entity";
+import { CategoriesService } from "./categories.service";
+import { CustomCategory } from "./custom-category.entity";
+import { HiddenCategory } from "./hidden-category.entity";
 import { Item } from "./item.entity";
 import { ShoppingList } from "./shopping-list.entity";
 import { ItemsController } from "./items.controller";
@@ -12,8 +15,12 @@ import { StaplesController } from "./staples.controller";
 import { StaplesService } from "./staples.service";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Item, ShoppingList, Staple, User]), HomesModule, NotificationsModule],
+  imports: [
+    TypeOrmModule.forFeature([Item, ShoppingList, Staple, User, CustomCategory, HiddenCategory]),
+    HomesModule,
+    NotificationsModule,
+  ],
   controllers: [ItemsController, StaplesController],
-  providers: [ItemsService, StaplesService],
+  providers: [ItemsService, StaplesService, CategoriesService],
 })
 export class ItemsModule {}

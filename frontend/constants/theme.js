@@ -50,11 +50,11 @@ const radius = {
 
 const fontSize = {
   xs: 12,
-  sm: 14,
-  md: 16,
-  lg: 18,
-  xl: 24,
-  display: 30,
+  sm: 13,
+  md: 15,
+  lg: 17,
+  xl: 19,
+  display: 26,
 };
 
 const fontWeight = {

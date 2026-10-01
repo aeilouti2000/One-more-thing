@@ -1,6 +1,6 @@
 import { View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { FrostedFill } from "@/components/ui/BlurBackdrop";
+import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export function FloatMessage({
@@ -29,7 +29,7 @@ export function FloatMessage({
         shadowRadius: 12,
       }}
     >
-      <FrostedFill />
+      <GlassFill />
       <AppText
         className="text-center text-sm font-semibold"
         style={{ color }}

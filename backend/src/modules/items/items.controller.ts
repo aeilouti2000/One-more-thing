@@ -2,13 +2,17 @@ import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGu
 import { AuthGuard } from "@nestjs/passport";
 import { CurrentUser } from "../../common/current-user.decorator";
 import { User } from "../../users/user.entity";
-import { CreateItemDto, CreateListDto, ItemIdsDto, UpdateItemDto } from "./dto";
+import { CreateCategoryDto, CreateItemDto, CreateListDto, ItemIdsDto, UpdateItemDto } from "./dto";
+import { CategoriesService } from "./categories.service";
 import { ItemsService } from "./items.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
 export class ItemsController {
-  constructor(private readonly items: ItemsService) {}
+  constructor(
+    private readonly items: ItemsService,
+    private readonly categories: CategoriesService,
+  ) {}
 
   @Get("homes/:homeId/lists")
   lists(@CurrentUser() user: User, @Param("homeId", ParseUUIDPipe) homeId: string) {
@@ -41,6 +45,29 @@ export class ItemsController {
     @Param("listId", ParseUUIDPipe) listId: string,
   ) {
     return this.items.deleteList(user.id, homeId, listId);
+  }
+
+  @Get("homes/:homeId/categories")
+  categoriesList(@CurrentUser() user: User, @Param("homeId", ParseUUIDPipe) homeId: string) {
+    return this.categories.list(user.id, homeId);
+  }
+
+  @Post("homes/:homeId/categories")
+  createCategory(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Body() body: CreateCategoryDto,
+  ) {
+    return this.categories.create(user.id, homeId, body.name);
+  }
+
+  @Delete("homes/:homeId/categories/:categoryId")
+  removeCategory(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Param("categoryId") categoryId: string,
+  ) {
+    return this.categories.remove(user.id, homeId, categoryId);
   }
 
   @Get("homes/:homeId/items")

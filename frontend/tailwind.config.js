@@ -24,6 +24,16 @@ module.exports = {
       fontFamily: {
         sans: [fonts.sans],
       },
+      fontSize: {
+        xs: ["12px", { lineHeight: "16px" }],
+        sm: ["13px", { lineHeight: "18px" }],
+        base: ["15px", { lineHeight: "21px" }],
+        lg: ["17px", { lineHeight: "23px" }],
+        xl: ["19px", { lineHeight: "25px" }],
+        "2xl": ["22px", { lineHeight: "28px" }],
+        "3xl": ["26px", { lineHeight: "32px" }],
+        "4xl": ["30px", { lineHeight: "36px" }],
+      },
     },
   },
   plugins: [],

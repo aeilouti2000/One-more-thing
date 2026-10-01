@@ -11,12 +11,15 @@ import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { BlurScreen } from "@/components/ui/BlurBackdrop";
+import { TabBlurProvider } from "@/components/ui/TabBlurTarget";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { requiredAppUpdate } from "@/lib/app-release";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { CategoriesProvider } from "@/providers/CategoriesProvider";
 import { HouseholdProvider } from "@/providers/HouseholdProvider";
 import { NotificationsProvider } from "@/providers/NotificationsProvider";
+import { FontScaleProvider } from "@/providers/FontScaleProvider";
 import { LanguageProvider } from "@/providers/LanguageProvider";
 import { ThemeProvider, useTheme } from "@/providers/ThemeProvider";
 
@@ -81,19 +84,25 @@ export default function RootLayout() {
 
   return (
     <LanguageProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <NotificationsProvider>
-            <HouseholdProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <BlurScreen>
-                  <UpdateGate />
-                </BlurScreen>
-              </GestureHandlerRootView>
-            </HouseholdProvider>
-          </NotificationsProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <FontScaleProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <NotificationsProvider>
+              <HouseholdProvider>
+                <CategoriesProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <BlurScreen>
+                    <TabBlurProvider>
+                      <UpdateGate />
+                    </TabBlurProvider>
+                  </BlurScreen>
+                </GestureHandlerRootView>
+                </CategoriesProvider>
+              </HouseholdProvider>
+            </NotificationsProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </FontScaleProvider>
     </LanguageProvider>
   );
 }

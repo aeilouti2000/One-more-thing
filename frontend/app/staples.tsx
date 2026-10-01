@@ -7,13 +7,14 @@ import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
-import { BlurBackdrop, FrostedFill } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { getCategoryLabel } from "@/constants/categories";
+import { useCategories } from "@/providers/CategoriesProvider";
 import { useHousehold } from "@/hooks/useHousehold";
 import { addItem, fetchHomeItems, updateItemDetails } from "@/lib/items";
 import { emitListChanged } from "@/lib/list-sync";
@@ -51,6 +52,12 @@ function StaplesBody() {
   const { user } = useAuth();
   const { household } = useHousehold();
   const { t, locale } = useI18n();
+  const { categories } = useCategories();
+  function categoryName(id: string) {
+    const match = categories.find((item) => item.id === id);
+    if (match && !match.builtin && match.name) return match.name;
+    return getCategoryLabel(id, locale);
+  }
   const { colors } = useTheme();
   const [staples, setStaples] = useState<Staple[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -230,7 +237,7 @@ function StaplesBody() {
               <View key={staple.id} className="rounded-3xl bg-cove-paper px-4 py-4">
                 <AppText className="text-base font-semibold text-cove-ink">{staple.name}</AppText>
                 <AppText className="mt-1 text-sm text-cove-muted">
-                  {quantityLabel} · {getCategoryLabel(staple.category, locale)} · {t(intervalKeys[staple.intervalDays])}
+                  {quantityLabel} · {categoryName(staple.category)} · {t(intervalKeys[staple.intervalDays])}
                 </AppText>
                 <AppText className="mt-1 text-sm text-cove-muted">{t("nextDue", { date: due })}</AppText>
                 {listCounts[staple.id] ? (
@@ -289,7 +296,7 @@ function StaplesBody() {
           <View
             className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
           >
-            <FrostedFill />
+            <GlassFill soft />
             <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">
               <AppText className="text-lg font-semibold text-cove-ink">{t("addStaple")}</AppText>
             </View>

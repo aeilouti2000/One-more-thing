@@ -1,6 +1,27 @@
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 import "@/lib/session-storage";
 
-const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api").replace(/\/$/, "");
+function resolveApiUrl() {
+  const configured = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api").replace(/\/$/, "");
+  if (Platform.OS === "web") return configured;
+
+  try {
+    const url = new URL(configured);
+    const isLoopback = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
+    const lanHost = hostUri?.split(":")[0];
+    if (!isLoopback || !lanHost || lanHost === "localhost" || lanHost === "127.0.0.1") {
+      return configured;
+    }
+    url.hostname = lanHost;
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return configured;
+  }
+}
+
+const API_URL = resolveApiUrl();
 const SESSION_KEY = "omt.session";
 
 export type AuthUser = {

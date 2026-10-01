@@ -21,6 +21,11 @@ export const categoryKeys = {
   other: "categoryOther",
 } as const;
 
+export function isBuiltinCategory(category: string): category is keyof typeof categoryKeys {
+  return category in categoryKeys;
+}
+
 export function getCategoryLabel(category: PurchaseCategory, locale?: Locale) {
+  if (!isBuiltinCategory(category)) return category;
   return translate(categoryKeys[category], undefined, locale);
 }
