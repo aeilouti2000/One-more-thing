@@ -106,6 +106,7 @@ export function AddItemCard({
             <View className="min-w-0 flex-1">
               <AppTextField
                 compact
+                glass
                 label={t("itemNameLabel")}
                 value={name}
                 onChangeText={setName}
@@ -116,6 +117,7 @@ export function AddItemCard({
             <View className="w-20">
               <AppTextField
                 compact
+                glass
                 label={t("quantity")}
                 value={quantity}
                 onChangeText={(value) => {
@@ -128,10 +130,11 @@ export function AddItemCard({
               />
             </View>
           </View>
-          <CategoryField value={category} onChange={setCategory} />
+          <CategoryField glass value={category} onChange={setCategory} />
           <UrgentToggle compact value={urgent} onValueChange={setUrgent} />
           <AppTextField
             compact
+            glass
             label={t("notes")}
             value={notes}
             onChangeText={setNotes}

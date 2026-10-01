@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -41,10 +41,9 @@ export function PurchaseRow({
 
   return (
     <View
-      className={`rounded-3xl border-2 px-4 py-3.5 ${
-        selected
-          ? "border-cove-accent bg-cove-mist"
-          : "border-transparent bg-cove-paper"
+      pointerEvents="box-none"
+      className={`rounded-3xl border-2 ${
+        selected ? "border-cove-accent bg-cove-mist" : "border-transparent bg-cove-paper"
       }`}
       style={
         selected
@@ -58,79 +57,80 @@ export function PurchaseRow({
             }
       }
     >
-      <View className="flex-row items-start gap-3">
-        {leading ? <View className="pt-1">{leading}</View> : null}
-        <View className="min-w-0 flex-1 gap-2.5">
-          <View className="flex-row items-center gap-2">
-            <Pressable
-              onPress={onPress}
-              onLongPress={onLongPress}
-              delayLongPress={350}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              className="min-w-0 flex-1 active:opacity-80"
-            >
-              <AppText numberOfLines={1} className="text-base font-semibold text-cove-ink">
-                {purchase.name}
-              </AppText>
-            </Pressable>
-            {selected ? (
-              <Pressable
-                onPress={onPress}
-                onLongPress={onLongPress}
-                delayLongPress={350}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-              >
-                <Ionicons name="checkmark-circle" size={26} color={colors.accent} />
-              </Pressable>
-            ) : showsStepper && onChangeQuantity ? (
-              <View className="flex-row items-center gap-1.5">
-                <Pressable
-                  disabled={quantityBusy || purchase.quantity <= 1}
-                  onPress={() => {
-                    const next = purchase.quantity - 1;
-                    onChangeQuantity(next < 1 ? 1 : next);
-                  }}
-                  onLongPress={onLongPress}
-                  delayLongPress={350}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("decreaseQuantity")}
-                  className={`h-8 w-8 items-center justify-center rounded-full border border-cove-line ${
-                    quantityBusy || purchase.quantity <= 1 ? "opacity-40" : "active:opacity-80"
-                  }`}
-                  style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.paper }}
-                >
-                  <Ionicons name="remove" size={16} color={colors.accent} />
-                </Pressable>
-                <AppText className="min-w-6 text-center text-sm font-semibold text-cove-ink">
-                  {quantityLabel}
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={350}
+        accessibilityRole="button"
+        accessibilityLabel={purchase.name}
+        accessibilityState={{ selected }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View pointerEvents="box-none" className="px-4 py-3.5">
+        <View pointerEvents="box-none" className="flex-row items-start gap-3">
+          {leading ? (
+            <View pointerEvents="box-none" className="pt-1">
+              {leading}
+            </View>
+          ) : null}
+          <View pointerEvents="box-none" className="min-w-0 flex-1 gap-2.5">
+            <View pointerEvents="box-none" className="flex-row items-center gap-2">
+              <View pointerEvents="none" className="min-w-0 flex-1">
+                <AppText numberOfLines={1} className="text-base font-semibold text-cove-ink">
+                  {purchase.name}
                 </AppText>
-                <Pressable
-                  disabled={quantityBusy}
-                  onPress={() => onChangeQuantity(purchase.quantity + 1)}
-                  onLongPress={onLongPress}
-                  delayLongPress={350}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("increaseQuantity")}
-                  className={`h-8 w-8 items-center justify-center rounded-full bg-cove-accent ${
-                    quantityBusy ? "opacity-40" : "active:opacity-80"
-                  }`}
-                >
-                  <Ionicons name="add" size={16} color={colors.white} />
-                </Pressable>
               </View>
-            ) : (
-              <AppText className="text-sm font-semibold text-cove-muted">{quantityLabel}</AppText>
-            )}
-          </View>
-          <View className="flex-row items-center gap-2">
-            <Pressable
-              onPress={onPress}
-              onLongPress={onLongPress}
-              delayLongPress={350}
-              className="min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden active:opacity-80"
-            >
+              {selected ? (
+                <View pointerEvents="none">
+                  <Ionicons name="checkmark-circle" size={26} color={colors.accent} />
+                </View>
+              ) : showsStepper && onChangeQuantity ? (
+                <View pointerEvents="box-none" className="flex-row items-center gap-1.5">
+                  <Pressable
+                    onPress={() => {
+                      if (quantityBusy || purchase.quantity <= 1) return;
+                      const next = purchase.quantity - 1;
+                      onChangeQuantity(next < 1 ? 1 : next);
+                    }}
+                    onLongPress={onLongPress}
+                    delayLongPress={350}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("decreaseQuantity")}
+                    className={`h-8 w-8 items-center justify-center rounded-full border border-cove-line ${
+                      quantityBusy || purchase.quantity <= 1 ? "opacity-40" : "active:opacity-80"
+                    }`}
+                    style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.paper }}
+                  >
+                    <Ionicons name="remove" size={16} color={colors.accent} />
+                  </Pressable>
+                  <View pointerEvents="none">
+                    <AppText className="min-w-6 text-center text-sm font-semibold text-cove-ink">
+                      {quantityLabel}
+                    </AppText>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      if (quantityBusy) return;
+                      onChangeQuantity(purchase.quantity + 1);
+                    }}
+                    onLongPress={onLongPress}
+                    delayLongPress={350}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("increaseQuantity")}
+                    className={`h-8 w-8 items-center justify-center rounded-full bg-cove-accent ${
+                      quantityBusy ? "opacity-40" : "active:opacity-80"
+                    }`}
+                  >
+                    <Ionicons name="add" size={16} color={colors.white} />
+                  </Pressable>
+                </View>
+              ) : (
+                <View pointerEvents="none">
+                  <AppText className="text-sm font-semibold text-cove-muted">{quantityLabel}</AppText>
+                </View>
+              )}
+            </View>
+            <View pointerEvents="none" className="flex-row items-center gap-1.5 overflow-hidden">
               <View className="min-w-0 overflow-hidden rounded-full bg-cove-mist px-2.5 py-1">
                 <AppText numberOfLines={1} className="text-xs font-semibold text-cove-accent">
                   {categoryLabel}
@@ -155,29 +155,29 @@ export function PurchaseRow({
                 </View>
               ) : null}
               {purchase.status === "bought" ? <StatusBadge status={purchase.status} /> : null}
-            </Pressable>
+            </View>
           </View>
         </View>
+        {onUndo || onBuyAgain ? (
+          <View pointerEvents="box-none" className="mt-3 flex-row flex-wrap gap-4">
+            {onUndo ? (
+              <Pressable onPress={onUndo} className="active:opacity-80">
+                <AppText className="text-sm font-semibold text-cove-accent">{t("undoBought")}</AppText>
+              </Pressable>
+            ) : null}
+            {onBuyAgain ? (
+              <Pressable
+                onPress={onBuyAgain}
+                accessibilityRole="button"
+                accessibilityLabel={t("buyAgain")}
+                className="active:opacity-80"
+              >
+                <AppText className="text-sm font-semibold text-cove-accent">{t("buyAgain")}</AppText>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
       </View>
-      {onUndo || onBuyAgain ? (
-        <View className="mt-3 flex-row flex-wrap gap-4">
-          {onUndo ? (
-            <Pressable onPress={onUndo} className="active:opacity-80">
-              <AppText className="text-sm font-semibold text-cove-accent">{t("undoBought")}</AppText>
-            </Pressable>
-          ) : null}
-          {onBuyAgain ? (
-            <Pressable
-              onPress={onBuyAgain}
-              accessibilityRole="button"
-              accessibilityLabel={t("buyAgain")}
-              className="active:opacity-80"
-            >
-              <AppText className="text-sm font-semibold text-cove-accent">{t("buyAgain")}</AppText>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
     </View>
   );
 }

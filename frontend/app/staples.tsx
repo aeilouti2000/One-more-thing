@@ -305,6 +305,7 @@ function StaplesBody() {
                   <View className="min-w-0 flex-1">
                     <AppTextField
                       compact
+                      glass
                       label={t("itemNameLabel")}
                       value={name}
                       onChangeText={setName}
@@ -315,6 +316,7 @@ function StaplesBody() {
                   <View className="w-20">
                     <AppTextField
                       compact
+                      glass
                       label={t("quantity")}
                       value={quantity}
                       onChangeText={(value) => {
@@ -327,7 +329,7 @@ function StaplesBody() {
                     />
                   </View>
                 </View>
-                <CategoryField value={category} onChange={setCategory} />
+                <CategoryField glass value={category} onChange={setCategory} />
                 <View className="gap-1.5">
                   <AppText className="text-xs font-medium text-cove-muted">{t("stapleInterval")}</AppText>
                   <View className="flex-row flex-wrap gap-2">

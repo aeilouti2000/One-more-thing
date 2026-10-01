@@ -1,7 +1,7 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Modal, Pressable, View } from "react-native";
+import { Dimensions, Modal, Pressable, ScrollView, View } from "react-native";
 import { HistoryDateField } from "@/components/purchases/HistoryDateField";
 import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
@@ -22,13 +22,14 @@ import { iconSize } from "@/constants/theme";
 import type { Purchase } from "@/types/purchase";
 
 type HistoryRange = "all" | "today" | "week" | "month";
+type Anchor = { x: number; y: number; width: number; height: number };
 
 const HISTORY_RANGES: HistoryRange[] = ["all", "today", "week", "month"];
 
 export default function HistoryScreen() {
   const { bought, isLoading, error, refresh, undoBought, addItem } = usePurchases();
   const { household } = useHousehold();
-  const { t, locale } = useI18n();
+  const { t, locale, isRTL } = useI18n();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
   const [undoId, setUndoId] = useState<string | null>(null);
@@ -40,6 +41,10 @@ export default function HistoryScreen() {
   const [pickedDate, setPickedDate] = useState<Date | null>(null);
   const [isChoosingList, setIsChoosingList] = useState(false);
   const [isChoosingRange, setIsChoosingRange] = useState(false);
+  const [listAnchor, setListAnchor] = useState<Anchor | null>(null);
+  const [rangeAnchor, setRangeAnchor] = useState<Anchor | null>(null);
+  const listButtonRef = useRef<View>(null);
+  const rangeButtonRef = useRef<View>(null);
   const [openItem, setOpenItem] = useState<Purchase | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const hasUndo = bought.some((item) => canUndoBought(item.boughtAt, now));
@@ -114,6 +119,22 @@ export default function HistoryScreen() {
     setBuyAgainNotice(t("boughtAgain"));
   }
 
+  function openAnchored(
+    ref: RefObject<View | null>,
+    setAnchor: (anchor: Anchor) => void,
+    setOpen: (open: boolean) => void,
+  ) {
+    const node = ref.current;
+    if (!node) {
+      setOpen(true);
+      return;
+    }
+    node.measureInWindow((x, y, width, height) => {
+      setAnchor({ x, y, width, height });
+      setOpen(true);
+    });
+  }
+
   async function onRefresh() {
     setIsRefreshing(true);
     await refresh();
@@ -145,22 +166,26 @@ export default function HistoryScreen() {
           onChange={(date) => setPickedDate(date)}
           leading={
             <>
-              <ChoiceButton
-                icon="list-outline"
-                selected={listId !== "all"}
-                label={
-                  listId === "all"
-                    ? t("allLists")
-                    : listLabel(lists.find((list) => list.id === listId)?.name ?? "", t("defaultList"))
-                }
-                onPress={() => setIsChoosingList(true)}
-              />
-              <ChoiceButton
-                icon="time-outline"
-                selected={pickedDate !== null || range !== "all"}
-                label={pickedLabel ?? rangeLabel[range]}
-                onPress={() => setIsChoosingRange(true)}
-              />
+              <View ref={listButtonRef} collapsable={false} className="min-w-0 flex-1">
+                <ChoiceButton
+                  icon="list-outline"
+                  selected={listId !== "all"}
+                  label={
+                    listId === "all"
+                      ? t("allLists")
+                      : listLabel(lists.find((list) => list.id === listId)?.name ?? "", t("defaultList"))
+                  }
+                  onPress={() => openAnchored(listButtonRef, setListAnchor, setIsChoosingList)}
+                />
+              </View>
+              <View ref={rangeButtonRef} collapsable={false} className="min-w-0 flex-1">
+                <ChoiceButton
+                  icon="time-outline"
+                  selected={pickedDate !== null || range !== "all"}
+                  label={pickedLabel ?? rangeLabel[range]}
+                  onPress={() => openAnchored(rangeButtonRef, setRangeAnchor, setIsChoosingRange)}
+                />
+              </View>
             </>
           }
         />
@@ -211,6 +236,8 @@ export default function HistoryScreen() {
 
       <OptionMenu
         visible={isChoosingList}
+        anchor={listAnchor}
+        isRTL={isRTL}
         options={[
           { id: "all", label: t("allLists") },
           ...lists.map((list) => ({
@@ -224,6 +251,8 @@ export default function HistoryScreen() {
       />
       <OptionMenu
         visible={isChoosingRange}
+        anchor={rangeAnchor}
+        isRTL={isRTL}
         options={HISTORY_RANGES.map((item) => ({ id: item, label: rangeLabel[item] }))}
         selectedId={pickedDate ? "" : range}
         onSelect={(id) => {
@@ -253,13 +282,17 @@ function ChoiceButton({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="min-w-0 flex-1 flex-row items-center gap-1 rounded-full px-2 py-2"
-      style={{ backgroundColor: selected ? colors.accent : colors.paper }}
+      className="h-10 w-full min-w-0 flex-row items-center justify-center gap-1.5 rounded-full px-2.5 active:opacity-80"
+      style={{
+        backgroundColor: selected ? colors.accent : colors.paper,
+        borderWidth: 1,
+        borderColor: selected ? colors.accent : colors.line,
+      }}
     >
-      <Ionicons name={icon} size={14} color={selected ? colors.white : colors.ink} />
+      <Ionicons name={icon} size={15} color={selected ? colors.white : colors.accent} />
       <AppText
         numberOfLines={1}
-        className="min-w-0 flex-1 text-xs font-medium"
+        className="shrink text-xs font-semibold"
         style={{ color: selected ? colors.white : colors.ink }}
       >
         {label}
@@ -270,53 +303,97 @@ function ChoiceButton({
 
 function OptionMenu({
   visible,
+  anchor,
+  isRTL,
   options,
   selectedId,
   onSelect,
   onClose,
 }: {
   visible: boolean;
+  anchor: Anchor | null;
+  isRTL: boolean;
   options: { id: string; label: string }[];
   selectedId: string;
   onSelect: (id: string) => void;
   onClose: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, shadow } = useTheme();
+  const frame = menuFrame(anchor, isRTL);
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <View className="flex-1 items-center justify-center px-6">
+      <View className="flex-1">
         <BlurBackdrop onPress={onClose} />
-        <View className="w-full max-w-md gap-1 overflow-hidden rounded-3xl border border-cove-line p-3">
-          <GlassFill />
-          {options.map((option) => {
-            const selected = option.id === selectedId;
-            return (
-              <Pressable
-                key={option.id}
-                onPress={() => {
-                  onSelect(option.id);
-                  onClose();
-                }}
-                className="flex-row items-center justify-between rounded-2xl px-3 py-3 active:opacity-80"
-                style={{ backgroundColor: selected ? colors.accent : "transparent" }}
-              >
-                <AppText
-                  className="text-sm font-medium"
-                  style={{ color: selected ? colors.white : colors.ink }}
+        <View
+          className="absolute"
+          style={{
+            top: frame.top,
+            left: frame.left,
+            width: frame.width,
+            borderRadius: 24,
+            shadowColor: shadow.color,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.16,
+            shadowRadius: 16,
+            elevation: 8,
+          }}
+        >
+          <View
+            className="overflow-hidden rounded-3xl border border-cove-line"
+            style={{ maxHeight: frame.maxHeight }}
+          >
+            <GlassFill soft />
+            <ScrollView
+              bounces={false}
+              style={{ flexGrow: 0, maxHeight: frame.maxHeight }}
+              contentContainerStyle={{ gap: 4, padding: 8 }}
+            >
+            {options.map((option) => {
+              const selected = option.id === selectedId;
+              return (
+                <Pressable
+                  key={option.id}
+                  onPress={() => {
+                    onSelect(option.id);
+                    onClose();
+                  }}
+                  className="flex-row items-center justify-between rounded-2xl px-3 py-3 active:opacity-80"
+                  style={{ backgroundColor: selected ? colors.accent : "transparent" }}
                 >
-                  {option.label}
-                </AppText>
-                {selected ? (
-                  <Ionicons name="checkmark" size={iconSize.sm} color={colors.white} />
-                ) : null}
-              </Pressable>
-            );
-          })}
+                  <AppText
+                    numberOfLines={1}
+                    className="min-w-0 flex-1 text-sm font-medium"
+                    style={{ color: selected ? colors.white : colors.ink }}
+                  >
+                    {option.label}
+                  </AppText>
+                  {selected ? (
+                    <Ionicons name="checkmark" size={iconSize.sm} color={colors.white} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          </View>
         </View>
       </View>
     </Modal>
   );
+}
+
+function menuFrame(anchor: Anchor | null, isRTL: boolean) {
+  const screen = Dimensions.get("window");
+  const width = Math.min(240, screen.width - 32);
+  const gap = 8;
+  const top = anchor ? anchor.y + anchor.height + gap : 96;
+  const start = anchor ? (isRTL ? anchor.x + anchor.width - width : anchor.x) : 16;
+  return {
+    top,
+    left: Math.max(16, Math.min(start, screen.width - width - 16)),
+    width,
+    maxHeight: Math.max(180, screen.height - top - 16),
+  };
 }
 
 function sameLocalDay(boughtAt: string | undefined, day: Date) {

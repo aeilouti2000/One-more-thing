@@ -101,6 +101,20 @@ function getColors(scheme) {
   return scheme === "dark" ? darkColors : lightColors;
 }
 
+function glassFieldStyle(scheme) {
+  if (scheme === "dark") {
+    return {
+      backgroundColor: "rgba(227, 242, 253, 0.14)",
+      borderColor: "rgba(144, 202, 249, 0.45)",
+    };
+  }
+
+  return {
+    backgroundColor: "rgba(255, 255, 255, 0.78)",
+    borderColor: "rgba(33, 150, 243, 0.32)",
+  };
+}
+
 function getCssVars(palette) {
   return {
     "--color-cove-ice": palette.ice,
@@ -135,6 +149,7 @@ module.exports = {
   darkColors,
   getColors,
   getCssVars,
+  glassFieldStyle,
   spacing,
   radius,
   fontSize,

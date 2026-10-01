@@ -22,6 +22,11 @@ export const darkColors: ThemeColors;
 export function getColors(scheme: ThemeScheme): ThemeColors;
 export function getCssVars(palette: ThemeColors): Record<string, string>;
 
+export function glassFieldStyle(scheme: ThemeScheme): {
+  backgroundColor: string;
+  borderColor: string;
+};
+
 export const spacing: {
   xs: number;
   sm: number;

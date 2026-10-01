@@ -37,7 +37,7 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
 
   return (
     <View className="mb-5 gap-2">
-      <View className="flex-row flex-nowrap items-center gap-1.5">
+      <View className="flex-row flex-nowrap items-center gap-2">
         {leading}
         <Pressable
           onPress={() => {
@@ -46,17 +46,21 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
           }}
           accessibilityRole="button"
           accessibilityLabel={t("historyPickDate")}
-          className="min-w-0 flex-1 flex-row items-center gap-1 rounded-full px-2 py-2"
-          style={{ backgroundColor: selected ? colors.accent : colors.paper }}
+          className="h-10 min-w-0 flex-1 flex-row items-center justify-center gap-1.5 rounded-full px-2.5 active:opacity-80"
+          style={{
+            backgroundColor: selected ? colors.accent : colors.paper,
+            borderWidth: 1,
+            borderColor: selected ? colors.accent : colors.line,
+          }}
         >
           <Ionicons
             name="calendar-outline"
-            size={14}
-            color={selected ? colors.white : colors.ink}
+            size={15}
+            color={selected ? colors.white : colors.accent}
           />
           <AppText
             numberOfLines={1}
-            className="min-w-0 flex-1 text-xs font-medium"
+            className="shrink text-xs font-semibold"
             style={{ color: selected ? colors.white : colors.ink }}
           >
             {label}

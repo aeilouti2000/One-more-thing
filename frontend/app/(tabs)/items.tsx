@@ -649,6 +649,7 @@ export default function ItemsScreen() {
           items={visibleItems}
           enabled={!isSelecting}
           onDragChange={setIsDragging}
+          onItemLongPress={startSelection}
           onReorder={(ids) => void reorderNeeded(ids)}
           renderRow={(purchase, handle) => (
             <PurchaseRow
@@ -790,13 +791,7 @@ export default function ItemsScreen() {
                   <View
                     key={list.id}
                     className="mb-1 flex-row items-center rounded-2xl px-2"
-                    style={{
-                      backgroundColor: selected
-                        ? scheme === "dark"
-                          ? "rgba(144, 202, 249, 0.12)"
-                          : "rgba(33, 150, 243, 0.08)"
-                        : "transparent",
-                    }}
+                    style={{ backgroundColor: selected ? colors.accent : "transparent" }}
                   >
                     <Pressable
                       onPress={() => {
@@ -812,9 +807,13 @@ export default function ItemsScreen() {
                       <Ionicons
                         name={selected ? "checkmark-circle" : "ellipse-outline"}
                         size={22}
-                        color={selected ? colors.accent : colors.muted}
+                        color={selected ? colors.white : colors.muted}
                       />
-                      <AppText numberOfLines={1} className="min-w-0 flex-1 text-base text-cove-ink">
+                      <AppText
+                        numberOfLines={1}
+                        className="min-w-0 flex-1 text-base"
+                        style={{ color: selected ? colors.white : colors.ink }}
+                      >
                         {label}
                       </AppText>
                     </Pressable>
@@ -825,7 +824,7 @@ export default function ItemsScreen() {
                       hitSlop={8}
                       className="h-10 w-10 items-center justify-center active:opacity-70"
                     >
-                      <Ionicons name="pencil" size={18} color={colors.accent} />
+                      <Ionicons name="pencil" size={18} color={selected ? colors.white : colors.accent} />
                     </Pressable>
                     <Pressable
                       onPress={() => askDeleteList(list)}
@@ -834,7 +833,7 @@ export default function ItemsScreen() {
                       hitSlop={8}
                       className="h-10 w-10 items-center justify-center active:opacity-70"
                     >
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                      <Ionicons name="trash-outline" size={18} color={selected ? "#FECACA" : "#EF4444"} />
                     </Pressable>
                   </View>
                 );
@@ -871,98 +870,68 @@ function SelectionBar({
 }) {
   const { colors, scheme, shadow } = useTheme();
   const { t } = useI18n();
-  const danger = scheme === "dark" ? "#F87171" : "#DC2626";
+  const dark = scheme === "dark";
+  const danger = dark ? "#F87171" : "#DC2626";
+  const barBackground = dark ? "rgba(12, 36, 72, 0.55)" : "rgba(187, 222, 251, 0.72)";
+  const barBorder = dark ? "rgba(144, 202, 249, 0.34)" : "rgba(33, 150, 243, 0.34)";
   const buttonShadow = {
     shadowColor: shadow.color,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: scheme === "dark" ? 0.45 : shadow.opacity,
+    shadowOpacity: dark ? 0.45 : shadow.opacity,
     shadowRadius: 16,
     elevation: 8,
   };
 
+  function actionButton(
+    label: string,
+    busy: boolean,
+    onPress: () => void,
+    icon: ReactNode,
+    spinnerColor: string,
+  ) {
+    return (
+      <Pressable
+        disabled={disabled}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        className={`h-14 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full ${
+          disabled ? "opacity-50" : "active:opacity-80"
+        }`}
+        style={[
+          buttonShadow,
+          { backgroundColor: barBackground, borderWidth: 1, borderColor: barBorder },
+        ]}
+      >
+        <GlassFill soft />
+        {busy ? <ActivityIndicator color={spinnerColor} /> : icon}
+      </Pressable>
+    );
+  }
+
   return (
     <View className="flex-row items-center gap-2">
-      <Pressable
-        disabled={disabled}
-        onPress={onBought}
-        accessibilityRole="button"
-        accessibilityLabel={t("markSelectedBought")}
-        className={`h-14 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full border border-cove-line ${
-          disabled ? "opacity-50" : "active:opacity-80"
-        }`}
-        style={[buttonShadow, { backgroundColor: "transparent" }]}
-      >
-        <GlassFill />
-        <View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor:
-                scheme === "dark" ? "rgba(66, 165, 245, 0.42)" : "rgba(33, 150, 243, 0.48)",
-            },
-          ]}
-        />
-        {busyAction === "bought" ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Ionicons name="bag-check" size={24} color="#FFFFFF" />
-        )}
-      </Pressable>
-      <Pressable
-        disabled={disabled}
-        onPress={onPin}
-        accessibilityRole="button"
-        accessibilityLabel={t("pinSelected")}
-        className={`h-14 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full border border-cove-line ${
-          disabled ? "opacity-50" : "active:opacity-80"
-        }`}
-        style={[buttonShadow, { backgroundColor: "transparent" }]}
-      >
-        <GlassFill />
-        <View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor:
-                scheme === "dark" ? "rgba(19, 34, 56, 0.28)" : "rgba(255, 255, 255, 0.32)",
-            },
-          ]}
-        />
-        {busyAction === "pin" ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : (
-          <MaterialCommunityIcons name="pin" size={22} color={colors.accent} />
-        )}
-      </Pressable>
-      <Pressable
-        disabled={disabled}
-        onPress={onDelete}
-        accessibilityRole="button"
-        accessibilityLabel={t("delete")}
-        className={`h-14 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full border border-cove-line ${
-          disabled ? "opacity-50" : "active:opacity-80"
-        }`}
-        style={[buttonShadow, { backgroundColor: "transparent" }]}
-      >
-        <GlassFill />
-        <View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor:
-                scheme === "dark" ? "rgba(19, 34, 56, 0.28)" : "rgba(255, 255, 255, 0.32)",
-            },
-          ]}
-        />
-        {busyAction === "delete" ? (
-          <ActivityIndicator color={danger} />
-        ) : (
-          <Ionicons name="trash-outline" size={22} color={danger} />
-        )}
-      </Pressable>
+      {actionButton(
+        t("markSelectedBought"),
+        busyAction === "bought",
+        onBought,
+        <MaterialCommunityIcons name="cart-check" size={26} color={colors.accentDeep} />,
+        colors.accentDeep,
+      )}
+      {actionButton(
+        t("pinSelected"),
+        busyAction === "pin",
+        onPin,
+        <MaterialCommunityIcons name="pin" size={22} color={colors.accent} />,
+        colors.accent,
+      )}
+      {actionButton(
+        t("delete"),
+        busyAction === "delete",
+        onDelete,
+        <Ionicons name="trash-outline" size={22} color={danger} />,
+        danger,
+      )}
     </View>
   );
 }

@@ -11,6 +11,7 @@ type ReorderableListProps = {
   enabled: boolean;
   onReorder: (ids: string[]) => void;
   onDragChange?: (dragging: boolean) => void;
+  onItemLongPress?: (id: string) => void;
   renderRow: (purchase: Purchase, handle: ReactNode) => ReactNode;
 };
 
@@ -19,6 +20,7 @@ export function ReorderableList({
   enabled,
   onReorder,
   onDragChange,
+  onItemLongPress,
   renderRow,
 }: ReorderableListProps) {
   const [rows, setRows] = useState(items);
@@ -104,6 +106,9 @@ export function ReorderableList({
                   onBegin={begin}
                   onMove={move}
                   onFinish={finish}
+                  onLongPress={
+                    onItemLongPress ? () => onItemLongPress(purchase.id) : undefined
+                  }
                 />
               ) : null,
             )}
@@ -120,30 +125,35 @@ function DragHandle({
   onBegin,
   onMove,
   onFinish,
+  onLongPress,
 }: {
   index: number;
   onHold: (active: boolean) => void;
   onBegin: (index: number) => void;
   onMove: (dy: number) => void;
   onFinish: (dy: number) => void;
+  onLongPress?: () => void;
 }) {
   const { colors } = useTheme();
   const { t } = useI18n();
-  const callbacks = useRef({ index, onHold, onBegin, onMove, onFinish });
-  callbacks.current = { index, onHold, onBegin, onMove, onFinish };
-  const pan = useMemo(
-    () =>
-      Gesture.Pan()
-        .runOnJS(true)
-        .activeOffsetY([-8, 8])
-        .onStart(() => callbacks.current.onBegin(callbacks.current.index))
-        .onUpdate((event) => callbacks.current.onMove(event.translationY))
-        .onFinalize((event) => callbacks.current.onFinish(event.translationY)),
-    [],
-  );
+  const callbacks = useRef({ index, onHold, onBegin, onMove, onFinish, onLongPress });
+  callbacks.current = { index, onHold, onBegin, onMove, onFinish, onLongPress };
+  const gesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .runOnJS(true)
+      .activeOffsetY([-8, 8])
+      .onStart(() => callbacks.current.onBegin(callbacks.current.index))
+      .onUpdate((event) => callbacks.current.onMove(event.translationY))
+      .onFinalize((event) => callbacks.current.onFinish(event.translationY));
+    const longPress = Gesture.LongPress()
+      .runOnJS(true)
+      .minDuration(350)
+      .onStart(() => callbacks.current.onLongPress?.());
+    return Gesture.Exclusive(pan, longPress);
+  }, []);
 
   return (
-    <GestureDetector gesture={pan}>
+    <GestureDetector gesture={gesture}>
       <View
         accessibilityRole="button"
         accessibilityLabel={t("reorderItem")}

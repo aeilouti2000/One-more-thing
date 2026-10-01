@@ -160,7 +160,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
           className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
         >
           <GlassFill soft />
-          <View className="-mx-7 mb-6 flex-row items-start justify-between gap-4 border-b border-cove-line px-7 pb-5">
+          <View className="mb-6 flex-row items-start justify-between gap-4">
             <AppText className="shrink-0 text-lg font-semibold text-cove-ink">{t("editItem")}</AppText>
             {purchase ? (
               <View className="min-w-0 flex-1 items-end">
@@ -191,6 +191,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
                 <View className="min-w-0 flex-1">
                   <AppTextField
                     compact
+                    glass
                     label={t("itemNameLabel")}
                     value={name}
                     onChangeText={setName}
@@ -201,6 +202,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
                 <View className="w-20">
                   <AppTextField
                     compact
+                    glass
                     label={t("quantity")}
                     value={quantity}
                     onChangeText={(value) => {
@@ -213,7 +215,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
                   />
                 </View>
               </View>
-              <CategoryField value={category} onChange={setCategory} />
+              <CategoryField glass value={category} onChange={setCategory} />
               <View className="flex-row flex-wrap gap-4">
                 <UrgentToggle compact value={urgent} onValueChange={setUrgent} />
                 <UrgentToggle
@@ -225,6 +227,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
               </View>
               <AppTextField
                 compact
+                glass
                 label={t("notes")}
                 value={notes}
                 onChangeText={setNotes}

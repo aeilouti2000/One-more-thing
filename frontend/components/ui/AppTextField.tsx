@@ -3,6 +3,7 @@ import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { appFont, scaleFontSize, singleLineInput } from "@/constants/font";
+import { glassFieldStyle } from "@/constants/theme";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { preserveSpaces } from "@/constants/text";
 
@@ -21,6 +22,7 @@ type AppTextFieldProps = {
   editable?: boolean;
   userText?: boolean;
   compact?: boolean;
+  glass?: boolean;
 };
 
 export function AppTextField({
@@ -38,8 +40,9 @@ export function AppTextField({
   editable = true,
   userText = false,
   compact = false,
+  glass = false,
 }: AppTextFieldProps) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
   const { scale } = useFontScale();
   const inputSize = scaleFontSize(Number(singleLineInput.fontSize), scale);
@@ -53,7 +56,7 @@ export function AppTextField({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.line}
+        placeholderTextColor={glass && scheme === "dark" ? "rgba(144, 202, 249, 0.62)" : colors.line}
         multiline={multiline}
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
@@ -69,10 +72,14 @@ export function AppTextField({
           multiline
             ? { fontFamily: appFont.regular, fontSize: inputSize, includeFontPadding: false }
             : { ...singleLineInput, fontSize: inputSize },
+          glass ? glassFieldStyle(scheme) : null,
+          error ? { borderColor: colors.ink } : null,
         ]}
-        className={`rounded-2xl border bg-cove-paper text-cove-ink ${
-          compact ? "px-3" : "px-4"
-        } ${error ? "border-cove-ink" : "border-cove-line"} ${
+        className={`rounded-2xl border text-cove-ink ${
+          glass ? "" : "bg-cove-paper"
+        } ${compact ? "px-3" : "px-4"} ${
+          error ? "border-cove-ink" : glass ? "" : "border-cove-line"
+        } ${
           multiline
             ? compact
               ? "min-h-[52px] py-2"
