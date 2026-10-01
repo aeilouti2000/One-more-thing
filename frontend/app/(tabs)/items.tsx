@@ -448,7 +448,10 @@ export default function ItemsScreen() {
           disabled={listEmpty}
           onPress={() => void shareList()}
           icon={
-            <View className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-mist">
+            <View
+              className="h-10 w-10 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.mist }}
+            >
               <Ionicons name="share-social" size={18} color={colors.accent} />
             </View>
           }
@@ -458,8 +461,11 @@ export default function ItemsScreen() {
           onPress={() => router.push("/staples")}
           icon={
             <View
-              className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-mist"
-              style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}
+              className="h-10 w-10 items-center justify-center rounded-2xl"
+              style={{
+                backgroundColor: scheme === "dark" ? colors.soft : colors.mist,
+                transform: [{ rotate: isRTL ? "28deg" : "-28deg" }],
+              }}
             >
               <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
             </View>

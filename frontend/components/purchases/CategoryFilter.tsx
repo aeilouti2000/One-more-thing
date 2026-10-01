@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, TextInput, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { BlurBackdrop, FrostedFill, GlassFill } from "@/components/ui/BlurBackdrop";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { singleLineInput } from "@/constants/font";
-import { iconSize } from "@/constants/theme";
+import { glassFieldStyle, iconSize } from "@/constants/theme";
 import { useCategories, useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -27,13 +27,31 @@ export function CategoryFilter({
   onChange,
 }: CategoryFilterProps) {
   const { t, isRTL } = useI18n();
-  const { colors } = useTheme();
+  const { colors, scheme, shadow } = useTheme();
   const { categories, addCategory, removeCategory } = useCategories();
   const selectedLabel = useCategoryLabel(value === "all" ? "" : value);
   const filtered = value !== "all";
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canAdd = Boolean(draft.trim()) && !busy;
+  const fieldStyle = glassFieldStyle(scheme);
+  const dark = scheme === "dark";
+  const cardShadow = {
+    shadowColor: shadow.color,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: dark ? 0.45 : shadow.opacity,
+    shadowRadius: 16,
+    elevation: 8,
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setDraft("");
+      setError(null);
+      setBusy(false);
+    }
+  }, [open]);
 
   function choose(next: PurchaseCategory | "all") {
     onChange(next);
@@ -80,7 +98,13 @@ export function CategoryFilter({
         <FrostedFill />
         <View
           className="h-10 w-10 items-center justify-center rounded-2xl"
-          style={{ backgroundColor: filtered ? colors.accent : colors.mist }}
+          style={{
+            backgroundColor: filtered
+              ? colors.accent
+              : scheme === "dark"
+                ? colors.soft
+                : colors.mist,
+          }}
         >
           <Ionicons
             name="chevron-down"
@@ -105,53 +129,108 @@ export function CategoryFilter({
       >
         <View className="flex-1 items-center justify-center px-6">
           <BlurBackdrop onPress={onClose} />
-          <View className="max-h-[80%] w-full max-w-md gap-2 overflow-hidden rounded-3xl border border-cove-line p-4">
-            <GlassFill soft />
-            <AppText className="px-2 pb-1 text-base font-semibold" style={{ color: colors.ink }}>
-              {t("categories")}
-            </AppText>
-            <ScrollView keyboardShouldPersistTaps="handled" className="grow-0">
-              <CategoryOption
-                label={t("all")}
-                selected={value === "all"}
-                onPress={() => choose("all")}
-              />
-              {categories.map((item) => (
-                <CategoryOption
-                  key={item.id}
-                  label={item.builtin ? undefined : item.name ?? item.id}
-                  category={item.builtin ? item.id : undefined}
-                  selected={value === item.id}
-                  onPress={() => choose(item.id)}
-                  onDelete={item.id === "other" ? undefined : () => void remove(item.id)}
-                />
-              ))}
-            </ScrollView>
-            <FormMessage message={error} />
-            <View className="flex-row items-center gap-2">
-              <TextInput
-                value={draft}
-                onChangeText={setDraft}
-                placeholder={t("newCategoryPlaceholder")}
-                placeholderTextColor={colors.muted}
-                textAlign={isRTL ? "right" : "left"}
-                textAlignVertical="center"
-                allowFontScaling={false}
-                onSubmitEditing={() => void add()}
-                style={singleLineInput}
-                className="h-11 min-w-0 flex-1 rounded-2xl border border-cove-line bg-cove-ice px-3 text-cove-ink"
-              />
-              <Pressable
-                onPress={() => void add()}
-                disabled={!draft.trim() || busy}
-                accessibilityRole="button"
-                accessibilityLabel={t("addCategory")}
-                className={`h-11 w-11 items-center justify-center rounded-2xl bg-cove-accent ${
-                  !draft.trim() || busy ? "opacity-45" : "active:opacity-80"
-                }`}
+          <View className="max-h-[80%] w-full max-w-md" style={[{ borderRadius: 28 }, cardShadow]}>
+            <View className="overflow-hidden rounded-[28px] border border-cove-line">
+              <GlassFill soft />
+
+              <View className="flex-row items-center justify-between px-5 pb-2 pt-4">
+                <AppText className="text-lg font-semibold" style={{ color: colors.ink }}>
+                  {t("categories")}
+                </AppText>
+                <Pressable
+                  onPress={onClose}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("cancel")}
+                  hitSlop={10}
+                  className="h-9 w-9 items-center justify-center rounded-full active:opacity-80"
+                  style={{
+                    backgroundColor: dark
+                      ? "rgba(227, 242, 253, 0.08)"
+                      : "rgba(13, 71, 161, 0.06)",
+                  }}
+                >
+                  <Ionicons name="close" size={18} color={colors.muted} />
+                </Pressable>
+              </View>
+
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                className="grow-0"
+                contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 8, gap: 4 }}
               >
-                <Ionicons name="add" size={22} color={colors.white} />
-              </Pressable>
+                <CategoryOption
+                  label={t("all")}
+                  selected={value === "all"}
+                  onPress={() => choose("all")}
+                />
+                {categories.map((item) => (
+                  <CategoryOption
+                    key={item.id}
+                    label={item.builtin ? undefined : item.name ?? item.id}
+                    category={item.builtin ? item.id : undefined}
+                    selected={value === item.id}
+                    onPress={() => choose(item.id)}
+                    onDelete={item.id === "other" ? undefined : () => void remove(item.id)}
+                  />
+                ))}
+              </ScrollView>
+
+              <View
+                className="gap-2.5 border-t px-4 pb-4 pt-3"
+                style={{
+                  borderTopColor: dark
+                    ? "rgba(144, 202, 249, 0.16)"
+                    : "rgba(33, 150, 243, 0.14)",
+                }}
+              >
+                <FormMessage message={error} />
+                <View
+                  className="flex-row items-center gap-2 rounded-2xl border px-2 py-1.5"
+                  style={fieldStyle}
+                >
+                  <View
+                    className="h-8 w-8 items-center justify-center rounded-xl"
+                    style={{
+                      backgroundColor: dark
+                        ? "rgba(66, 165, 245, 0.16)"
+                        : "rgba(33, 150, 243, 0.1)",
+                    }}
+                  >
+                    <Ionicons name="pricetag-outline" size={15} color={colors.accent} />
+                  </View>
+                  <TextInput
+                    value={draft}
+                    onChangeText={setDraft}
+                    placeholder={t("newCategoryPlaceholder")}
+                    placeholderTextColor={
+                      dark ? "rgba(144, 202, 249, 0.55)" : colors.line
+                    }
+                    textAlign={isRTL ? "right" : "left"}
+                    textAlignVertical="center"
+                    allowFontScaling={false}
+                    onSubmitEditing={() => void add()}
+                    style={[singleLineInput, { color: colors.ink, flex: 1, minWidth: 0 }]}
+                    className="h-10 px-1"
+                  />
+                  <Pressable
+                    onPress={() => void add()}
+                    disabled={!canAdd}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("addCategory")}
+                    className="h-10 w-10 items-center justify-center rounded-xl"
+                    style={{
+                      backgroundColor: canAdd ? colors.accent : colors.mist,
+                      opacity: canAdd ? 1 : 0.55,
+                    }}
+                  >
+                    <Ionicons
+                      name="add"
+                      size={22}
+                      color={canAdd ? colors.white : colors.muted}
+                    />
+                  </Pressable>
+                </View>
+              </View>
             </View>
           </View>
         </View>
@@ -173,7 +252,7 @@ function CategoryOption({
   onPress: () => void;
   onDelete?: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const { t } = useI18n();
   const resolved = useCategoryLabel(category ?? "");
   const text = label ?? resolved;
@@ -183,8 +262,14 @@ function CategoryOption({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      className="flex-row items-center justify-between rounded-2xl px-3 py-3 active:opacity-80"
-      style={{ backgroundColor: selected ? colors.accent : "transparent" }}
+      className="flex-row items-center gap-2 rounded-2xl px-3 py-2.5 active:opacity-80"
+      style={{
+        backgroundColor: selected
+          ? colors.accent
+          : scheme === "dark"
+            ? "rgba(227, 242, 253, 0.04)"
+            : "rgba(13, 71, 161, 0.03)",
+      }}
     >
       <AppText
         className="min-w-0 flex-1 text-sm font-medium"
@@ -192,19 +277,34 @@ function CategoryOption({
       >
         {text}
       </AppText>
-      <View className="flex-row items-center gap-2">
+      <View className="flex-row items-center gap-1">
         {onDelete ? (
           <Pressable
             onPress={onDelete}
             accessibilityRole="button"
             accessibilityLabel={t("deleteCategory")}
             hitSlop={8}
-            className="h-8 w-8 items-center justify-center active:opacity-80"
+            className="h-8 w-8 items-center justify-center rounded-xl active:opacity-80"
+            style={{
+              backgroundColor: selected
+                ? "rgba(255, 255, 255, 0.16)"
+                : scheme === "dark"
+                  ? "rgba(248, 113, 113, 0.12)"
+                  : "rgba(248, 113, 113, 0.1)",
+            }}
           >
-            <Ionicons name="trash-outline" size={18} color={selected ? colors.white : colors.muted} />
+            <Ionicons
+              name="trash-outline"
+              size={15}
+              color={selected ? colors.white : "#F87171"}
+            />
           </Pressable>
         ) : null}
-        {selected ? <Ionicons name="checkmark" size={iconSize.sm} color={colors.white} /> : null}
+        {selected ? (
+          <View className="h-8 w-8 items-center justify-center">
+            <Ionicons name="checkmark" size={iconSize.sm} color={colors.white} />
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
