@@ -1,4 +1,4 @@
-import { IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
 
 const usernamePattern = /^[a-zA-Z0-9._]{3,32}$/;
 const loginNamePattern = /^[a-zA-Z0-9._@+-]{3,64}$/;
@@ -55,8 +55,17 @@ export class ChangePasswordDto {
 }
 
 export class UpdateProfileDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(80)
-  name: string;
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(usernamePattern, {
+    message: "Use 3–32 letters, numbers, dots, or underscores.",
+  })
+  @MaxLength(32)
+  email?: string;
 }

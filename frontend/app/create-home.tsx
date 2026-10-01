@@ -5,6 +5,7 @@ import { RequireSession } from "@/components/auth/RequireSession";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
@@ -21,6 +22,8 @@ export default function CreateHomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   async function onSubmit() {
     const homeName = name.trim();
@@ -58,15 +61,16 @@ export default function CreateHomeScreen() {
 
   async function onSignOut() {
     setIsSigningOut(true);
-    setError(null);
+    setSignOutError(null);
     const result = await signOut();
     setIsSigningOut(false);
 
     if (result.error) {
-      setError(result.error);
+      setSignOutError(result.error);
       return;
     }
 
+    setIsConfirmingSignOut(false);
     router.replace("/");
   }
 
@@ -109,10 +113,30 @@ export default function CreateHomeScreen() {
           <AppButton
             label={t("logOut")}
             variant="ghost"
-            loading={isSigningOut}
-            onPress={() => void onSignOut()}
+            disabled={isSigningOut}
+            onPress={() => {
+              setSignOutError(null);
+              setIsConfirmingSignOut(true);
+            }}
           />
         </View>
+
+        <ConfirmModal
+          visible={isConfirmingSignOut}
+          title={t("logOutTitle")}
+          message={t("logOutMessage")}
+          confirmLabel={t("logOut")}
+          cancelLabel={t("cancel")}
+          icon="log-out-outline"
+          error={signOutError}
+          loading={isSigningOut}
+          onConfirm={() => void onSignOut()}
+          onCancel={() => {
+            if (isSigningOut) return;
+            setIsConfirmingSignOut(false);
+            setSignOutError(null);
+          }}
+        />
       </Screen>
     </RequireSession>
   );

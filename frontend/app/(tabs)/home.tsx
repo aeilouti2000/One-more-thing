@@ -175,7 +175,18 @@ export default function HomeScreen() {
       onRefresh={() => void onRefresh()}
       floating={floatMessage ? <FloatMessage message={floatMessage} tone="success" /> : null}
     >
-      <ScreenHeader title={t("homeTitle")} subtitle={t("homeSubtitle")} />
+      <ScreenHeader
+        title={t("homeTitle")}
+        subtitle={t("homeSubtitle")}
+        icon={
+          <View
+            className="items-center justify-center bg-white/20"
+            style={{ width: 56, height: 56, borderRadius: 28 }}
+          >
+            <Ionicons name="home-outline" size={34} color="#FFFFFF" />
+          </View>
+        }
+      />
 
       <FormMessage message={error} />
 
@@ -354,6 +365,7 @@ export default function HomeScreen() {
         message={t("removeMemberMessage")}
         confirmLabel={t("remove")}
         cancelLabel={t("cancel")}
+        icon="person-remove-outline"
         error={memberError}
         loading={isRemovingMember}
         onConfirm={() => void removeSelectedMember()}
@@ -368,6 +380,7 @@ export default function HomeScreen() {
         message={t("leaveHomeMessage")}
         confirmLabel={t("leaveHome")}
         cancelLabel={t("cancel")}
+        icon="exit-outline"
         error={leaveError}
         loading={isLeaving}
         onConfirm={() => void leaveCurrentHome()}

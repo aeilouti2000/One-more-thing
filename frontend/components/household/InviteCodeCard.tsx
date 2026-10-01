@@ -68,13 +68,8 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
           onPress={() => void shareCode()}
           accessibilityRole="button"
           accessibilityLabel={t("shareInvite")}
-          className="h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-white/30 active:opacity-80"
+          className="h-11 w-11 items-center justify-center rounded-2xl bg-white/25 active:opacity-80"
         >
-          <FrostedBlur style={StyleSheet.absoluteFill} />
-          <View
-            pointerEvents="none"
-            style={[StyleSheet.absoluteFill, { backgroundColor: cardTint }]}
-          />
           <Ionicons name="share-social" size={20} color="#FFFFFF" />
         </Pressable>
       </View>

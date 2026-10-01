@@ -1,28 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, View } from "react-native";
+import { Pressable } from "react-native";
 import { iconSize } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
-
-function ThickPencil({ color }: { color: string }) {
-  const size = iconSize.sm;
-  return (
-    <View style={{ width: size, height: size }}>
-      {[
-        { left: 0, top: 0 },
-        { left: 0.7, top: 0 },
-        { left: 0, top: 0.7 },
-      ].map((offset) => (
-        <Ionicons
-          key={`${offset.left}-${offset.top}`}
-          name="pencil-outline"
-          size={size}
-          color={color}
-          style={{ position: "absolute", left: offset.left, top: offset.top }}
-        />
-      ))}
-    </View>
-  );
-}
 
 type EditButtonProps = {
   onPress: () => void;
@@ -43,7 +22,11 @@ export function EditButton({ onPress, accessibilityLabel, variant = "paper" }: E
         onPaper ? "bg-white" : "bg-cove-mist"
       }`}
     >
-      <ThickPencil color={onPaper ? colors.accent : colors.ink} />
+      <Ionicons
+        name="create-outline"
+        size={iconSize.sm}
+        color={onPaper ? colors.accent : colors.ink}
+      />
     </Pressable>
   );
 }

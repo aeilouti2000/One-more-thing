@@ -40,7 +40,10 @@ export class AuthController {
   @Patch("me")
   @UseGuards(AuthGuard("jwt"))
   updateMe(@CurrentUser() user: User, @Body() body: UpdateProfileDto) {
-    return this.auth.updateProfile(user.id, body.name);
+    return this.auth.updateProfile(user.id, {
+      name: body.name,
+      email: body.email,
+    });
   }
 
   @Post("change-password")

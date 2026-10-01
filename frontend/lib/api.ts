@@ -223,6 +223,14 @@ export async function changePassword(currentPassword: string, newPassword: strin
   clearSession();
 }
 
+export async function updateProfile(input: { name?: string; email?: string }) {
+  const user = await api.patch<AuthUser>("/auth/me", input);
+  const session = readSession();
+  if (session) writeSession({ ...session, user });
+  else emit(user);
+  return user;
+}
+
 export async function signOut() {
   const session = readSession();
   clearSession();

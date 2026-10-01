@@ -74,18 +74,18 @@ export function PurchaseRow({
             </View>
           ) : null}
           <View pointerEvents="box-none" className="min-w-0 flex-1 gap-2.5">
-            <View pointerEvents="box-none" className="flex-row items-center gap-2">
+            <View pointerEvents="box-none" className="flex-row items-start gap-2">
               <View pointerEvents="none" className="min-w-0 flex-1">
-                <AppText numberOfLines={1} className="text-base font-semibold text-cove-ink">
+                <AppText numberOfLines={2} className="text-base font-semibold text-cove-ink">
                   {purchase.name}
                 </AppText>
               </View>
               {selected ? (
-                <View pointerEvents="none">
+                <View pointerEvents="none" className="pt-0.5">
                   <Ionicons name="checkmark-circle" size={26} color={colors.accent} />
                 </View>
               ) : showsStepper && onChangeQuantity ? (
-                <View pointerEvents="box-none" className="flex-row items-center gap-1.5">
+                <View pointerEvents="box-none" className="flex-row items-center gap-1.5 pt-0.5">
                   <Pressable
                     onPress={() => {
                       if (quantityBusy || purchase.quantity <= 1) return;
@@ -125,7 +125,7 @@ export function PurchaseRow({
                   </Pressable>
                 </View>
               ) : (
-                <View pointerEvents="none">
+                <View pointerEvents="none" className="pt-0.5">
                   <AppText className="text-sm font-semibold text-cove-muted">{quantityLabel}</AppText>
                 </View>
               )}

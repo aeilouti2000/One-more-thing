@@ -12,6 +12,7 @@ type AppTextFieldProps = {
   value: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
+  hint?: string;
   multiline?: boolean;
   secureTextEntry?: boolean;
   keyboardType?: TextInputProps["keyboardType"];
@@ -23,6 +24,7 @@ type AppTextFieldProps = {
   userText?: boolean;
   compact?: boolean;
   glass?: boolean;
+  onFocus?: TextInputProps["onFocus"];
 };
 
 export function AppTextField({
@@ -30,6 +32,7 @@ export function AppTextField({
   value,
   onChangeText,
   placeholder,
+  hint,
   multiline = false,
   secureTextEntry = false,
   keyboardType,
@@ -41,36 +44,58 @@ export function AppTextField({
   userText = false,
   compact = false,
   glass = false,
+  onFocus,
 }: AppTextFieldProps) {
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
   const { scale } = useFontScale();
   const inputSize = scaleFontSize(Number(singleLineInput.fontSize), scale);
+  const multilineLineHeight = Math.round(inputSize * 1.4);
+  const multilinePadY = compact ? 16 : 24;
+  const multilineMaxHeight = multilineLineHeight * 5 + multilinePadY;
 
   return (
     <View className={compact ? "gap-1.5" : "gap-2"}>
-      <AppText className={`font-medium text-cove-muted ${compact ? "text-xs" : "text-sm"}`}>
-        {label}
-      </AppText>
+      <View className={compact ? "gap-0.5" : "gap-1"}>
+        <AppText className={`font-medium text-cove-muted ${compact ? "text-xs" : "text-sm"}`}>
+          {label}
+        </AppText>
+        {hint ? (
+          <AppText
+            className={`leading-4 ${compact ? "text-[11px]" : "text-xs"}`}
+            style={{ color: colors.muted, opacity: 0.62 }}
+          >
+            {hint}
+          </AppText>
+        ) : null}
+      </View>
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={glass && scheme === "dark" ? "rgba(144, 202, 249, 0.62)" : colors.line}
         multiline={multiline}
+        scrollEnabled={multiline}
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
         autoCorrect={autoCorrect}
         editable={editable}
+        onFocus={onFocus}
         textAlign={userText ? undefined : isRTL ? "right" : "left"}
         textAlignVertical={multiline ? "top" : "center"}
         allowFontScaling={false}
         style={[
           preserveSpaces,
           multiline
-            ? { fontFamily: appFont.regular, fontSize: inputSize, includeFontPadding: false }
+            ? {
+                fontFamily: appFont.regular,
+                fontSize: inputSize,
+                lineHeight: multilineLineHeight,
+                includeFontPadding: false,
+                maxHeight: multilineMaxHeight,
+              }
             : { ...singleLineInput, fontSize: inputSize },
           glass ? glassFieldStyle(scheme) : null,
           error ? { borderColor: colors.ink } : null,

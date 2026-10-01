@@ -11,29 +11,33 @@ type ScreenHeaderProps = {
   title?: string;
   subtitle?: string;
   showBack?: boolean;
+  icon?: ReactNode;
   right?: ReactNode;
   footer?: ReactNode;
   children?: ReactNode;
   flush?: boolean;
+  compact?: boolean;
 };
 
 export function ScreenHeader({
   title,
   subtitle,
   showBack = false,
+  icon,
   right,
   footer,
   children,
   flush = true,
+  compact = false,
 }: ScreenHeaderProps) {
   const { colors, scheme } = useTheme();
   const { isRTL, t } = useI18n();
 
   return (
     <View
-      className={`mb-6 overflow-hidden rounded-b-3xl px-5 pb-7 pt-5 ${
-        flush ? "-mx-5 -mt-2" : ""
-      } ${
+      className={`overflow-hidden rounded-b-3xl px-5 ${
+        compact ? "mb-3 pb-4 pt-4" : "mb-6 pb-7 pt-5"
+      } ${flush ? "-mx-5 -mt-2" : ""} ${
         scheme === "dark" ? "bg-cove-deep" : "bg-cove-accent"
       }`}
     >
@@ -56,16 +60,16 @@ export function ScreenHeader({
 
       <View
         className={`relative z-10 flex-row justify-between gap-3 ${
-          children ? "items-center" : "items-start"
+          children || icon ? "items-center" : "items-start"
         }`}
       >
-        <View className="min-w-0 flex-1 flex-row items-start gap-3">
+        <View className="min-w-0 flex-1 flex-row items-center gap-3">
           {showBack ? (
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
               accessibilityLabel={t("back")}
-              className="mt-0.5 h-10 w-10 items-center justify-center rounded-full bg-white"
+              className="h-10 w-10 items-center justify-center rounded-full bg-white"
             >
               <Ionicons
                 name={isRTL ? "chevron-forward" : "chevron-back"}
@@ -73,6 +77,11 @@ export function ScreenHeader({
                 color={colors.accent}
               />
             </Pressable>
+          ) : null}
+          {icon ? (
+            <View className="shrink-0" style={{ alignSelf: "center" }}>
+              {icon}
+            </View>
           ) : null}
           <View className="min-w-0 flex-1">
             {children ?? (

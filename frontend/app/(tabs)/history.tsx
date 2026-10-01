@@ -158,6 +158,14 @@ export default function HistoryScreen() {
       <ScreenHeader
         title={t("historyTitle")}
         subtitle={t("historySubtitle")}
+        icon={
+          <View
+            className="items-center justify-center bg-white/20"
+            style={{ width: 56, height: 56, borderRadius: 28 }}
+          >
+            <Ionicons name="time-outline" size={34} color="#FFFFFF" />
+          </View>
+        }
       />
 
       {bought.length > 0 ? (

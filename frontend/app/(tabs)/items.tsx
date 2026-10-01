@@ -1,14 +1,15 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import * as Haptics from "expo-haptics";
-import { ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, BackHandler, Dimensions, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { CategoryFilter } from "@/components/purchases/CategoryFilter";
 import { AddItemCard } from "@/components/purchases/AddItemCard";
 import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
 import { ReorderableList } from "@/components/purchases/ReorderableList";
 import { AppText } from "@/components/ui/AppText";
+import { AppLogo } from "@/components/ui/AppLogo";
 import { BlurBackdrop, FrostedBlur, FrostedFill, GlassFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -123,6 +124,11 @@ export default function ItemsScreen() {
   function startSelection(id: string) {
     void Haptics.selectionAsync();
     toggleSelection(id);
+  }
+
+  function cancelSelection() {
+    setSelectedIds(new Set());
+    setIsConfirmingDelete(false);
   }
 
   async function pinSelection() {
@@ -258,6 +264,19 @@ export default function ItemsScreen() {
     setTabBarHidden(isSelecting);
     return () => setTabBarHidden(false);
   }, [isSelecting, setTabBarHidden]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isSelecting) return;
+      const onBackPress = () => {
+        setSelectedIds(new Set());
+        setIsConfirmingDelete(false);
+        return true;
+      };
+      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+      return () => subscription.remove();
+    }, [isSelecting]),
+  );
 
   if (isLoading && needed.length === 0 && !error) {
     return <LoadingScreen />;
@@ -469,6 +488,7 @@ export default function ItemsScreen() {
   const header = (
     <ScreenHeader
       flush={!isSelecting}
+      icon={isSelecting ? undefined : <AppLogo size={52} />}
       title={
         isSelecting ? t("selectedCount", { count: selectedIds.size }) : undefined
       }
@@ -476,10 +496,7 @@ export default function ItemsScreen() {
       right={
         isSelecting ? (
           <Pressable
-            onPress={() => {
-              setSelectedIds(new Set());
-              setIsConfirmingDelete(false);
-            }}
+            onPress={cancelSelection}
             accessibilityRole="button"
             className="h-11 w-11 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: headerButton.backgroundColor }}
@@ -492,7 +509,7 @@ export default function ItemsScreen() {
               onPress={openListMenu}
               accessibilityRole="button"
               accessibilityLabel={t("chooseList")}
-              className="h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-white/25 active:opacity-80"
+              className="h-11 w-11 items-center justify-center overflow-hidden rounded-full active:opacity-80"
               style={{ backgroundColor: "transparent" }}
             >
               <FrostedBlur style={StyleSheet.absoluteFill} />
@@ -677,6 +694,7 @@ export default function ItemsScreen() {
         message={t("deleteItemsMessage", { count: selectedIds.size })}
         confirmLabel={t("delete")}
         cancelLabel={t("cancel")}
+        icon="trash-outline"
         error={actionError}
         loading={isApplyingAction}
         onConfirm={() => void deleteSelection()}
@@ -706,6 +724,7 @@ export default function ItemsScreen() {
         })}
         confirmLabel={t("delete")}
         cancelLabel={t("cancel")}
+        icon="trash-outline"
         error={actionError}
         loading={isDeletingList}
         onConfirm={() => void confirmDeleteList()}
@@ -830,7 +849,7 @@ export default function ItemsScreen() {
                       hitSlop={8}
                       className="h-10 w-10 items-center justify-center active:opacity-70"
                     >
-                      <Ionicons name="pencil" size={18} color={colors.accent} />
+                      <Ionicons name="create-outline" size={18} color={colors.accent} />
                     </Pressable>
                     <Pressable
                       onPress={() => askDeleteList(list)}

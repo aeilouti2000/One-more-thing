@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { ActivityIndicator, Modal, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import { CategoryField } from "@/components/purchases/CategoryField";
 import { StatusBadge, UrgentBadge } from "@/components/purchases/StatusBadge";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
-import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
+import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { FormSheetModal, useFormSheet } from "@/components/ui/FormSheetModal";
 import { useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
@@ -26,8 +27,7 @@ type ItemDetailCardProps = {
 export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardProps) {
   const { updateItem, markBought } = usePurchases();
   const { household } = useHousehold();
-  const { t, locale } = useI18n();
-  const { colors, scheme } = useTheme();
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
@@ -139,150 +139,212 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
   }
 
   return (
-    <Modal
+    <FormSheetModal
       visible={visible && purchase !== null}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
+      onClose={close}
       onShow={() => {
         if (!purchase) return;
         fill(purchase);
         void loadPin(purchase);
       }}
-      onRequestClose={close}
     >
-      <View className="flex-1 items-center justify-center px-5">
-        <BlurBackdrop onPress={close} />
-        {purchase && !editable ? (
-          <HistoryItemCard purchase={purchase} onClose={close} />
-        ) : (
-        <View
-          className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
-        >
-          <GlassFill soft />
-          <View className="mb-6 flex-row items-start justify-between gap-4">
-            <AppText className="shrink-0 text-lg font-semibold text-cove-ink">{t("editItem")}</AppText>
-            {purchase ? (
-              <View className="min-w-0 flex-1 items-end">
-                <AppText
-                  numberOfLines={1}
-                  className="text-xs"
-                  style={{ color: scheme === "dark" ? "#FFFFFF" : colors.ink }}
-                >
-                  {t("addedByName", { name: purchase.addedByName })}
-                </AppText>
-                <AppText
-                  numberOfLines={1}
-                  className="text-xs"
-                  style={{ color: scheme === "dark" ? "#FFFFFF" : colors.ink }}
-                >
-                  {new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  }).format(new Date(purchase.createdAt))}
-                </AppText>
-              </View>
-            ) : null}
+      {purchase && !editable ? (
+        <HistoryItemCard purchase={purchase} onClose={close} />
+      ) : (
+        <EditItemForm
+          purchase={purchase}
+          name={name}
+          quantity={quantity}
+          notes={notes}
+          category={category}
+          urgent={urgent}
+          pinned={pinned}
+          quantityError={quantityError}
+          error={error}
+          isSubmitting={isSubmitting}
+          onChangeName={setName}
+          onChangeQuantity={(value) => {
+            setQuantity(value);
+            setQuantityError(undefined);
+          }}
+          onChangeNotes={setNotes}
+          onChangeCategory={setCategory}
+          onChangeUrgent={setUrgent}
+          onChangePinned={setPinned}
+          onSubmit={() => void onSubmit()}
+          onMarkBought={() => void onMarkBought()}
+        />
+      )}
+    </FormSheetModal>
+  );
+}
+
+function EditItemForm({
+  purchase,
+  name,
+  quantity,
+  notes,
+  category,
+  urgent,
+  pinned,
+  quantityError,
+  error,
+  isSubmitting,
+  onChangeName,
+  onChangeQuantity,
+  onChangeNotes,
+  onChangeCategory,
+  onChangeUrgent,
+  onChangePinned,
+  onSubmit,
+  onMarkBought,
+}: {
+  purchase: Purchase | null;
+  name: string;
+  quantity: string;
+  notes: string;
+  category: PurchaseCategory;
+  urgent: boolean;
+  pinned: boolean;
+  quantityError?: string;
+  error: string | null;
+  isSubmitting: boolean;
+  onChangeName: (value: string) => void;
+  onChangeQuantity: (value: string) => void;
+  onChangeNotes: (value: string) => void;
+  onChangeCategory: (value: PurchaseCategory) => void;
+  onChangeUrgent: (value: boolean) => void;
+  onChangePinned: (value: boolean) => void;
+  onSubmit: () => void;
+  onMarkBought: () => void;
+}) {
+  const { t, locale } = useI18n();
+  const { colors, scheme } = useTheme();
+  const formSheet = useFormSheet();
+
+  return (
+    <View className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8">
+      <GlassFill soft />
+      <View className="mb-6 flex-row items-start justify-between gap-4">
+        <AppText className="shrink-0 text-lg font-semibold text-cove-ink">{t("editItem")}</AppText>
+        {purchase ? (
+          <View className="min-w-0 flex-1 items-end">
+            <AppText
+              numberOfLines={1}
+              className="text-xs"
+              style={{ color: scheme === "dark" ? "#FFFFFF" : colors.ink }}
+            >
+              {t("addedByName", { name: purchase.addedByName })}
+            </AppText>
+            <AppText
+              numberOfLines={1}
+              className="text-xs"
+              style={{ color: scheme === "dark" ? "#FFFFFF" : colors.ink }}
+            >
+              {new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              }).format(new Date(purchase.createdAt))}
+            </AppText>
           </View>
-          {purchase && editable ? (
-            <View className="gap-4">
-              <View className="flex-row items-stretch gap-3">
-                <View className="min-w-0 flex-1">
-                  <AppTextField
-                    compact
-                    glass
-                    label={t("itemNameLabel")}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder={t("itemNamePlaceholder")}
-                    userText
-                  />
-                </View>
-                <View className="w-20">
-                  <AppTextField
-                    compact
-                    glass
-                    label={t("quantity")}
-                    value={quantity}
-                    onChangeText={(value) => {
-                      setQuantity(value);
-                      setQuantityError(undefined);
-                    }}
-                    placeholder="1"
-                    keyboardType="decimal-pad"
-                    error={quantityError}
-                  />
-                </View>
-              </View>
-              <CategoryField glass value={category} onChange={setCategory} />
-              <View className="flex-row flex-wrap gap-4">
-                <UrgentToggle compact value={urgent} onValueChange={setUrgent} />
-                <UrgentToggle
-                  compact
-                  label={t("pinSelected")}
-                  value={pinned}
-                  onValueChange={setPinned}
-                />
-              </View>
+        ) : null}
+      </View>
+      {purchase ? (
+        <View className="gap-4">
+          <View className="flex-row items-stretch gap-3">
+            <View className="min-w-0 flex-1">
               <AppTextField
                 compact
                 glass
-                label={t("notes")}
-                value={notes}
-                onChangeText={setNotes}
-                placeholder={t("notesPlaceholder")}
-                multiline
+                label={t("itemNameLabel")}
+                value={name}
+                onChangeText={onChangeName}
+                placeholder={t("itemNamePlaceholder")}
                 userText
+                onFocus={() => formSheet?.scrollToStart()}
               />
-              <FormMessage message={error} />
-              <View className="mt-6 flex-row items-stretch gap-3">
-                <Pressable
-                  disabled={isSubmitting || !name.trim()}
-                  onPress={() => void onSubmit()}
-                  accessibilityRole="button"
-                  className={`h-12 min-w-0 flex-1 items-center justify-center rounded-2xl bg-cove-accent px-3 ${
-                    isSubmitting || !name.trim() ? "opacity-50" : "active:opacity-80"
-                  }`}
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color={colors.white} />
-                  ) : (
-                    <AppText
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.8}
-                      className="text-sm font-semibold text-white"
-                    >
-                      {t("saveChanges")}
-                    </AppText>
-                  )}
-                </Pressable>
-                <Pressable
-                  disabled={isSubmitting}
-                  onPress={() => void onMarkBought()}
-                  accessibilityRole="button"
-                  className={`h-12 min-w-0 flex-1 items-center justify-center rounded-2xl px-3 ${
-                    isSubmitting ? "opacity-50" : "active:opacity-80"
-                  }`}
-                  style={{ backgroundColor: colors.mist }}
-                >
-                  <AppText
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
-                    className="text-sm font-semibold text-cove-accent"
-                  >
-                    {t("markBought")}
-                  </AppText>
-                </Pressable>
-              </View>
             </View>
-          ) : null}
+            <View className="w-20">
+              <AppTextField
+                compact
+                glass
+                label={t("quantity")}
+                value={quantity}
+                onChangeText={onChangeQuantity}
+                placeholder="1"
+                keyboardType="decimal-pad"
+                error={quantityError}
+                onFocus={() => formSheet?.scrollToStart()}
+              />
+            </View>
+          </View>
+          <CategoryField glass value={category} onChange={onChangeCategory} />
+          <View className="flex-row flex-wrap gap-4">
+            <UrgentToggle compact value={urgent} onValueChange={onChangeUrgent} />
+            <UrgentToggle
+              compact
+              label={t("pinSelected")}
+              value={pinned}
+              onValueChange={onChangePinned}
+            />
+          </View>
+          <AppTextField
+            compact
+            glass
+            label={t("notes")}
+            value={notes}
+            onChangeText={onChangeNotes}
+            placeholder={t("notesPlaceholder")}
+            multiline
+            userText
+            onFocus={() => formSheet?.scrollToEnd()}
+          />
+          <FormMessage message={error} />
+          <View className="mt-6 flex-row items-stretch gap-3">
+            <Pressable
+              disabled={isSubmitting || !name.trim()}
+              onPress={onSubmit}
+              accessibilityRole="button"
+              className={`h-12 min-w-0 flex-1 items-center justify-center rounded-2xl bg-cove-accent px-3 ${
+                isSubmitting || !name.trim() ? "opacity-50" : "active:opacity-80"
+              }`}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <AppText
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  className="text-sm font-semibold text-white"
+                >
+                  {t("saveChanges")}
+                </AppText>
+              )}
+            </Pressable>
+            <Pressable
+              disabled={isSubmitting}
+              onPress={onMarkBought}
+              accessibilityRole="button"
+              className={`h-12 min-w-0 flex-1 items-center justify-center rounded-2xl px-3 ${
+                isSubmitting ? "opacity-50" : "active:opacity-80"
+              }`}
+              style={{ backgroundColor: colors.mist }}
+            >
+              <AppText
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                className="text-sm font-semibold text-cove-accent"
+              >
+                {t("markBought")}
+              </AppText>
+            </Pressable>
+          </View>
         </View>
-        )}
-      </View>
-    </Modal>
+      ) : null}
+    </View>
   );
 }
 
@@ -321,9 +383,7 @@ function HistoryItemCard({
   ].filter((fact): fact is { label: string; value: string } => fact !== null);
 
   return (
-    <View
-      className="w-full max-w-md gap-6 overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8"
-    >
+    <View className="w-full max-w-md gap-6 overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8">
       <GlassFill soft />
       <View className="-mx-7 flex-row items-center gap-3 border-b border-cove-line px-7 pb-5">
         <AppText

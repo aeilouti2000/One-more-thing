@@ -5,7 +5,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 type AppButtonProps = {
   label: string;
   onPress?: () => void;
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
   disabled?: boolean;
   loading?: boolean;
   compact?: boolean;
@@ -15,12 +15,14 @@ const variants = {
   primary: "bg-cove-accent",
   secondary: "bg-cove-paper border border-cove-line",
   ghost: "bg-transparent",
+  danger: "bg-cove-paper border border-cove-line",
 };
 
 const labelVariants = {
   primary: "text-white",
   secondary: "text-cove-ink",
   ghost: "text-cove-accent",
+  danger: "text-red-600 dark:text-red-400",
 };
 
 export function AppButton({
@@ -31,8 +33,9 @@ export function AppButton({
   loading = false,
   compact = false,
 }: AppButtonProps) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const isDisabled = disabled || loading;
+  const danger = scheme === "dark" ? "#F87171" : "#DC2626";
 
   return (
     <Pressable
@@ -47,10 +50,21 @@ export function AppButton({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === "primary" ? colors.white : colors.accent}
+          color={
+            variant === "primary"
+              ? colors.white
+              : variant === "danger"
+                ? danger
+                : colors.accent
+          }
         />
       ) : (
-        <AppText className={`font-semibold ${compact ? "text-sm" : "text-base"} ${labelVariants[variant]}`}>
+        <AppText
+          className={`font-semibold ${compact ? "text-sm" : "text-base"} ${
+            variant === "danger" ? "" : labelVariants[variant]
+          }`}
+          style={variant === "danger" ? { color: danger } : undefined}
+        >
           {label}
         </AppText>
       )}

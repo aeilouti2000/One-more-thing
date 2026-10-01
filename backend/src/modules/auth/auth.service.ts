@@ -113,13 +113,46 @@ export class AuthService {
     return { updated: true };
   }
 
-  async updateProfile(userId: string, name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      throw new DomainError("NAME_REQUIRED", "Name is required", HttpStatus.BAD_REQUEST);
+  async updateProfile(
+    userId: string,
+    input: { name?: string; email?: string },
+  ) {
+    const user = await this.users.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new DomainError("NOT_SIGNED_IN", "Sign in required", HttpStatus.UNAUTHORIZED);
     }
-    await this.users.update(userId, { name: trimmed });
-    const user = await this.users.findOneOrFail({ where: { id: userId } });
+
+    if (input.name !== undefined) {
+      const trimmed = input.name.trim();
+      if (!trimmed) {
+        throw new DomainError("NAME_REQUIRED", "Name is required", HttpStatus.BAD_REQUEST);
+      }
+      user.name = trimmed;
+    }
+
+    if (input.email !== undefined) {
+      const normalized = input.email.trim().toLowerCase();
+      if (!normalized) {
+        throw new DomainError("USERNAME_REQUIRED", "Username is required", HttpStatus.BAD_REQUEST);
+      }
+      const existing = await this.users.findOne({ where: { email: normalized } });
+      if (existing && existing.id !== userId) {
+        throw new DomainError("EMAIL_TAKEN", "That username is already taken", HttpStatus.CONFLICT);
+      }
+      user.email = normalized;
+    }
+
+    if (input.name === undefined && input.email === undefined) {
+      throw new DomainError("PROFILE_UNCHANGED", "Nothing to update", HttpStatus.BAD_REQUEST);
+    }
+
+    await this.users.save(user).catch((error: unknown) => {
+      if (isUniqueViolation(error)) {
+        throw new DomainError("EMAIL_TAKEN", "That username is already taken", HttpStatus.CONFLICT);
+      }
+      throw error;
+    });
+
     return this.toPublicUser(user);
   }
 

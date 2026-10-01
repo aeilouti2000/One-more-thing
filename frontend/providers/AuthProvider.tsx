@@ -16,6 +16,7 @@ import {
   restoreSession,
   signOut as endSession,
   signUp as register,
+  updateProfile as updateAccountProfile,
   type AuthUser,
 } from "@/lib/api";
 import { formatAppError, logError } from "@/lib/errors";
@@ -32,6 +33,7 @@ type AuthContextValue = {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (name: string, email: string, password: string) => Promise<AuthResult>;
+  updateProfile: (input: { name?: string; email?: string }) => Promise<AuthResult>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<AuthResult>;
   signOut: () => Promise<AuthResult>;
 };
@@ -88,6 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateProfile = useCallback(async (input: { name?: string; email?: string }) => {
+    try {
+      await updateAccountProfile(input);
+      return { error: null };
+    } catch (error) {
+      logError("update_profile", error);
+      return { error: formatAppError(error) };
+    }
+  }, []);
+
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
     if (currentPassword === newPassword) {
       return { error: translate("errorNewPasswordDifferent") };
@@ -119,10 +131,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       signIn,
       signUp,
+      updateProfile,
       changePassword,
       signOut,
     }),
-    [user, isLoading, signIn, signUp, changePassword, signOut],
+    [user, isLoading, signIn, signUp, updateProfile, changePassword, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
