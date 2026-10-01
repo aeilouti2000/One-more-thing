@@ -104,13 +104,13 @@ function getColors(scheme) {
 function glassFieldStyle(scheme) {
   if (scheme === "dark") {
     return {
-      backgroundColor: "rgba(227, 242, 253, 0.14)",
+      backgroundColor: "rgba(30, 58, 95, 0.92)",
       borderColor: "rgba(144, 202, 249, 0.45)",
     };
   }
 
   return {
-    backgroundColor: "rgba(255, 255, 255, 0.78)",
+    backgroundColor: "rgba(255, 255, 255, 0.96)",
     borderColor: "rgba(33, 150, 243, 0.32)",
   };
 }

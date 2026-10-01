@@ -17,7 +17,9 @@ function storage() {
 export function readStoredLocale(): Locale {
   try {
     const value = storage()?.getItem(LANGUAGE_STORAGE_KEY);
-    return value === "ar" ? "ar" : "en";
+    if (value === "ar") return "ar";
+    if (value === "en") return "en";
+    return "en";
   } catch {
     return "en";
   }

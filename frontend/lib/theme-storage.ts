@@ -17,9 +17,11 @@ function storage() {
 export function readStoredTheme(): ThemeScheme {
   try {
     const value = storage()?.getItem(THEME_STORAGE_KEY);
-    return value === "dark" ? "dark" : "light";
+    if (value === "light") return "light";
+    if (value === "dark") return "dark";
+    return "dark";
   } catch {
-    return "light";
+    return "dark";
   }
 }
 

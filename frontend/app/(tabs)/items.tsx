@@ -791,7 +791,13 @@ export default function ItemsScreen() {
                   <View
                     key={list.id}
                     className="mb-1 flex-row items-center rounded-2xl px-2"
-                    style={{ backgroundColor: selected ? colors.accent : "transparent" }}
+                    style={{
+                      backgroundColor: selected
+                        ? scheme === "dark"
+                          ? "rgba(66, 165, 245, 0.28)"
+                          : "rgba(33, 150, 243, 0.16)"
+                        : "transparent",
+                    }}
                   >
                     <Pressable
                       onPress={() => {
@@ -807,12 +813,12 @@ export default function ItemsScreen() {
                       <Ionicons
                         name={selected ? "checkmark-circle" : "ellipse-outline"}
                         size={22}
-                        color={selected ? colors.white : colors.muted}
+                        color={selected ? colors.accent : colors.muted}
                       />
                       <AppText
                         numberOfLines={1}
                         className="min-w-0 flex-1 text-base"
-                        style={{ color: selected ? colors.white : colors.ink }}
+                        style={{ color: colors.ink }}
                       >
                         {label}
                       </AppText>
@@ -824,7 +830,7 @@ export default function ItemsScreen() {
                       hitSlop={8}
                       className="h-10 w-10 items-center justify-center active:opacity-70"
                     >
-                      <Ionicons name="pencil" size={18} color={selected ? colors.white : colors.accent} />
+                      <Ionicons name="pencil" size={18} color={colors.accent} />
                     </Pressable>
                     <Pressable
                       onPress={() => askDeleteList(list)}
@@ -833,7 +839,7 @@ export default function ItemsScreen() {
                       hitSlop={8}
                       className="h-10 w-10 items-center justify-center active:opacity-70"
                     >
-                      <Ionicons name="trash-outline" size={18} color={selected ? "#FECACA" : "#EF4444"} />
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
                     </Pressable>
                   </View>
                 );

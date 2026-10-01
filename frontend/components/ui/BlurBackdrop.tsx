@@ -27,12 +27,53 @@ type BlurBackdropProps = {
   disabled?: boolean;
 };
 
+function SolidFrost({
+  style,
+  soft = false,
+}: {
+  style?: StyleProp<ViewStyle>;
+  soft?: boolean;
+}) {
+  const { scheme, colors } = useTheme();
+  const dark = scheme === "dark";
+
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: soft
+              ? dark
+                ? "rgba(19, 34, 56, 0.96)"
+                : "rgba(255, 255, 255, 0.96)"
+              : colors.paper,
+          },
+        ]}
+      />
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: soft
+              ? dark
+                ? "rgba(66, 165, 245, 0.12)"
+                : "rgba(33, 150, 243, 0.08)"
+              : dark
+                ? "rgba(66, 165, 245, 0.16)"
+                : "rgba(33, 150, 243, 0.1)",
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
 export function FrostedBlur({ style }: { style?: StyleProp<ViewStyle> }) {
   const { scheme } = useTheme();
   const blurTarget = useContext(BlurTargetContext);
 
-  // Android's blur view crashes if it is drawn inside the screen it blurs.
-  // The tab bar and cards mount that way, so use a solid frost there instead.
+  // Android cannot safely blur a parent that contains the blur view.
   if (Platform.OS === "android") {
     return (
       <View
@@ -41,7 +82,7 @@ export function FrostedBlur({ style }: { style?: StyleProp<ViewStyle> }) {
           style,
           {
             backgroundColor:
-              scheme === "dark" ? "rgba(19, 34, 56, 0.94)" : "rgba(255, 255, 255, 0.94)",
+              scheme === "dark" ? "rgba(19, 34, 56, 0.96)" : "rgba(255, 255, 255, 0.96)",
           },
         ]}
       />
@@ -75,6 +116,11 @@ export function GlassFill({
   // Only the tab bar may blur the screen. Cards sit inside that screen, and
   // blurring a view from inside it crashes Android on launch.
   const androidBlur = Platform.OS === "android" && screenBlur && screenTarget != null;
+
+  if (Platform.OS === "android" && !androidBlur) {
+    return <SolidFrost style={style} soft={soft} />;
+  }
+
   const intensity = soft
     ? dark
       ? Platform.OS === "android"
@@ -124,6 +170,10 @@ export function GlassFill({
 export function FrostedFill() {
   const { scheme } = useTheme();
 
+  if (Platform.OS === "android") {
+    return <SolidFrost soft />;
+  }
+
   return (
     <>
       <FrostedBlur style={StyleSheet.absoluteFill} />
@@ -142,11 +192,19 @@ export function FrostedFill() {
 }
 
 export function BlurBackdrop({ onPress, disabled = false }: BlurBackdropProps) {
+  const { scheme } = useTheme();
+
   return (
     <Pressable
       disabled={disabled || !onPress}
       onPress={onPress}
-      style={StyleSheet.absoluteFill}
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          backgroundColor:
+            scheme === "dark" ? "rgba(7, 14, 28, 0.62)" : "rgba(13, 71, 161, 0.34)",
+        },
+      ]}
     />
   );
 }
