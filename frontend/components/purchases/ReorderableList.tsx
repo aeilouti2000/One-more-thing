@@ -138,19 +138,22 @@ function DragHandle({
   const { t } = useI18n();
   const callbacks = useRef({ index, onHold, onBegin, onMove, onFinish, onLongPress });
   callbacks.current = { index, onHold, onBegin, onMove, onFinish, onLongPress };
-  const gesture = useMemo(() => {
-    const pan = Gesture.Pan()
-      .runOnJS(true)
-      .activeOffsetY([-8, 8])
-      .onStart(() => callbacks.current.onBegin(callbacks.current.index))
-      .onUpdate((event) => callbacks.current.onMove(event.translationY))
-      .onFinalize((event) => callbacks.current.onFinish(event.translationY));
-    const longPress = Gesture.LongPress()
-      .runOnJS(true)
-      .minDuration(350)
-      .onStart(() => callbacks.current.onLongPress?.());
-    return Gesture.Exclusive(pan, longPress);
-  }, []);
+  const gesture = useMemo(
+    () =>
+      Gesture.Exclusive(
+        Gesture.Pan()
+          .runOnJS(true)
+          .activeOffsetY([-8, 8])
+          .onStart(() => callbacks.current.onBegin(callbacks.current.index))
+          .onUpdate((event) => callbacks.current.onMove(event.translationY))
+          .onFinalize((event) => callbacks.current.onFinish(event.translationY)),
+        Gesture.LongPress()
+          .runOnJS(true)
+          .minDuration(350)
+          .onStart(() => callbacks.current.onLongPress?.()),
+      ),
+    [],
+  );
 
   return (
     <GestureDetector gesture={gesture}>

@@ -9,12 +9,12 @@ import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
 import { ReorderableList } from "@/components/purchases/ReorderableList";
 import { AppText } from "@/components/ui/AppText";
-import { AppLogo } from "@/components/ui/AppLogo";
 import { BlurBackdrop, FrostedBlur, FrostedFill, GlassFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { ListsHeaderIcon } from "@/components/ui/ListsHeaderIcon";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { useTabBarVisibility } from "@/components/ui/TabBarVisibility";
@@ -487,8 +487,8 @@ export default function ItemsScreen() {
 
   const header = (
     <ScreenHeader
-      flush={!isSelecting}
-      icon={isSelecting ? undefined : <AppLogo size={52} />}
+      flush={false}
+      icon={isSelecting ? undefined : <ListsHeaderIcon />}
       title={
         isSelecting ? t("selectedCount", { count: selectedIds.size }) : undefined
       }
@@ -566,7 +566,7 @@ export default function ItemsScreen() {
           <FloatMessage message={floatMessage} tone={floatTone} />
         ) : null
       }
-      top={isSelecting ? header : null}
+      top={header}
       dock={
         isSelecting ? (
           <SelectionBar
@@ -591,8 +591,6 @@ export default function ItemsScreen() {
         void Haptics.selectionAsync();
       }}
     >
-      {isSelecting ? null : header}
-
       {shareNotice && !isSelecting ? (
         <View className="mb-5">
           <FormMessage message={shareNotice} tone="success" />

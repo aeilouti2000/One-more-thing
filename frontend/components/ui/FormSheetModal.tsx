@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Keyboard, Modal, Platform, Pressable, ScrollView, View } from "react-native";
 import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
 
 type FormSheetContextValue = {
@@ -96,13 +96,21 @@ export function FormSheetModal({ visible, onClose, onShow, children }: FormSheet
         <FormSheetContext.Provider value={sheet}>
           <ScrollView
             ref={scrollRef}
-            style={styles.sheet}
-            contentContainerStyle={styles.sheetContent}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1 }}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
-            <Pressable style={styles.dismissArea} onPress={closeFromOutside}>
+            <Pressable
+              style={{
+                flexGrow: 1,
+                justifyContent: "center",
+                paddingHorizontal: 20,
+                paddingVertical: 24,
+              }}
+              onPress={closeFromOutside}
+            >
               <Pressable onPress={() => undefined}>{children}</Pressable>
             </Pressable>
           </ScrollView>
@@ -111,18 +119,3 @@ export function FormSheetModal({ visible, onClose, onShow, children }: FormSheet
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  sheet: {
-    flex: 1,
-  },
-  sheetContent: {
-    flexGrow: 1,
-  },
-  dismissArea: {
-    flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-  },
-});
