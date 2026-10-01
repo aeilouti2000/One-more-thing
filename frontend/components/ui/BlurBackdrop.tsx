@@ -63,14 +63,18 @@ export function FrostedBlur({ style }: { style?: StyleProp<ViewStyle> }) {
 export function GlassFill({
   style,
   soft = false,
+  screenBlur = false,
 }: {
   style?: StyleProp<ViewStyle>;
   soft?: boolean;
+  screenBlur?: boolean;
 }) {
   const { scheme } = useTheme();
   const screenTarget = useTabBlurTarget();
   const dark = scheme === "dark";
-  const androidBlur = Platform.OS === "android" && screenTarget != null;
+  // Only the tab bar may blur the screen. Cards sit inside that screen, and
+  // blurring a view from inside it crashes Android on launch.
+  const androidBlur = Platform.OS === "android" && screenBlur && screenTarget != null;
   const intensity = soft
     ? dark
       ? Platform.OS === "android"

@@ -142,7 +142,7 @@ export function GlassTabBar({
           },
         ]}
       >
-        <GlassFill soft />
+        <GlassFill soft screenBlur />
         <Animated.View
           pointerEvents="none"
           style={[
