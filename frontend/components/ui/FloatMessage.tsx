@@ -10,13 +10,8 @@ export function FloatMessage({
   message: string;
   tone?: "error" | "success";
 }) {
-  const { colors, scheme } = useTheme();
-  const color =
-    tone === "success"
-      ? colors.accent
-      : scheme === "dark"
-        ? "#F87171"
-        : "#DC2626";
+  const { colors } = useTheme();
+  const color = tone === "success" ? colors.accent : "#F87171";
 
   return (
     <View

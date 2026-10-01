@@ -67,7 +67,7 @@ export function GlassTabBar({
     const next = measured.current.slice();
     next[index] = nextSlot;
     measured.current = next;
-    slots.value = next.map((slot) => slot ?? { x: 0, width: 0, content: 0 });
+    slots.set(next.map((slot) => slot ?? { x: 0, width: 0, content: 0 }));
   }
 
   useEffect(() => {
@@ -84,10 +84,12 @@ export function GlassTabBar({
   useEffect(() => {
     const previous = lastTabIndex;
     lastTabIndex = state.index;
-    progress.value = withTiming(state.index, {
-      duration: previous == null || previous === state.index ? 0 : MOVE_MS,
-      easing: Easing.bezier(0.22, 0.9, 0.24, 1),
-    });
+    progress.set(
+      withTiming(state.index, {
+        duration: previous == null || previous === state.index ? 0 : MOVE_MS,
+        easing: Easing.bezier(0.22, 0.9, 0.24, 1),
+      }),
+    );
   }, [progress, state.index]);
 
   const indicator = useAnimatedStyle(() => {
@@ -156,7 +158,7 @@ export function GlassTabBar({
           collapsable={false}
           onLayout={(event) => {
             const width = event.nativeEvent.layout.width;
-            if (width > 0) rowWidth.value = width;
+            if (width > 0) rowWidth.set(width);
           }}
           style={[StyleSheet.absoluteFill, styles.row]}
         >

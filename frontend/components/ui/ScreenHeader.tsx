@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { iconSize } from "@/constants/theme";
+import { iconSize, spacing } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -37,9 +37,12 @@ export function ScreenHeader({
     <View
       className={`overflow-hidden rounded-b-3xl px-5 ${
         compact ? "mb-3 pb-4 pt-4" : "mb-6 pb-7 pt-5"
-      } ${flush ? "-mx-5 -mt-2" : ""} ${
-        scheme === "dark" ? "bg-cove-deep" : "bg-cove-accent"
-      }`}
+      } ${scheme === "dark" ? "bg-cove-deep" : "bg-cove-accent"}`}
+      style={
+        flush
+          ? { marginHorizontal: -spacing.screen, marginTop: -spacing.sm }
+          : undefined
+      }
     >
       <View
         pointerEvents="none"

@@ -150,7 +150,10 @@ function DragHandle({
         Gesture.LongPress()
           .runOnJS(true)
           .minDuration(350)
-          .onStart(() => callbacks.current.onLongPress?.()),
+          .onStart(() => {
+            callbacks.current.onHold(false);
+            callbacks.current.onLongPress?.();
+          }),
       ),
     [],
   );

@@ -262,7 +262,7 @@ function StaplesBody() {
                     onPress={() => void onRemove(staple.id)}
                     className="active:opacity-80"
                   >
-                    <AppText className="text-sm font-semibold text-red-600">{t("removeStaple")}</AppText>
+                    <AppText className="text-sm font-semibold" style={{ color: "#F87171" }}>{t("removeStaple")}</AppText>
                   </Pressable>
                 </View>
               </View>

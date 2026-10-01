@@ -48,6 +48,7 @@ export function AddItemCard({
   }
 
   function close() {
+    if (isSubmitting) return;
     reset(initialCategory);
     onClose();
   }

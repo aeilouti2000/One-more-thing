@@ -15,14 +15,14 @@ const lightColors = {
 
 const darkColors = {
   ice: "#0B1526",
-  paper: "#132238",
+  paper: "#1A3050",
   mist: "#1E3A5F",
   line: "#2A4A73",
   muted: "#90CAF9",
   ink: "#E3F2FD",
   accent: "#42A5F5",
   accentDeep: "#90CAF9",
-  soft: "#1A3050",
+  soft: "#132238",
   deep: "#102A43",
   white: "#FFFFFF",
   transparent: "transparent",
@@ -104,7 +104,7 @@ function getColors(scheme) {
 function glassFieldStyle(scheme) {
   if (scheme === "dark") {
     return {
-      backgroundColor: "rgba(30, 58, 95, 0.92)",
+      backgroundColor: "rgba(26, 48, 80, 0.92)",
       borderColor: "rgba(144, 202, 249, 0.45)",
     };
   }

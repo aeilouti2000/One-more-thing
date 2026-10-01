@@ -115,7 +115,7 @@ export function AppTextField({
         }`}
       />
       {error ? (
-        <AppText className="text-sm text-red-600 dark:text-red-400">{error}</AppText>
+        <AppText className="text-sm" style={{ color: "#F87171" }}>{error}</AppText>
       ) : null}
     </View>
   );

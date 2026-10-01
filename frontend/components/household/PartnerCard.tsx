@@ -41,9 +41,10 @@ export function PartnerCard({
           onPress={onRemove}
           accessibilityRole="button"
           accessibilityLabel={t("removeMember")}
-          className="h-11 w-11 items-center justify-center rounded-full bg-red-50 active:opacity-80"
+          className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
+          style={{ backgroundColor: "rgba(248, 113, 113, 0.18)" }}
         >
-          <Ionicons name="trash-outline" size={iconSize.sm} color="#DC2626" />
+          <Ionicons name="trash-outline" size={iconSize.sm} color="#F87171" />
         </Pressable>
       ) : null}
       {canLeave && onLeave ? (
@@ -51,9 +52,10 @@ export function PartnerCard({
           onPress={onLeave}
           accessibilityRole="button"
           accessibilityLabel={t("leaveHome")}
-          className="h-11 w-11 items-center justify-center rounded-full bg-red-50 active:opacity-80"
+          className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
+          style={{ backgroundColor: "rgba(248, 113, 113, 0.18)" }}
         >
-          <Ionicons name="exit-outline" size={iconSize.sm} color="#DC2626" />
+          <Ionicons name="exit-outline" size={iconSize.sm} color="#F87171" />
         </Pressable>
       ) : null}
     </View>

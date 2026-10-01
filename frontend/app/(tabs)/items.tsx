@@ -95,6 +95,20 @@ export default function ItemsScreen() {
       : listItems.filter((item) => item.category === category);
   const isSelecting = selectedIds.size > 0;
 
+  async function loadLists(homeId: string) {
+    const result = await fetchLists(homeId);
+    if (result.error) {
+      setActionError(result.error);
+      return;
+    }
+    setLists(result.lists);
+    setSelectedListId((current) =>
+      current && result.lists.some((list) => list.id === current)
+        ? current
+        : (result.lists[0]?.id ?? null),
+    );
+  }
+
   async function onRefresh() {
     setIsRefreshing(true);
     await Promise.all([
@@ -129,6 +143,25 @@ export default function ItemsScreen() {
   function cancelSelection() {
     setSelectedIds(new Set());
     setIsConfirmingDelete(false);
+  }
+
+  const neededIdsKey = needed.map((item) => item.id).join("\0");
+  const [prunedNeededKey, setPrunedNeededKey] = useState(neededIdsKey);
+  if (neededIdsKey !== prunedNeededKey) {
+    setPrunedNeededKey(neededIdsKey);
+    if (selectedIds.size > 0) {
+      const valid = new Set(needed.map((item) => item.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of selectedIds) {
+        if (valid.has(id)) next.add(id);
+        else changed = true;
+      }
+      if (changed) {
+        setSelectedIds(next);
+        if (next.size === 0) setIsConfirmingDelete(false);
+      }
+    }
   }
 
   async function pinSelection() {
@@ -251,14 +284,19 @@ export default function ItemsScreen() {
     return () => clearTimeout(timer);
   }, [floatMessage]);
 
+  const homeId = household?.id;
   useEffect(() => {
-    if (!household) {
-      setLists([]);
-      setSelectedListId(null);
+    if (!homeId) {
+      queueMicrotask(() => {
+        setLists([]);
+        setSelectedListId(null);
+      });
       return;
     }
-    void loadLists(household.id);
-  }, [household?.id]);
+    // Fetch lists when the active home changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async load updates list state on completion
+    void loadLists(homeId);
+  }, [homeId]);
 
   useLayoutEffect(() => {
     setTabBarHidden(isSelecting);
@@ -303,20 +341,6 @@ export default function ItemsScreen() {
   }
 
   const listEmpty = listItems.length === 0;
-
-  async function loadLists(homeId: string) {
-    const result = await fetchLists(homeId);
-    if (result.error) {
-      setActionError(result.error);
-      return;
-    }
-    setLists(result.lists);
-    setSelectedListId((current) =>
-      current && result.lists.some((list) => list.id === current)
-        ? current
-        : (result.lists[0]?.id ?? null),
-    );
-  }
 
   function closeListForm() {
     if (isSavingList) return;
@@ -411,7 +435,7 @@ export default function ItemsScreen() {
       <View className="mb-5 flex-row gap-2">
         <ListAction
           label={t("shop")}
-          disabled={listEmpty}
+          disabled={needed.length === 0}
           onPress={() => router.push("/trip")}
           icon={
             <View className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-accent">
@@ -487,7 +511,7 @@ export default function ItemsScreen() {
 
   const header = (
     <ScreenHeader
-      flush={false}
+      flush={!isSelecting}
       icon={isSelecting ? undefined : <ListsHeaderIcon />}
       title={
         isSelecting ? t("selectedCount", { count: selectedIds.size }) : undefined
@@ -566,7 +590,7 @@ export default function ItemsScreen() {
           <FloatMessage message={floatMessage} tone={floatTone} />
         ) : null
       }
-      top={header}
+      top={isSelecting ? header : null}
       dock={
         isSelecting ? (
           <SelectionBar
@@ -574,7 +598,10 @@ export default function ItemsScreen() {
             disabled={isApplyingAction}
             onBought={() => void markSelectionBought()}
             onPin={() => void pinSelection()}
-            onDelete={() => setIsConfirmingDelete(true)}
+            onDelete={() => {
+              setActionError(null);
+              setIsConfirmingDelete(true);
+            }}
           />
         ) : null
       }
@@ -591,6 +618,8 @@ export default function ItemsScreen() {
         void Haptics.selectionAsync();
       }}
     >
+      {isSelecting ? null : header}
+
       {shareNotice && !isSelecting ? (
         <View className="mb-5">
           <FormMessage message={shareNotice} tone="success" />
@@ -856,7 +885,7 @@ export default function ItemsScreen() {
                       hitSlop={8}
                       className="h-10 w-10 items-center justify-center active:opacity-70"
                     >
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                      <Ionicons name="trash-outline" size={18} color="#F87171" />
                     </Pressable>
                   </View>
                 );
@@ -894,7 +923,7 @@ function SelectionBar({
   const { colors, scheme, shadow } = useTheme();
   const { t } = useI18n();
   const dark = scheme === "dark";
-  const danger = dark ? "#F87171" : "#DC2626";
+  const danger = "#F87171";
   const barBackground = dark ? "rgba(12, 36, 72, 0.55)" : "rgba(187, 222, 251, 0.72)";
   const barBorder = dark ? "rgba(144, 202, 249, 0.34)" : "rgba(33, 150, 243, 0.34)";
   const buttonShadow = {

@@ -356,7 +356,7 @@ function HistoryItemCard({
   onClose: () => void;
 }) {
   const { t, locale, isRTL } = useI18n();
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const categoryLabel = useCategoryLabel(purchase.category);
   const quantityLabel = purchase.unit
     ? `${purchase.quantity} ${purchase.unit}`
@@ -400,7 +400,7 @@ function HistoryItemCard({
 
       <View
         className="overflow-hidden rounded-2xl px-4"
-        style={{ backgroundColor: colors.ice }}
+        style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.ice }}
       >
         {facts.map((fact, index) => (
           <View

@@ -181,24 +181,20 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <Screen
-      tabBarInset
-      top={
-        <ScreenHeader
-          flush={false}
-          title={t("settingsTitle")}
-          subtitle={t("settingsSubtitle")}
-          icon={
-            <View
-              className="items-center justify-center bg-white/20"
-              style={{ width: 56, height: 56, borderRadius: 28 }}
-            >
-              <Ionicons name="settings-outline" size={34} color="#FFFFFF" />
-            </View>
-          }
-        />
-      }
-    >
+    <Screen tabBarInset>
+      <ScreenHeader
+        title={t("settingsTitle")}
+        subtitle={t("settingsSubtitle")}
+        icon={
+          <View
+            className="items-center justify-center bg-white/20"
+            style={{ width: 56, height: 56, borderRadius: 28 }}
+          >
+            <Ionicons name="settings-outline" size={34} color="#FFFFFF" />
+          </View>
+        }
+      />
+
       <View className="gap-8">
         <View className="gap-3">
           <SectionHeader title={t("account")} />

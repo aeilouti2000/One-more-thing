@@ -45,7 +45,7 @@ function SolidFrost({
           {
             backgroundColor: soft
               ? dark
-                ? "rgba(19, 34, 56, 0.96)"
+                ? colors.paper
                 : "rgba(255, 255, 255, 0.96)"
               : colors.paper,
           },

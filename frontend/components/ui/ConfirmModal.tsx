@@ -32,11 +32,10 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
-  const { colors, scheme } = useTheme();
+  const { colors } = useTheme();
   const { isRTL } = useI18n();
-  const dark = scheme === "dark";
-  const danger = dark ? "#F87171" : "#DC2626";
-  const dangerSoft = dark ? "rgba(248, 113, 113, 0.18)" : "#FEE2E2";
+  const danger = "#F87171";
+  const dangerSoft = "rgba(248, 113, 113, 0.18)";
 
   return (
     <Modal

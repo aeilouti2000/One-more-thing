@@ -73,9 +73,17 @@ export default function HistoryScreen() {
     useCallback(() => {
       if (!household) {
         setLists([]);
+        setListId("all");
         return;
       }
-      void fetchLists(household.id).then((result) => setLists(result.lists));
+      void fetchLists(household.id).then((result) => {
+        setLists(result.lists);
+        setListId((current) =>
+          current === "all" || result.lists.some((list) => list.id === current)
+            ? current
+            : "all",
+        );
+      });
     }, [household]),
   );
 
@@ -141,6 +149,14 @@ export default function HistoryScreen() {
     if (household) {
       const result = await fetchLists(household.id);
       setLists(result.lists);
+      setListId((current) =>
+        current === "all" || result.lists.some((list) => list.id === current)
+          ? current
+          : "all",
+      );
+    } else {
+      setLists([]);
+      setListId("all");
     }
     setIsRefreshing(false);
   }
@@ -154,22 +170,20 @@ export default function HistoryScreen() {
       tabBarInset
       refreshing={isRefreshing}
       onRefresh={() => void onRefresh()}
-      top={
-        <ScreenHeader
-          flush={false}
-          title={t("historyTitle")}
-          subtitle={t("historySubtitle")}
-          icon={
-            <View
-              className="items-center justify-center bg-white/20"
-              style={{ width: 56, height: 56, borderRadius: 28 }}
-            >
-              <Ionicons name="time-outline" size={34} color="#FFFFFF" />
-            </View>
-          }
-        />
-      }
     >
+      <ScreenHeader
+        title={t("historyTitle")}
+        subtitle={t("historySubtitle")}
+        icon={
+          <View
+            className="items-center justify-center bg-white/20"
+            style={{ width: 56, height: 56, borderRadius: 28 }}
+          >
+            <Ionicons name="time-outline" size={34} color="#FFFFFF" />
+          </View>
+        }
+      />
+
       {bought.length > 0 ? (
         <HistoryDateField
           value={pickedDate}

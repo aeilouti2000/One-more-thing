@@ -1,4 +1,4 @@
-import { useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { RefreshControl, ScrollView, View } from "react-native";
 import {
   Gesture,
@@ -39,7 +39,6 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const dockBottom = Math.max(insets.bottom, spacing.md) + spacing.sm;
   const swipeRef = useRef(onSwipe);
-  swipeRef.current = onSwipe;
   const padding = tabBarInset
     ? top
       ? "px-5 pb-32 pt-4"
@@ -47,18 +46,29 @@ export function Screen({
     : top
       ? "px-5 pb-10 pt-4"
       : "px-5 pb-10 pt-2";
-  const swipe = useMemo(() => {
-    const native = Gesture.Native();
-    const pan = Gesture.Pan()
-      .runOnJS(true)
-      .activeOffsetX([-36, 36])
-      .failOffsetY([-16, 16])
-      .onEnd((event) => {
-        if (!swipeRef.current || Math.abs(event.translationX) < 56) return;
-        swipeRef.current(event.translationX < 0 ? "next" : "previous");
-      });
-    return Gesture.Simultaneous(pan, native);
-  }, []);
+
+  useEffect(() => {
+    swipeRef.current = onSwipe;
+  }, [onSwipe]);
+
+  /* eslint-disable react-hooks/refs -- gesture callback reads latest onSwipe via ref */
+  const swipe = useMemo(
+    () =>
+      Gesture.Simultaneous(
+        Gesture.Pan()
+          .runOnJS(true)
+          .activeOffsetX([-36, 36])
+          .failOffsetY([-16, 16])
+          .onEnd((event) => {
+            const handler = swipeRef.current;
+            if (!handler || Math.abs(event.translationX) < 56) return;
+            handler(event.translationX < 0 ? "next" : "previous");
+          }),
+        Gesture.Native(),
+      ),
+    [],
+  );
+  /* eslint-enable react-hooks/refs */
 
   const body = (
     <SafeAreaView
@@ -73,12 +83,12 @@ export function Screen({
         onSwipe ? (
           <GestureDetector gesture={swipe}>
             <GestureScrollView
-              style={{ flex: 1 }}
+              style={{ flex: 1, width: "100%" }}
               scrollEnabled={scrollEnabled}
               removeClippedSubviews={false}
               contentContainerStyle={{
-                paddingHorizontal: 20,
-                paddingTop: top ? 16 : 8,
+                paddingHorizontal: spacing.screen,
+                paddingTop: top ? spacing.lg : spacing.sm,
                 paddingBottom: tabBarInset ? 128 : 40,
               }}
               keyboardShouldPersistTaps="handled"

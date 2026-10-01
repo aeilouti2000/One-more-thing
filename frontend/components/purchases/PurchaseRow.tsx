@@ -147,9 +147,9 @@ export function PurchaseRow({
               {purchase.urgent && purchase.status !== "bought" ? (
                 <View
                   className="rounded-full px-2.5 py-1"
-                  style={{ backgroundColor: scheme === "dark" ? "rgba(220,38,38,0.22)" : "#FEE2E2" }}
+                  style={{ backgroundColor: "rgba(248, 113, 113, 0.18)" }}
                 >
-                  <AppText className="text-xs font-semibold" style={{ color: "#DC2626" }}>
+                  <AppText className="text-xs font-semibold" style={{ color: "#F87171" }}>
                     {t("urgent")}
                   </AppText>
                 </View>

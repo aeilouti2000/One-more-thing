@@ -22,7 +22,7 @@ const labelVariants = {
   primary: "text-white",
   secondary: "text-cove-ink",
   ghost: "text-cove-accent",
-  danger: "text-red-600 dark:text-red-400",
+  danger: "",
 };
 
 export function AppButton({
@@ -33,9 +33,9 @@ export function AppButton({
   loading = false,
   compact = false,
 }: AppButtonProps) {
-  const { colors, scheme } = useTheme();
+  const { colors } = useTheme();
   const isDisabled = disabled || loading;
-  const danger = scheme === "dark" ? "#F87171" : "#DC2626";
+  const danger = "#F87171";
 
   return (
     <Pressable

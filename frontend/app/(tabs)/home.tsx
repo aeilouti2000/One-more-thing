@@ -47,6 +47,7 @@ export default function HomeScreen() {
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [floatMessage, setFloatMessage] = useState<string | null>(null);
+  const [floatTone, setFloatTone] = useState<"error" | "success">("success");
 
   const isHost = household?.members.some(
     (member) => member.id === user?.id && member.role === "owner",
@@ -133,12 +134,16 @@ export default function HomeScreen() {
   async function openHome(homeId: string) {
     if (!household || homeId === household.id) return;
     setSwitchingId(homeId);
+    setFloatMessage(null);
     const result = await switchHome(homeId);
     setSwitchingId(null);
-    if (result.home) {
-      adoptHome(result.home);
-      await refresh();
+    if (result.error || !result.home) {
+      setFloatTone("error");
+      setFloatMessage(result.error ?? t("errorGeneric"));
+      return;
     }
+    adoptHome(result.home);
+    await refresh();
   }
 
   async function leaveCurrentHome() {
@@ -173,23 +178,21 @@ export default function HomeScreen() {
       tabBarInset
       refreshing={isRefreshing}
       onRefresh={() => void onRefresh()}
-      floating={floatMessage ? <FloatMessage message={floatMessage} tone="success" /> : null}
-      top={
-        <ScreenHeader
-          flush={false}
-          title={t("homeTitle")}
-          subtitle={t("homeSubtitle")}
-          icon={
-            <View
-              className="items-center justify-center bg-white/20"
-              style={{ width: 56, height: 56, borderRadius: 28 }}
-            >
-              <Ionicons name="home-outline" size={34} color="#FFFFFF" />
-            </View>
-          }
-        />
-      }
+      floating={floatMessage ? <FloatMessage message={floatMessage} tone={floatTone} /> : null}
     >
+      <ScreenHeader
+        title={t("homeTitle")}
+        subtitle={t("homeSubtitle")}
+        icon={
+          <View
+            className="items-center justify-center bg-white/20"
+            style={{ width: 56, height: 56, borderRadius: 28 }}
+          >
+            <Ionicons name="home-outline" size={34} color="#FFFFFF" />
+          </View>
+        }
+      />
+
       <FormMessage message={error} />
 
       {household ? (
@@ -253,7 +256,10 @@ export default function HomeScreen() {
 
           <InviteCodeCard
             code={household.inviteCode}
-            onCopied={() => setFloatMessage(t("inviteCopied"))}
+            onCopied={() => {
+              setFloatTone("success");
+              setFloatMessage(t("inviteCopied"));
+            }}
           />
 
           <View>
