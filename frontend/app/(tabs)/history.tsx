@@ -248,7 +248,7 @@ export default function HistoryScreen() {
         icon={
           <View
             className="items-center justify-center"
-            style={headerIconFrameStyle(scheme)}
+            style={headerIconFrameStyle(scheme, colors)}
           >
             <Ionicons
               name={mode === "invoice" ? "receipt-outline" : "time-outline"}

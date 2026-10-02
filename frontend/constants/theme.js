@@ -1,33 +1,183 @@
-const lightColors = {
-  ice: "#E3F2FD",
-  paper: "#FFFFFF",
-  mist: "#BBDEFB",
-  line: "#90CAF9",
-  muted: "#1565C0",
-  ink: "#0D47A1",
-  accent: "#2196F3",
-  accentDeep: "#0D47A1",
-  soft: "#E3F2FD",
-  deep: "#0D47A1",
-  white: "#FFFFFF",
-  transparent: "transparent",
-};
+const DEFAULT_ACCENT = "#2196F3";
 
-const darkColors = {
-  ice: "#0B1526",
-  paper: "#1A3050",
-  mist: "#1E3A5F",
-  line: "#2A4A73",
-  muted: "#90CAF9",
-  ink: "#E3F2FD",
-  accent: "#42A5F5",
-  accentDeep: "#90CAF9",
-  soft: "#132238",
-  deep: "#102A43",
-  white: "#FFFFFF",
-  transparent: "transparent",
-};
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
 
+function normalizeHex(value) {
+  if (typeof value !== "string") return null;
+  const raw = value.trim().replace(/^#/, "");
+  if (!/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(raw)) return null;
+  const hex =
+    raw.length === 3
+      ? raw
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : raw;
+  return `#${hex.toUpperCase()}`;
+}
+
+function hexToRgb(hex) {
+  const normalized = normalizeHex(hex) ?? DEFAULT_ACCENT;
+  const value = normalized.slice(1);
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex(r, g, b) {
+  const toHex = (channel) =>
+    Math.round(clamp(channel, 0, 255))
+      .toString(16)
+      .padStart(2, "0")
+      .toUpperCase();
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function hexToHsl(hex) {
+  let { r, g, b } = hexToRgb(hex);
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+  let hue = 0;
+  let saturation = 0;
+
+  if (max !== min) {
+    const delta = max - min;
+    saturation =
+      lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+    switch (max) {
+      case r:
+        hue = ((g - b) / delta + (g < b ? 6 : 0)) / 6;
+        break;
+      case g:
+        hue = ((b - r) / delta + 2) / 6;
+        break;
+      default:
+        hue = ((r - g) / delta + 4) / 6;
+        break;
+    }
+  }
+
+  return {
+    h: hue * 360,
+    s: saturation * 100,
+    l: lightness * 100,
+  };
+}
+
+function hslToHex(h, s, l) {
+  const saturation = clamp(s, 0, 100) / 100;
+  const lightness = clamp(l, 0, 100) / 100;
+  const chroma = saturation * Math.min(lightness, 1 - lightness);
+  const channel = (n) => {
+    const k = (n + h / 30) % 12;
+    const color =
+      lightness - chroma * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color);
+  };
+  return rgbToHex(channel(0), channel(8), channel(4));
+}
+
+function mixHex(from, to, amount) {
+  const a = hexToRgb(from);
+  const b = hexToRgb(to);
+  const t = clamp(amount, 0, 1);
+  return rgbToHex(
+    a.r + (b.r - a.r) * t,
+    a.g + (b.g - a.g) * t,
+    a.b + (b.b - a.b) * t,
+  );
+}
+
+function withAlpha(hex, alpha) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`;
+}
+
+function buildColors(scheme, accentHex) {
+  const accent = normalizeHex(accentHex) ?? DEFAULT_ACCENT;
+  const { h, s } = hexToHsl(accent);
+  const neutral = s < 12;
+
+  if (neutral) {
+    if (scheme === "dark") {
+      return {
+        ice: "#0E0E0E",
+        paper: "#1A1A1A",
+        mist: "#242424",
+        line: "#333333",
+        muted: "#B0B0B0",
+        ink: "#F2F2F2",
+        accent: "#E0E0E0",
+        accentDeep: "#BDBDBD",
+        soft: "#161616",
+        deep: "#121212",
+        white: "#FFFFFF",
+        transparent: "transparent",
+      };
+    }
+
+    return {
+      ice: "#F5F5F5",
+      paper: "#FFFFFF",
+      mist: "#EEEEEE",
+      line: "#D6D6D6",
+      muted: "#616161",
+      ink: "#212121",
+      accent: "#212121",
+      accentDeep: "#000000",
+      soft: "#F5F5F5",
+      deep: "#212121",
+      white: "#FFFFFF",
+      transparent: "transparent",
+    };
+  }
+
+  const sat = clamp(s, 42, 88);
+
+  if (scheme === "dark") {
+    const tint = hslToHex(h, sat, 48);
+    return {
+      ice: mixHex("#0A1018", tint, 0.22),
+      paper: mixHex("#121C28", tint, 0.34),
+      mist: mixHex("#162436", tint, 0.4),
+      line: mixHex("#1E3048", tint, 0.48),
+      muted: hslToHex(h, clamp(sat, 40, 72), 74),
+      ink: hslToHex(h, clamp(sat * 0.35, 18, 42), 93),
+      accent: hslToHex(h, sat, 62),
+      accentDeep: hslToHex(h, clamp(sat, 40, 72), 74),
+      soft: mixHex("#101820", tint, 0.28),
+      deep: mixHex("#0C1420", tint, 0.24),
+      white: "#FFFFFF",
+      transparent: "transparent",
+    };
+  }
+
+  return {
+    ice: hslToHex(h, clamp(sat, 40, 72), 94),
+    paper: "#FFFFFF",
+    mist: hslToHex(h, clamp(sat, 38, 68), 88),
+    line: hslToHex(h, clamp(sat, 40, 72), 78),
+    muted: hslToHex(h, clamp(sat + 8, 48, 86), 38),
+    ink: hslToHex(h, clamp(sat + 12, 52, 90), 28),
+    accent: hslToHex(h, sat, 54),
+    accentDeep: hslToHex(h, clamp(sat + 12, 52, 90), 28),
+    soft: hslToHex(h, clamp(sat, 40, 72), 94),
+    deep: hslToHex(h, clamp(sat + 12, 52, 90), 28),
+    white: "#FFFFFF",
+    transparent: "transparent",
+  };
+}
+
+const lightColors = buildColors("light", DEFAULT_ACCENT);
+const darkColors = buildColors("dark", DEFAULT_ACCENT);
 const colors = lightColors;
 
 const spacing = {
@@ -97,35 +247,35 @@ const shadow = {
   elevation: 12,
 };
 
-function getColors(scheme) {
-  return scheme === "dark" ? darkColors : lightColors;
+function getColors(scheme, accentHex = DEFAULT_ACCENT) {
+  return buildColors(scheme, accentHex);
 }
 
-function glassFieldStyle(scheme) {
+function glassFieldStyle(scheme, palette = getColors(scheme)) {
   if (scheme === "dark") {
     return {
-      backgroundColor: "rgba(26, 48, 80, 0.92)",
-      borderColor: "rgba(144, 202, 249, 0.45)",
+      backgroundColor: withAlpha(palette.paper, 0.92),
+      borderColor: withAlpha(palette.muted, 0.45),
     };
   }
 
   return {
-    backgroundColor: "rgba(255, 255, 255, 0.96)",
-    borderColor: "rgba(33, 150, 243, 0.32)",
+    backgroundColor: withAlpha(palette.white, 0.96),
+    borderColor: withAlpha(palette.accent, 0.32),
   };
 }
 
-function floatedCardStyle(scheme) {
+function floatedCardStyle(scheme, palette = getColors(scheme)) {
   return {
     borderWidth: 1,
     borderColor:
       scheme === "dark"
-        ? "rgba(144, 202, 249, 0.42)"
-        : "rgba(33, 150, 243, 0.28)",
+        ? withAlpha(palette.muted, 0.42)
+        : withAlpha(palette.accent, 0.28),
   };
 }
 
-function headerIconFrameStyle(scheme) {
+function headerIconFrameStyle(scheme, palette = getColors(scheme)) {
   return {
     width: 56,
     height: 56,
@@ -133,9 +283,9 @@ function headerIconFrameStyle(scheme) {
     borderWidth: 1,
     borderColor:
       scheme === "dark"
-        ? "rgba(144, 202, 249, 0.55)"
-        : "rgba(255, 255, 255, 0.55)",
-    backgroundColor: "rgba(255,255,255,0.2)",
+        ? withAlpha(palette.muted, 0.55)
+        : withAlpha(palette.white, 0.55),
+    backgroundColor: withAlpha(palette.white, 0.2),
   };
 }
 
@@ -168,11 +318,16 @@ const theme = {
 };
 
 module.exports = {
+  DEFAULT_ACCENT,
   colors,
   lightColors,
   darkColors,
   getColors,
   getCssVars,
+  normalizeHex,
+  hexToHsl,
+  hslToHex,
+  withAlpha,
   glassFieldStyle,
   floatedCardStyle,
   headerIconFrameStyle,

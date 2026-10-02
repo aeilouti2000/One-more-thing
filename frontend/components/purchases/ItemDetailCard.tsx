@@ -11,7 +11,7 @@ import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { FormSheetModal, useFormSheet } from "@/components/ui/FormSheetModal";
-import { floatedCardStyle } from "@/constants/theme";
+import { floatedCardStyle, withAlpha } from "@/constants/theme";
 import { useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
@@ -335,7 +335,7 @@ function EditItemForm({
   return (
     <View
       className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
-      style={floatedCardStyle(scheme)}
+      style={floatedCardStyle(scheme, colors)}
     >
       <GlassFill soft />
       <View className="mb-5 flex-row items-start justify-between gap-4">
@@ -390,11 +390,15 @@ function EditItemForm({
           <View
             className="overflow-hidden rounded-2xl"
             style={{
-              backgroundColor:
-                scheme === "dark" ? "rgba(144, 202, 249, 0.18)" : "rgba(33, 150, 243, 0.12)",
+              backgroundColor: withAlpha(
+                scheme === "dark" ? colors.muted : colors.accent,
+                scheme === "dark" ? 0.18 : 0.12,
+              ),
               borderWidth: 1,
-              borderColor:
-                scheme === "dark" ? "rgba(144, 202, 249, 0.45)" : "rgba(33, 150, 243, 0.32)",
+              borderColor: withAlpha(
+                scheme === "dark" ? colors.muted : colors.accent,
+                scheme === "dark" ? 0.45 : 0.32,
+              ),
             }}
           >
             <Pressable
@@ -415,8 +419,10 @@ function EditItemForm({
               <View
                 className="gap-4 border-t border-cove-line px-4 pb-4 pt-3"
                 style={{
-                  borderTopColor:
-                    scheme === "dark" ? "rgba(144, 202, 249, 0.28)" : "rgba(33, 150, 243, 0.2)",
+                  borderTopColor: withAlpha(
+                    scheme === "dark" ? colors.muted : colors.accent,
+                    scheme === "dark" ? 0.28 : 0.2,
+                  ),
                 }}
               >
                 <View className="flex-row items-stretch gap-3">
@@ -575,7 +581,7 @@ function HistoryItemCard({
   return (
     <View
       className="w-full max-w-md gap-6 overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
-      style={floatedCardStyle(scheme)}
+      style={floatedCardStyle(scheme, colors)}
     >
       <GlassFill soft />
       <View className="-mx-7 flex-row items-center gap-3 border-b border-cove-line px-7 pb-5">

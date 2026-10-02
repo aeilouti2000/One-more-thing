@@ -15,24 +15,39 @@ export type ThemeColors = {
   transparent: string;
 };
 
+export const DEFAULT_ACCENT: string;
+
 export const colors: ThemeColors;
 export const lightColors: ThemeColors;
 export const darkColors: ThemeColors;
 
-export function getColors(scheme: ThemeScheme): ThemeColors;
+export function getColors(scheme: ThemeScheme, accentHex?: string): ThemeColors;
 export function getCssVars(palette: ThemeColors): Record<string, string>;
+export function normalizeHex(value: string | null | undefined): string | null;
+export function hexToHsl(hex: string): { h: number; s: number; l: number };
+export function hslToHex(h: number, s: number, l: number): string;
+export function withAlpha(hex: string, alpha: number): string;
 
-export function glassFieldStyle(scheme: ThemeScheme): {
+export function glassFieldStyle(
+  scheme: ThemeScheme,
+  palette?: ThemeColors,
+): {
   backgroundColor: string;
   borderColor: string;
 };
 
-export function floatedCardStyle(scheme: ThemeScheme): {
+export function floatedCardStyle(
+  scheme: ThemeScheme,
+  palette?: ThemeColors,
+): {
   borderWidth: number;
   borderColor: string;
 };
 
-export function headerIconFrameStyle(scheme: ThemeScheme): {
+export function headerIconFrameStyle(
+  scheme: ThemeScheme,
+  palette?: ThemeColors,
+): {
   width: number;
   height: number;
   borderRadius: number;

@@ -5,7 +5,7 @@ import { AppText } from "@/components/ui/AppText";
 import { BlurBackdrop, FrostedFill, GlassFill } from "@/components/ui/BlurBackdrop";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { singleLineInput } from "@/constants/font";
-import { glassFieldStyle, iconSize } from "@/constants/theme";
+import { glassFieldStyle, iconSize, withAlpha } from "@/constants/theme";
 import { useCategories, useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -35,7 +35,7 @@ export function CategoryFilter({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canAdd = Boolean(draft.trim()) && !busy;
-  const fieldStyle = glassFieldStyle(scheme);
+  const fieldStyle = glassFieldStyle(scheme, colors);
   const dark = scheme === "dark";
   const cardShadow = {
     shadowColor: shadow.color,
@@ -178,9 +178,7 @@ export function CategoryFilter({
               <View
                 className="gap-2.5 border-t px-4 pb-4 pt-3"
                 style={{
-                  borderTopColor: dark
-                    ? "rgba(144, 202, 249, 0.16)"
-                    : "rgba(33, 150, 243, 0.14)",
+                  borderTopColor: withAlpha(dark ? colors.muted : colors.accent, dark ? 0.16 : 0.14),
                 }}
               >
                 <FormMessage message={error} />
@@ -191,9 +189,7 @@ export function CategoryFilter({
                   <View
                     className="h-8 w-8 items-center justify-center rounded-xl"
                     style={{
-                      backgroundColor: dark
-                        ? "rgba(66, 165, 245, 0.16)"
-                        : "rgba(33, 150, 243, 0.1)",
+                      backgroundColor: withAlpha(colors.accent, dark ? 0.16 : 0.1),
                     }}
                   >
                     <Ionicons name="pricetag-outline" size={15} color={colors.accent} />
@@ -203,7 +199,7 @@ export function CategoryFilter({
                     onChangeText={setDraft}
                     placeholder={t("newCategoryPlaceholder")}
                     placeholderTextColor={
-                      dark ? "rgba(144, 202, 249, 0.55)" : colors.line
+                      dark ? withAlpha(colors.muted, 0.55) : colors.line
                     }
                     textAlign={isRTL ? "right" : "left"}
                     textAlignVertical="center"

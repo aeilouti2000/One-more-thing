@@ -52,7 +52,7 @@ export function ConfirmModal({
 
         <View
           className="w-full max-w-md gap-4 overflow-hidden rounded-3xl p-5"
-          style={floatedCardStyle(scheme)}
+          style={floatedCardStyle(scheme, colors)}
         >
           <GlassFill />
           <View className="flex-row items-center gap-3">

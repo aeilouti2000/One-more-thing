@@ -16,7 +16,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/AppText";
 import { GlassFill } from "@/components/ui/BlurBackdrop";
-import { spacing, tabBar } from "@/constants/theme";
+import { spacing, tabBar, withAlpha } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
 type Slot = { x: number; width: number; content: number };
@@ -118,7 +118,7 @@ export function GlassTabBar({
   if (hidden || keyboardOpen) return null;
 
   const dark = scheme === "dark";
-  const pillBackground = dark ? "rgba(20, 90, 170, 0.55)" : "rgba(13, 110, 210, 0.28)";
+  const pillBackground = withAlpha(colors.accent, dark ? 0.55 : 0.28);
 
   return (
     <View
@@ -139,8 +139,8 @@ export function GlassTabBar({
         style={[
           styles.shell,
           {
-            borderColor: dark ? "rgba(144, 202, 249, 0.34)" : "rgba(33, 150, 243, 0.34)",
-            backgroundColor: dark ? "rgba(12, 36, 72, 0.55)" : "rgba(187, 222, 251, 0.72)",
+            borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
+            backgroundColor: withAlpha(dark ? colors.deep : colors.mist, dark ? 0.55 : 0.72),
           },
         ]}
       >

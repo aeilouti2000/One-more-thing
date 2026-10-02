@@ -7,12 +7,12 @@ const lightIcon = require("../../assets/images/lists-header-light.png");
 const darkIcon = require("../../assets/images/lists-header-dark.png");
 
 export function ListsHeaderIcon() {
-  const { scheme } = useTheme();
+  const { colors, scheme } = useTheme();
 
   return (
     <View
       className="items-center justify-center"
-      style={headerIconFrameStyle(scheme)}
+      style={headerIconFrameStyle(scheme, colors)}
     >
       <Image
         source={scheme === "dark" ? darkIcon : lightIcon}

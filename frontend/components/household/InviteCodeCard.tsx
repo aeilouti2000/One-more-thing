@@ -6,6 +6,7 @@ import { AppText } from "@/components/ui/AppText";
 import { FrostedBlur } from "@/components/ui/BlurBackdrop";
 import { shareNeededText } from "@/lib/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
+import { withAlpha } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
 type InviteCodeCardProps = {
@@ -15,7 +16,7 @@ type InviteCodeCardProps = {
 
 export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
   const { t } = useI18n();
-  const { scheme } = useTheme();
+  const { colors, scheme } = useTheme();
 
   async function copyCode() {
     await Clipboard.setStringAsync(code);
@@ -32,8 +33,7 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
     }
   }
 
-  const cardTint =
-    scheme === "dark" ? "rgba(66, 165, 245, 0.55)" : "rgba(33, 150, 243, 0.72)";
+  const cardTint = withAlpha(colors.accent, scheme === "dark" ? 0.55 : 0.72);
 
   return (
     <View className="overflow-hidden rounded-[28px] border border-white/30 px-6 py-6">

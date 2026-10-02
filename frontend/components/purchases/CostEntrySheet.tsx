@@ -143,7 +143,7 @@ function CostSheetBody({
   onSkip: () => void;
 }) {
   const { t } = useI18n();
-  const { scheme } = useTheme();
+  const { colors, scheme } = useTheme();
   const sheet = useFormSheet();
   const single = items.length === 1;
 
@@ -156,7 +156,7 @@ function CostSheetBody({
   return (
     <View
       className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
-      style={floatedCardStyle(scheme)}
+      style={floatedCardStyle(scheme, colors)}
     >
       <GlassFill soft />
       <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Linking, Pressable, Switch, View } from "react-native";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
@@ -12,7 +12,8 @@ import { FontSizeBar } from "@/components/ui/FontSizeBar";
 import { LanguagePicker } from "@/components/ui/LanguagePicker";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
-import { SectionHeader } from "@/components/ui/SectionHeader";
+import { ThemeColorPicker } from "@/components/ui/ThemeColorPicker";
+import { LOCALES } from "@/constants/i18n";
 import { headerIconFrameStyle, iconSize, type ThemeScheme } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import { updateCostSettings } from "@/lib/homes";
@@ -35,6 +36,9 @@ export default function SettingsScreen() {
   const { household, refresh: refreshHome, adoptHome } = useHousehold();
   const { colors, scheme, setScheme } = useTheme();
   const { t, locale } = useI18n();
+  const [openCard, setOpenCard] = useState<
+    "account" | "app" | "costs" | "language" | "appearance" | null
+  >(null);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
@@ -194,12 +198,22 @@ export default function SettingsScreen() {
     router.replace("/");
   }
 
+  function toggleCard(card: typeof openCard) {
+    setOpenCard((current) => (current === card ? null : card));
+  }
+
   const displayName = user?.name?.trim() || t("member");
   const displayUsername = user?.email ?? t("noEmail");
+  const languageLabel = LOCALES.find((item) => item.id === locale)?.label ?? t("language");
   const themes: { id: ThemeScheme; label: string }[] = [
     { id: "light", label: t("light") },
     { id: "dark", label: t("dark") },
   ];
+  const costsSummary = !household
+    ? t("costsSectionBody")
+    : household.costsEnabled
+      ? t("trackCosts")
+      : t("costsSection");
 
   return (
     <Screen tabBarInset>
@@ -209,18 +223,23 @@ export default function SettingsScreen() {
         icon={
           <View
             className="items-center justify-center"
-            style={headerIconFrameStyle(scheme)}
+            style={headerIconFrameStyle(scheme, colors)}
           >
             <Ionicons name="settings-outline" size={34} color="#FFFFFF" />
           </View>
         }
       />
 
-      <View className="gap-8">
-        <View className="gap-3">
-          <SectionHeader title={t("account")} />
-
-          <View className="rounded-3xl bg-cove-paper px-4 py-4">
+      <View className="gap-3">
+        <SettingsCard
+          icon="person-outline"
+          title={t("account")}
+          summary={displayName}
+          open={openCard === "account"}
+          onToggle={() => toggleCard("account")}
+          colors={colors}
+        >
+          <CardBlock>
             {isEditingName ? (
               <View className="gap-4">
                 <AppTextField
@@ -259,12 +278,6 @@ export default function SettingsScreen() {
                   <AppText className="mt-2 text-base font-semibold text-cove-ink">
                     {displayName}
                   </AppText>
-                  <AppText
-                    className="mt-2 text-xs leading-4"
-                    style={{ color: colors.muted, opacity: 0.62 }}
-                  >
-                    {t("nameHint")}
-                  </AppText>
                   <FormMessage message={nameSuccess} tone="success" />
                 </View>
                 <EditButton
@@ -279,9 +292,9 @@ export default function SettingsScreen() {
                 />
               </View>
             )}
-          </View>
+          </CardBlock>
 
-          <View className="rounded-3xl bg-cove-paper px-4 py-4">
+          <CardBlock>
             {isEditingUsername ? (
               <View className="gap-4">
                 <AppTextField
@@ -321,12 +334,6 @@ export default function SettingsScreen() {
                   <AppText className="mt-2 text-base font-semibold text-cove-ink">
                     {displayUsername}
                   </AppText>
-                  <AppText
-                    className="mt-2 text-xs leading-4"
-                    style={{ color: colors.muted, opacity: 0.62 }}
-                  >
-                    {t("usernameHint")}
-                  </AppText>
                   <FormMessage message={usernameSuccess} tone="success" />
                 </View>
                 <EditButton
@@ -341,17 +348,15 @@ export default function SettingsScreen() {
                 />
               </View>
             )}
-          </View>
+          </CardBlock>
 
-          <View className="rounded-3xl bg-cove-paper px-4 py-4">
+          <CardBlock>
             <Pressable
               onPress={() => setIsPasswordOpen((open) => !open)}
               className="flex-row items-center justify-between gap-3 active:opacity-80"
             >
               <View className="min-w-0 flex-1">
-                <AppText className="text-sm font-medium text-cove-muted">
-                  {t("password")}
-                </AppText>
+                <AppText className="text-sm font-medium text-cove-muted">{t("password")}</AppText>
                 <AppText className="mt-2 text-base font-semibold text-cove-ink">
                   {t("changePassword")}
                 </AppText>
@@ -402,26 +407,93 @@ export default function SettingsScreen() {
                 />
               </View>
             ) : null}
-          </View>
+          </CardBlock>
 
-          <FormMessage message={signOutError} />
-          <AppButton
-            label={t("logOut")}
-            variant="danger"
-            disabled={isSigningOut}
-            onPress={() => {
-              setSignOutError(null);
-              setIsConfirmingSignOut(true);
-            }}
-          />
-        </View>
+          <CardBlock>
+            <FormMessage message={signOutError} />
+            <AppButton
+              label={t("logOut")}
+              variant="danger"
+              disabled={isSigningOut}
+              onPress={() => {
+                setSignOutError(null);
+                setIsConfirmingSignOut(true);
+              }}
+            />
+          </CardBlock>
+        </SettingsCard>
+
+        <SettingsCard
+          icon="options-outline"
+          title={t("appSettings")}
+          summary={`${t("staplesTitle")} · ${t("listAlerts")}`}
+          open={openCard === "app"}
+          onToggle={() => toggleCard("app")}
+          colors={colors}
+        >
+          <CardBlock>
+            <Pressable
+              onPress={() => router.push("/staples")}
+              className="flex-row items-center justify-between gap-3 active:opacity-80"
+            >
+              <View className="min-w-0 flex-1">
+                <AppText className="text-base font-semibold text-cove-ink">
+                  {t("staplesTitle")}
+                </AppText>
+                <AppText className="mt-1 text-sm text-cove-muted">{t("staplesSubtitle")}</AppText>
+              </View>
+              <Ionicons name="chevron-forward" size={iconSize.sm} color={colors.muted} />
+            </Pressable>
+          </CardBlock>
+
+          <CardBlock>
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="min-w-0 flex-1">
+                <AppText className="text-base font-semibold text-cove-ink">
+                  {t("listAlerts")}
+                </AppText>
+                <AppText className="mt-2 text-sm text-cove-muted">
+                  {pushStatus === "unsupported"
+                    ? t("notificationsPhoneOnly")
+                    : pushStatus === "denied"
+                      ? t("notificationsDenied")
+                      : t("listAlertsBody")}
+                </AppText>
+                {pushStatus === "denied" ? (
+                  <Pressable
+                    onPress={() => void Linking.openSettings()}
+                    className="mt-3 self-start active:opacity-80"
+                  >
+                    <AppText className="text-sm font-semibold text-cove-accent">
+                      {t("openPhoneSettings")}
+                    </AppText>
+                  </Pressable>
+                ) : null}
+              </View>
+              {pushStatus === "unsupported" ? null : (
+                <Switch
+                  value={pushStatus !== "off"}
+                  disabled={isUpdatingPush}
+                  onValueChange={(enabled) => void onTogglePush(enabled)}
+                  trackColor={{ false: colors.mist, true: colors.accent }}
+                  thumbColor={colors.white}
+                />
+              )}
+            </View>
+          </CardBlock>
+        </SettingsCard>
 
         {household ? (
-          <View className="gap-3">
-            <SectionHeader title={t("costsSection")} />
-            <AppText className="-mt-1 mb-1 text-sm text-cove-muted">{t("costsSectionBody")}</AppText>
-
-            <View className="rounded-3xl bg-cove-paper px-4 py-4">
+          <SettingsCard
+            icon="cash-outline"
+            title={t("costsSection")}
+            summary={costsSummary}
+            open={openCard === "costs"}
+            onToggle={() => toggleCard("costs")}
+            colors={colors}
+          >
+            <CardBlock>
+              <AppText className="mb-3 text-sm text-cove-muted">{t("costsSectionBody")}</AppText>
               <View className="flex-row items-center justify-between gap-3">
                 <View className="min-w-0 flex-1">
                   <AppText className="text-base font-semibold text-cove-ink">
@@ -441,18 +513,18 @@ export default function SettingsScreen() {
                 <AppText className="mt-3 text-xs text-cove-muted">{t("costsHostOnly")}</AppText>
               ) : null}
               <FormMessage message={costError} />
-            </View>
+            </CardBlock>
 
             {household.costsEnabled ? (
               <>
-                <View className="rounded-3xl bg-cove-paper px-4 py-4">
+                <CardBlock>
                   <AppText className="text-sm font-medium text-cove-muted">
                     {t("currencyLabel")}
                   </AppText>
                   <Pressable
                     disabled={!isHost || isSavingCosts}
                     onPress={() => setIsChoosingCurrency((open) => !open)}
-                    className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3 active:opacity-80"
+                    className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-paper px-4 py-3 active:opacity-80"
                   >
                     <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
                       {t(
@@ -481,7 +553,7 @@ export default function SettingsScreen() {
                               }
                             }}
                             className={`rounded-2xl px-4 py-3 ${
-                              selected ? "bg-cove-accent" : "bg-cove-mist"
+                              selected ? "bg-cove-accent" : "bg-cove-paper"
                             }`}
                           >
                             <AppText
@@ -496,7 +568,7 @@ export default function SettingsScreen() {
                       })}
                     </View>
                   ) : null}
-                </View>
+                </CardBlock>
 
                 <CostAskToggle
                   title={t("askCostSingle")}
@@ -524,56 +596,33 @@ export default function SettingsScreen() {
                 />
               </>
             ) : null}
-          </View>
+          </SettingsCard>
         ) : null}
 
-        <View className="gap-3">
-          <SectionHeader title={t("appSettings")} />
+        <SettingsCard
+          icon="language-outline"
+          title={t("languageLabel")}
+          summary={languageLabel}
+          open={openCard === "language"}
+          onToggle={() => toggleCard("language")}
+          colors={colors}
+        >
+          <CardBlock>
+            <LanguagePicker />
+          </CardBlock>
+        </SettingsCard>
 
-          <View className="rounded-3xl bg-cove-paper px-4 py-4">
-            <View className="flex-row items-center justify-between gap-3">
-              <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
-                {t("listAlerts")}
-              </AppText>
-              {pushStatus === "unsupported" ? null : (
-                <Switch
-                  value={pushStatus !== "off"}
-                  disabled={isUpdatingPush}
-                  onValueChange={(enabled) => void onTogglePush(enabled)}
-                  trackColor={{ false: colors.mist, true: colors.accent }}
-                  thumbColor={colors.white}
-                />
-              )}
-            </View>
-            <AppText className="mt-2 text-sm text-cove-muted">
-              {pushStatus === "unsupported"
-                ? t("notificationsPhoneOnly")
-                : pushStatus === "denied"
-                  ? t("notificationsDenied")
-                  : t("listAlertsBody")}
-            </AppText>
-            {pushStatus === "denied" ? (
-              <Pressable onPress={() => void Linking.openSettings()} className="mt-3 active:opacity-80">
-                <AppText className="text-sm font-semibold text-cove-accent">
-                  {t("openPhoneSettings")}
-                </AppText>
-              </Pressable>
-            ) : null}
-          </View>
-
-          <Pressable
-            onPress={() => router.push("/staples")}
-            className="rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
-          >
-            <AppText className="text-base font-semibold text-cove-ink">{t("staplesTitle")}</AppText>
-            <AppText className="mt-1 text-sm text-cove-muted">{t("staplesSubtitle")}</AppText>
-          </Pressable>
-
-          <View className="rounded-3xl bg-cove-paper px-4 py-4">
-            <AppText className="text-sm font-medium text-cove-muted">
-              {t("appearance")}
-            </AppText>
-            <View className="mt-3 flex-row gap-2">
+        <SettingsCard
+          icon="color-palette-outline"
+          title={t("appearance")}
+          summary={`${scheme === "dark" ? t("dark") : t("light")} · ${t("textSize")}`}
+          open={openCard === "appearance"}
+          onToggle={() => toggleCard("appearance")}
+          colors={colors}
+        >
+          <CardBlock>
+            <AppText className="mb-3 text-sm font-medium text-cove-muted">{t("theme")}</AppText>
+            <View className="flex-row gap-2">
               {themes.map((option) => {
                 const selected = scheme === option.id;
                 return (
@@ -581,7 +630,7 @@ export default function SettingsScreen() {
                     key={option.id}
                     onPress={() => setScheme(option.id)}
                     className={`flex-1 items-center rounded-2xl px-4 py-3 ${
-                      selected ? "bg-cove-accent" : "bg-cove-mist"
+                      selected ? "bg-cove-accent" : "bg-cove-paper"
                     }`}
                   >
                     <AppText
@@ -595,24 +644,18 @@ export default function SettingsScreen() {
                 );
               })}
             </View>
-          </View>
+            <View className="mt-5">
+              <ThemeColorPicker />
+            </View>
+          </CardBlock>
 
-          <View className="rounded-3xl bg-cove-paper px-4 py-3">
+          <CardBlock>
             <AppText className="mb-2 text-sm font-medium text-cove-muted">
               {t("textSize")}
             </AppText>
             <FontSizeBar />
-          </View>
-
-          <View className="rounded-3xl bg-cove-paper px-4 py-4">
-            <AppText className="text-sm font-medium text-cove-muted">
-              {t("languageLabel")}
-            </AppText>
-            <View className="mt-3">
-              <LanguagePicker />
-            </View>
-          </View>
-        </View>
+          </CardBlock>
+        </SettingsCard>
       </View>
 
       <ConfirmModal
@@ -635,6 +678,58 @@ export default function SettingsScreen() {
   );
 }
 
+function SettingsCard({
+  icon,
+  title,
+  summary,
+  open,
+  onToggle,
+  colors,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  summary: string;
+  open: boolean;
+  onToggle: () => void;
+  colors: { mist: string; accent: string; ink: string; muted: string };
+  children: ReactNode;
+}) {
+  return (
+    <View className="overflow-hidden rounded-3xl bg-cove-paper">
+      <Pressable
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        className="flex-row items-center gap-3 px-4 py-4 active:opacity-80"
+      >
+        <View
+          className="h-11 w-11 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: colors.mist }}
+        >
+          <Ionicons name={icon} size={22} color={colors.accent} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <AppText className="text-base font-semibold text-cove-ink">{title}</AppText>
+          <AppText className="mt-1 text-sm text-cove-muted" numberOfLines={1}>
+            {summary}
+          </AppText>
+        </View>
+        <Ionicons
+          name={open ? "chevron-up" : "chevron-down"}
+          size={iconSize.sm}
+          color={colors.ink}
+        />
+      </Pressable>
+      {open ? <View className="gap-2.5 px-3 pb-3">{children}</View> : null}
+    </View>
+  );
+}
+
+function CardBlock({ children }: { children: ReactNode }) {
+  return <View className="rounded-2xl bg-cove-soft px-3.5 py-3.5">{children}</View>;
+}
+
 function CostAskToggle({
   title,
   body,
@@ -651,7 +746,7 @@ function CostAskToggle({
   colors: { mist: string; accent: string; white: string };
 }) {
   return (
-    <View className="rounded-3xl bg-cove-paper px-4 py-4">
+    <CardBlock>
       <View className="flex-row items-center justify-between gap-3">
         <View className="min-w-0 flex-1">
           <AppText className="text-base font-semibold text-cove-ink">{title}</AppText>
@@ -665,6 +760,6 @@ function CostAskToggle({
           thumbColor={colors.white}
         />
       </View>
-    </View>
+    </CardBlock>
   );
 }

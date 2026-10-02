@@ -1,7 +1,8 @@
 import "@/lib/session-storage";
-import type { ThemeScheme } from "@/constants/theme";
+import { DEFAULT_ACCENT, normalizeHex, type ThemeScheme } from "@/constants/theme";
 
 const THEME_STORAGE_KEY = "one-more-thing.theme";
+const THEME_ACCENT_STORAGE_KEY = "one-more-thing.theme-accent";
 
 function storage() {
   try {
@@ -30,5 +31,23 @@ export function writeStoredTheme(scheme: ThemeScheme) {
     storage()?.setItem(THEME_STORAGE_KEY, scheme);
   } catch {
     // Keep the active in-memory theme when persistence is unavailable.
+  }
+}
+
+export function readStoredAccent(): string {
+  try {
+    const value = storage()?.getItem(THEME_ACCENT_STORAGE_KEY);
+    return normalizeHex(value) ?? DEFAULT_ACCENT;
+  } catch {
+    return DEFAULT_ACCENT;
+  }
+}
+
+export function writeStoredAccent(accent: string) {
+  try {
+    const next = normalizeHex(accent) ?? DEFAULT_ACCENT;
+    storage()?.setItem(THEME_ACCENT_STORAGE_KEY, next);
+  } catch {
+    // Keep the active in-memory accent when persistence is unavailable.
   }
 }

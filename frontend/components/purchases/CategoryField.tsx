@@ -50,7 +50,7 @@ export function CategoryField({ value, onChange, glass = false }: CategoryFieldP
             className={`h-10 flex-row items-center justify-between rounded-2xl border px-3 active:opacity-80 ${
               glass ? "" : "border-cove-line bg-cove-paper"
             }`}
-            style={glass ? glassFieldStyle(scheme) : undefined}
+            style={glass ? glassFieldStyle(scheme, colors) : undefined}
           >
             <AppText className="text-sm font-medium text-cove-ink">
               {selectedLabel}

@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { PanResponder, Text, View } from "react-native";
 import { appFont, type FontScaleLevel } from "@/constants/font";
+import { withAlpha } from "@/constants/theme";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -17,8 +18,8 @@ export function FontSizeBar() {
   const levelRef = useRef(level);
   levelRef.current = level;
   const index = LEVELS.indexOf(level);
-  const groove = scheme === "dark" ? "rgba(227,242,253,0.16)" : colors.mist;
-  const tick = scheme === "dark" ? "rgba(227,242,253,0.55)" : colors.line;
+  const groove = scheme === "dark" ? withAlpha(colors.ink, 0.16) : colors.mist;
+  const tick = scheme === "dark" ? withAlpha(colors.ink, 0.55) : colors.line;
   const labels = {
     small: t("textSizeSmall"),
     medium: t("textSizeMedium"),

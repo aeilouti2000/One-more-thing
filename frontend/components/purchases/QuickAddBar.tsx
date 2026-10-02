@@ -23,6 +23,7 @@ import { FrostedFill } from "@/components/ui/BlurBackdrop";
 import { scaleFontSize } from "@/constants/font";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
+import { withAlpha } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
 type QuickAddBarProps = {
@@ -181,7 +182,7 @@ export function QuickAddBar({
             style={{
               backgroundColor:
                 scheme === "dark" && !addEnabled
-                  ? "rgba(66, 165, 245, 0.45)"
+                  ? withAlpha(colors.accent, 0.45)
                   : colors.accent,
             }}
           >

@@ -16,7 +16,7 @@ import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { getCategoryLabel } from "@/constants/categories";
 import { scaleFontSize, singleLineInput } from "@/constants/font";
-import { floatedCardStyle } from "@/constants/theme";
+import { floatedCardStyle, withAlpha } from "@/constants/theme";
 import { useCategories } from "@/providers/CategoriesProvider";
 import { useHousehold } from "@/hooks/useHousehold";
 import { addItem, fetchHomeItems, updateItemDetails } from "@/lib/items";
@@ -228,8 +228,8 @@ function StaplesBody() {
             borderRadius: 28,
             borderWidth: 1,
             overflow: "hidden",
-            borderColor: dark ? "rgba(144, 202, 249, 0.34)" : "rgba(33, 150, 243, 0.34)",
-            backgroundColor: dark ? "rgba(12, 36, 72, 0.55)" : "rgba(187, 222, 251, 0.72)",
+            borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
+            backgroundColor: withAlpha(dark ? colors.deep : colors.mist, dark ? 0.55 : 0.72),
             shadowColor: shadow.color,
             shadowOffset: shadow.offset,
             shadowOpacity: dark ? 0.42 : 0.16,
@@ -321,7 +321,7 @@ function StaplesBody() {
                 key={staple.id}
                 className="rounded-3xl bg-cove-paper px-4 py-4"
                 style={{
-                  shadowColor: scheme === "dark" ? "#000000" : "#0D47A1",
+                  shadowColor: scheme === "dark" ? "#000000" : colors.ink,
                   shadowOpacity: scheme === "dark" ? 0.28 : 0.08,
                   shadowRadius: 10,
                   shadowOffset: { width: 0, height: 4 },
@@ -333,7 +333,7 @@ function StaplesBody() {
                     className="mt-0.5 h-10 w-10 items-center justify-center rounded-2xl"
                     style={{
                       backgroundColor:
-                        scheme === "dark" ? "rgba(66, 165, 245, 0.22)" : colors.mist,
+                        scheme === "dark" ? withAlpha(colors.accent, 0.22) : colors.mist,
                     }}
                   >
                     <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
@@ -371,11 +371,12 @@ function StaplesBody() {
                       busy ? "opacity-45" : "active:opacity-80"
                     }`}
                     style={{
-                      backgroundColor:
-                        scheme === "dark" ? "rgba(66, 165, 245, 0.18)" : "rgba(33, 150, 243, 0.12)",
+                      backgroundColor: withAlpha(colors.accent, scheme === "dark" ? 0.18 : 0.12),
                       borderWidth: 1,
-                      borderColor:
-                        scheme === "dark" ? "rgba(144, 202, 249, 0.4)" : "rgba(33, 150, 243, 0.28)",
+                      borderColor: withAlpha(
+                        scheme === "dark" ? colors.muted : colors.accent,
+                        scheme === "dark" ? 0.4 : 0.28,
+                      ),
                     }}
                   >
                     {isAddingThis ? (
@@ -440,7 +441,7 @@ function StaplesBody() {
           <BlurBackdrop onPress={closeForm} disabled={isSaving} />
           <View
             className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
-            style={floatedCardStyle(scheme)}
+            style={floatedCardStyle(scheme, colors)}
           >
             <GlassFill soft />
             <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">
@@ -553,9 +554,7 @@ function MetaChip({ label, accent = false }: { label: string; accent?: boolean }
       className="rounded-full px-2.5 py-1"
       style={{
         backgroundColor: accent
-          ? scheme === "dark"
-            ? "rgba(66, 165, 245, 0.22)"
-            : "rgba(33, 150, 243, 0.14)"
+          ? withAlpha(colors.accent, scheme === "dark" ? 0.22 : 0.14)
           : scheme === "dark"
             ? colors.mist
             : colors.soft,

@@ -56,7 +56,7 @@ export function PurchaseRow({
         selected
           ? undefined
           : {
-              shadowColor: scheme === "dark" ? "#000000" : "#0D47A1",
+              shadowColor: scheme === "dark" ? "#000000" : colors.ink,
               shadowOpacity: scheme === "dark" ? 0.28 : 0.08,
               shadowRadius: 10,
               shadowOffset: { width: 0, height: 4 },

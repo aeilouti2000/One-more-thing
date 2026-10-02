@@ -2,6 +2,7 @@ import { BlurTargetView, BlurView } from "expo-blur";
 import { createContext, useContext, useRef, type ReactNode, type RefObject } from "react";
 import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useTabBlurTarget } from "@/components/ui/TabBlurTarget";
+import { withAlpha } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
 const BlurTargetContext = createContext<RefObject<View | null> | null>(null);
@@ -55,13 +56,7 @@ function SolidFrost({
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor: soft
-              ? dark
-                ? "rgba(66, 165, 245, 0.12)"
-                : "rgba(33, 150, 243, 0.08)"
-              : dark
-                ? "rgba(66, 165, 245, 0.16)"
-                : "rgba(33, 150, 243, 0.1)",
+            backgroundColor: withAlpha(colors.accent, soft ? (dark ? 0.12 : 0.08) : dark ? 0.16 : 0.1),
           },
         ]}
       />
@@ -110,7 +105,7 @@ export function GlassFill({
   soft?: boolean;
   screenBlur?: boolean;
 }) {
-  const { scheme } = useTheme();
+  const { colors, scheme } = useTheme();
   const screenTarget = useTabBlurTarget();
   const dark = scheme === "dark";
   // Only the tab bar may blur the screen. Cards sit inside that screen, and
@@ -153,13 +148,10 @@ export function GlassFill({
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor: soft
-              ? dark
-                ? "rgba(36, 120, 210, 0.06)"
-                : "rgba(33, 150, 243, 0.08)"
-              : dark
-                ? "rgba(36, 120, 210, 0.22)"
-                : "rgba(33, 150, 243, 0.24)",
+            backgroundColor: withAlpha(
+              colors.accent,
+              soft ? (dark ? 0.06 : 0.08) : dark ? 0.22 : 0.24,
+            ),
           },
         ]}
       />

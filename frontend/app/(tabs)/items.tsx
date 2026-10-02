@@ -26,7 +26,7 @@ import { formatNeededShare, shareNeededText } from "@/lib/share-list";
 import { createStaple, fetchStaples } from "@/lib/staples";
 import { scaleFontSize, singleLineInput } from "@/constants/font";
 import { useFontScale } from "@/providers/FontScaleProvider";
-import { iconSize, floatedCardStyle, tabBar } from "@/constants/theme";
+import { iconSize, floatedCardStyle, tabBar, withAlpha } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -652,7 +652,9 @@ export default function ItemsScreen() {
                   StyleSheet.absoluteFill,
                   {
                     backgroundColor:
-                      scheme === "dark" ? "rgba(66, 165, 245, 0.35)" : "rgba(255, 255, 255, 0.45)",
+                      scheme === "dark"
+                        ? withAlpha(colors.accent, 0.35)
+                        : withAlpha(colors.white, 0.45),
                   },
                 ]}
               />
@@ -856,7 +858,7 @@ export default function ItemsScreen() {
           <BlurBackdrop onPress={closeListForm} disabled={isSavingList} />
           <View
             className="w-full max-w-md gap-4 overflow-hidden rounded-3xl p-5"
-            style={floatedCardStyle(scheme)}
+            style={floatedCardStyle(scheme, colors)}
           >
             <GlassFill soft />
             <AppText className="text-xl font-semibold text-cove-ink">
@@ -925,9 +927,7 @@ export default function ItemsScreen() {
                     className="mb-1 flex-row items-center rounded-2xl px-2"
                     style={{
                       backgroundColor: selected
-                        ? scheme === "dark"
-                          ? "rgba(66, 165, 245, 0.28)"
-                          : "rgba(33, 150, 243, 0.16)"
+                        ? withAlpha(colors.accent, scheme === "dark" ? 0.28 : 0.16)
                         : "transparent",
                     }}
                   >
@@ -1063,8 +1063,8 @@ function SelectionBar({
         style={[
           selectionStyles.shell,
           {
-            borderColor: dark ? "rgba(144, 202, 249, 0.34)" : "rgba(33, 150, 243, 0.34)",
-            backgroundColor: dark ? "rgba(12, 36, 72, 0.55)" : "rgba(187, 222, 251, 0.72)",
+            borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
+            backgroundColor: withAlpha(dark ? colors.deep : colors.mist, dark ? 0.55 : 0.72),
           },
         ]}
       >

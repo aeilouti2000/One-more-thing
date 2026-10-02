@@ -3,7 +3,7 @@ import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { appFont, scaleFontSize, singleLineInput } from "@/constants/font";
-import { glassFieldStyle } from "@/constants/theme";
+import { glassFieldStyle, withAlpha } from "@/constants/theme";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { preserveSpaces } from "@/constants/text";
 
@@ -73,7 +73,9 @@ export function AppTextField({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={glass && scheme === "dark" ? "rgba(144, 202, 249, 0.62)" : colors.line}
+        placeholderTextColor={
+          glass && scheme === "dark" ? withAlpha(colors.muted, 0.62) : colors.line
+        }
         multiline={multiline}
         scrollEnabled={multiline}
         secureTextEntry={secureTextEntry}
@@ -97,7 +99,7 @@ export function AppTextField({
                 maxHeight: multilineMaxHeight,
               }
             : { ...singleLineInput, fontSize: inputSize },
-          glass ? glassFieldStyle(scheme) : null,
+          glass ? glassFieldStyle(scheme, colors) : null,
           error ? { borderColor: colors.ink } : null,
         ]}
         className={`rounded-2xl border text-cove-ink ${
