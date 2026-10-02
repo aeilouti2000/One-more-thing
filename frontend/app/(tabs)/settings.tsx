@@ -13,7 +13,7 @@ import { LanguagePicker } from "@/components/ui/LanguagePicker";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { iconSize, type ThemeScheme } from "@/constants/theme";
+import { headerIconFrameStyle, iconSize, type ThemeScheme } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import {
   canUsePush,
@@ -187,8 +187,8 @@ export default function SettingsScreen() {
         subtitle={t("settingsSubtitle")}
         icon={
           <View
-            className="items-center justify-center bg-white/20"
-            style={{ width: 56, height: 56, borderRadius: 28 }}
+            className="items-center justify-center"
+            style={headerIconFrameStyle(scheme)}
           >
             <Ionicons name="settings-outline" size={34} color="#FFFFFF" />
           </View>

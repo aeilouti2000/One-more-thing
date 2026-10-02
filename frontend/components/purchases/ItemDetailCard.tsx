@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { CategoryField } from "@/components/purchases/CategoryField";
 import { StatusBadge, UrgentBadge } from "@/components/purchases/StatusBadge";
@@ -9,6 +10,7 @@ import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { FormSheetModal, useFormSheet } from "@/components/ui/FormSheetModal";
+import { floatedCardStyle } from "@/constants/theme";
 import { useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
@@ -38,6 +40,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingOpen, setEditingOpen] = useState(false);
   const editable = purchase?.status === "needed";
 
   function fill(item: Purchase) {
@@ -50,6 +53,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
     setPinnedStapleId(null);
     setQuantityError(undefined);
     setError(null);
+    setEditingOpen(false);
   }
 
   async function loadPin(item: Purchase) {
@@ -162,6 +166,8 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
           quantityError={quantityError}
           error={error}
           isSubmitting={isSubmitting}
+          editingOpen={editingOpen}
+          onToggleEditing={() => setEditingOpen((open) => !open)}
           onChangeName={setName}
           onChangeQuantity={(value) => {
             setQuantity(value);
@@ -190,6 +196,8 @@ function EditItemForm({
   quantityError,
   error,
   isSubmitting,
+  editingOpen,
+  onToggleEditing,
   onChangeName,
   onChangeQuantity,
   onChangeNotes,
@@ -209,6 +217,8 @@ function EditItemForm({
   quantityError?: string;
   error: string | null;
   isSubmitting: boolean;
+  editingOpen: boolean;
+  onToggleEditing: () => void;
   onChangeName: (value: string) => void;
   onChangeQuantity: (value: string) => void;
   onChangeNotes: (value: string) => void;
@@ -221,14 +231,32 @@ function EditItemForm({
   const { t, locale } = useI18n();
   const { colors, scheme } = useTheme();
   const formSheet = useFormSheet();
+  const categoryLabel = useCategoryLabel(category);
+  const quantityLabel = purchase?.unit
+    ? `${quantity} ${purchase.unit}`
+    : quantity;
+
+  useEffect(() => {
+    if (editingOpen) {
+      formSheet?.scrollToEnd();
+    }
+  }, [editingOpen, formSheet]);
 
   return (
-    <View className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8">
+    <View
+      className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
+      style={floatedCardStyle(scheme)}
+    >
       <GlassFill soft />
-      <View className="mb-6 flex-row items-start justify-between gap-4">
-        <AppText className="shrink-0 text-lg font-semibold text-cove-ink">{t("editItem")}</AppText>
+      <View className="mb-5 flex-row items-start justify-between gap-4">
+        <AppText
+          className="min-w-0 flex-1 text-lg font-semibold text-cove-ink"
+          numberOfLines={2}
+        >
+          {name.trim() || purchase?.name || t("item")}
+        </AppText>
         {purchase ? (
-          <View className="min-w-0 flex-1 items-end">
+          <View className="shrink-0 items-end">
             <AppText
               numberOfLines={1}
               className="text-xs"
@@ -250,100 +278,160 @@ function EditItemForm({
           </View>
         ) : null}
       </View>
+
       {purchase ? (
         <View className="gap-4">
-          <View className="flex-row items-stretch gap-3">
-            <View className="min-w-0 flex-1">
-              <AppTextField
-                compact
-                glass
-                label={t("itemNameLabel")}
-                value={name}
-                onChangeText={onChangeName}
-                placeholder={t("itemNamePlaceholder")}
-                userText
-                onFocus={() => formSheet?.scrollToStart()}
-              />
-            </View>
-            <View className="w-20">
-              <AppTextField
-                compact
-                glass
-                label={t("quantity")}
-                value={quantity}
-                onChangeText={onChangeQuantity}
-                placeholder="1"
-                keyboardType="decimal-pad"
-                error={quantityError}
-                onFocus={() => formSheet?.scrollToStart()}
-              />
-            </View>
-          </View>
-          <CategoryField glass value={category} onChange={onChangeCategory} />
-          <View className="flex-row flex-wrap gap-4">
-            <UrgentToggle compact value={urgent} onValueChange={onChangeUrgent} />
-            <UrgentToggle
-              compact
-              label={t("pinSelected")}
-              value={pinned}
-              onValueChange={onChangePinned}
-            />
-          </View>
-          <AppTextField
-            compact
-            glass
-            label={t("notes")}
-            value={notes}
-            onChangeText={onChangeNotes}
-            placeholder={t("notesPlaceholder")}
-            multiline
-            userText
-            onFocus={() => formSheet?.scrollToEnd()}
-          />
-          <FormMessage message={error} />
-          <View className="mt-6 flex-row items-stretch gap-3">
-            <Pressable
-              disabled={isSubmitting || !name.trim()}
-              onPress={onSubmit}
-              accessibilityRole="button"
-              className={`h-12 min-w-0 flex-1 items-center justify-center rounded-2xl bg-cove-accent px-3 ${
-                isSubmitting || !name.trim() ? "opacity-50" : "active:opacity-80"
-              }`}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <AppText
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                  className="text-sm font-semibold text-white"
-                >
-                  {t("saveChanges")}
+          {!editingOpen ? (
+            <View className="gap-3">
+              <View className="flex-row flex-wrap items-center gap-2">
+                {urgent ? <UrgentBadge /> : null}
+                <SummaryChip label={`${t("quantity")}: ${quantityLabel}`} />
+                <SummaryChip label={categoryLabel} />
+                {pinned ? <SummaryChip label={t("pinSelected")} /> : null}
+              </View>
+              {notes.trim() ? (
+                <AppText className="text-sm text-cove-muted" numberOfLines={3}>
+                  {notes}
                 </AppText>
-              )}
-            </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View
+            className="overflow-hidden rounded-2xl"
+            style={{
+              backgroundColor:
+                scheme === "dark" ? "rgba(144, 202, 249, 0.18)" : "rgba(33, 150, 243, 0.12)",
+              borderWidth: 1,
+              borderColor:
+                scheme === "dark" ? "rgba(144, 202, 249, 0.45)" : "rgba(33, 150, 243, 0.32)",
+            }}
+          >
             <Pressable
-              disabled={isSubmitting}
-              onPress={onMarkBought}
+              onPress={onToggleEditing}
               accessibilityRole="button"
-              className={`h-12 min-w-0 flex-1 items-center justify-center rounded-2xl px-3 ${
-                isSubmitting ? "opacity-50" : "active:opacity-80"
-              }`}
-              style={{ backgroundColor: colors.mist }}
+              accessibilityState={{ expanded: editingOpen }}
+              className="flex-row items-center justify-between px-4 py-3 active:opacity-80"
             >
-              <AppText
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                className="text-sm font-semibold text-cove-accent"
-              >
-                {t("markBought")}
-              </AppText>
+              <AppText className="text-sm font-semibold text-cove-ink">{t("editItem")}</AppText>
+              <Ionicons
+                name={editingOpen ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={colors.muted}
+              />
             </Pressable>
+
+            {editingOpen ? (
+              <View
+                className="gap-4 border-t border-cove-line px-4 pb-4 pt-3"
+                style={{
+                  borderTopColor:
+                    scheme === "dark" ? "rgba(144, 202, 249, 0.28)" : "rgba(33, 150, 243, 0.2)",
+                }}
+              >
+                <View className="flex-row items-stretch gap-3">
+                  <View className="min-w-0 flex-1">
+                    <AppTextField
+                      compact
+                      glass
+                      label={t("itemNameLabel")}
+                      value={name}
+                      onChangeText={onChangeName}
+                      placeholder={t("itemNamePlaceholder")}
+                      userText
+                      onFocus={() => formSheet?.scrollToStart()}
+                    />
+                  </View>
+                  <View className="w-20">
+                    <AppTextField
+                      compact
+                      glass
+                      label={t("quantity")}
+                      value={quantity}
+                      onChangeText={onChangeQuantity}
+                      placeholder="1"
+                      keyboardType="decimal-pad"
+                      error={quantityError}
+                      onFocus={() => formSheet?.scrollToStart()}
+                    />
+                  </View>
+                </View>
+                <CategoryField glass value={category} onChange={onChangeCategory} />
+                <View className="flex-row flex-wrap gap-4">
+                  <UrgentToggle compact value={urgent} onValueChange={onChangeUrgent} />
+                  <UrgentToggle
+                    compact
+                    label={t("pinSelected")}
+                    value={pinned}
+                    onValueChange={onChangePinned}
+                  />
+                </View>
+                <AppTextField
+                  compact
+                  glass
+                  label={t("notes")}
+                  value={notes}
+                  onChangeText={onChangeNotes}
+                  placeholder={t("notesPlaceholder")}
+                  multiline
+                  userText
+                  onFocus={() => formSheet?.scrollToEnd()}
+                />
+                <Pressable
+                  disabled={isSubmitting || !name.trim()}
+                  onPress={onSubmit}
+                  accessibilityRole="button"
+                  className={`h-11 items-center justify-center rounded-2xl px-3 ${
+                    isSubmitting || !name.trim() ? "opacity-50" : "active:opacity-80"
+                  }`}
+                  style={{ backgroundColor: scheme === "dark" ? colors.mist : colors.paper }}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color={colors.accent} />
+                  ) : (
+                    <AppText className="text-sm font-semibold text-cove-accent">
+                      {t("saveChanges")}
+                    </AppText>
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
           </View>
+
+          <FormMessage message={error} />
+
+          <Pressable
+            disabled={isSubmitting}
+            onPress={onMarkBought}
+            accessibilityRole="button"
+            className={`mt-2 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-cove-accent px-3 ${
+              isSubmitting ? "opacity-50" : "active:opacity-80"
+            }`}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="cart-check" size={18} color={colors.white} />
+                <AppText className="text-sm font-semibold text-white">{t("markBought")}</AppText>
+              </>
+            )}
+          </Pressable>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function SummaryChip({ label }: { label: string }) {
+  const { colors, scheme } = useTheme();
+
+  return (
+    <View
+      className="rounded-full px-3 py-1"
+      style={{ backgroundColor: scheme === "dark" ? colors.mist : colors.soft }}
+    >
+      <AppText className="text-xs font-medium text-cove-ink">{label}</AppText>
     </View>
   );
 }
@@ -383,7 +471,10 @@ function HistoryItemCard({
   ].filter((fact): fact is { label: string; value: string } => fact !== null);
 
   return (
-    <View className="w-full max-w-md gap-6 overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8">
+    <View
+      className="w-full max-w-md gap-6 overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
+      style={floatedCardStyle(scheme)}
+    >
       <GlassFill soft />
       <View className="-mx-7 flex-row items-center gap-3 border-b border-cove-line px-7 pb-5">
         <AppText

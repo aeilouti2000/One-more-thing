@@ -8,9 +8,11 @@ import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { FormSheetModal, useFormSheet } from "@/components/ui/FormSheetModal";
+import { floatedCardStyle } from "@/constants/theme";
 import { usePurchases } from "@/hooks/usePurchases";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useTheme } from "@/providers/ThemeProvider";
 import type { PurchaseCategory } from "@/types/purchase";
 
 type AddItemCardProps = {
@@ -157,10 +159,14 @@ function AddItemForm({
   onCancel: () => void;
 }) {
   const { t } = useI18n();
+  const { scheme } = useTheme();
   const formSheet = useFormSheet();
 
   return (
-    <View className="w-full max-w-md overflow-hidden rounded-[28px] border border-cove-line px-7 pb-5 pt-8">
+    <View
+      className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
+      style={floatedCardStyle(scheme)}
+    >
       <GlassFill soft />
       <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">
         <AppText className="text-lg font-semibold text-cove-ink">{t("addItem")}</AppText>

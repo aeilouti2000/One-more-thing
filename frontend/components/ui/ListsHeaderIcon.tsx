@@ -1,5 +1,6 @@
 import { Image } from "expo-image";
 import { View } from "react-native";
+import { headerIconFrameStyle } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
 const lightIcon = require("../../assets/images/lists-header-light.png");
@@ -10,8 +11,8 @@ export function ListsHeaderIcon() {
 
   return (
     <View
-      className="items-center justify-center bg-white/20"
-      style={{ width: 56, height: 56, borderRadius: 28 }}
+      className="items-center justify-center"
+      style={headerIconFrameStyle(scheme)}
     >
       <Image
         source={scheme === "dark" ? darkIcon : lightIcon}

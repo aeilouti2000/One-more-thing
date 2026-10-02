@@ -3,7 +3,7 @@ import { ActivityIndicator, Modal, Pressable, View } from "react-native";
 import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { iconSize } from "@/constants/theme";
+import { floatedCardStyle, iconSize } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -32,7 +32,7 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
   const danger = "#F87171";
   const dangerSoft = "rgba(248, 113, 113, 0.18)";
@@ -50,7 +50,10 @@ export function ConfirmModal({
       <View className="flex-1 items-center justify-center px-6">
         <BlurBackdrop onPress={onCancel} disabled={loading} />
 
-        <View className="w-full max-w-md gap-4 overflow-hidden rounded-3xl border border-cove-line p-5">
+        <View
+          className="w-full max-w-md gap-4 overflow-hidden rounded-3xl p-5"
+          style={floatedCardStyle(scheme)}
+        >
           <GlassFill />
           <View className="flex-row items-center gap-3">
             <View

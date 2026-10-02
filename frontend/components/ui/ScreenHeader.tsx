@@ -36,7 +36,7 @@ export function ScreenHeader({
   return (
     <View
       className={`overflow-hidden rounded-b-3xl px-5 ${
-        compact ? "mb-3 pb-4 pt-4" : "mb-6 pb-7 pt-5"
+        compact ? "pb-4 pt-4" : "mb-6 pb-7 pt-5"
       } ${scheme === "dark" ? "bg-cove-deep" : "bg-cove-accent"}`}
       style={
         flush

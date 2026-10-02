@@ -68,7 +68,7 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
           onPress={() => void shareCode()}
           accessibilityRole="button"
           accessibilityLabel={t("shareInvite")}
-          className="h-11 w-11 items-center justify-center rounded-2xl bg-white/25 active:opacity-80"
+          className="h-11 w-11 items-center justify-center active:opacity-80"
         >
           <Ionicons name="share-social" size={20} color="#FFFFFF" />
         </Pressable>

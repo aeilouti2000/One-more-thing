@@ -7,6 +7,7 @@ import { CategoryFilter } from "@/components/purchases/CategoryFilter";
 import { AddItemCard } from "@/components/purchases/AddItemCard";
 import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
+import { QuickAddBar } from "@/components/purchases/QuickAddBar";
 import { ReorderableList } from "@/components/purchases/ReorderableList";
 import { AppText } from "@/components/ui/AppText";
 import { BlurBackdrop, FrostedBlur, FrostedFill, GlassFill } from "@/components/ui/BlurBackdrop";
@@ -16,7 +17,7 @@ import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { ListsHeaderIcon } from "@/components/ui/ListsHeaderIcon";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
-import { Screen } from "@/components/ui/Screen";
+import { Screen, SwipeSlideContent } from "@/components/ui/Screen";
 import { useTabBarVisibility } from "@/components/ui/TabBarVisibility";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { createList, deleteList, fetchLists, listLabel, renameList, type HomeList } from "@/lib/lists";
@@ -24,7 +25,7 @@ import { formatNeededShare, shareNeededText } from "@/lib/share-list";
 import { createStaple, fetchStaples } from "@/lib/staples";
 import { scaleFontSize, singleLineInput } from "@/constants/font";
 import { useFontScale } from "@/providers/FontScaleProvider";
-import { iconSize } from "@/constants/theme";
+import { iconSize, floatedCardStyle, tabBar } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -94,6 +95,9 @@ export default function ItemsScreen() {
       ? listItems
       : listItems.filter((item) => item.category === category);
   const isSelecting = selectedIds.size > 0;
+  const selectedItems = needed.filter((item) => selectedIds.has(item.id));
+  const allSelectedUrgent =
+    selectedItems.length > 0 && selectedItems.every((item) => item.urgent);
 
   async function loadLists(homeId: string) {
     const result = await fetchLists(homeId);
@@ -237,21 +241,15 @@ export default function ItemsScreen() {
 
     const selected = needed.filter((item) => selectedIds.has(item.id));
     const toMark = selected.filter((item) => !item.urgent);
-    if (toMark.length === 0) {
-      setBusyAction(null);
-      setFloatTone("error");
-      setFloatMessage(
-        selected.length === 1 ? t("alreadyUrgentOne") : t("alreadyUrgent"),
-      );
-      return;
-    }
+    const nextUrgent = toMark.length > 0;
+    const targets = nextUrgent ? toMark : selected;
 
-    for (const item of toMark) {
+    for (const item of targets) {
       const result = await updateItem(item.id, {
         name: item.name,
         quantity: item.quantity,
         category: item.category,
-        urgent: true,
+        urgent: nextUrgent,
         notes: item.notes,
       });
       if (result.error) {
@@ -463,6 +461,33 @@ export default function ItemsScreen() {
 
   const currentList = lists.find((list) => list.id === selectedListId) ?? null;
 
+  const canSwipeList = useCallback(
+    (direction: "next" | "previous") => {
+      if (isSelecting || isDragging || lists.length < 2) return false;
+      const index = lists.findIndex((list) => list.id === selectedListId);
+      if (index < 0) return false;
+      const step = direction === "next" ? (isRTL ? -1 : 1) : isRTL ? 1 : -1;
+      return Boolean(lists[index + step]);
+    },
+    [isDragging, isRTL, isSelecting, lists, selectedListId],
+  );
+
+  const onSwipeList = useCallback(
+    (direction: "next" | "previous") => {
+      if (isSelecting || isDragging || lists.length < 2) return;
+      const index = lists.findIndex((list) => list.id === selectedListId);
+      const step = direction === "next" ? (isRTL ? -1 : 1) : isRTL ? 1 : -1;
+      const next = lists[index + step];
+      if (!next) return;
+      setSelectedListId(next.id);
+      setCategory("all");
+      setSelectedIds(new Set());
+      setIsConfirmingDelete(false);
+      void Haptics.selectionAsync();
+    },
+    [isDragging, isRTL, isSelecting, lists, selectedListId],
+  );
+
   function listActions() {
     if (isSelecting) return null;
 
@@ -474,7 +499,7 @@ export default function ItemsScreen() {
           onPress={() => router.push("/trip")}
           icon={
             <View className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-accent">
-              <Ionicons name="storefront" size={18} color={colors.white} />
+              <MaterialCommunityIcons name="cart-check" size={18} color={colors.white} />
             </View>
           }
         />
@@ -559,21 +584,6 @@ export default function ItemsScreen() {
         isSelecting ? t("selectedCount", { count: selectedIds.size }) : undefined
       }
       subtitle={isSelecting ? t("selectMoreItems") : undefined}
-      footer={
-        isSelecting ? (
-          <SelectionBar
-            busyAction={busyAction}
-            disabled={isApplyingAction}
-            onBought={() => void markSelectionBought()}
-            onPin={() => void pinSelection()}
-            onUrgent={() => void markSelectionUrgent()}
-            onDelete={() => {
-              setActionError(null);
-              setIsConfirmingDelete(true);
-            }}
-          />
-        ) : undefined
-      }
       right={
         isSelecting ? (
           <Pressable
@@ -649,18 +659,24 @@ export default function ItemsScreen() {
         ) : null
       }
       top={isSelecting ? header : null}
-      onSwipe={(direction) => {
-        if (isSelecting || isDragging || lists.length < 2) return;
-        const index = lists.findIndex((list) => list.id === selectedListId);
-        const step = direction === "next" ? (isRTL ? -1 : 1) : isRTL ? 1 : -1;
-        const next = lists[index + step];
-        if (!next) return;
-        setSelectedListId(next.id);
-        setCategory("all");
-        setSelectedIds(new Set());
-        setIsConfirmingDelete(false);
-        void Haptics.selectionAsync();
-      }}
+      dock={
+        isSelecting ? (
+          <SelectionBar
+            busyAction={busyAction}
+            disabled={isApplyingAction}
+            clearUrgent={allSelectedUrgent}
+            onBought={() => void markSelectionBought()}
+            onPin={() => void pinSelection()}
+            onUrgent={() => void markSelectionUrgent()}
+            onDelete={() => {
+              setActionError(null);
+              setIsConfirmingDelete(true);
+            }}
+          />
+        ) : null
+      }
+      canSwipe={canSwipeList}
+      onSwipe={onSwipeList}
     >
       {isSelecting ? null : header}
 
@@ -673,92 +689,53 @@ export default function ItemsScreen() {
       {listActions()}
 
       {isSelecting ? null : (
-        <View className="mb-3 overflow-hidden rounded-3xl border border-cove-line">
-          <FrostedFill />
-          <View className="flex-row items-center gap-2 px-4 py-2">
-          <TextInput
-            value={quickName}
-            onChangeText={setQuickName}
-            placeholder={t("quickAddPlaceholder")}
-            placeholderTextColor={colors.muted}
-            onSubmitEditing={() => void quickAdd()}
-            returnKeyType="done"
-            editable={!isQuickAdding}
-            textAlign={isRTL ? "right" : "left"}
-            textAlignVertical="center"
-            allowFontScaling={false}
-            style={quickInputStyle}
-            className="h-11 min-w-0 flex-1 text-cove-ink"
-          />
-          <Pressable
-            onPress={() => setIsAddingDetails(true)}
-            accessibilityRole="button"
-            accessibilityLabel={t("addItemDetails")}
-            className="h-9 w-9 items-center justify-center rounded-full active:opacity-80"
-            style={{ backgroundColor: scheme === "dark" ? colors.paper : colors.mist }}
-          >
-            <Ionicons name="create-outline" size={18} color={colors.accent} />
-          </Pressable>
-          <Pressable
-            disabled={!quickName.trim() || isQuickAdding}
-            onPress={() => void quickAdd()}
-            accessibilityRole="button"
-            accessibilityLabel={t("addItem")}
-            className={`h-9 w-9 items-center justify-center rounded-full ${
-              !quickName.trim() || isQuickAdding ? "" : "active:opacity-80"
-            }`}
-            style={{
-              backgroundColor:
-                scheme === "dark" && (!quickName.trim() || isQuickAdding)
-                  ? "rgba(66, 165, 245, 0.45)"
-                  : colors.accent,
-            }}
-          >
-            {isQuickAdding ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Ionicons name="add" size={20} color="#FFFFFF" />
-            )}
-          </Pressable>
-          </View>
-        </View>
+        <QuickAddBar
+          value={quickName}
+          onChangeText={setQuickName}
+          onSubmit={() => void quickAdd()}
+          onOpenDetails={() => setIsAddingDetails(true)}
+          busy={isQuickAdding}
+          inputStyle={quickInputStyle}
+        />
       )}
 
       <FormMessage
         message={isConfirmingDelete ? error : actionError ?? error}
       />
 
-      {visibleItems.length === 0 ? (
-        <EmptyState
-          title={t("nothingToBuy")}
-          message={t("nothingToBuyBody")}
-        />
-      ) : (
-        <ReorderableList
-          items={visibleItems}
-          enabled={!isSelecting}
-          onDragChange={setIsDragging}
-          onItemLongPress={startSelection}
-          onReorder={(ids) => void reorderNeeded(ids)}
-          renderRow={(purchase, handle) => (
-            <PurchaseRow
-              purchase={purchase}
-              leading={isSelecting ? null : handle}
-              selected={selectedIds.has(purchase.id)}
-              onLongPress={() => startSelection(purchase.id)}
-              onPress={() =>
-                isSelecting ? toggleSelection(purchase.id) : setOpenItem(purchase)
-              }
-              quantityBusy={adjustingId === purchase.id}
-              onChangeQuantity={
-                isSelecting
-                  ? undefined
-                  : (quantity) => void changeQuantity(purchase.id, quantity)
-              }
-            />
-          )}
-        />
-      )}
+      <SwipeSlideContent>
+        {visibleItems.length === 0 ? (
+          <EmptyState
+            title={t("nothingToBuy")}
+            message={t("nothingToBuyBody")}
+          />
+        ) : (
+          <ReorderableList
+            items={visibleItems}
+            enabled={!isSelecting}
+            onDragChange={setIsDragging}
+            onItemLongPress={startSelection}
+            onReorder={(ids) => void reorderNeeded(ids)}
+            renderRow={(purchase, handle) => (
+              <PurchaseRow
+                purchase={purchase}
+                leading={isSelecting ? null : handle}
+                selected={selectedIds.has(purchase.id)}
+                onLongPress={() => startSelection(purchase.id)}
+                onPress={() =>
+                  isSelecting ? toggleSelection(purchase.id) : setOpenItem(purchase)
+                }
+                quantityBusy={adjustingId === purchase.id}
+                onChangeQuantity={
+                  isSelecting
+                    ? undefined
+                    : (quantity) => void changeQuantity(purchase.id, quantity)
+                }
+              />
+            )}
+          />
+        )}
+      </SwipeSlideContent>
 
       <ConfirmModal
         visible={isConfirmingDelete}
@@ -818,7 +795,10 @@ export default function ItemsScreen() {
       >
         <View className="flex-1 items-center justify-center px-6">
           <BlurBackdrop onPress={closeListForm} disabled={isSavingList} />
-          <View className="w-full max-w-md gap-4 overflow-hidden rounded-3xl border border-cove-line p-5">
+          <View
+            className="w-full max-w-md gap-4 overflow-hidden rounded-3xl p-5"
+            style={floatedCardStyle(scheme)}
+          >
             <GlassFill soft />
             <AppText className="text-xl font-semibold text-cove-ink">
               {editingListId ? t("editList") : t("newList")}
@@ -957,6 +937,7 @@ export default function ItemsScreen() {
 function SelectionBar({
   busyAction,
   disabled,
+  clearUrgent,
   onBought,
   onPin,
   onUrgent,
@@ -964,24 +945,24 @@ function SelectionBar({
 }: {
   busyAction: "pin" | "bought" | "delete" | "urgent" | null;
   disabled: boolean;
+  clearUrgent: boolean;
   onBought: () => void;
   onPin: () => void;
   onUrgent: () => void;
   onDelete: () => void;
 }) {
-  const { colors, scheme } = useTheme();
+  const { colors, scheme, shadow } = useTheme();
   const { t, isRTL } = useI18n();
   const dark = scheme === "dark";
   const danger = "#F87171";
-  const labelColor = "rgba(255,255,255,0.92)";
+  const actionColor = colors.ink;
 
   function actionButton(
     label: string,
     busy: boolean,
     onPress: () => void,
     icon: ReactNode,
-    spinnerColor: string,
-    textColor = labelColor,
+    color: string,
   ) {
     return (
       <Pressable
@@ -989,21 +970,17 @@ function SelectionBar({
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={label}
-        className={`min-h-[72px] min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-3xl border border-white/20 px-1 py-2 ${
-          disabled ? "opacity-50" : "active:opacity-80"
-        }`}
-        style={{ backgroundColor: dark ? "rgba(12, 36, 72, 0.45)" : "rgba(255,255,255,0.18)" }}
+        style={[selectionStyles.cell, { opacity: disabled ? 0.5 : 1 }]}
+        android_ripple={null}
       >
-        <GlassFill soft />
         {busy ? (
-          <ActivityIndicator color={spinnerColor} />
+          <ActivityIndicator color={color} />
         ) : (
           <>
-            {icon}
+            <View style={selectionStyles.iconSlot}>{icon}</View>
             <AppText
               numberOfLines={1}
-              className="text-center text-xs font-semibold leading-4"
-              style={{ color: textColor }}
+              style={[selectionStyles.label, { color }]}
             >
               {label}
             </AppText>
@@ -1014,42 +991,118 @@ function SelectionBar({
   }
 
   return (
-    <View className="flex-row items-center gap-2">
-      {actionButton(
-        t("markSelectedBought"),
-        busyAction === "bought",
-        onBought,
-        <MaterialCommunityIcons name="cart-check" size={22} color={colors.white} />,
-        colors.white,
-      )}
-      {actionButton(
-        t("pinSelected"),
-        busyAction === "pin",
-        onPin,
-        <View style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}>
-          <MaterialCommunityIcons name="pin" size={20} color={colors.white} />
-        </View>,
-        colors.white,
-      )}
-      {actionButton(
-        t("markSelectedUrgent"),
-        busyAction === "urgent",
-        onUrgent,
-        <Ionicons name="flash" size={20} color={danger} />,
-        danger,
-        danger,
-      )}
-      {actionButton(
-        t("delete"),
-        busyAction === "delete",
-        onDelete,
-        <Ionicons name="trash-outline" size={20} color={danger} />,
-        danger,
-        danger,
-      )}
+    <View
+      style={{
+        shadowColor: shadow.color,
+        shadowOffset: shadow.offset,
+        shadowOpacity: dark ? 0.42 : 0.16,
+        shadowRadius: 24,
+        elevation: shadow.elevation,
+      }}
+    >
+      <View
+        style={[
+          selectionStyles.shell,
+          {
+            borderColor: dark ? "rgba(144, 202, 249, 0.34)" : "rgba(33, 150, 243, 0.34)",
+            backgroundColor: dark ? "rgba(12, 36, 72, 0.55)" : "rgba(187, 222, 251, 0.72)",
+          },
+        ]}
+      >
+        <GlassFill soft screenBlur />
+        <View style={selectionStyles.row}>
+          {actionButton(
+            t("markSelectedBought"),
+            busyAction === "bought",
+            onBought,
+            <MaterialCommunityIcons name="cart-check" size={20} color={actionColor} />,
+            actionColor,
+          )}
+          {actionButton(
+            t("pinSelected"),
+            busyAction === "pin",
+            onPin,
+            <View style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}>
+              <MaterialCommunityIcons name="pin" size={18} color={actionColor} />
+            </View>,
+            actionColor,
+          )}
+          {actionButton(
+            clearUrgent ? t("clearSelectedUrgent") : t("markSelectedUrgent"),
+            busyAction === "urgent",
+            onUrgent,
+            clearUrgent ? (
+              <View style={selectionStyles.iconSlot}>
+                <Ionicons name="flash" size={18} color={danger} style={{ opacity: 0.45 }} />
+                <View
+                  pointerEvents="none"
+                  style={[selectionStyles.strike, { backgroundColor: danger }]}
+                />
+              </View>
+            ) : (
+              <Ionicons name="flash" size={18} color={danger} />
+            ),
+            danger,
+          )}
+          {actionButton(
+            t("delete"),
+            busyAction === "delete",
+            onDelete,
+            <Ionicons name="trash-outline" size={18} color={danger} />,
+            danger,
+          )}
+        </View>
+      </View>
     </View>
   );
 }
+
+const selectionStyles = StyleSheet.create({
+  shell: {
+    height: tabBar.height,
+    borderRadius: tabBar.radius,
+    borderWidth: tabBar.borderWidth,
+    overflow: "hidden",
+  },
+  row: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 6,
+    padding: 6,
+  },
+  cell: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  iconSlot: {
+    height: 22,
+    width: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  label: {
+    fontSize: tabBar.labelSize,
+    fontWeight: "600",
+    textAlign: "center",
+    lineHeight: tabBar.labelSize + 2,
+    width: "100%",
+  },
+  strike: {
+    position: "absolute",
+    width: 20,
+    height: 2.5,
+    borderRadius: 2,
+    transform: [{ rotate: "-38deg" }],
+  },
+});
 
 function ListAction({
   label,

@@ -115,6 +115,30 @@ function glassFieldStyle(scheme) {
   };
 }
 
+function floatedCardStyle(scheme) {
+  return {
+    borderWidth: 1,
+    borderColor:
+      scheme === "dark"
+        ? "rgba(144, 202, 249, 0.42)"
+        : "rgba(33, 150, 243, 0.28)",
+  };
+}
+
+function headerIconFrameStyle(scheme) {
+  return {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor:
+      scheme === "dark"
+        ? "rgba(144, 202, 249, 0.55)"
+        : "rgba(255, 255, 255, 0.55)",
+    backgroundColor: "rgba(255,255,255,0.2)",
+  };
+}
+
 function getCssVars(palette) {
   return {
     "--color-cove-ice": palette.ice,
@@ -150,6 +174,8 @@ module.exports = {
   getColors,
   getCssVars,
   glassFieldStyle,
+  floatedCardStyle,
+  headerIconFrameStyle,
   spacing,
   radius,
   fontSize,

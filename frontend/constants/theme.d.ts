@@ -27,6 +27,20 @@ export function glassFieldStyle(scheme: ThemeScheme): {
   borderColor: string;
 };
 
+export function floatedCardStyle(scheme: ThemeScheme): {
+  borderWidth: number;
+  borderColor: string;
+};
+
+export function headerIconFrameStyle(scheme: ThemeScheme): {
+  width: number;
+  height: number;
+  borderRadius: number;
+  borderWidth: number;
+  borderColor: string;
+  backgroundColor: string;
+};
+
 export const spacing: {
   xs: number;
   sm: number;

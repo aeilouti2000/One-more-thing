@@ -18,7 +18,7 @@ import { fetchLists, listLabel, type HomeList } from "@/lib/lists";
 import { canUndoBought } from "@/lib/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { iconSize } from "@/constants/theme";
+import { headerIconFrameStyle, iconSize } from "@/constants/theme";
 import type { Purchase } from "@/types/purchase";
 
 type HistoryRange = "all" | "today" | "week" | "month";
@@ -30,6 +30,7 @@ export default function HistoryScreen() {
   const { bought, isLoading, error, refresh, undoBought, addItem } = usePurchases();
   const { household } = useHousehold();
   const { t, locale, isRTL } = useI18n();
+  const { scheme } = useTheme();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
   const [undoId, setUndoId] = useState<string | null>(null);
@@ -176,8 +177,8 @@ export default function HistoryScreen() {
         subtitle={t("historySubtitle")}
         icon={
           <View
-            className="items-center justify-center bg-white/20"
-            style={{ width: 56, height: 56, borderRadius: 28 }}
+            className="items-center justify-center"
+            style={headerIconFrameStyle(scheme)}
           >
             <Ionicons name="time-outline" size={34} color="#FFFFFF" />
           </View>

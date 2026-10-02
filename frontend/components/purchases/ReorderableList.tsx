@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -31,7 +31,8 @@ export function ReorderableList({
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
 
-  useEffect(() => {
+  // Sync before paint so list switches don't flash the previous rows for a frame.
+  useLayoutEffect(() => {
     if (!dragging.current) setRows(items);
   }, [items]);
 

@@ -15,7 +15,7 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { iconSize } from "@/constants/theme";
+import { headerIconFrameStyle, iconSize } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
 import { joinHome, leaveHome, removeHomeMember, switchHome, updateHomeName } from "@/lib/homes";
 import { useAuth } from "@/providers/AuthProvider";
@@ -27,7 +27,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { household, homes, isLoading, error, refresh, adoptHome } = useHousehold();
   const { t } = useI18n();
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [familyName, setFamilyName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -185,8 +185,8 @@ export default function HomeScreen() {
         subtitle={t("homeSubtitle")}
         icon={
           <View
-            className="items-center justify-center bg-white/20"
-            style={{ width: 56, height: 56, borderRadius: 28 }}
+            className="items-center justify-center"
+            style={headerIconFrameStyle(scheme)}
           >
             <Ionicons name="home-outline" size={34} color="#FFFFFF" />
           </View>
