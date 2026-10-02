@@ -17,14 +17,18 @@ type AddItemCardProps = {
   visible: boolean;
   listId: string | null;
   initialCategory?: PurchaseCategory;
+  initialName?: string;
   onClose: () => void;
+  onSaved?: () => void;
 };
 
 export function AddItemCard({
   visible,
   listId,
   initialCategory = "vegetables",
+  initialName = "",
   onClose,
+  onSaved,
 }: AddItemCardProps) {
   const { addItem } = usePurchases();
   const { t } = useI18n();
@@ -37,8 +41,8 @@ export function AddItemCard({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function reset(nextCategory: PurchaseCategory) {
-    setName("");
+  function reset(nextCategory: PurchaseCategory, nextName = "") {
+    setName(nextName);
     setQuantity("1");
     setNotes("");
     setCategory(nextCategory);
@@ -82,6 +86,7 @@ export function AddItemCard({
       return;
     }
     reset(initialCategory);
+    onSaved?.();
     onClose();
   }
 
@@ -89,7 +94,7 @@ export function AddItemCard({
     <FormSheetModal
       visible={visible}
       onClose={close}
-      onShow={() => reset(initialCategory)}
+      onShow={() => reset(initialCategory, initialName.trim())}
     >
       <AddItemForm
         name={name}

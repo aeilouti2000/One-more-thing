@@ -56,7 +56,7 @@ export default function ItemsScreen() {
   const [isChoosingCategory, setIsChoosingCategory] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [busyAction, setBusyAction] = useState<"pin" | "bought" | "delete" | null>(null);
+  const [busyAction, setBusyAction] = useState<"pin" | "bought" | "delete" | "urgent" | null>(null);
   const isApplyingAction = busyAction !== null;
   const [actionError, setActionError] = useState<string | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -227,6 +227,41 @@ export default function ItemsScreen() {
       return;
     }
 
+    setSelectedIds(new Set());
+    setIsConfirmingDelete(false);
+  }
+
+  async function markSelectionUrgent() {
+    setBusyAction("urgent");
+    setActionError(null);
+
+    const selected = needed.filter((item) => selectedIds.has(item.id));
+    const toMark = selected.filter((item) => !item.urgent);
+    if (toMark.length === 0) {
+      setBusyAction(null);
+      setFloatTone("error");
+      setFloatMessage(
+        selected.length === 1 ? t("alreadyUrgentOne") : t("alreadyUrgent"),
+      );
+      return;
+    }
+
+    for (const item of toMark) {
+      const result = await updateItem(item.id, {
+        name: item.name,
+        quantity: item.quantity,
+        category: item.category,
+        urgent: true,
+        notes: item.notes,
+      });
+      if (result.error) {
+        setBusyAction(null);
+        setActionError(result.error);
+        return;
+      }
+    }
+
+    setBusyAction(null);
     setSelectedIds(new Set());
     setIsConfirmingDelete(false);
   }
@@ -518,16 +553,33 @@ export default function ItemsScreen() {
   const header = (
     <ScreenHeader
       flush={!isSelecting}
+      compact={isSelecting}
       icon={isSelecting ? undefined : <ListsHeaderIcon />}
       title={
         isSelecting ? t("selectedCount", { count: selectedIds.size }) : undefined
       }
       subtitle={isSelecting ? t("selectMoreItems") : undefined}
+      footer={
+        isSelecting ? (
+          <SelectionBar
+            busyAction={busyAction}
+            disabled={isApplyingAction}
+            onBought={() => void markSelectionBought()}
+            onPin={() => void pinSelection()}
+            onUrgent={() => void markSelectionUrgent()}
+            onDelete={() => {
+              setActionError(null);
+              setIsConfirmingDelete(true);
+            }}
+          />
+        ) : undefined
+      }
       right={
         isSelecting ? (
           <Pressable
             onPress={cancelSelection}
             accessibilityRole="button"
+            accessibilityLabel={t("close")}
             className="h-11 w-11 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: headerButton.backgroundColor }}
           >
@@ -597,20 +649,6 @@ export default function ItemsScreen() {
         ) : null
       }
       top={isSelecting ? header : null}
-      dock={
-        isSelecting ? (
-          <SelectionBar
-            busyAction={busyAction}
-            disabled={isApplyingAction}
-            onBought={() => void markSelectionBought()}
-            onPin={() => void pinSelection()}
-            onDelete={() => {
-              setActionError(null);
-              setIsConfirmingDelete(true);
-            }}
-          />
-        ) : null
-      }
       onSwipe={(direction) => {
         if (isSelecting || isDragging || lists.length < 2) return;
         const index = lists.findIndex((list) => list.id === selectedListId);
@@ -656,7 +694,8 @@ export default function ItemsScreen() {
             onPress={() => setIsAddingDetails(true)}
             accessibilityRole="button"
             accessibilityLabel={t("addItemDetails")}
-            className="h-9 w-9 items-center justify-center rounded-full bg-cove-mist active:opacity-80"
+            className="h-9 w-9 items-center justify-center rounded-full active:opacity-80"
+            style={{ backgroundColor: scheme === "dark" ? colors.paper : colors.mist }}
           >
             <Ionicons name="create-outline" size={18} color={colors.accent} />
           </Pressable>
@@ -741,7 +780,9 @@ export default function ItemsScreen() {
         visible={isAddingDetails}
         listId={selectedListId}
         initialCategory={category === "all" ? "vegetables" : category}
+        initialName={quickName}
         onClose={() => setIsAddingDetails(false)}
+        onSaved={() => setQuickName("")}
       />
       <ItemDetailCard
         purchase={openItem}
@@ -918,27 +959,21 @@ function SelectionBar({
   disabled,
   onBought,
   onPin,
+  onUrgent,
   onDelete,
 }: {
-  busyAction: "pin" | "bought" | "delete" | null;
+  busyAction: "pin" | "bought" | "delete" | "urgent" | null;
   disabled: boolean;
   onBought: () => void;
   onPin: () => void;
+  onUrgent: () => void;
   onDelete: () => void;
 }) {
-  const { colors, scheme, shadow } = useTheme();
-  const { t } = useI18n();
+  const { colors, scheme } = useTheme();
+  const { t, isRTL } = useI18n();
   const dark = scheme === "dark";
   const danger = "#F87171";
-  const barBackground = dark ? "rgba(12, 36, 72, 0.55)" : "rgba(187, 222, 251, 0.72)";
-  const barBorder = dark ? "rgba(144, 202, 249, 0.34)" : "rgba(33, 150, 243, 0.34)";
-  const buttonShadow = {
-    shadowColor: shadow.color,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: dark ? 0.45 : shadow.opacity,
-    shadowRadius: 16,
-    elevation: 8,
-  };
+  const labelColor = "rgba(255,255,255,0.92)";
 
   function actionButton(
     label: string,
@@ -946,6 +981,7 @@ function SelectionBar({
     onPress: () => void,
     icon: ReactNode,
     spinnerColor: string,
+    textColor = labelColor,
   ) {
     return (
       <Pressable
@@ -953,16 +989,26 @@ function SelectionBar({
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={label}
-        className={`h-14 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-full ${
+        className={`min-h-[72px] min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-3xl border border-white/20 px-1 py-2 ${
           disabled ? "opacity-50" : "active:opacity-80"
         }`}
-        style={[
-          buttonShadow,
-          { backgroundColor: barBackground, borderWidth: 1, borderColor: barBorder },
-        ]}
+        style={{ backgroundColor: dark ? "rgba(12, 36, 72, 0.45)" : "rgba(255,255,255,0.18)" }}
       >
         <GlassFill soft />
-        {busy ? <ActivityIndicator color={spinnerColor} /> : icon}
+        {busy ? (
+          <ActivityIndicator color={spinnerColor} />
+        ) : (
+          <>
+            {icon}
+            <AppText
+              numberOfLines={1}
+              className="text-center text-xs font-semibold leading-4"
+              style={{ color: textColor }}
+            >
+              {label}
+            </AppText>
+          </>
+        )}
       </Pressable>
     );
   }
@@ -973,21 +1019,32 @@ function SelectionBar({
         t("markSelectedBought"),
         busyAction === "bought",
         onBought,
-        <MaterialCommunityIcons name="cart-check" size={26} color={colors.accentDeep} />,
-        colors.accentDeep,
+        <MaterialCommunityIcons name="cart-check" size={22} color={colors.white} />,
+        colors.white,
       )}
       {actionButton(
         t("pinSelected"),
         busyAction === "pin",
         onPin,
-        <MaterialCommunityIcons name="pin" size={22} color={colors.accent} />,
-        colors.accent,
+        <View style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}>
+          <MaterialCommunityIcons name="pin" size={20} color={colors.white} />
+        </View>,
+        colors.white,
+      )}
+      {actionButton(
+        t("markSelectedUrgent"),
+        busyAction === "urgent",
+        onUrgent,
+        <Ionicons name="flash" size={20} color={danger} />,
+        danger,
+        danger,
       )}
       {actionButton(
         t("delete"),
         busyAction === "delete",
         onDelete,
-        <Ionicons name="trash-outline" size={22} color={danger} />,
+        <Ionicons name="trash-outline" size={20} color={danger} />,
+        danger,
         danger,
       )}
     </View>
