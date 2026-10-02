@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { CategoryField } from "@/components/purchases/CategoryField";
+import { CostEntrySheet } from "@/components/purchases/CostEntrySheet";
 import { StatusBadge, UrgentBadge } from "@/components/purchases/StatusBadge";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { AppButton } from "@/components/ui/AppButton";
@@ -14,6 +15,7 @@ import { floatedCardStyle } from "@/constants/theme";
 import { useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
+import { formatMoney } from "@/lib/currency";
 import { createStaple, deleteStaple, fetchStaples } from "@/lib/staples";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -27,7 +29,7 @@ type ItemDetailCardProps = {
 };
 
 export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardProps) {
-  const { updateItem, markBought } = usePurchases();
+  const { updateItem, updateCost, markBought } = usePurchases();
   const { household } = useHousehold();
   const { t } = useI18n();
   const [name, setName] = useState("");
@@ -41,7 +43,11 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingOpen, setEditingOpen] = useState(false);
+  const [costPromptOpen, setCostPromptOpen] = useState(false);
+  const [editCostOpen, setEditCostOpen] = useState(false);
   const editable = purchase?.status === "needed";
+  const askSingleCost =
+    household?.costsEnabled === true && household.askCostOnSingleBuy !== false;
 
   function fill(item: Purchase) {
     setName(item.name);
@@ -52,7 +58,6 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
     setPinned(false);
     setPinnedStapleId(null);
     setQuantityError(undefined);
-    setError(null);
     setEditingOpen(false);
   }
 
@@ -129,59 +134,144 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
     onClose();
   }
 
-  async function onMarkBought() {
+  async function completeBought(cost: number | null) {
     if (!purchase) return;
     setIsSubmitting(true);
     setError(null);
-    const result = await markBought(purchase.id);
+    const result = await markBought(purchase.id, cost);
     setIsSubmitting(false);
     if (result.error) {
       setError(result.error);
       return;
     }
+    setCostPromptOpen(false);
+    onClose();
+  }
+
+  function onMarkBought() {
+    if (!purchase) return;
+    if (askSingleCost) {
+      setError(null);
+      setCostPromptOpen(true);
+      return;
+    }
+    void completeBought(null);
+  }
+
+  async function onSaveEditedCost(cost: number | null) {
+    if (!purchase) return;
+    setIsSubmitting(true);
+    setError(null);
+    const result = await updateCost(purchase.id, cost);
+    setIsSubmitting(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setEditCostOpen(false);
     onClose();
   }
 
   return (
-    <FormSheetModal
-      visible={visible && purchase !== null}
-      onClose={close}
-      onShow={() => {
-        if (!purchase) return;
-        fill(purchase);
-        void loadPin(purchase);
-      }}
-    >
-      {purchase && !editable ? (
-        <HistoryItemCard purchase={purchase} onClose={close} />
-      ) : (
-        <EditItemForm
-          purchase={purchase}
-          name={name}
-          quantity={quantity}
-          notes={notes}
-          category={category}
-          urgent={urgent}
-          pinned={pinned}
-          quantityError={quantityError}
-          error={error}
-          isSubmitting={isSubmitting}
-          editingOpen={editingOpen}
-          onToggleEditing={() => setEditingOpen((open) => !open)}
-          onChangeName={setName}
-          onChangeQuantity={(value) => {
-            setQuantity(value);
-            setQuantityError(undefined);
+    <>
+      <FormSheetModal
+        visible={visible && purchase !== null && !costPromptOpen && !editCostOpen}
+        onClose={close}
+        onShow={() => {
+          if (!purchase) return;
+          fill(purchase);
+          setError(null);
+          setCostPromptOpen(false);
+          setEditCostOpen(false);
+          void loadPin(purchase);
+        }}
+      >
+        {purchase && !editable ? (
+          <HistoryItemCard
+            purchase={purchase}
+            currency={household?.currency ?? "JOD"}
+            costsEnabled={household?.costsEnabled === true}
+            error={error}
+            onEditCost={() => setEditCostOpen(true)}
+            onClose={close}
+          />
+        ) : (
+          <EditItemForm
+            purchase={purchase}
+            name={name}
+            quantity={quantity}
+            notes={notes}
+            category={category}
+            urgent={urgent}
+            pinned={pinned}
+            quantityError={quantityError}
+            error={error}
+            isSubmitting={isSubmitting}
+            editingOpen={editingOpen}
+            onToggleEditing={() => setEditingOpen((open) => !open)}
+            onChangeName={setName}
+            onChangeQuantity={(value) => {
+              setQuantity(value);
+              setQuantityError(undefined);
+            }}
+            onChangeNotes={setNotes}
+            onChangeCategory={setCategory}
+            onChangeUrgent={setUrgent}
+            onChangePinned={setPinned}
+            onSubmit={() => void onSubmit()}
+            onMarkBought={() => onMarkBought()}
+          />
+        )}
+      </FormSheetModal>
+
+      {purchase ? (
+        <CostEntrySheet
+          visible={costPromptOpen}
+          title={t("enterCost")}
+          subtitle={purchase.name}
+          currency={household?.currency ?? "JOD"}
+          items={[{ id: purchase.id, name: purchase.name }]}
+          loading={isSubmitting}
+          errorMessage={costPromptOpen ? error : null}
+          skipLabel={t("skipCost")}
+          onConfirm={(entries) => void completeBought(entries[0]?.cost ?? null)}
+          onSkip={() => void completeBought(null)}
+          onClose={() => {
+            if (!isSubmitting) {
+              setCostPromptOpen(false);
+              setError(null);
+            }
           }}
-          onChangeNotes={setNotes}
-          onChangeCategory={setCategory}
-          onChangeUrgent={setUrgent}
-          onChangePinned={setPinned}
-          onSubmit={() => void onSubmit()}
-          onMarkBought={() => void onMarkBought()}
         />
-      )}
-    </FormSheetModal>
+      ) : null}
+
+      {purchase && household?.costsEnabled ? (
+        <CostEntrySheet
+          visible={editCostOpen}
+          title={t("editCost")}
+          subtitle={purchase.name}
+          currency={household.currency}
+          items={[
+            {
+              id: purchase.id,
+              name: purchase.name,
+              initialCost: purchase.cost,
+            },
+          ]}
+          loading={isSubmitting}
+          errorMessage={editCostOpen ? error : null}
+          skipLabel={t("clearCost")}
+          onConfirm={(entries) => void onSaveEditedCost(entries[0]?.cost ?? null)}
+          onSkip={() => void onSaveEditedCost(null)}
+          onClose={() => {
+            if (!isSubmitting) {
+              setEditCostOpen(false);
+              setError(null);
+            }
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -438,9 +528,17 @@ function SummaryChip({ label }: { label: string }) {
 
 function HistoryItemCard({
   purchase,
+  currency,
+  costsEnabled,
+  error,
+  onEditCost,
   onClose,
 }: {
   purchase: Purchase;
+  currency: string;
+  costsEnabled: boolean;
+  error: string | null;
+  onEditCost: () => void;
   onClose: () => void;
 }) {
   const { t, locale, isRTL } = useI18n();
@@ -457,9 +555,13 @@ function HistoryItemCard({
         day: "numeric",
       }).format(new Date(when))
     : null;
+  const costLabel = costsEnabled
+    ? formatMoney(purchase.cost, currency, t("noPrice"))
+    : null;
   const facts = [
     { label: t("quantity"), value: quantityLabel },
     { label: t("category"), value: categoryLabel },
+    costLabel ? { label: t("itemCost"), value: costLabel } : null,
     { label: t("addedBy"), value: purchase.addedByName },
     purchase.boughtByName ? { label: t("boughtBy"), value: purchase.boughtByName } : null,
     dateLabel
@@ -522,7 +624,12 @@ function HistoryItemCard({
         </View>
       ) : null}
 
-      <View className="mt-2">
+      <FormMessage message={error} />
+
+      <View className="mt-2 gap-2">
+        {costsEnabled ? (
+          <AppButton label={t("editCost")} variant="secondary" onPress={onEditCost} />
+        ) : null}
         <AppButton label={t("close")} variant="secondary" onPress={onClose} />
       </View>
     </View>

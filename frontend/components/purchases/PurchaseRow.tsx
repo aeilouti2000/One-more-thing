@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { useHousehold } from "@/hooks/useHousehold";
+import { formatMoney } from "@/lib/currency";
 import { useCategoryLabel } from "@/providers/CategoriesProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -32,12 +34,17 @@ export function PurchaseRow({
   leading,
 }: PurchaseRowProps) {
   const { t } = useI18n();
+  const { household } = useHousehold();
   const categoryLabel = useCategoryLabel(purchase.category);
   const { colors, scheme } = useTheme();
   const showsStepper = !selected && Boolean(onChangeQuantity) && purchase.status === "needed";
   const quantityLabel = purchase.unit
     ? `${purchase.quantity} ${purchase.unit}`
     : `${purchase.quantity}`;
+  const costLabel =
+    household?.costsEnabled && purchase.status === "bought"
+      ? formatMoney(purchase.cost, household.currency, t("noPrice"))
+      : null;
 
   return (
     <View
@@ -155,6 +162,11 @@ export function PurchaseRow({
                 </View>
               ) : null}
               {purchase.status === "bought" ? <StatusBadge status={purchase.status} /> : null}
+              {purchase.status === "bought" && costLabel ? (
+                <View className="rounded-full bg-cove-mist px-2.5 py-1">
+                  <AppText className="text-xs font-semibold text-cove-accent">{costLabel}</AppText>
+                </View>
+              ) : null}
             </View>
           </View>
         </View>

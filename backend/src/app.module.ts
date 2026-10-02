@@ -8,6 +8,7 @@ import { RefreshToken } from "./modules/auth/refresh-token.entity";
 import { type AppConfig, validateEnv } from "./config/env";
 import { ItemSortOrder1740000000006 } from "./database/migrations/1740000000006-ItemSortOrder";
 import { CustomCategories1740000000008 } from "./database/migrations/1740000000008-CustomCategories";
+import { ItemCosts1740000000009 } from "./database/migrations/1740000000009-ItemCosts";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
 import { ShoppingTrip1740000000004 } from "./database/migrations/1740000000004-ShoppingTrip";
@@ -69,6 +70,7 @@ import { User } from "./users/user.entity";
             ItemSortOrder1740000000006,
             ShoppingLists1740000000007,
             CustomCategories1740000000008,
+            ItemCosts1740000000009,
           ],
           migrationsRun: true,
         };

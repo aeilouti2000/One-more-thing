@@ -1,4 +1,20 @@
-import { ArrayNotEmpty, IsArray, IsBoolean, IsIn, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateIf,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
 import type { ItemCategory } from "./item.entity";
 import { STAPLE_INTERVALS, type StapleInterval } from "./staple.entity";
 
@@ -60,6 +76,43 @@ export class UpdateItemDto {
   @IsString()
   @MaxLength(500)
   notes?: string;
+}
+
+export class MarkBoughtDto {
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsNumber()
+  @Min(0)
+  @Max(999999.999)
+  cost?: number | null;
+}
+
+export class MarkBoughtItemEntryDto {
+  @IsUUID()
+  id: string;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsNumber()
+  @Min(0)
+  @Max(999999.999)
+  cost?: number | null;
+}
+
+export class MarkBoughtItemsDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => MarkBoughtItemEntryDto)
+  items: MarkBoughtItemEntryDto[];
+}
+
+export class UpdateItemCostDto {
+  @ValidateIf((_, value) => value !== null)
+  @IsNumber()
+  @Min(0)
+  @Max(999999.999)
+  cost: number | null;
 }
 
 export class CreateStapleDto extends CreateItemDto {

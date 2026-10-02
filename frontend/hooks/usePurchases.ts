@@ -8,7 +8,9 @@ import {
   markItemBought,
   markItemsBought,
   undoItemBought,
+  updateItemCost,
   updateItemDetails,
+  type BoughtCostEntry,
 } from "@/lib/items";
 import type { NewItemInput, UpdateItemInput } from "@/lib/items";
 import { translate } from "@/constants/i18n";
@@ -32,12 +34,21 @@ type UsePurchasesResult = {
     id: string,
     values: UpdateItemInput,
   ) => Promise<{ error: string | null }>;
-  markBought: (id: string) => Promise<{ error: string | null }>;
+  updateCost: (id: string, cost: number | null) => Promise<{ error: string | null }>;
+  markBought: (id: string, cost?: number | null) => Promise<{ error: string | null }>;
   undoBought: (id: string) => Promise<{ error: string | null }>;
-  markManyBought: (ids: string[]) => Promise<{ error: string | null }>;
+  markManyBought: (entries: BoughtCostEntry[] | string[]) => Promise<{ error: string | null }>;
   deleteMany: (ids: string[]) => Promise<{ error: string | null }>;
   reorderNeeded: (ids: string[]) => Promise<{ error: string | null }>;
 };
+
+function toEntries(entries: BoughtCostEntry[] | string[]): BoughtCostEntry[] {
+  if (entries.length === 0) return [];
+  if (typeof entries[0] === "string") {
+    return (entries as string[]).map((id) => ({ id, cost: null }));
+  }
+  return entries as BoughtCostEntry[];
+}
 
 export function usePurchases(): UsePurchasesResult {
   const { user } = useAuth();
@@ -93,12 +104,12 @@ export function usePurchases(): UsePurchasesResult {
   );
 
   const markBought = useCallback(
-    async (id: string) => {
+    async (id: string, cost?: number | null) => {
       if (!user) {
         return { error: translate("errorNeedLogin") };
       }
 
-      const result = await markItemBought(id);
+      const result = await markItemBought(id, cost);
       if (!result.error) {
         emitListChanged();
       }
@@ -115,6 +126,22 @@ export function usePurchases(): UsePurchasesResult {
       }
 
       const result = await updateItemDetails(id, values);
+      if (!result.error) {
+        emitListChanged();
+      }
+
+      return result;
+    },
+    [user],
+  );
+
+  const updateCost = useCallback(
+    async (id: string, cost: number | null) => {
+      if (!user) {
+        return { error: translate("errorNeedLogin") };
+      }
+
+      const result = await updateItemCost(id, cost);
       if (!result.error) {
         emitListChanged();
       }
@@ -141,12 +168,12 @@ export function usePurchases(): UsePurchasesResult {
   );
 
   const markManyBought = useCallback(
-    async (ids: string[]) => {
+    async (entries: BoughtCostEntry[] | string[]) => {
       if (!user) {
         return { error: translate("errorNeedLogin") };
       }
 
-      const result = await markItemsBought(ids);
+      const result = await markItemsBought(toEntries(entries));
       if (!result.error) {
         emitListChanged();
       }
@@ -215,6 +242,7 @@ export function usePurchases(): UsePurchasesResult {
     refresh,
     addItem,
     updateItem,
+    updateCost,
     markBought,
     undoBought,
     markManyBought,

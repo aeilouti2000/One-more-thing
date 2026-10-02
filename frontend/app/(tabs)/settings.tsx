@@ -15,6 +15,7 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { headerIconFrameStyle, iconSize, type ThemeScheme } from "@/constants/theme";
 import { useHousehold } from "@/hooks/useHousehold";
+import { updateCostSettings } from "@/lib/homes";
 import {
   canUsePush,
   readPushEnabled,
@@ -27,10 +28,11 @@ import { isValidPassword, isValidUsername } from "@/lib/validation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { HOME_CURRENCIES, type CostSettings, type HomeCurrency } from "@/types/household";
 
 export default function SettingsScreen() {
   const { user, signOut, changePassword, updateProfile } = useAuth();
-  const { refresh: refreshHome } = useHousehold();
+  const { household, refresh: refreshHome, adoptHome } = useHousehold();
   const { colors, scheme, setScheme } = useTheme();
   const { t, locale } = useI18n();
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
@@ -53,10 +55,16 @@ export default function SettingsScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [costError, setCostError] = useState<string | null>(null);
+  const [isSavingCosts, setIsSavingCosts] = useState(false);
+  const [isChoosingCurrency, setIsChoosingCurrency] = useState(false);
   const [pushStatus, setPushStatus] = useState<PushStatus>(
     canUsePush() ? (readPushEnabled() ? "on" : "off") : "unsupported",
   );
   const [isUpdatingPush, setIsUpdatingPush] = useState(false);
+  const isHost =
+    household?.members.some((member) => member.id === user?.id && member.role === "owner") ===
+    true;
 
   useEffect(() => {
     if (!user) return;
@@ -80,6 +88,19 @@ export default function SettingsScreen() {
     }
     setPushStatus(await syncPushRegistration(locale));
     setIsUpdatingPush(false);
+  }
+
+  async function saveCostSettings(patch: Partial<CostSettings>) {
+    if (!household || !isHost) return;
+    setIsSavingCosts(true);
+    setCostError(null);
+    const result = await updateCostSettings(household.id, patch);
+    setIsSavingCosts(false);
+    if (result.error || !result.home) {
+      setCostError(result.error ?? t("errorGeneric"));
+      return;
+    }
+    adoptHome(result.home);
   }
 
   const canUpdatePassword =
@@ -395,6 +416,117 @@ export default function SettingsScreen() {
           />
         </View>
 
+        {household ? (
+          <View className="gap-3">
+            <SectionHeader title={t("costsSection")} />
+            <AppText className="-mt-1 mb-1 text-sm text-cove-muted">{t("costsSectionBody")}</AppText>
+
+            <View className="rounded-3xl bg-cove-paper px-4 py-4">
+              <View className="flex-row items-center justify-between gap-3">
+                <View className="min-w-0 flex-1">
+                  <AppText className="text-base font-semibold text-cove-ink">
+                    {t("trackCosts")}
+                  </AppText>
+                  <AppText className="mt-2 text-sm text-cove-muted">{t("trackCostsBody")}</AppText>
+                </View>
+                <Switch
+                  value={household.costsEnabled}
+                  disabled={!isHost || isSavingCosts}
+                  onValueChange={(enabled) => void saveCostSettings({ costsEnabled: enabled })}
+                  trackColor={{ false: colors.mist, true: colors.accent }}
+                  thumbColor={colors.white}
+                />
+              </View>
+              {!isHost ? (
+                <AppText className="mt-3 text-xs text-cove-muted">{t("costsHostOnly")}</AppText>
+              ) : null}
+              <FormMessage message={costError} />
+            </View>
+
+            {household.costsEnabled ? (
+              <>
+                <View className="rounded-3xl bg-cove-paper px-4 py-4">
+                  <AppText className="text-sm font-medium text-cove-muted">
+                    {t("currencyLabel")}
+                  </AppText>
+                  <Pressable
+                    disabled={!isHost || isSavingCosts}
+                    onPress={() => setIsChoosingCurrency((open) => !open)}
+                    className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3 active:opacity-80"
+                  >
+                    <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+                      {t(
+                        (HOME_CURRENCIES.find((item) => item.code === household.currency)
+                          ?.labelKey ?? "currencyJOD") as "currencyJOD",
+                      )}
+                    </AppText>
+                    <Ionicons
+                      name={isChoosingCurrency ? "chevron-up" : "chevron-down"}
+                      size={iconSize.sm}
+                      color={colors.ink}
+                    />
+                  </Pressable>
+                  {isChoosingCurrency ? (
+                    <View className="mt-3 gap-2">
+                      {HOME_CURRENCIES.map((option) => {
+                        const selected = household.currency === option.code;
+                        return (
+                          <Pressable
+                            key={option.code}
+                            disabled={!isHost || isSavingCosts}
+                            onPress={() => {
+                              setIsChoosingCurrency(false);
+                              if (option.code !== household.currency) {
+                                void saveCostSettings({ currency: option.code as HomeCurrency });
+                              }
+                            }}
+                            className={`rounded-2xl px-4 py-3 ${
+                              selected ? "bg-cove-accent" : "bg-cove-mist"
+                            }`}
+                          >
+                            <AppText
+                              className={`text-base font-semibold ${
+                                selected ? "text-white" : "text-cove-ink"
+                              }`}
+                            >
+                              {t(option.labelKey as "currencyJOD")}
+                            </AppText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
+
+                <CostAskToggle
+                  title={t("askCostSingle")}
+                  body={t("askCostSingleBody")}
+                  value={household.askCostOnSingleBuy}
+                  disabled={!isHost || isSavingCosts}
+                  onChange={(value) => void saveCostSettings({ askCostOnSingleBuy: value })}
+                  colors={colors}
+                />
+                <CostAskToggle
+                  title={t("askCostBulk")}
+                  body={t("askCostBulkBody")}
+                  value={household.askCostOnBulkBuy}
+                  disabled={!isHost || isSavingCosts}
+                  onChange={(value) => void saveCostSettings({ askCostOnBulkBuy: value })}
+                  colors={colors}
+                />
+                <CostAskToggle
+                  title={t("askCostTrip")}
+                  body={t("askCostTripBody")}
+                  value={household.askCostOnTripEnd}
+                  disabled={!isHost || isSavingCosts}
+                  onChange={(value) => void saveCostSettings({ askCostOnTripEnd: value })}
+                  colors={colors}
+                />
+              </>
+            ) : null}
+          </View>
+        ) : null}
+
         <View className="gap-3">
           <SectionHeader title={t("appSettings")} />
 
@@ -500,5 +632,39 @@ export default function SettingsScreen() {
         }}
       />
     </Screen>
+  );
+}
+
+function CostAskToggle({
+  title,
+  body,
+  value,
+  disabled,
+  onChange,
+  colors,
+}: {
+  title: string;
+  body: string;
+  value: boolean;
+  disabled: boolean;
+  onChange: (value: boolean) => void;
+  colors: { mist: string; accent: string; white: string };
+}) {
+  return (
+    <View className="rounded-3xl bg-cove-paper px-4 py-4">
+      <View className="flex-row items-center justify-between gap-3">
+        <View className="min-w-0 flex-1">
+          <AppText className="text-base font-semibold text-cove-ink">{title}</AppText>
+          <AppText className="mt-2 text-sm text-cove-muted">{body}</AppText>
+        </View>
+        <Switch
+          value={value}
+          disabled={disabled}
+          onValueChange={onChange}
+          trackColor={{ false: colors.mist, true: colors.accent }}
+          thumbColor={colors.white}
+        />
+      </View>
+    </View>
   );
 }

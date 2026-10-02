@@ -19,6 +19,11 @@ export type UpdateItemInput = Pick<
   "name" | "quantity" | "category" | "urgent" | "notes"
 >;
 
+export type BoughtCostEntry = {
+  id: string;
+  cost?: number | null;
+};
+
 type ItemResponse = {
   id: string;
   name: string;
@@ -28,6 +33,7 @@ type ItemResponse = {
   notes: string | null;
   status: Purchase["status"];
   urgent: boolean;
+  cost?: number | null;
   listId?: string;
   listName?: string;
   addedByName: string;
@@ -38,6 +44,12 @@ type ItemResponse = {
 
 function toPurchase(item: ItemResponse): Purchase {
   const quantity = Number(item.quantity);
+  const cost =
+    item.cost === null || item.cost === undefined
+      ? null
+      : Number.isFinite(Number(item.cost))
+        ? Number(item.cost)
+        : null;
   return {
     id: item.id,
     name: item.name,
@@ -47,6 +59,7 @@ function toPurchase(item: ItemResponse): Purchase {
     notes: item.notes ?? undefined,
     status: item.status,
     urgent: Boolean(item.urgent),
+    cost,
     listId: item.listId,
     listName: item.listName,
     addedByName: item.addedByName,
@@ -97,6 +110,15 @@ export async function updateItemDetails(itemId: string, input: UpdateItemInput) 
   }
 }
 
+export async function updateItemCost(itemId: string, cost: number | null) {
+  try {
+    await api.patch(`/items/${itemId}/cost`, { cost });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}
+
 export async function undoItemBought(itemId: string) {
   try {
     await api.post(`/items/${itemId}/needed`);
@@ -106,19 +128,24 @@ export async function undoItemBought(itemId: string) {
   }
 }
 
-export async function markItemBought(itemId: string) {
+export async function markItemBought(itemId: string, cost?: number | null) {
   try {
-    await api.post(`/items/${itemId}/bought`);
+    await api.post(`/items/${itemId}/bought`, { cost: cost ?? null });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
   }
 }
 
-export async function markItemsBought(itemIds: string[]) {
-  if (itemIds.length === 0) return { error: null };
+export async function markItemsBought(entries: BoughtCostEntry[]) {
+  if (entries.length === 0) return { error: null };
   try {
-    await api.post("/items/bought", { ids: itemIds });
+    await api.post("/items/bought", {
+      items: entries.map((entry) => ({
+        id: entry.id,
+        cost: entry.cost ?? null,
+      })),
+    });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };

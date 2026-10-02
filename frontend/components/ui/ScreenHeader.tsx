@@ -11,6 +11,7 @@ type ScreenHeaderProps = {
   title?: string;
   subtitle?: string;
   showBack?: boolean;
+  onBack?: () => void;
   icon?: ReactNode;
   right?: ReactNode;
   footer?: ReactNode;
@@ -23,6 +24,7 @@ export function ScreenHeader({
   title,
   subtitle,
   showBack = false,
+  onBack,
   icon,
   right,
   footer,
@@ -69,7 +71,7 @@ export function ScreenHeader({
         <View className="min-w-0 flex-1 flex-row items-center gap-3">
           {showBack ? (
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => (onBack ? onBack() : router.back())}
               accessibilityRole="button"
               accessibilityLabel={t("back")}
               className="h-10 w-10 items-center justify-center rounded-full bg-white"

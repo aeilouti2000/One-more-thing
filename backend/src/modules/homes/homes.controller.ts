@@ -4,7 +4,7 @@ import { CurrentUser } from "../../common/current-user.decorator";
 import { DomainError } from "../../common/domain.error";
 import { HttpStatus } from "@nestjs/common";
 import { User } from "../../users/user.entity";
-import { CreateHomeDto, JoinHomeDto, UpdateHomeNameDto } from "./dto";
+import { CreateHomeDto, JoinHomeDto, UpdateCostSettingsDto, UpdateHomeNameDto } from "./dto";
 import { HomesService } from "./homes.service";
 
 @Controller("homes")
@@ -53,6 +53,15 @@ export class HomesController {
     @Body() body: UpdateHomeNameDto,
   ) {
     return this.homes.updateName(user.id, homeId, body.name);
+  }
+
+  @Patch(":homeId/cost-settings")
+  updateCostSettings(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Body() body: UpdateCostSettingsDto,
+  ) {
+    return this.homes.updateCostSettings(user.id, homeId, body);
   }
 
   @Delete(":homeId/members/:memberId")

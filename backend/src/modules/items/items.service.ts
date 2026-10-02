@@ -25,6 +25,7 @@ export type ItemView = {
   notes: string | null;
   status: "needed" | "bought";
   urgent: boolean;
+  cost: number | null;
   addedBy: string;
   boughtBy: string | null;
   addedByName: string;
@@ -124,13 +125,14 @@ export class ItemsService {
     return view;
   }
 
-  async markBought(userId: string, itemId: string) {
+  async markBought(userId: string, itemId: string, cost?: number | null) {
     const item = await this.requireItem(userId, itemId);
     item.urgentBeforeBought = item.urgent;
     item.status = "bought";
     item.urgent = false;
     item.boughtBy = userId;
     item.boughtAt = new Date();
+    item.cost = normalizeCost(cost);
     const saved = await this.items.save(item);
     const [view] = await this.withNames([saved]);
     return view;
@@ -150,6 +152,7 @@ export class ItemsService {
     item.urgentBeforeBought = false;
     item.boughtBy = null;
     item.boughtAt = null;
+    item.cost = null;
     const saved = await this.items.save(item);
     await placeNeededItem(
       this.items,
@@ -158,6 +161,21 @@ export class ItemsService {
       saved.urgent ? "top" : "after-urgent",
       saved.listId,
     );
+    const [view] = await this.withNames([saved]);
+    return view;
+  }
+
+  async updateCost(userId: string, itemId: string, cost: number | null) {
+    const item = await this.requireItem(userId, itemId);
+    if (item.status !== "bought") {
+      throw new DomainError(
+        "ITEM_NOT_BOUGHT",
+        "Only bought items can have a cost.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    item.cost = normalizeCost(cost);
+    const saved = await this.items.save(item);
     const [view] = await this.withNames([saved]);
     return view;
   }
@@ -171,28 +189,42 @@ export class ItemsService {
     return { updated: ids.length };
   }
 
-  async markManyBought(userId: string, ids: string[]) {
-    const uniqueIds = [...new Set(ids)];
+  async markManyBought(
+    userId: string,
+    entries: { id: string; cost?: number | null }[],
+  ) {
+    const unique = new Map<string, number | null | undefined>();
+    for (const entry of entries) {
+      unique.set(entry.id, entry.cost);
+    }
+    const uniqueIds = [...unique.keys()];
     const membership = await this.homes.requireMembership(userId);
     const owned = await this.items.count({ where: { id: In(uniqueIds), homeId: membership.homeId } });
     if (owned !== uniqueIds.length) {
       throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
     }
-    const result = await this.items
-      .createQueryBuilder()
-      .update(Item)
-      .set({
-        status: "bought",
-        urgentBeforeBought: () => "urgent",
-        urgent: false,
-        boughtBy: userId,
-        boughtAt: new Date(),
-      })
-      .where("id IN (:...uniqueIds)", { uniqueIds })
-      .andWhere("home_id = :homeId", { homeId: membership.homeId })
-      .andWhere("status = :status", { status: "needed" })
-      .execute();
-    return { updated: result.affected ?? 0 };
+
+    const now = new Date();
+    let updated = 0;
+    for (const [id, cost] of unique) {
+      const result = await this.items
+        .createQueryBuilder()
+        .update(Item)
+        .set({
+          status: "bought",
+          urgentBeforeBought: () => "urgent",
+          urgent: false,
+          boughtBy: userId,
+          boughtAt: now,
+          cost: normalizeCost(cost),
+        })
+        .where("id = :id", { id })
+        .andWhere("home_id = :homeId", { homeId: membership.homeId })
+        .andWhere("status = :status", { status: "needed" })
+        .execute();
+      updated += result.affected ?? 0;
+    }
+    return { updated };
   }
 
   async removeMany(userId: string, ids: string[]) {
@@ -299,6 +331,7 @@ export class ItemsService {
       notes: row.notes,
       status: row.status,
       urgent: row.urgent,
+      cost: row.cost === null || row.cost === undefined ? null : Number(row.cost),
       addedBy: row.addedBy,
       boughtBy: row.boughtBy,
       addedByName: names.get(row.addedBy) ?? "Member",
@@ -312,4 +345,12 @@ export class ItemsService {
 function blankToNull(value: string | undefined) {
   const trimmed = value?.trim() ?? "";
   return trimmed ? trimmed : null;
+}
+
+function normalizeCost(cost: number | null | undefined): number | null {
+  if (cost === undefined || cost === null) return null;
+  if (!Number.isFinite(cost) || cost < 0) {
+    throw new DomainError("INVALID_COST", "Enter a valid cost.", HttpStatus.BAD_REQUEST);
+  }
+  return Math.round(cost * 1000) / 1000;
 }

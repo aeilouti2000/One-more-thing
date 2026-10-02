@@ -2,7 +2,16 @@ import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGu
 import { AuthGuard } from "@nestjs/passport";
 import { CurrentUser } from "../../common/current-user.decorator";
 import { User } from "../../users/user.entity";
-import { CreateCategoryDto, CreateItemDto, CreateListDto, ItemIdsDto, UpdateItemDto } from "./dto";
+import {
+  CreateCategoryDto,
+  CreateItemDto,
+  CreateListDto,
+  ItemIdsDto,
+  MarkBoughtDto,
+  MarkBoughtItemsDto,
+  UpdateItemCostDto,
+  UpdateItemDto,
+} from "./dto";
 import { CategoriesService } from "./categories.service";
 import { ItemsService } from "./items.service";
 
@@ -93,9 +102,22 @@ export class ItemsController {
     return this.items.updateDetails(user.id, itemId, body);
   }
 
+  @Patch("items/:itemId/cost")
+  updateCost(
+    @CurrentUser() user: User,
+    @Param("itemId", ParseUUIDPipe) itemId: string,
+    @Body() body: UpdateItemCostDto,
+  ) {
+    return this.items.updateCost(user.id, itemId, body.cost);
+  }
+
   @Post("items/:itemId/bought")
-  markBought(@CurrentUser() user: User, @Param("itemId", ParseUUIDPipe) itemId: string) {
-    return this.items.markBought(user.id, itemId);
+  markBought(
+    @CurrentUser() user: User,
+    @Param("itemId", ParseUUIDPipe) itemId: string,
+    @Body() body: MarkBoughtDto,
+  ) {
+    return this.items.markBought(user.id, itemId, body?.cost);
   }
 
   @Post("items/:itemId/needed")
@@ -109,8 +131,8 @@ export class ItemsController {
   }
 
   @Post("items/bought")
-  markMany(@CurrentUser() user: User, @Body() body: ItemIdsDto) {
-    return this.items.markManyBought(user.id, body.ids);
+  markMany(@CurrentUser() user: User, @Body() body: MarkBoughtItemsDto) {
+    return this.items.markManyBought(user.id, body.items);
   }
 
   @Post("items/delete")

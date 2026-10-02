@@ -2,6 +2,7 @@ import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
 import { CategoryChip } from "@/components/purchases/CategoryChip";
+import { CostEntrySheet } from "@/components/purchases/CostEntrySheet";
 import { UrgentToggle } from "@/components/purchases/UrgentToggle";
 import { StatusBadge, UrgentBadge } from "@/components/purchases/StatusBadge";
 import { AppText } from "@/components/ui/AppText";
@@ -16,6 +17,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { useCategories, useCategoryLabel } from "@/providers/CategoriesProvider";
 import { usePurchases } from "@/hooks/usePurchases";
 import { useHousehold } from "@/hooks/useHousehold";
+import { formatMoney } from "@/lib/currency";
 import { createStaple, deleteStaple, fetchStaples } from "@/lib/staples";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -23,13 +25,15 @@ import type { PurchaseCategory } from "@/types/purchase";
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getById, isLoading, markBought, updateItem } = usePurchases();
+  const { getById, isLoading, markBought, updateCost, updateItem } = usePurchases();
   const { household } = useHousehold();
   const { t, locale } = useI18n();
   const { categories } = useCategories();
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [costPromptOpen, setCostPromptOpen] = useState(false);
+  const [editCostOpen, setEditCostOpen] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editQuantity, setEditQuantity] = useState("1");
   const [editCategory, setEditCategory] =
@@ -41,6 +45,8 @@ export default function ItemDetailScreen() {
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const purchase = getById(id ?? "");
   const categoryLabel = useCategoryLabel(purchase?.category ?? "");
+  const askSingleCost =
+    household?.costsEnabled === true && household.askCostOnSingleBuy !== false;
 
   if (isLoading && !purchase) {
     return <LoadingScreen />;
@@ -62,10 +68,10 @@ export default function ItemDetailScreen() {
     ? `${item.quantity} ${item.unit}`
     : `${item.quantity}`;
 
-  async function onMarkBought() {
+  async function completeBought(cost: number | null) {
     setIsSaving(true);
     setError(null);
-    const result = await markBought(item.id);
+    const result = await markBought(item.id, cost);
     setIsSaving(false);
 
     if (result.error) {
@@ -73,7 +79,28 @@ export default function ItemDetailScreen() {
       return;
     }
 
+    setCostPromptOpen(false);
     router.back();
+  }
+
+  function onMarkBought() {
+    if (askSingleCost) {
+      setCostPromptOpen(true);
+      return;
+    }
+    void completeBought(null);
+  }
+
+  async function onSaveEditedCost(cost: number | null) {
+    setIsSaving(true);
+    setError(null);
+    const result = await updateCost(item.id, cost);
+    setIsSaving(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setEditCostOpen(false);
   }
 
   async function onSaveChanges() {
@@ -261,10 +288,13 @@ export default function ItemDetailScreen() {
           <>
             <View className="gap-4 rounded-3xl bg-cove-paper px-5 py-5">
               <DetailRow label={t("quantity")} value={quantityLabel} />
-              <DetailRow
-                label={t("category")}
-                value={categoryLabel}
-              />
+              <DetailRow label={t("category")} value={categoryLabel} />
+              {household?.costsEnabled && item.status === "bought" ? (
+                <DetailRow
+                  label={t("itemCost")}
+                  value={formatMoney(item.cost, household.currency, t("noPrice"))}
+                />
+              ) : null}
               <DetailRow label={t("addedBy")} value={item.addedByName} />
               {item.boughtByName ? (
                 <DetailRow label={t("boughtBy")} value={item.boughtByName} />
@@ -280,18 +310,59 @@ export default function ItemDetailScreen() {
               <AppButton
                 label={t("markBought")}
                 loading={isSaving}
-                onPress={() => void onMarkBought()}
+                onPress={() => onMarkBought()}
               />
             ) : (
-              <AppButton
-                label={t("backToHistory")}
-                variant="secondary"
-                onPress={() => router.back()}
-              />
+              <View className="gap-2">
+                {household?.costsEnabled ? (
+                  <AppButton
+                    label={t("editCost")}
+                    variant="secondary"
+                    onPress={() => setEditCostOpen(true)}
+                  />
+                ) : null}
+                <AppButton
+                  label={t("backToHistory")}
+                  variant="secondary"
+                  onPress={() => router.back()}
+                />
+              </View>
             )}
           </>
         )}
       </View>
+
+      <CostEntrySheet
+        visible={costPromptOpen}
+        title={t("enterCost")}
+        subtitle={item.name}
+        currency={household?.currency ?? "JOD"}
+        items={[{ id: item.id, name: item.name }]}
+        loading={isSaving}
+        errorMessage={costPromptOpen ? error : null}
+        skipLabel={t("skipCost")}
+        onConfirm={(entries) => void completeBought(entries[0]?.cost ?? null)}
+        onSkip={() => void completeBought(null)}
+        onClose={() => {
+          if (!isSaving) setCostPromptOpen(false);
+        }}
+      />
+
+      <CostEntrySheet
+        visible={editCostOpen}
+        title={t("editCost")}
+        subtitle={item.name}
+        currency={household?.currency ?? "JOD"}
+        items={[{ id: item.id, name: item.name, initialCost: item.cost }]}
+        loading={isSaving}
+        errorMessage={editCostOpen ? error : null}
+        skipLabel={t("clearCost")}
+        onConfirm={(entries) => void onSaveEditedCost(entries[0]?.cost ?? null)}
+        onSkip={() => void onSaveEditedCost(null)}
+        onClose={() => {
+          if (!isSaving) setEditCostOpen(false);
+        }}
+      />
     </Screen>
   );
 }

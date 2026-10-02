@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef, useState } from "react";
-import { Pressable, View, type LayoutChangeEvent } from "react-native";
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BackHandler, Pressable, View, type LayoutChangeEvent } from "react-native";
 import Animated, {
   Easing,
   Extrapolation,
@@ -14,6 +15,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { RequireSession } from "@/components/auth/RequireSession";
+import { CostEntrySheet } from "@/components/purchases/CostEntrySheet";
 import { AppText } from "@/components/ui/AppText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -24,7 +26,9 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { getCategoryLabel } from "@/constants/categories";
 import { useCategories } from "@/providers/CategoriesProvider";
 import { iconSize } from "@/constants/theme";
+import { useHousehold } from "@/hooks/useHousehold";
 import { usePurchases } from "@/hooks/usePurchases";
+import { listLabel } from "@/lib/lists";
 import { canUndoBought, formatNeededShare, shareNeededText } from "@/lib/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -44,23 +48,86 @@ export default function TripScreen() {
 }
 
 function TripBody() {
-  const { needed, bought, isLoading, error, markBought, undoBought } = usePurchases();
+  const { needed, bought, isLoading, error, markBought, undoBought, updateCost } = usePurchases();
+  const { household } = useHousehold();
   const { t, locale } = useI18n();
   const { categories } = useCategories();
   const { colors } = useTheme();
+  const navigation = useNavigation();
+  const params = useLocalSearchParams<{ listId?: string; listName?: string }>();
+  const listId = typeof params.listId === "string" && params.listId.length > 0 ? params.listId : null;
+  const listName =
+    typeof params.listName === "string" && params.listName.length > 0
+      ? listLabel(params.listName, t("defaultList"))
+      : null;
   const [actionError, setActionError] = useState<string | null>(null);
   const [undoId, setUndoId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [sessionBoughtIds, setSessionBoughtIds] = useState<string[]>([]);
+  const [tripCostOpen, setTripCostOpen] = useState(false);
+  const [singleCostItem, setSingleCostItem] = useState<Purchase | null>(null);
+  const [isSavingCosts, setIsSavingCosts] = useState(false);
+  const [frozenTripCostItems, setFrozenTripCostItems] = useState<
+    { id: string; name: string; initialCost?: number | null }[] | null
+  >(null);
+  const sessionNames = useRef(new Map<string, string>());
+  const singleCostResolver = useRef<((value: number | null | undefined) => void) | null>(null);
+  const inflightChecks = useRef(0);
+  const allowLeaveRef = useRef(false);
+  const tripCostOpenRef = useRef(false);
+  const askTripCostsRef = useRef(false);
+
+  const tripItems = useMemo(
+    () => (listId ? needed.filter((item) => item.listId === listId) : needed),
+    [listId, needed],
+  );
 
   const recent = bought.find((item) => item.id === undoId && canUndoBought(item.boughtAt, now));
-  const urgent = needed.filter((item) => item.urgent);
+  const urgent = tripItems.filter((item) => item.urgent);
   const groups = categories
     .map((category) => ({
       id: category.id,
       title: category.builtin ? getCategoryLabel(category.id, locale) : (category.name ?? category.id),
-      items: needed.filter((item) => !item.urgent && item.category === category.id),
+      items: tripItems.filter((item) => !item.urgent && item.category === category.id),
     }))
     .filter((group) => group.items.length > 0);
+
+  const askCostOnCheck =
+    household?.costsEnabled === true && household.askCostOnSingleBuy !== false;
+
+  const unpricedSessionIds = useMemo(
+    () =>
+      sessionBoughtIds.filter((id) => {
+        const item = bought.find((row) => row.id === id);
+        return !item || item.cost === null || item.cost === undefined;
+      }),
+    [bought, sessionBoughtIds],
+  );
+
+  const liveTripCostItems = useMemo(
+    () =>
+      unpricedSessionIds.map((id) => ({
+        id,
+        name: sessionNames.current.get(id) ?? bought.find((item) => item.id === id)?.name ?? id,
+        initialCost: bought.find((item) => item.id === id)?.cost,
+      })),
+    [bought, unpricedSessionIds],
+  );
+
+  const tripCostItems = frozenTripCostItems ?? liveTripCostItems;
+
+  const askTripCosts =
+    household?.costsEnabled === true &&
+    household.askCostOnTripEnd !== false &&
+    unpricedSessionIds.length > 0;
+
+  useEffect(() => {
+    tripCostOpenRef.current = tripCostOpen;
+  }, [tripCostOpen]);
+
+  useEffect(() => {
+    askTripCostsRef.current = askTripCosts;
+  }, [askTripCosts]);
 
   useEffect(() => {
     if (!undoId) return;
@@ -68,13 +135,50 @@ function TripBody() {
     return () => clearInterval(timer);
   }, [undoId]);
 
-  async function checkOff(id: string) {
+  function exitTrip() {
+    allowLeaveRef.current = true;
+    router.back();
+  }
+
+  async function askCostForItem(item: Purchase): Promise<number | null | undefined> {
+    if (!askCostOnCheck) return null;
+    // Avoid overlapping prompts (would orphan the first check's promise).
+    if (singleCostResolver.current || tripCostOpen) return undefined;
+    return new Promise((resolve) => {
+      singleCostResolver.current = resolve;
+      setSingleCostItem(item);
+    });
+  }
+
+  function resolveSingleCost(value: number | null | undefined) {
+    const resolve = singleCostResolver.current;
+    singleCostResolver.current = null;
+    setSingleCostItem(null);
+    resolve?.(value);
+  }
+
+  const singleCostSheetItems = useMemo(
+    () =>
+      singleCostItem
+        ? [{ id: singleCostItem.id, name: singleCostItem.name }]
+        : [],
+    [singleCostItem],
+  );
+
+  function noteInflight(delta: number) {
+    inflightChecks.current = Math.max(0, inflightChecks.current + delta);
+  }
+
+  async function checkOff(id: string, cost: number | null = null) {
     setActionError(null);
-    const result = await markBought(id);
+    const item = tripItems.find((row) => row.id === id);
+    if (item) sessionNames.current.set(id, item.name);
+    const result = await markBought(id, cost);
     if (result.error) {
       setActionError(result.error);
       return false;
     }
+    setSessionBoughtIds((current) => (current.includes(id) ? current : [...current, id]));
     setUndoId(id);
     setNow(Date.now());
     return true;
@@ -88,12 +192,13 @@ function TripBody() {
       setActionError(result.error);
       return;
     }
+    setSessionBoughtIds((current) => current.filter((id) => id !== recent.id));
     setUndoId(null);
   }
 
   async function shareList() {
-    if (needed.length === 0) return;
-    const message = formatNeededShare(needed, {
+    if (tripItems.length === 0) return;
+    const message = formatNeededShare(tripItems, {
       title: t("shareListTitle"),
       urgent: t("urgent"),
     });
@@ -105,20 +210,89 @@ function TripBody() {
     }
   }
 
-  if (isLoading && needed.length === 0 && bought.length === 0 && !error) {
+  function leaveTrip() {
+    if (inflightChecks.current > 0 || isSavingCosts) return;
+    if (singleCostResolver.current) {
+      resolveSingleCost(undefined);
+      return;
+    }
+    if (tripCostOpen) {
+      setTripCostOpen(false);
+      setFrozenTripCostItems(null);
+      exitTrip();
+      return;
+    }
+    if (askTripCosts) {
+      setFrozenTripCostItems(liveTripCostItems);
+      setTripCostOpen(true);
+      return;
+    }
+    exitTrip();
+  }
+
+  const leaveTripRef = useRef(leaveTrip);
+  leaveTripRef.current = leaveTrip;
+
+  useFocusEffect(
+    useCallback(() => {
+      const onHardwareBack = () => {
+        leaveTripRef.current();
+        return true;
+      };
+      const sub = BackHandler.addEventListener("hardwareBackPress", onHardwareBack);
+      return () => sub.remove();
+    }, []),
+  );
+
+  useEffect(() => {
+    const unsub = navigation.addListener("beforeRemove", (event) => {
+      if (allowLeaveRef.current) return;
+      if (
+        inflightChecks.current > 0 ||
+        singleCostResolver.current ||
+        tripCostOpenRef.current ||
+        askTripCostsRef.current
+      ) {
+        event.preventDefault();
+        leaveTripRef.current();
+      }
+    });
+    return unsub;
+  }, [navigation]);
+
+  async function saveTripCosts(entries: { id: string; cost: number | null }[]) {
+    setIsSavingCosts(true);
+    setActionError(null);
+    for (const entry of entries) {
+      if (entry.cost === null) continue;
+      const result = await updateCost(entry.id, entry.cost);
+      if (result.error) {
+        setIsSavingCosts(false);
+        setActionError(result.error);
+        return;
+      }
+    }
+    setIsSavingCosts(false);
+    setTripCostOpen(false);
+    setFrozenTripCostItems(null);
+    exitTrip();
+  }
+
+  if (isLoading && tripItems.length === 0 && bought.length === 0 && !error) {
     return <LoadingScreen />;
   }
 
   return (
     <Screen>
       <ScreenHeader
-        title={t("tripTitle")}
+        title={listName ?? t("tripTitle")}
         subtitle={t("tripSubtitle")}
         showBack
+        onBack={leaveTrip}
         right={
           <Pressable
             onPress={() => void shareList()}
-            disabled={needed.length === 0}
+            disabled={tripItems.length === 0}
             accessibilityRole="button"
             accessibilityLabel={t("shareList")}
             className="h-11 w-11 items-center justify-center rounded-full bg-white active:opacity-80"
@@ -139,7 +313,7 @@ function TripBody() {
         </View>
       ) : null}
 
-      {needed.length === 0 ? (
+      {tripItems.length === 0 ? (
         <EmptyState title={t("tripEmpty")} message={t("tripEmptyBody")} />
       ) : (
         <View className="gap-6">
@@ -147,7 +321,9 @@ function TripBody() {
             <TripGroup
               title={t("urgentSection")}
               items={urgent}
+              onAskCost={askCostForItem}
               onCheck={checkOff}
+              onInflight={noteInflight}
             />
           ) : null}
           {groups.map((group) => (
@@ -155,11 +331,48 @@ function TripBody() {
               key={`${group.id}-${locale}`}
               title={group.title}
               items={group.items}
+              onAskCost={askCostForItem}
               onCheck={checkOff}
+              onInflight={noteInflight}
             />
           ))}
         </View>
       )}
+
+      <CostEntrySheet
+        visible={singleCostItem !== null}
+        title={t("enterCost")}
+        subtitle={singleCostItem?.name}
+        currency={household?.currency ?? "JOD"}
+        items={singleCostSheetItems}
+        skipLabel={t("skipCost")}
+        onConfirm={(entries) => resolveSingleCost(entries[0]?.cost ?? null)}
+        onSkip={() => resolveSingleCost(null)}
+        onClose={() => resolveSingleCost(undefined)}
+      />
+
+      <CostEntrySheet
+        visible={tripCostOpen}
+        title={t("tripCostsTitle")}
+        subtitle={t("tripCostsSubtitle")}
+        currency={household?.currency ?? "JOD"}
+        items={tripCostItems}
+        loading={isSavingCosts}
+        errorMessage={actionError}
+        skipLabel={t("skipCostsForNow")}
+        onConfirm={(entries) => void saveTripCosts(entries)}
+        onSkip={() => {
+          setTripCostOpen(false);
+          setFrozenTripCostItems(null);
+          exitTrip();
+        }}
+        onClose={() => {
+          if (isSavingCosts) return;
+          setTripCostOpen(false);
+          setFrozenTripCostItems(null);
+          exitTrip();
+        }}
+      />
     </Screen>
   );
 }
@@ -167,11 +380,15 @@ function TripBody() {
 function TripGroup({
   title,
   items,
+  onAskCost,
   onCheck,
+  onInflight,
 }: {
   title: string;
   items: Purchase[];
-  onCheck: (id: string) => Promise<boolean>;
+  onAskCost: (item: Purchase) => Promise<number | null | undefined>;
+  onCheck: (id: string, cost: number | null) => Promise<boolean>;
+  onInflight: (delta: number) => void;
 }) {
   return (
     <View>
@@ -182,7 +399,9 @@ function TripGroup({
             key={item.id}
             item={item}
             gap={index < items.length - 1 ? ROW_GAP : 0}
-            onCheck={() => onCheck(item.id)}
+            onAskCost={() => onAskCost(item)}
+            onCheck={(cost) => onCheck(item.id, cost)}
+            onInflight={onInflight}
           />
         ))}
       </View>
@@ -193,21 +412,34 @@ function TripGroup({
 function TripCheckRow({
   item,
   gap,
+  onAskCost,
   onCheck,
+  onInflight,
 }: {
   item: Purchase;
   gap: number;
-  onCheck: () => Promise<boolean>;
+  onAskCost: () => Promise<number | null | undefined>;
+  onCheck: (cost: number | null) => Promise<boolean>;
+  onInflight: (delta: number) => void;
 }) {
   const { colors } = useTheme();
   const { isRTL } = useI18n();
   const quantity = item.unit ? `${item.quantity} ${item.unit}` : `x${item.quantity}`;
   const locked = useRef(false);
+  const pendingCost = useRef<number | null>(null);
+  const mounted = useRef(true);
   const [leaving, setLeaving] = useState(false);
   const contentHeight = useSharedValue(0);
   const check = useSharedValue(0);
   const ripple = useSharedValue(0);
   const leave = useSharedValue(0);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   function onContentLayout(event: LayoutChangeEvent) {
     if (locked.current) return;
@@ -228,14 +460,18 @@ function TripCheckRow({
     });
   }
 
+  function finishInflight() {
+    onInflight(-1);
+  }
+
   function commit() {
-    void onCheck().then((ok) => {
-      if (!ok) restore();
+    void onCheck(pendingCost.current).then((ok) => {
+      finishInflight();
+      if (!ok && mounted.current) restore();
     });
   }
 
-  function playExit() {
-    if (locked.current) return;
+  function startExit() {
     locked.current = true;
     setLeaving(true);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -247,6 +483,18 @@ function TripCheckRow({
         if (finished) runOnJS(commit)();
       }),
     );
+  }
+
+  async function playExit() {
+    if (locked.current) return;
+    onInflight(1);
+    const cost = await onAskCost();
+    if (cost === undefined) {
+      onInflight(-1);
+      return;
+    }
+    pendingCost.current = cost;
+    startExit();
   }
 
   const shellStyle = useAnimatedStyle(() => {

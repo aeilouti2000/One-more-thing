@@ -27,6 +27,15 @@ const quantityTransformer = {
   from: (value: string | number) => Number(value),
 };
 
+const nullableMoneyTransformer = {
+  to: (value: number | null) => value,
+  from: (value: string | number | null) => {
+    if (value === null || value === undefined) return null;
+    const next = Number(value);
+    return Number.isFinite(next) ? next : null;
+  },
+};
+
 @Entity("items")
 export class Item {
   @PrimaryGeneratedColumn("uuid")
@@ -97,4 +106,13 @@ export class Item {
 
   @Column({ name: "bought_at", type: "timestamptz", nullable: true })
   boughtAt: Date | null;
+
+  @Column({
+    type: "numeric",
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: nullableMoneyTransformer,
+  })
+  cost: number | null;
 }

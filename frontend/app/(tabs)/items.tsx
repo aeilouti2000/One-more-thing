@@ -1,10 +1,11 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as Haptics from "expo-haptics";
 import { ActivityIndicator, BackHandler, Dimensions, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { CategoryFilter } from "@/components/purchases/CategoryFilter";
 import { AddItemCard } from "@/components/purchases/AddItemCard";
+import { CostEntrySheet } from "@/components/purchases/CostEntrySheet";
 import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
 import { PurchaseRow } from "@/components/purchases/PurchaseRow";
 import { QuickAddBar } from "@/components/purchases/QuickAddBar";
@@ -36,6 +37,7 @@ export default function ItemsScreen() {
   const { household, refresh: refreshHome } = useHousehold();
   const {
     needed,
+    purchases,
     isLoading,
     error,
     refresh,
@@ -82,6 +84,13 @@ export default function ItemsScreen() {
   const [isDeletingList, setIsDeletingList] = useState(false);
   const [isAddingDetails, setIsAddingDetails] = useState(false);
   const [openItem, setOpenItem] = useState<Purchase | null>(null);
+  const [bulkCostIds, setBulkCostIds] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!openItem) return;
+    const next = purchases.find((item) => item.id === openItem.id);
+    setOpenItem(next ?? null);
+  }, [purchases, openItem?.id]);
 
   const listItems = selectedListId
     ? needed.filter((item) => item.listId === selectedListId)
@@ -221,10 +230,24 @@ export default function ItemsScreen() {
   }
 
   async function markSelectionBought() {
+    const ids = [...selectedIds];
+    if (
+      household?.costsEnabled &&
+      household.askCostOnBulkBuy !== false &&
+      ids.length > 0
+    ) {
+      setBulkCostIds(ids);
+      return;
+    }
+    await completeBulkBought(ids.map((id) => ({ id, cost: null })));
+  }
+
+  async function completeBulkBought(entries: { id: string; cost: number | null }[]) {
     setBusyAction("bought");
     setActionError(null);
-    const result = await markManyBought([...selectedIds]);
+    const result = await markManyBought(entries);
     setBusyAction(null);
+    setBulkCostIds(null);
 
     if (result.error) {
       setActionError(result.error);
@@ -234,6 +257,15 @@ export default function ItemsScreen() {
     setSelectedIds(new Set());
     setIsConfirmingDelete(false);
   }
+
+  const bulkCostItems = useMemo(
+    () =>
+      (bulkCostIds ?? []).map((id) => {
+        const item = needed.find((row) => row.id === id);
+        return { id, name: item?.name ?? id };
+      }),
+    [bulkCostIds, needed],
+  );
 
   async function markSelectionUrgent() {
     setBusyAction("urgent");
@@ -349,6 +381,33 @@ export default function ItemsScreen() {
     }, [isSelecting]),
   );
 
+  const canSwipeList = useCallback(
+    (direction: "next" | "previous") => {
+      if (isSelecting || isDragging || lists.length < 2) return false;
+      const index = lists.findIndex((list) => list.id === selectedListId);
+      if (index < 0) return false;
+      const step = direction === "next" ? (isRTL ? -1 : 1) : isRTL ? 1 : -1;
+      return Boolean(lists[index + step]);
+    },
+    [isDragging, isRTL, isSelecting, lists, selectedListId],
+  );
+
+  const onSwipeList = useCallback(
+    (direction: "next" | "previous") => {
+      if (isSelecting || isDragging || lists.length < 2) return;
+      const index = lists.findIndex((list) => list.id === selectedListId);
+      const step = direction === "next" ? (isRTL ? -1 : 1) : isRTL ? 1 : -1;
+      const next = lists[index + step];
+      if (!next) return;
+      setSelectedListId(next.id);
+      setCategory("all");
+      setSelectedIds(new Set());
+      setIsConfirmingDelete(false);
+      void Haptics.selectionAsync();
+    },
+    [isDragging, isRTL, isSelecting, lists, selectedListId],
+  );
+
   if (isLoading && needed.length === 0 && !error) {
     return <LoadingScreen />;
   }
@@ -461,33 +520,6 @@ export default function ItemsScreen() {
 
   const currentList = lists.find((list) => list.id === selectedListId) ?? null;
 
-  const canSwipeList = useCallback(
-    (direction: "next" | "previous") => {
-      if (isSelecting || isDragging || lists.length < 2) return false;
-      const index = lists.findIndex((list) => list.id === selectedListId);
-      if (index < 0) return false;
-      const step = direction === "next" ? (isRTL ? -1 : 1) : isRTL ? 1 : -1;
-      return Boolean(lists[index + step]);
-    },
-    [isDragging, isRTL, isSelecting, lists, selectedListId],
-  );
-
-  const onSwipeList = useCallback(
-    (direction: "next" | "previous") => {
-      if (isSelecting || isDragging || lists.length < 2) return;
-      const index = lists.findIndex((list) => list.id === selectedListId);
-      const step = direction === "next" ? (isRTL ? -1 : 1) : isRTL ? 1 : -1;
-      const next = lists[index + step];
-      if (!next) return;
-      setSelectedListId(next.id);
-      setCategory("all");
-      setSelectedIds(new Set());
-      setIsConfirmingDelete(false);
-      void Haptics.selectionAsync();
-    },
-    [isDragging, isRTL, isSelecting, lists, selectedListId],
-  );
-
   function listActions() {
     if (isSelecting) return null;
 
@@ -495,8 +527,17 @@ export default function ItemsScreen() {
       <View className="mb-5 flex-row gap-2">
         <ListAction
           label={t("shop")}
-          disabled={needed.length === 0}
-          onPress={() => router.push("/trip")}
+          disabled={listEmpty || !selectedListId}
+          onPress={() => {
+            if (!selectedListId) return;
+            router.push({
+              pathname: "/trip",
+              params: {
+                listId: selectedListId,
+                listName: currentList?.name ?? "",
+              },
+            });
+          }}
           icon={
             <View className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-accent">
               <MaterialCommunityIcons name="cart-check" size={18} color={colors.white} />
@@ -765,6 +806,22 @@ export default function ItemsScreen() {
         purchase={openItem}
         visible={openItem !== null}
         onClose={() => setOpenItem(null)}
+      />
+
+      <CostEntrySheet
+        visible={bulkCostIds !== null}
+        title={t("enterCosts")}
+        currency={household?.currency ?? "JOD"}
+        items={bulkCostItems}
+        loading={busyAction === "bought"}
+        onConfirm={(entries) => void completeBulkBought(entries)}
+        onSkip={() =>
+          void completeBulkBought((bulkCostIds ?? []).map((id) => ({ id, cost: null })))
+        }
+        onClose={() => {
+          if (busyAction === "bought") return;
+          setBulkCostIds(null);
+        }}
       />
 
       <ConfirmModal

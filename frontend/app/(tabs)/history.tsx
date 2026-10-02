@@ -1,6 +1,7 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Dimensions, Modal, Pressable, ScrollView, View } from "react-native";
 import { HistoryDateField } from "@/components/purchases/HistoryDateField";
 import { ItemDetailCard } from "@/components/purchases/ItemDetailCard";
@@ -10,10 +11,11 @@ import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
-import { Screen } from "@/components/ui/Screen";
+import { Screen, SwipeSlideContent } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { usePurchases } from "@/hooks/usePurchases";
 import { useHousehold } from "@/hooks/useHousehold";
+import { formatMoney, sumKnownCosts } from "@/lib/currency";
 import { fetchLists, listLabel, type HomeList } from "@/lib/lists";
 import { canUndoBought } from "@/lib/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -22,6 +24,7 @@ import { headerIconFrameStyle, iconSize } from "@/constants/theme";
 import type { Purchase } from "@/types/purchase";
 
 type HistoryRange = "all" | "today" | "week" | "month";
+type HistoryMode = "list" | "invoice";
 type Anchor = { x: number; y: number; width: number; height: number };
 
 const HISTORY_RANGES: HistoryRange[] = ["all", "today", "week", "month"];
@@ -30,13 +33,14 @@ export default function HistoryScreen() {
   const { bought, isLoading, error, refresh, undoBought, addItem } = usePurchases();
   const { household } = useHousehold();
   const { t, locale, isRTL } = useI18n();
-  const { scheme } = useTheme();
+  const { colors, scheme } = useTheme();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
   const [undoId, setUndoId] = useState<string | null>(null);
   const [buyAgainId, setBuyAgainId] = useState<string | null>(null);
   const [buyAgainNotice, setBuyAgainNotice] = useState<string | null>(null);
   const [range, setRange] = useState<HistoryRange>("all");
+  const [mode, setMode] = useState<HistoryMode>("list");
   const [lists, setLists] = useState<HomeList[]>([]);
   const [listId, setListId] = useState<string>("all");
   const [pickedDate, setPickedDate] = useState<Date | null>(null);
@@ -48,6 +52,8 @@ export default function HistoryScreen() {
   const rangeButtonRef = useRef<View>(null);
   const [openItem, setOpenItem] = useState<Purchase | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const costsEnabled = household?.costsEnabled === true;
+  const currency = household?.currency ?? "JOD";
   const hasUndo = bought.some((item) => canUndoBought(item.boughtAt, now));
   const visible = bought.filter((item) => {
     const inList = listId === "all" || item.listId === listId;
@@ -56,6 +62,16 @@ export default function HistoryScreen() {
       : boughtInRange(item.boughtAt, range, now);
     return inList && inDate;
   });
+
+  useEffect(() => {
+    if (!openItem) return;
+    const next = bought.find((item) => item.id === openItem.id);
+    setOpenItem(next ?? null);
+  }, [bought, openItem?.id]);
+  const spend = useMemo(
+    () => sumKnownCosts(visible.map((item) => item.cost)),
+    [visible],
+  );
   const pickedLabel = pickedDate
     ? new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
         year: "numeric",
@@ -69,6 +85,11 @@ export default function HistoryScreen() {
     week: t("historyWeek"),
     month: t("historyMonth"),
   };
+  const periodTitle = pickedLabel ?? rangeLabel[range];
+
+  useEffect(() => {
+    if (!costsEnabled && mode === "invoice") setMode("list");
+  }, [costsEnabled, mode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -99,6 +120,25 @@ export default function HistoryScreen() {
     const timer = setTimeout(() => setBuyAgainNotice(null), 2500);
     return () => clearTimeout(timer);
   }, [buyAgainNotice]);
+
+  const canSwipeMode = useCallback(
+    (direction: "next" | "previous") => {
+      if (!costsEnabled) return false;
+      const toInvoice = direction === "next" ? !isRTL : isRTL;
+      return toInvoice ? mode === "list" : mode === "invoice";
+    },
+    [costsEnabled, isRTL, mode],
+  );
+
+  const onSwipeMode = useCallback(
+    (direction: "next" | "previous") => {
+      if (!costsEnabled) return;
+      const toInvoice = direction === "next" ? !isRTL : isRTL;
+      setMode(toInvoice ? "invoice" : "list");
+      void Haptics.selectionAsync();
+    },
+    [costsEnabled, isRTL],
+  );
 
   async function undo(id: string) {
     setUndoId(id);
@@ -171,87 +211,136 @@ export default function HistoryScreen() {
       tabBarInset
       refreshing={isRefreshing}
       onRefresh={() => void onRefresh()}
+      onSwipe={costsEnabled ? onSwipeMode : undefined}
+      canSwipe={costsEnabled ? canSwipeMode : undefined}
     >
       <ScreenHeader
-        title={t("historyTitle")}
-        subtitle={t("historySubtitle")}
+        title={mode === "invoice" ? t("invoiceTitle") : t("historyTitle")}
+        subtitle={mode === "invoice" ? t("invoiceSubtitle") : t("historySubtitle")}
         icon={
           <View
             className="items-center justify-center"
             style={headerIconFrameStyle(scheme)}
           >
-            <Ionicons name="time-outline" size={34} color="#FFFFFF" />
+            <Ionicons
+              name={mode === "invoice" ? "receipt-outline" : "time-outline"}
+              size={34}
+              color="#FFFFFF"
+            />
           </View>
+        }
+        right={
+          costsEnabled ? (
+            <Pressable
+              onPress={() => {
+                setMode((current) => (current === "list" ? "invoice" : "list"));
+                void Haptics.selectionAsync();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={mode === "list" ? t("openInvoice") : t("backToHistoryList")}
+              className="rounded-full bg-white px-3 py-2 active:opacity-80"
+            >
+              <AppText className="text-sm font-semibold" style={{ color: colors.accent }}>
+                {mode === "list" ? t("openInvoice") : t("backToHistoryList")}
+              </AppText>
+            </Pressable>
+          ) : null
         }
       />
 
-      {bought.length > 0 ? (
-        <HistoryDateField
-          value={pickedDate}
-          onChange={(date) => setPickedDate(date)}
-          leading={
-            <>
-              <View ref={listButtonRef} collapsable={false} className="min-w-0 flex-1">
-                <ChoiceButton
-                  icon="list-outline"
-                  selected={listId !== "all"}
-                  label={
-                    listId === "all"
-                      ? t("allLists")
-                      : listLabel(lists.find((list) => list.id === listId)?.name ?? "", t("defaultList"))
-                  }
-                  onPress={() => openAnchored(listButtonRef, setListAnchor, setIsChoosingList)}
-                />
-              </View>
-              <View ref={rangeButtonRef} collapsable={false} className="min-w-0 flex-1">
-                <ChoiceButton
-                  icon="time-outline"
-                  selected={pickedDate !== null || range !== "all"}
-                  label={pickedLabel ?? rangeLabel[range]}
-                  onPress={() => openAnchored(rangeButtonRef, setRangeAnchor, setIsChoosingRange)}
-                />
-              </View>
-            </>
-          }
-        />
-      ) : null}
+      <SwipeSlideContent>
+        {bought.length > 0 ? (
+          <HistoryDateField
+            value={pickedDate}
+            onChange={(date) => setPickedDate(date)}
+            leading={
+              <>
+                <View ref={listButtonRef} collapsable={false} className="min-w-0 flex-1">
+                  <ChoiceButton
+                    icon="list-outline"
+                    selected={listId !== "all"}
+                    label={
+                      listId === "all"
+                        ? t("allLists")
+                        : listLabel(lists.find((list) => list.id === listId)?.name ?? "", t("defaultList"))
+                    }
+                    onPress={() => openAnchored(listButtonRef, setListAnchor, setIsChoosingList)}
+                  />
+                </View>
+                <View ref={rangeButtonRef} collapsable={false} className="min-w-0 flex-1">
+                  <ChoiceButton
+                    icon="time-outline"
+                    selected={pickedDate !== null || range !== "all"}
+                    label={pickedLabel ?? rangeLabel[range]}
+                    onPress={() => openAnchored(rangeButtonRef, setRangeAnchor, setIsChoosingRange)}
+                  />
+                </View>
+              </>
+            }
+          />
+        ) : null}
 
-      <FormMessage message={undoError ?? error} />
-      <FormMessage message={buyAgainNotice} tone="success" />
+        {costsEnabled && visible.length > 0 ? (
+          <View className="mb-4 rounded-3xl bg-cove-paper px-4 py-3">
+            <AppText className="text-sm font-semibold text-cove-ink">
+              {t("costSummary", {
+                priced: spend.priced,
+                count: spend.count,
+                total: formatMoney(spend.total, currency),
+              })}
+            </AppText>
+            <AppText className="mt-1 text-xs text-cove-muted">{periodTitle}</AppText>
+          </View>
+        ) : null}
 
-      {bought.length === 0 ? (
-        <EmptyState
-          title={t("noPurchases")}
-          message={t("noPurchasesBody")}
-        />
-      ) : visible.length === 0 ? (
-        <EmptyState
-          title={pickedLabel ? t("historyNoDateData") : t("historyFilterEmpty")}
-          message={
-            pickedLabel
-              ? t("historyNoDateDataBody", { date: pickedLabel })
-              : t("historyFilterEmptyBody")
-          }
-        />
-      ) : (
-        <View className="gap-3">
-          {visible.map((purchase) => (
-            <PurchaseRow
-              key={purchase.id}
-              purchase={purchase}
-              onPress={() => setOpenItem(purchase)}
-              onUndo={
-                canUndoBought(purchase.boughtAt, now) && undoId !== purchase.id
-                  ? () => void undo(purchase.id)
-                  : undefined
-              }
-              onBuyAgain={
-                buyAgainId === purchase.id ? undefined : () => void buyAgain(purchase)
-              }
-            />
-          ))}
-        </View>
-      )}
+        <FormMessage message={undoError ?? error} />
+        <FormMessage message={buyAgainNotice} tone="success" />
+
+        {bought.length === 0 ? (
+          <EmptyState
+            title={t("noPurchases")}
+            message={t("noPurchasesBody")}
+          />
+        ) : visible.length === 0 ? (
+          <EmptyState
+            title={pickedLabel ? t("historyNoDateData") : t("historyFilterEmpty")}
+            message={
+              pickedLabel
+                ? t("historyNoDateDataBody", { date: pickedLabel })
+                : t("historyFilterEmptyBody")
+            }
+          />
+        ) : mode === "invoice" ? (
+          <InvoiceView
+            items={visible}
+            currency={currency}
+            periodTitle={periodTitle}
+            locale={locale}
+            total={spend.total}
+            priced={spend.priced}
+            count={spend.count}
+            onPressItem={setOpenItem}
+          />
+        ) : (
+          <View className="gap-3">
+            {visible.map((purchase) => (
+              <PurchaseRow
+                key={purchase.id}
+                purchase={purchase}
+                onPress={() => setOpenItem(purchase)}
+                onUndo={
+                  canUndoBought(purchase.boughtAt, now) && undoId !== purchase.id
+                    ? () => void undo(purchase.id)
+                    : undefined
+                }
+                onBuyAgain={
+                  buyAgainId === purchase.id ? undefined : () => void buyAgain(purchase)
+                }
+              />
+            ))}
+          </View>
+        )}
+      </SwipeSlideContent>
 
       <ItemDetailCard
         purchase={openItem}
@@ -287,6 +376,96 @@ export default function HistoryScreen() {
         onClose={() => setIsChoosingRange(false)}
       />
     </Screen>
+  );
+}
+
+function InvoiceView({
+  items,
+  currency,
+  periodTitle,
+  locale,
+  total,
+  priced,
+  count,
+  onPressItem,
+}: {
+  items: Purchase[];
+  currency: string;
+  periodTitle: string;
+  locale: string;
+  total: number;
+  priced: number;
+  count: number;
+  onPressItem: (item: Purchase) => void;
+}) {
+  const { t } = useI18n();
+  const { colors, scheme } = useTheme();
+
+  if (items.length === 0) {
+    return (
+      <EmptyState title={t("invoiceEmpty")} message={t("invoiceEmptyBody")} />
+    );
+  }
+
+  return (
+    <View
+      className="overflow-hidden rounded-3xl border border-cove-line px-4 py-4"
+      style={{ backgroundColor: scheme === "dark" ? colors.paper : colors.paper }}
+    >
+      <AppText className="text-lg font-semibold text-cove-ink">{periodTitle}</AppText>
+      <AppText className="mt-1 text-sm text-cove-muted">
+        {t("costSummary", {
+          priced,
+          count,
+          total: formatMoney(total, currency),
+        })}
+      </AppText>
+
+      <View className="mt-4 gap-0">
+        {items.map((item, index) => {
+          const when = item.boughtAt
+            ? new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+                month: "short",
+                day: "numeric",
+              }).format(new Date(item.boughtAt))
+            : "";
+          const qty = item.unit ? `${item.quantity} ${item.unit}` : String(item.quantity);
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => onPressItem(item)}
+              className="flex-row items-start justify-between gap-3 py-3 active:opacity-80"
+              style={
+                index < items.length - 1
+                  ? { borderBottomWidth: 1, borderBottomColor: colors.line }
+                  : undefined
+              }
+            >
+              <View className="min-w-0 flex-1">
+                <AppText className="text-base font-semibold text-cove-ink" numberOfLines={2}>
+                  {item.name}
+                </AppText>
+                <AppText className="mt-1 text-xs text-cove-muted">
+                  {qty}
+                  {item.boughtByName ? ` · ${item.boughtByName}` : ""}
+                  {when ? ` · ${when}` : ""}
+                </AppText>
+              </View>
+              <AppText className="text-base font-semibold text-cove-ink">
+                {formatMoney(item.cost, currency, t("noPrice"))}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View className="mt-4 flex-row items-center justify-between border-t border-cove-line pt-4">
+        <AppText className="text-base font-semibold text-cove-ink">{t("itemCost")}</AppText>
+        <AppText className="text-lg font-semibold text-cove-accent">
+          {formatMoney(total, currency)}
+        </AppText>
+      </View>
+    </View>
   );
 }
 

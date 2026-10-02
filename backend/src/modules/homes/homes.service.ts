@@ -19,6 +19,11 @@ export type Household = {
   name: string;
   inviteCode: string;
   createdAt: Date;
+  costsEnabled: boolean;
+  currency: string;
+  askCostOnSingleBuy: boolean;
+  askCostOnBulkBuy: boolean;
+  askCostOnTripEnd: boolean;
   members: HouseholdMember[];
 };
 
@@ -123,6 +128,39 @@ export class HomesService {
     }
     await this.requireMembership(userId, homeId);
     await this.dataSource.getRepository(Home).update(homeId, { name: homeName });
+    return this.loadHousehold(homeId);
+  }
+
+  async updateCostSettings(
+    userId: string,
+    homeId: string,
+    input: {
+      costsEnabled?: boolean;
+      currency?: string;
+      askCostOnSingleBuy?: boolean;
+      askCostOnBulkBuy?: boolean;
+      askCostOnTripEnd?: boolean;
+    },
+  ) {
+    const membership = await this.requireMembership(userId, homeId);
+    if (membership.role !== "owner") {
+      throw new DomainError(
+        "ONLY_HOST_CAN_UPDATE_COSTS",
+        "Only the host can change cost settings",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const patch: Partial<Home> = {};
+    if (typeof input.costsEnabled === "boolean") patch.costsEnabled = input.costsEnabled;
+    if (typeof input.currency === "string") patch.currency = input.currency;
+    if (typeof input.askCostOnSingleBuy === "boolean") patch.askCostOnSingleBuy = input.askCostOnSingleBuy;
+    if (typeof input.askCostOnBulkBuy === "boolean") patch.askCostOnBulkBuy = input.askCostOnBulkBuy;
+    if (typeof input.askCostOnTripEnd === "boolean") patch.askCostOnTripEnd = input.askCostOnTripEnd;
+
+    if (Object.keys(patch).length > 0) {
+      await this.dataSource.getRepository(Home).update(homeId, patch);
+    }
     return this.loadHousehold(homeId);
   }
 
@@ -251,6 +289,11 @@ export class HomesService {
       name: home.name,
       inviteCode: home.inviteCode,
       createdAt: home.createdAt,
+      costsEnabled: home.costsEnabled,
+      currency: home.currency,
+      askCostOnSingleBuy: home.askCostOnSingleBuy,
+      askCostOnBulkBuy: home.askCostOnBulkBuy,
+      askCostOnTripEnd: home.askCostOnTripEnd,
       members: rows.map((row) => ({
         id: row.id,
         role: row.role,

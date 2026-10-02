@@ -11,6 +11,7 @@ export type Purchase = {
   notes?: string;
   status: PurchaseStatus;
   urgent: boolean;
+  cost?: number | null;
   listId?: string;
   listName?: string;
   addedByName: string;
