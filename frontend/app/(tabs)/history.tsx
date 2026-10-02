@@ -253,7 +253,7 @@ export default function HistoryScreen() {
             <Ionicons
               name={mode === "invoice" ? "receipt-outline" : "time-outline"}
               size={34}
-              color="#FFFFFF"
+              color={scheme === "dark" ? colors.ink : colors.onAccent}
             />
           </View>
         }
@@ -525,11 +525,11 @@ function ChoiceButton({
         borderColor: selected ? colors.accent : colors.line,
       }}
     >
-      <Ionicons name={icon} size={15} color={selected ? colors.white : colors.accent} />
+      <Ionicons name={icon} size={15} color={selected ? colors.onAccent : colors.accent} />
       <AppText
         numberOfLines={1}
         className="shrink text-xs font-semibold"
-        style={{ color: selected ? colors.white : colors.ink }}
+        style={{ color: selected ? colors.onAccent : colors.ink }}
       >
         {label}
       </AppText>
@@ -600,12 +600,12 @@ function OptionMenu({
                   <AppText
                     numberOfLines={1}
                     className="min-w-0 flex-1 text-sm font-medium"
-                    style={{ color: selected ? colors.white : colors.ink }}
+                    style={{ color: selected ? colors.onAccent : colors.ink }}
                   >
                     {option.label}
                   </AppText>
                   {selected ? (
-                    <Ionicons name="checkmark" size={iconSize.sm} color={colors.white} />
+                    <Ionicons name="checkmark" size={iconSize.sm} color={colors.onAccent} />
                   ) : null}
                 </Pressable>
               );

@@ -35,7 +35,7 @@ export default function SettingsScreen() {
   const { user, signOut, changePassword, updateProfile } = useAuth();
   const { household, refresh: refreshHome, adoptHome } = useHousehold();
   const { colors, scheme, setScheme } = useTheme();
-  const { t, locale } = useI18n();
+  const { t, locale, isRTL } = useI18n();
   const [openCard, setOpenCard] = useState<
     "account" | "app" | "costs" | "language" | "appearance" | null
   >(null);
@@ -70,16 +70,23 @@ export default function SettingsScreen() {
     household?.members.some((member) => member.id === user?.id && member.role === "owner") ===
     true;
 
-  useEffect(() => {
-    if (!user) return;
-    if (!isEditingName) setName(user.name?.trim() || t("member"));
-    if (!isEditingUsername) setUsername(user.email ?? "");
-  }, [user, isEditingName, isEditingUsername, t]);
+  if (user && !isEditingName) {
+    const nextName = user.name?.trim() || t("member");
+    if (name !== nextName) setName(nextName);
+  }
+  if (user && !isEditingUsername) {
+    const nextUsername = user.email ?? "";
+    if (username !== nextUsername) setUsername(nextUsername);
+  }
 
   useEffect(() => {
     if (!user || !canUsePush() || !readPushEnabled()) return;
     void syncPushRegistration(locale).then(setPushStatus);
   }, [locale, user]);
+
+  if (!household && openCard === "costs") {
+    setOpenCard(null);
+  }
 
   async function onTogglePush(enabled: boolean) {
     setIsUpdatingPush(true);
@@ -209,11 +216,7 @@ export default function SettingsScreen() {
     { id: "light", label: t("light") },
     { id: "dark", label: t("dark") },
   ];
-  const costsSummary = !household
-    ? t("costsSectionBody")
-    : household.costsEnabled
-      ? t("trackCosts")
-      : t("costsSection");
+  const costsSummary = household?.costsEnabled ? t("trackCosts") : t("costsSectionBody");
 
   return (
     <Screen tabBarInset>
@@ -225,7 +228,11 @@ export default function SettingsScreen() {
             className="items-center justify-center"
             style={headerIconFrameStyle(scheme, colors)}
           >
-            <Ionicons name="settings-outline" size={34} color="#FFFFFF" />
+            <Ionicons
+              name="settings-outline"
+              size={34}
+              color={scheme === "dark" ? colors.ink : colors.onAccent}
+            />
           </View>
         }
       />
@@ -281,7 +288,7 @@ export default function SettingsScreen() {
                   <FormMessage message={nameSuccess} tone="success" />
                 </View>
                 <EditButton
-                  variant="mist"
+                  variant="paper"
                   accessibilityLabel={t("editName")}
                   onPress={() => {
                     setName(displayName);
@@ -337,7 +344,7 @@ export default function SettingsScreen() {
                   <FormMessage message={usernameSuccess} tone="success" />
                 </View>
                 <EditButton
-                  variant="mist"
+                  variant="paper"
                   accessibilityLabel={t("editUsername")}
                   onPress={() => {
                     setUsername(user?.email ?? "");
@@ -442,7 +449,11 @@ export default function SettingsScreen() {
                 </AppText>
                 <AppText className="mt-1 text-sm text-cove-muted">{t("staplesSubtitle")}</AppText>
               </View>
-              <Ionicons name="chevron-forward" size={iconSize.sm} color={colors.muted} />
+              <Ionicons
+                name={isRTL ? "chevron-back" : "chevron-forward"}
+                size={iconSize.sm}
+                color={colors.muted}
+              />
             </Pressable>
           </CardBlock>
 
@@ -558,8 +569,9 @@ export default function SettingsScreen() {
                           >
                             <AppText
                               className={`text-base font-semibold ${
-                                selected ? "text-white" : "text-cove-ink"
+                                selected ? "" : "text-cove-ink"
                               }`}
+                              style={selected ? { color: colors.onAccent } : undefined}
                             >
                               {t(option.labelKey as "currencyJOD")}
                             </AppText>
@@ -635,8 +647,9 @@ export default function SettingsScreen() {
                   >
                     <AppText
                       className={`text-base font-semibold ${
-                        selected ? "text-white" : "text-cove-ink"
+                        selected ? "" : "text-cove-ink"
                       }`}
+                      style={selected ? { color: colors.onAccent } : undefined}
                     >
                       {option.label}
                     </AppText>
@@ -727,7 +740,7 @@ function SettingsCard({
 }
 
 function CardBlock({ children }: { children: ReactNode }) {
-  return <View className="rounded-2xl bg-cove-soft px-3.5 py-3.5">{children}</View>;
+  return <View className="rounded-2xl bg-cove-mist px-3.5 py-3.5">{children}</View>;
 }
 
 function CostAskToggle({

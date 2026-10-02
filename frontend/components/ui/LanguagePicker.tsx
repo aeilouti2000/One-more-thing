@@ -2,6 +2,7 @@ import { Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { LOCALES } from "@/constants/i18n";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useTheme } from "@/providers/ThemeProvider";
 
 type LanguagePickerProps = {
   size?: "regular" | "compact";
@@ -9,6 +10,7 @@ type LanguagePickerProps = {
 
 export function LanguagePicker({ size = "regular" }: LanguagePickerProps) {
   const { locale, setLocale, t } = useI18n();
+  const { colors } = useTheme();
   const compact = size === "compact";
 
   return (
@@ -28,12 +30,13 @@ export function LanguagePicker({ size = "regular" }: LanguagePickerProps) {
             onPress={() => setLocale(option.id)}
             className={`items-center active:opacity-80 ${
               compact ? "rounded-full px-4 py-1.5" : "flex-1 rounded-2xl px-4 py-3"
-            } ${selected ? "bg-cove-accent" : "bg-cove-mist"}`}
+            } ${selected ? "bg-cove-accent" : "bg-cove-paper"}`}
           >
             <AppText
               className={`font-semibold ${compact ? "text-sm" : "text-base"} ${
-                selected ? "text-white" : "text-cove-ink"
+                selected ? "" : "text-cove-ink"
               }`}
+              style={selected ? { color: colors.onAccent } : undefined}
             >
               {option.label}
             </AppText>

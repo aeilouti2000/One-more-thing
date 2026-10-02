@@ -101,6 +101,30 @@ function withAlpha(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`;
 }
 
+function relativeLuminance(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const toLinear = (channel) => {
+    const value = channel / 255;
+    return value <= 0.03928
+      ? value / 12.92
+      : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return (
+    0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
+  );
+}
+
+function onAccentFor(accentHex) {
+  return relativeLuminance(accentHex) > 0.55 ? "#121212" : "#FFFFFF";
+}
+
+function withOnAccent(palette) {
+  return {
+    ...palette,
+    onAccent: onAccentFor(palette.accent),
+  };
+}
+
 function buildColors(scheme, accentHex) {
   const accent = normalizeHex(accentHex) ?? DEFAULT_ACCENT;
   const { h, s } = hexToHsl(accent);
@@ -108,11 +132,11 @@ function buildColors(scheme, accentHex) {
 
   if (neutral) {
     if (scheme === "dark") {
-      return {
+      return withOnAccent({
         ice: "#0E0E0E",
         paper: "#1A1A1A",
-        mist: "#242424",
-        line: "#333333",
+        mist: "#2A2A2A",
+        line: "#3A3A3A",
         muted: "#B0B0B0",
         ink: "#F2F2F2",
         accent: "#E0E0E0",
@@ -121,10 +145,10 @@ function buildColors(scheme, accentHex) {
         deep: "#121212",
         white: "#FFFFFF",
         transparent: "transparent",
-      };
+      });
     }
 
-    return {
+    return withOnAccent({
       ice: "#F5F5F5",
       paper: "#FFFFFF",
       mist: "#EEEEEE",
@@ -137,14 +161,14 @@ function buildColors(scheme, accentHex) {
       deep: "#212121",
       white: "#FFFFFF",
       transparent: "transparent",
-    };
+    });
   }
 
   const sat = clamp(s, 42, 88);
 
   if (scheme === "dark") {
     const tint = hslToHex(h, sat, 48);
-    return {
+    return withOnAccent({
       ice: mixHex("#0A1018", tint, 0.22),
       paper: mixHex("#121C28", tint, 0.34),
       mist: mixHex("#162436", tint, 0.4),
@@ -157,10 +181,10 @@ function buildColors(scheme, accentHex) {
       deep: mixHex("#0C1420", tint, 0.24),
       white: "#FFFFFF",
       transparent: "transparent",
-    };
+    });
   }
 
-  return {
+  return withOnAccent({
     ice: hslToHex(h, clamp(sat, 40, 72), 94),
     paper: "#FFFFFF",
     mist: hslToHex(h, clamp(sat, 38, 68), 88),
@@ -173,7 +197,7 @@ function buildColors(scheme, accentHex) {
     deep: hslToHex(h, clamp(sat + 12, 52, 90), 28),
     white: "#FFFFFF",
     transparent: "transparent",
-  };
+  });
 }
 
 const lightColors = buildColors("light", DEFAULT_ACCENT);
@@ -299,6 +323,7 @@ function getCssVars(palette) {
     "--color-cove-ink": palette.ink,
     "--color-cove-accent": palette.accent,
     "--color-cove-accent-deep": palette.accentDeep,
+    "--color-cove-on-accent": palette.onAccent,
     "--color-cove-soft": palette.soft,
     "--color-cove-deep": palette.deep,
   };

@@ -109,7 +109,7 @@ export function CategoryFilter({
           <Ionicons
             name="chevron-down"
             size={20}
-            color={filtered ? colors.white : colors.accent}
+            color={filtered ? colors.onAccent : colors.accent}
           />
         </View>
         <AppText
@@ -222,7 +222,7 @@ export function CategoryFilter({
                     <Ionicons
                       name="add"
                       size={22}
-                      color={canAdd ? colors.white : colors.muted}
+                      color={canAdd ? colors.onAccent : colors.muted}
                     />
                   </Pressable>
                 </View>
@@ -269,7 +269,7 @@ function CategoryOption({
     >
       <AppText
         className="min-w-0 flex-1 text-sm font-medium"
-        style={{ color: selected ? colors.white : colors.ink }}
+        style={{ color: selected ? colors.onAccent : colors.ink }}
       >
         {text}
       </AppText>
@@ -292,13 +292,13 @@ function CategoryOption({
             <Ionicons
               name="trash-outline"
               size={15}
-              color={selected ? colors.white : "#F87171"}
+              color={selected ? colors.onAccent : "#F87171"}
             />
           </Pressable>
         ) : null}
         {selected ? (
           <View className="h-8 w-8 items-center justify-center">
-            <Ionicons name="checkmark" size={iconSize.sm} color={colors.white} />
+            <Ionicons name="checkmark" size={iconSize.sm} color={colors.onAccent} />
           </View>
         ) : null}
       </View>

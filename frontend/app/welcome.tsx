@@ -12,7 +12,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 
 export default function WelcomeScreen() {
   const { t } = useI18n();
-  const { scheme } = useTheme();
+  const { colors, scheme } = useTheme();
 
   return (
     <GuestOnly>
@@ -42,13 +42,19 @@ export default function WelcomeScreen() {
             <View className="relative z-10">
               <View className="mb-5 flex-row items-center gap-4">
                 <AppLogo size={logo.size} />
-                <AppText className="flex-1 text-3xl font-semibold text-white">
+                <AppText
+                  className="flex-1 text-3xl font-semibold"
+                  style={{ color: scheme === "dark" ? colors.ink : colors.onAccent }}
+                >
                   {t("appName")}
                 </AppText>
               </View>
               <AppText
-                className="max-w-[320px] text-lg leading-7 text-white"
-                style={{ opacity: 0.9 }}
+                className="max-w-[320px] text-lg leading-7"
+                style={{
+                  color: scheme === "dark" ? colors.ink : colors.onAccent,
+                  opacity: 0.9,
+                }}
               >
                 {t("appTagline")}
               </AppText>

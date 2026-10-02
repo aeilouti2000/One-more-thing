@@ -97,7 +97,7 @@ export default function ItemsScreen() {
     : [];
   const headerButton = {
     backgroundColor: scheme === "dark" ? colors.accent : colors.white,
-    icon: scheme === "dark" ? colors.white : colors.accent,
+    icon: scheme === "dark" ? colors.onAccent : colors.accent,
   };
   const visibleItems =
     category === "all"
@@ -540,7 +540,7 @@ export default function ItemsScreen() {
           }}
           icon={
             <View className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-accent">
-              <MaterialCommunityIcons name="cart-check" size={18} color={colors.white} />
+              <MaterialCommunityIcons name="cart-check" size={18} color={colors.onAccent} />
             </View>
           }
         />
@@ -670,7 +670,8 @@ export default function ItemsScreen() {
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.65}
-            className="text-3xl font-semibold tracking-tight text-white"
+            className="text-3xl font-semibold tracking-tight"
+            style={{ color: scheme === "dark" ? colors.ink : colors.onAccent }}
           >
             {household?.name ?? t("yourItems")}
           </AppText>
@@ -885,9 +886,9 @@ export default function ItemsScreen() {
               }`}
             >
               {isSavingList ? (
-                <ActivityIndicator color={colors.white} />
+                <ActivityIndicator color={colors.onAccent} />
               ) : (
-                <AppText className="text-sm font-semibold text-white">
+                <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
                   {editingListId ? t("saveChanges") : t("createList")}
                 </AppText>
               )}
@@ -983,8 +984,10 @@ export default function ItemsScreen() {
               accessibilityLabel={t("newList")}
               className="mt-2 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-cove-accent active:opacity-80"
             >
-              <Ionicons name="add" size={20} color={colors.white} />
-              <AppText className="text-base font-semibold text-white">{t("newList")}</AppText>
+              <Ionicons name="add" size={20} color={colors.onAccent} />
+              <AppText className="text-base font-semibold" style={{ color: colors.onAccent }}>
+                {t("newList")}
+              </AppText>
             </Pressable>
           </View>
         </View>

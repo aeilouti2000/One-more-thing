@@ -56,12 +56,12 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
           <Ionicons
             name="calendar-outline"
             size={15}
-            color={selected ? colors.white : colors.accent}
+            color={selected ? colors.onAccent : colors.accent}
           />
           <AppText
             numberOfLines={1}
             className="shrink text-xs font-semibold"
-            style={{ color: selected ? colors.white : colors.ink }}
+            style={{ color: selected ? colors.onAccent : colors.ink }}
           >
             {label}
           </AppText>
@@ -143,7 +143,7 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
                         color: disabled
                           ? colors.line
                           : isSelected
-                            ? colors.white
+                            ? colors.onAccent
                             : colors.ink,
                       }}
                     >

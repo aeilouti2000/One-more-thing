@@ -109,7 +109,9 @@ export function CategoryField({ value, onChange, glass = false }: CategoryFieldP
                         name={item.builtin ? null : item.name}
                         selected={selected}
                       />
-                      {selected ? <Ionicons name="checkmark" size={16} color={colors.white} /> : null}
+                      {selected ? (
+                        <Ionicons name="checkmark" size={16} color={colors.onAccent} />
+                      ) : null}
                     </Pressable>
                   );
                 })}
@@ -157,7 +159,7 @@ function CategoryChoice({
   const label = useCategoryLabel(name ? "" : id);
 
   return (
-    <AppText className="text-sm font-medium" style={{ color: selected ? colors.white : colors.ink }}>
+    <AppText className="text-sm font-medium" style={{ color: selected ? colors.onAccent : colors.ink }}>
       {name ?? label}
     </AppText>
   );

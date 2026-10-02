@@ -19,7 +19,7 @@ const variants = {
 };
 
 const labelVariants = {
-  primary: "text-white",
+  primary: "text-cove-on-accent",
   secondary: "text-cove-ink",
   ghost: "text-cove-accent",
   danger: "",
@@ -52,7 +52,7 @@ export function AppButton({
         <ActivityIndicator
           color={
             variant === "primary"
-              ? colors.white
+              ? colors.onAccent
               : variant === "danger"
                 ? danger
                 : colors.accent

@@ -34,7 +34,7 @@ export function CategoryChip({
       <AppText
         key={locale}
         className={dense ? "text-xs font-medium" : "text-sm font-medium"}
-        style={{ color: selected ? colors.white : colors.ink }}
+        style={{ color: selected ? colors.onAccent : colors.ink }}
       >
         {text}
       </AppText>

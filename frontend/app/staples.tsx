@@ -245,7 +245,7 @@ function StaplesBody() {
             className="flex-row items-center gap-3 px-4 py-3.5 active:opacity-80"
           >
             <View className="h-11 w-11 items-center justify-center rounded-2xl bg-cove-accent">
-              <MaterialCommunityIcons name="pin" size={20} color={colors.white} />
+              <MaterialCommunityIcons name="pin" size={20} color={colors.onAccent} />
             </View>
             <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
               {t("addStaple")}
@@ -494,7 +494,7 @@ function StaplesBody() {
                       >
                         <AppText
                           className="text-xs font-medium"
-                          style={{ color: selected ? colors.white : colors.ink }}
+                          style={{ color: selected ? colors.onAccent : colors.ink }}
                         >
                           {t(intervalKeys[days])}
                         </AppText>
@@ -516,7 +516,9 @@ function StaplesBody() {
                   }`}
                 >
                   {addNow ? (
-                    <AppText className="text-xs font-semibold text-white">✓</AppText>
+                    <AppText className="text-xs font-semibold" style={{ color: colors.onAccent }}>
+                      ✓
+                    </AppText>
                   ) : null}
                 </View>
                 <AppText className="text-base text-cove-ink">{t("addToListNow")}</AppText>

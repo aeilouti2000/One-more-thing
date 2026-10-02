@@ -17,6 +17,7 @@ module.exports = {
           ink: "var(--color-cove-ink)",
           accent: "var(--color-cove-accent)",
           "accent-deep": "var(--color-cove-accent-deep)",
+          "on-accent": "var(--color-cove-on-accent)",
           soft: "var(--color-cove-soft)",
           deep: "var(--color-cove-deep)",
         },

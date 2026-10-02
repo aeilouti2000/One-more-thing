@@ -619,7 +619,7 @@ function TripCheckRow({
                     markStyle,
                   ]}
                 >
-                  <Ionicons name="checkmark" size={17} color={colors.white} />
+                  <Ionicons name="checkmark" size={17} color={colors.onAccent} />
                 </Animated.View>
               </View>
               <View className="min-w-0 flex-1">

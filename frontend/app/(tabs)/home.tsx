@@ -188,7 +188,11 @@ export default function HomeScreen() {
             className="items-center justify-center"
             style={headerIconFrameStyle(scheme, colors)}
           >
-            <Ionicons name="home-outline" size={34} color="#FFFFFF" />
+            <Ionicons
+              name="home-outline"
+              size={34}
+              color={scheme === "dark" ? colors.ink : colors.onAccent}
+            />
           </View>
         }
       />

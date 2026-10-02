@@ -128,7 +128,7 @@ export function PurchaseRow({
                       quantityBusy ? "opacity-40" : "active:opacity-80"
                     }`}
                   >
-                    <Ionicons name="add" size={16} color={colors.white} />
+                    <Ionicons name="add" size={16} color={colors.onAccent} />
                   </Pressable>
                 </View>
               ) : (

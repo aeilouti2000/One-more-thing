@@ -187,9 +187,9 @@ export function QuickAddBar({
             }}
           >
             {busy ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator color={colors.onAccent} size="small" />
             ) : (
-              <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Ionicons name="add" size={20} color={colors.onAccent} />
             )}
           </Pressable>
         </Animated.View>

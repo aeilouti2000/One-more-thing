@@ -34,6 +34,7 @@ export function ScreenHeader({
 }: ScreenHeaderProps) {
   const { colors, scheme } = useTheme();
   const { isRTL, t } = useI18n();
+  const headerFg = scheme === "dark" ? colors.ink : colors.onAccent;
 
   return (
     <View
@@ -92,14 +93,17 @@ export function ScreenHeader({
             {children ?? (
               <>
                 {title ? (
-                  <AppText className="text-3xl font-semibold tracking-tight text-white">
+                  <AppText
+                    className="text-3xl font-semibold tracking-tight"
+                    style={{ color: headerFg }}
+                  >
                     {title}
                   </AppText>
                 ) : null}
                 {subtitle ? (
                   <AppText
-                    className="mt-1 text-base text-white"
-                    style={{ opacity: 0.88 }}
+                    className="mt-1 text-base"
+                    style={{ color: headerFg, opacity: 0.88 }}
                   >
                     {subtitle}
                   </AppText>

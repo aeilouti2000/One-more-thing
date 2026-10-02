@@ -505,11 +505,13 @@ function EditItemForm({
             }`}
           >
             {isSubmitting ? (
-              <ActivityIndicator color={colors.white} />
+              <ActivityIndicator color={colors.onAccent} />
             ) : (
               <>
-                <MaterialCommunityIcons name="cart-check" size={18} color={colors.white} />
-                <AppText className="text-sm font-semibold text-white">{t("markBought")}</AppText>
+                <MaterialCommunityIcons name="cart-check" size={18} color={colors.onAccent} />
+                <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
+                  {t("markBought")}
+                </AppText>
               </>
             )}
           </Pressable>

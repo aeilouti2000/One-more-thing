@@ -59,8 +59,13 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
           accessibilityLabel={t("inviteCode")}
           className="min-w-0 flex-1 active:opacity-80"
         >
-          <AppText className="text-sm font-medium text-white">{t("inviteCode")}</AppText>
-          <AppText className="mt-2 text-2xl font-semibold tracking-widest text-white">
+          <AppText className="text-sm font-medium" style={{ color: colors.onAccent }}>
+            {t("inviteCode")}
+          </AppText>
+          <AppText
+            className="mt-2 text-2xl font-semibold tracking-widest"
+            style={{ color: colors.onAccent }}
+          >
             {code}
           </AppText>
         </Pressable>
@@ -70,10 +75,10 @@ export function InviteCodeCard({ code, onCopied }: InviteCodeCardProps) {
           accessibilityLabel={t("shareInvite")}
           className="h-11 w-11 items-center justify-center active:opacity-80"
         >
-          <Ionicons name="share-social" size={20} color="#FFFFFF" />
+          <Ionicons name="share-social" size={20} color={colors.onAccent} />
         </Pressable>
       </View>
-      <AppText className="mt-3 text-sm leading-5 text-white/90">
+      <AppText className="mt-3 text-sm leading-5" style={{ color: colors.onAccent, opacity: 0.9 }}>
         {t("inviteCodeHint")}
       </AppText>
     </View>

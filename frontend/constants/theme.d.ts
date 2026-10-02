@@ -9,6 +9,7 @@ export type ThemeColors = {
   ink: string;
   accent: string;
   accentDeep: string;
+  onAccent: string;
   soft: string;
   deep: string;
   white: string;
