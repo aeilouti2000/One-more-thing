@@ -247,13 +247,13 @@ export default function ItemsScreen() {
     setActionError(null);
     const result = await markManyBought(entries);
     setBusyAction(null);
-    setBulkCostIds(null);
 
     if (result.error) {
       setActionError(result.error);
       return;
     }
 
+    setBulkCostIds(null);
     setSelectedIds(new Set());
     setIsConfirmingDelete(false);
   }
@@ -814,6 +814,7 @@ export default function ItemsScreen() {
         currency={household?.currency ?? "JOD"}
         items={bulkCostItems}
         loading={busyAction === "bought"}
+        errorMessage={actionError}
         onConfirm={(entries) => void completeBulkBought(entries)}
         onSkip={() =>
           void completeBulkBought((bulkCostIds ?? []).map((id) => ({ id, cost: null })))
@@ -821,6 +822,7 @@ export default function ItemsScreen() {
         onClose={() => {
           if (busyAction === "bought") return;
           setBulkCostIds(null);
+          setActionError(null);
         }}
       />
 

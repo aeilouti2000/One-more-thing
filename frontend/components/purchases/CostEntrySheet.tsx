@@ -55,6 +55,7 @@ export function CostEntrySheet({
   const { t } = useI18n();
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [hideExternalError, setHideExternalError] = useState(false);
   const symbol = currencySymbol(currency);
   const sessionKey = useMemo(() => itemsIdentity(items), [items]);
 
@@ -71,6 +72,7 @@ export function CostEntrySheet({
     }
     setValues(next);
     setError(null);
+    setHideExternalError(false);
     // items read from latest render when sessionKey/visible change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, sessionKey]);
@@ -97,13 +99,14 @@ export function CostEntrySheet({
         symbol={symbol}
         items={items}
         values={values}
-        error={error ?? errorMessage}
+        error={error ?? (hideExternalError ? null : errorMessage)}
         loading={loading}
         confirmLabel={confirmLabel ?? (items.length > 1 ? t("saveCosts") : t("saveCost"))}
         skipLabel={skipLabel ?? t("skipCostsForNow")}
         onChange={(id, text) => {
           setValues((current) => ({ ...current, [id]: text }));
           setError(null);
+          setHideExternalError(true);
         }}
         onConfirm={submit}
         onSkip={onSkip}

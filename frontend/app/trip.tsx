@@ -211,7 +211,7 @@ function TripBody() {
   }
 
   function leaveTrip() {
-    if (inflightChecks.current > 0 || isSavingCosts) return;
+    if (isSavingCosts) return;
     if (singleCostResolver.current) {
       resolveSingleCost(undefined);
       return;
@@ -222,6 +222,8 @@ function TripBody() {
       exitTrip();
       return;
     }
+    // Block leave only while a check-off animation/API is in flight (not during cost prompt).
+    if (inflightChecks.current > 0) return;
     if (askTripCosts) {
       setFrozenTripCostItems(liveTripCostItems);
       setTripCostOpen(true);
