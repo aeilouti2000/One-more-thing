@@ -25,4 +25,7 @@ export class ShoppingList {
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
+
+  @Column({ name: "deleted_at", type: "timestamptz", nullable: true })
+  deletedAt: Date | null;
 }

@@ -28,6 +28,11 @@ export class ItemsController {
     return this.items.lists(user.id, homeId);
   }
 
+  @Get("homes/:homeId/history-lists")
+  historyLists(@CurrentUser() user: User, @Param("homeId", ParseUUIDPipe) homeId: string) {
+    return this.items.historyLists(user.id, homeId);
+  }
+
   @Post("homes/:homeId/lists")
   createList(
     @CurrentUser() user: User,

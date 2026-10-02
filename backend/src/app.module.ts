@@ -9,6 +9,7 @@ import { type AppConfig, validateEnv } from "./config/env";
 import { ItemSortOrder1740000000006 } from "./database/migrations/1740000000006-ItemSortOrder";
 import { CustomCategories1740000000008 } from "./database/migrations/1740000000008-CustomCategories";
 import { ItemCosts1740000000009 } from "./database/migrations/1740000000009-ItemCosts";
+import { SoftDeleteLists1740000000010 } from "./database/migrations/1740000000010-SoftDeleteLists";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
 import { ShoppingTrip1740000000004 } from "./database/migrations/1740000000004-ShoppingTrip";
@@ -71,6 +72,7 @@ import { User } from "./users/user.entity";
             ShoppingLists1740000000007,
             CustomCategories1740000000008,
             ItemCosts1740000000009,
+            SoftDeleteLists1740000000010,
           ],
           migrationsRun: true,
         };

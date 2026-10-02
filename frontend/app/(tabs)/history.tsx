@@ -16,7 +16,7 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { usePurchases } from "@/hooks/usePurchases";
 import { useHousehold } from "@/hooks/useHousehold";
 import { formatMoney, sumKnownCosts } from "@/lib/currency";
-import { fetchLists, listLabel, type HomeList } from "@/lib/lists";
+import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeList } from "@/lib/lists";
 import { canUndoBought } from "@/lib/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -41,7 +41,8 @@ export default function HistoryScreen() {
   const [buyAgainNotice, setBuyAgainNotice] = useState<string | null>(null);
   const [range, setRange] = useState<HistoryRange>("all");
   const [mode, setMode] = useState<HistoryMode>("list");
-  const [lists, setLists] = useState<HomeList[]>([]);
+  const [activeLists, setActiveLists] = useState<HomeList[]>([]);
+  const [historyLists, setHistoryLists] = useState<HistoryList[]>([]);
   const [listId, setListId] = useState<string>("all");
   const [pickedDate, setPickedDate] = useState<Date | null>(null);
   const [isChoosingList, setIsChoosingList] = useState(false);
@@ -55,6 +56,26 @@ export default function HistoryScreen() {
   const costsEnabled = household?.costsEnabled === true;
   const currency = household?.currency ?? "JOD";
   const hasUndo = bought.some((item) => canUndoBought(item.boughtAt, now));
+  const filterLists = useMemo(() => {
+    const byId = new Map<string, HistoryList>();
+    for (const list of historyLists) {
+      byId.set(list.id, list);
+    }
+    // Fallback: derived from bought purchases if the history-lists API is unavailable.
+    const activeIds = new Set(activeLists.map((list) => list.id));
+    for (const item of bought) {
+      if (!item.listId || byId.has(item.listId)) continue;
+      byId.set(item.listId, {
+        id: item.listId,
+        name: item.listName ?? "List",
+        deleted: !activeIds.has(item.listId),
+      });
+    }
+    return [...byId.values()].sort((a, b) => {
+      if (a.deleted !== b.deleted) return a.deleted ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [historyLists, bought, activeLists]);
   const visible = bought.filter((item) => {
     const inList = listId === "all" || item.listId === listId;
     const inDate = pickedDate
@@ -94,20 +115,25 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!household) {
-        setLists([]);
+        setActiveLists([]);
+        setHistoryLists([]);
         setListId("all");
         return;
       }
-      void fetchLists(household.id).then((result) => {
-        setLists(result.lists);
-        setListId((current) =>
-          current === "all" || result.lists.some((list) => list.id === current)
-            ? current
-            : "all",
-        );
-      });
+      void Promise.all([fetchLists(household.id), fetchHistoryLists(household.id)]).then(
+        ([active, history]) => {
+          setActiveLists(active.lists);
+          setHistoryLists(history.lists);
+        },
+      );
     }, [household]),
   );
+
+  useEffect(() => {
+    setListId((current) =>
+      current === "all" || filterLists.some((list) => list.id === current) ? current : "all",
+    );
+  }, [filterLists]);
 
   useEffect(() => {
     if (!hasUndo) return;
@@ -152,13 +178,15 @@ export default function HistoryScreen() {
     setBuyAgainId(purchase.id);
     setUndoError(null);
     setBuyAgainNotice(null);
+    const listStillActive =
+      !!purchase.listId && activeLists.some((list) => list.id === purchase.listId);
     const result = await addItem({
       name: purchase.name,
       quantity: purchase.quantity,
       category: purchase.category,
       unit: purchase.unit,
       notes: purchase.notes,
-      listId: purchase.listId,
+      listId: listStillActive ? purchase.listId : undefined,
     });
     setBuyAgainId(null);
     if (result.error) {
@@ -188,15 +216,15 @@ export default function HistoryScreen() {
     setIsRefreshing(true);
     await refresh();
     if (household) {
-      const result = await fetchLists(household.id);
-      setLists(result.lists);
-      setListId((current) =>
-        current === "all" || result.lists.some((list) => list.id === current)
-          ? current
-          : "all",
-      );
+      const [active, history] = await Promise.all([
+        fetchLists(household.id),
+        fetchHistoryLists(household.id),
+      ]);
+      setActiveLists(active.lists);
+      setHistoryLists(history.lists);
     } else {
-      setLists([]);
+      setActiveLists([]);
+      setHistoryLists([]);
       setListId("all");
     }
     setIsRefreshing(false);
@@ -262,7 +290,11 @@ export default function HistoryScreen() {
                     label={
                       listId === "all"
                         ? t("allLists")
-                        : listLabel(lists.find((list) => list.id === listId)?.name ?? "", t("defaultList"))
+                        : historyListLabel(
+                            filterLists.find((list) => list.id === listId),
+                            t("defaultList"),
+                            t("deletedList"),
+                          )
                     }
                     onPress={() => openAnchored(listButtonRef, setListAnchor, setIsChoosingList)}
                   />
@@ -354,9 +386,9 @@ export default function HistoryScreen() {
         isRTL={isRTL}
         options={[
           { id: "all", label: t("allLists") },
-          ...lists.map((list) => ({
+          ...filterLists.map((list) => ({
             id: list.id,
-            label: listLabel(list.name, t("defaultList")),
+            label: historyListLabel(list, t("defaultList"), t("deletedList")),
           })),
         ]}
         selectedId={listId}
@@ -584,6 +616,15 @@ function OptionMenu({
       </View>
     </Modal>
   );
+}
+
+function historyListLabel(
+  list: { name: string; deleted: boolean } | undefined,
+  defaultLabel: string,
+  deletedLabel: string,
+) {
+  const name = listLabel(list?.name ?? "", defaultLabel);
+  return list?.deleted ? `${name} (${deletedLabel})` : name;
 }
 
 function menuFrame(anchor: Anchor | null, isRTL: boolean) {

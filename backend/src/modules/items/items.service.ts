@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, Repository } from "typeorm";
+import { In, IsNull, Repository } from "typeorm";
 import { DomainError } from "../../common/domain.error";
 import { HomesService } from "../homes/homes.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -147,6 +147,19 @@ export class ItemsService {
         HttpStatus.CONFLICT,
       );
     }
+    const list = await this.shoppingLists.findOne({
+      where: { id: item.listId, homeId: item.homeId },
+    });
+    if (!list || list.deletedAt) {
+      const fallback = await this.shoppingLists.findOne({
+        where: { homeId: item.homeId, deletedAt: IsNull() },
+        order: { createdAt: "ASC" },
+      });
+      if (!fallback) {
+        throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
+      }
+      item.listId = fallback.id;
+    }
     item.status = "needed";
     item.urgent = item.urgentBeforeBought;
     item.urgentBeforeBought = false;
@@ -241,10 +254,35 @@ export class ItemsService {
   async lists(userId: string, homeId: string) {
     await this.homes.requireMembership(userId, homeId);
     const rows = await this.shoppingLists.find({
-      where: { homeId },
+      where: { homeId, deletedAt: IsNull() },
       order: { createdAt: "ASC" },
     });
     return rows.map((row) => ({ id: row.id, homeId: row.homeId, name: row.name }));
+  }
+
+  async historyLists(userId: string, homeId: string) {
+    await this.homes.requireMembership(userId, homeId);
+    const rows = await this.shoppingLists
+      .createQueryBuilder("list")
+      .innerJoin(Item, "item", "item.list_id = list.id AND item.status = :status", {
+        status: "bought",
+      })
+      .where("list.home_id = :homeId", { homeId })
+      .select("list.id", "id")
+      .addSelect("list.name", "name")
+      .addSelect("list.deleted_at", "deletedAt")
+      .groupBy("list.id")
+      .addGroupBy("list.name")
+      .addGroupBy("list.deleted_at")
+      .orderBy("list.deleted_at", "ASC", "NULLS FIRST")
+      .addOrderBy("list.name", "ASC")
+      .getRawMany<{ id: string; name: string; deletedAt: Date | string | null }>();
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      deleted: row.deletedAt != null,
+    }));
   }
 
   async createList(userId: string, homeId: string, name: string) {
@@ -254,14 +292,16 @@ export class ItemsService {
       throw new DomainError("LIST_NAME_REQUIRED", "Enter a list name.", HttpStatus.BAD_REQUEST);
     }
     const row = await this.shoppingLists.save(
-      this.shoppingLists.create({ homeId, name: trimmed }),
+      this.shoppingLists.create({ homeId, name: trimmed, deletedAt: null }),
     );
     return { id: row.id, homeId: row.homeId, name: row.name };
   }
 
   async renameList(userId: string, homeId: string, listId: string, name: string) {
     await this.homes.requireMembership(userId, homeId);
-    const list = await this.shoppingLists.findOne({ where: { id: listId, homeId } });
+    const list = await this.shoppingLists.findOne({
+      where: { id: listId, homeId, deletedAt: IsNull() },
+    });
     if (!list) {
       throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
     }
@@ -276,22 +316,34 @@ export class ItemsService {
 
   async deleteList(userId: string, homeId: string, listId: string) {
     await this.homes.requireMembership(userId, homeId);
-    const count = await this.shoppingLists.count({ where: { homeId } });
+    const count = await this.shoppingLists.count({
+      where: { homeId, deletedAt: IsNull() },
+    });
     if (count <= 1) {
       throw new DomainError("LAST_LIST", "Keep at least one list.", HttpStatus.BAD_REQUEST);
     }
-    const list = await this.shoppingLists.findOne({ where: { id: listId, homeId } });
+    const list = await this.shoppingLists.findOne({
+      where: { id: listId, homeId, deletedAt: IsNull() },
+    });
     if (!list) {
       throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
     }
-    await this.shoppingLists.delete({ id: listId, homeId });
+    // Drop open needed items; keep bought history attached to this list.
+    await this.items.delete({ homeId, listId, status: "needed" });
+    list.deletedAt = new Date();
+    await this.shoppingLists.save(list);
     return { deleted: true };
   }
 
   private async resolveList(homeId: string, listId?: string) {
     const list = listId
-      ? await this.shoppingLists.findOne({ where: { id: listId, homeId } })
-      : await this.shoppingLists.findOne({ where: { homeId }, order: { createdAt: "ASC" } });
+      ? await this.shoppingLists.findOne({
+          where: { id: listId, homeId, deletedAt: IsNull() },
+        })
+      : await this.shoppingLists.findOne({
+          where: { homeId, deletedAt: IsNull() },
+          order: { createdAt: "ASC" },
+        });
     if (!list) {
       throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
     }

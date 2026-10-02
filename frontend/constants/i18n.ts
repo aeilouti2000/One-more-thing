@@ -169,7 +169,9 @@ const en = {
   editListName: "Edit list name",
   deleteList: "Delete list",
   deleteListTitle: "Delete this list?",
-  deleteListMessage: "Items on {{name}} will be removed.",
+  deleteListMessage:
+    "Unbought items on {{name}} will be removed. Bought history stays in History.",
+  deletedList: "deleted",
   defaultList: "List",
   allLists: "All lists",
   allTime: "All time",
@@ -516,7 +518,9 @@ const ar: { [K in keyof typeof en]: string } = {
   editListName: "تعديل اسم القائمة",
   deleteList: "حذف القائمة",
   deleteListTitle: "حذف هذه القائمة؟",
-  deleteListMessage: "ستُحذف عناصر {{name}}.",
+  deleteListMessage:
+    "ستُحذف العناصر غير المشتراة من {{name}}. يبقى سجل المشتريات في السجل.",
+  deletedList: "محذوفة",
   defaultList: "قائمة",
   allLists: "كل القوائم",
   allTime: "كل الوقت",

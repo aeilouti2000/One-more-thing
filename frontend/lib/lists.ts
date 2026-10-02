@@ -7,6 +7,12 @@ export type HomeList = {
   name: string;
 };
 
+export type HistoryList = {
+  id: string;
+  name: string;
+  deleted: boolean;
+};
+
 export function listLabel(name: string, defaultLabel: string) {
   return name === "List" ? defaultLabel : name;
 }
@@ -17,6 +23,15 @@ export async function fetchLists(homeId: string) {
     return { lists, error: null };
   } catch (error) {
     return { lists: [] as HomeList[], error: formatAppError(error) };
+  }
+}
+
+export async function fetchHistoryLists(homeId: string) {
+  try {
+    const lists = await api.get<HistoryList[]>(`/homes/${homeId}/history-lists`);
+    return { lists, error: null };
+  } catch (error) {
+    return { lists: [] as HistoryList[], error: formatAppError(error) };
   }
 }
 

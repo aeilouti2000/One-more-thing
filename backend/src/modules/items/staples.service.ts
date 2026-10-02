@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { IsNull, Repository } from "typeorm";
 import { DomainError } from "../../common/domain.error";
 import { HomesService } from "../homes/homes.service";
 import type { ItemCategory } from "./item.entity";
@@ -102,7 +102,7 @@ export class StaplesService {
       const key = staple.name.trim().toLowerCase();
       if (!names.has(key)) {
         const list = await this.shoppingLists.findOne({
-          where: { homeId },
+          where: { homeId, deletedAt: IsNull() },
           order: { createdAt: "ASC" },
         });
         if (!list) continue;
