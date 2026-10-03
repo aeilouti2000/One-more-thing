@@ -75,6 +75,7 @@ export default function ItemsScreen() {
   const [isChoosingList, setIsChoosingList] = useState(false);
   const [listMenuFrame, setListMenuFrame] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const listButtonRef = useRef<View>(null);
+  const listsLoadSeq = useRef(0);
   const [isCreatingList, setIsCreatingList] = useState(false);
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [listPendingDelete, setListPendingDelete] = useState<HomeList | null>(null);
@@ -109,7 +110,9 @@ export default function ItemsScreen() {
     selectedItems.length > 0 && selectedItems.every((item) => item.urgent);
 
   async function loadLists(homeId: string) {
+    const sequence = ++listsLoadSeq.current;
     const result = await fetchLists(homeId);
+    if (sequence !== listsLoadSeq.current) return;
     if (result.error) {
       setActionError(result.error);
       return;
@@ -282,7 +285,6 @@ export default function ItemsScreen() {
         quantity: item.quantity,
         category: item.category,
         urgent: nextUrgent,
-        notes: item.notes,
       });
       if (result.error) {
         setBusyAction(null);
@@ -726,7 +728,11 @@ export default function ItemsScreen() {
 
       {shareNotice && !isSelecting ? (
         <View className="mb-5">
-          <FormMessage message={shareNotice} tone="success" />
+          <FormMessage
+            message={shareNotice}
+            tone="success"
+            onDismiss={() => setShareNotice(null)}
+          />
         </View>
       ) : null}
 
@@ -982,10 +988,13 @@ export default function ItemsScreen() {
               onPress={openCreateList}
               accessibilityRole="button"
               accessibilityLabel={t("newList")}
-              className="mt-2 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-cove-accent active:opacity-80"
+              className="mt-2 h-12 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80"
+              style={{
+                backgroundColor: scheme === "dark" ? colors.soft : colors.mist,
+              }}
             >
-              <Ionicons name="add" size={20} color={colors.onAccent} />
-              <AppText className="text-base font-semibold" style={{ color: colors.onAccent }}>
+              <Ionicons name="add" size={20} color={colors.accent} />
+              <AppText className="text-base font-semibold" style={{ color: colors.accent }}>
                 {t("newList")}
               </AppText>
             </Pressable>

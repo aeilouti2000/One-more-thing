@@ -167,18 +167,19 @@ function buildColors(scheme, accentHex) {
   const sat = clamp(s, 42, 88);
 
   if (scheme === "dark") {
-    const tint = hslToHex(h, sat, 48);
+    // Keep surfaces near-neutral charcoal; accent carries the color.
+    const tint = hslToHex(h, clamp(sat * 0.4, 14, 32), 28);
     return withOnAccent({
-      ice: mixHex("#0A1018", tint, 0.22),
-      paper: mixHex("#121C28", tint, 0.34),
-      mist: mixHex("#162436", tint, 0.4),
-      line: mixHex("#1E3048", tint, 0.48),
-      muted: hslToHex(h, clamp(sat, 40, 72), 74),
-      ink: hslToHex(h, clamp(sat * 0.35, 18, 42), 93),
-      accent: hslToHex(h, sat, 62),
-      accentDeep: hslToHex(h, clamp(sat, 40, 72), 74),
-      soft: mixHex("#101820", tint, 0.28),
-      deep: mixHex("#0C1420", tint, 0.24),
+      ice: mixHex("#0B0D10", tint, 0.1),
+      paper: mixHex("#14171C", tint, 0.14),
+      mist: mixHex("#1C2128", tint, 0.16),
+      line: mixHex("#2A313A", tint, 0.18),
+      muted: hslToHex(h, clamp(sat * 0.28, 10, 24), 68),
+      ink: hslToHex(h, clamp(sat * 0.1, 4, 14), 93),
+      accent: hslToHex(h, sat, 58),
+      accentDeep: hslToHex(h, clamp(sat * 0.7, 28, 56), 70),
+      soft: mixHex("#101318", tint, 0.12),
+      deep: mixHex("#090B0E", tint, 0.08),
       white: "#FFFFFF",
       transparent: "transparent",
     });
@@ -278,14 +279,14 @@ function getColors(scheme, accentHex = DEFAULT_ACCENT) {
 function glassFieldStyle(scheme, palette = getColors(scheme)) {
   if (scheme === "dark") {
     return {
-      backgroundColor: withAlpha(palette.paper, 0.92),
-      borderColor: withAlpha(palette.muted, 0.45),
+      backgroundColor: withAlpha(palette.ice, 0.72),
+      borderColor: withAlpha(palette.accent, 0.28),
     };
   }
 
   return {
     backgroundColor: withAlpha(palette.white, 0.96),
-    borderColor: withAlpha(palette.accent, 0.32),
+    borderColor: withAlpha(palette.accent, 0.28),
   };
 }
 
@@ -294,8 +295,8 @@ function floatedCardStyle(scheme, palette = getColors(scheme)) {
     borderWidth: 1,
     borderColor:
       scheme === "dark"
-        ? withAlpha(palette.muted, 0.42)
-        : withAlpha(palette.accent, 0.28),
+        ? withAlpha(palette.accent, 0.24)
+        : withAlpha(palette.accent, 0.22),
   };
 }
 
@@ -310,6 +311,30 @@ function headerIconFrameStyle(scheme, palette = getColors(scheme)) {
         ? withAlpha(palette.muted, 0.55)
         : withAlpha(palette.white, 0.55),
     backgroundColor: withAlpha(palette.white, 0.2),
+  };
+}
+
+/** Chip colors for actions sitting on the ScreenHeader band. */
+function headerActionStyle(scheme, palette = getColors(scheme)) {
+  if (scheme === "dark") {
+    // Neutral/dark palettes use a light accent — prefer a raised surface so the
+    // chip stays readable instead of a near-white pill with washed-out label.
+    if (relativeLuminance(palette.accent) > 0.55) {
+      return {
+        backgroundColor: palette.mist,
+        color: palette.ink,
+      };
+    }
+    return {
+      backgroundColor: palette.accent,
+      color: palette.onAccent,
+    };
+  }
+
+  // Light headers are accent-filled; a white chip with accent label contrasts.
+  return {
+    backgroundColor: palette.white,
+    color: palette.accent,
   };
 }
 
@@ -356,6 +381,7 @@ module.exports = {
   glassFieldStyle,
   floatedCardStyle,
   headerIconFrameStyle,
+  headerActionStyle,
   spacing,
   radius,
   fontSize,

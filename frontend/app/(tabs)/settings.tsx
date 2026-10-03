@@ -285,7 +285,11 @@ export default function SettingsScreen() {
                   <AppText className="mt-2 text-base font-semibold text-cove-ink">
                     {displayName}
                   </AppText>
-                  <FormMessage message={nameSuccess} tone="success" />
+                  <FormMessage
+                    message={nameSuccess}
+                    tone="success"
+                    onDismiss={() => setNameSuccess(null)}
+                  />
                 </View>
                 <EditButton
                   variant="paper"
@@ -341,7 +345,11 @@ export default function SettingsScreen() {
                   <AppText className="mt-2 text-base font-semibold text-cove-ink">
                     {displayUsername}
                   </AppText>
-                  <FormMessage message={usernameSuccess} tone="success" />
+                  <FormMessage
+                    message={usernameSuccess}
+                    tone="success"
+                    onDismiss={() => setUsernameSuccess(null)}
+                  />
                 </View>
                 <EditButton
                   variant="paper"
@@ -405,7 +413,11 @@ export default function SettingsScreen() {
                   autoComplete="new-password"
                 />
                 <FormMessage message={passwordError} />
-                <FormMessage message={passwordSuccess} tone="success" />
+                <FormMessage
+                  message={passwordSuccess}
+                  tone="success"
+                  onDismiss={() => setPasswordSuccess(null)}
+                />
                 <AppButton
                   label={t("updatePassword")}
                   disabled={!canUpdatePassword}
@@ -483,8 +495,8 @@ export default function SettingsScreen() {
               </View>
               {pushStatus === "unsupported" ? null : (
                 <Switch
-                  value={pushStatus !== "off"}
-                  disabled={isUpdatingPush}
+                  value={pushStatus === "on"}
+                  disabled={isUpdatingPush || pushStatus === "denied"}
                   onValueChange={(enabled) => void onTogglePush(enabled)}
                   trackColor={{ false: colors.mist, true: colors.accent }}
                   thumbColor={colors.white}

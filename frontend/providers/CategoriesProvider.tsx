@@ -31,18 +31,20 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   const [categories, setCategories] = useState<HomeCategory[]>(builtinCategories);
   const homeId = household?.id;
 
-  const refresh = useCallback(async (id: string) => {
-    const result = await fetchCategories(id);
-    if (!result.error) setCategories(result.categories);
-  }, []);
-
   useEffect(() => {
+    let cancelled = false;
     if (!homeId) {
       setCategories(builtinCategories);
       return;
     }
-    void refresh(homeId);
-  }, [homeId, refresh]);
+    void fetchCategories(homeId).then((result) => {
+      if (cancelled || result.error) return;
+      setCategories(result.categories);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [homeId]);
 
   const addCategory = useCallback(
     async (name: string) => {

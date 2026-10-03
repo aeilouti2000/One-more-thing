@@ -20,7 +20,7 @@ import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeLi
 import { canUndoBought } from "@/lib/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { headerIconFrameStyle, iconSize } from "@/constants/theme";
+import { headerActionStyle, headerIconFrameStyle, iconSize } from "@/constants/theme";
 import type { Purchase } from "@/types/purchase";
 
 type HistoryRange = "all" | "today" | "week" | "month";
@@ -34,6 +34,7 @@ export default function HistoryScreen() {
   const { household } = useHousehold();
   const { t, locale, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
+  const invoiceAction = headerActionStyle(scheme, colors);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
   const [undoId, setUndoId] = useState<string | null>(null);
@@ -114,18 +115,24 @@ export default function HistoryScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      let cancelled = false;
       if (!household) {
         setActiveLists([]);
         setHistoryLists([]);
         setListId("all");
         return;
       }
-      void Promise.all([fetchLists(household.id), fetchHistoryLists(household.id)]).then(
+      const homeId = household.id;
+      void Promise.all([fetchLists(homeId), fetchHistoryLists(homeId)]).then(
         ([active, history]) => {
+          if (cancelled) return;
           setActiveLists(active.lists);
           setHistoryLists(history.lists);
         },
       );
+      return () => {
+        cancelled = true;
+      };
     }, [household]),
   );
 
@@ -140,12 +147,6 @@ export default function HistoryScreen() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [hasUndo]);
-
-  useEffect(() => {
-    if (!buyAgainNotice) return;
-    const timer = setTimeout(() => setBuyAgainNotice(null), 2500);
-    return () => clearTimeout(timer);
-  }, [buyAgainNotice]);
 
   const canSwipeMode = useCallback(
     (direction: "next" | "previous") => {
@@ -266,9 +267,13 @@ export default function HistoryScreen() {
               }}
               accessibilityRole="button"
               accessibilityLabel={mode === "list" ? t("openInvoice") : t("backToHistoryList")}
-              className="rounded-full bg-white px-3 py-2 active:opacity-80"
+              className="rounded-full px-3 py-2 active:opacity-80"
+              style={{ backgroundColor: invoiceAction.backgroundColor }}
             >
-              <AppText className="text-sm font-semibold" style={{ color: colors.accent }}>
+              <AppText
+                className="text-sm font-semibold"
+                style={{ color: invoiceAction.color }}
+              >
                 {mode === "list" ? t("openInvoice") : t("backToHistoryList")}
               </AppText>
             </Pressable>
@@ -326,7 +331,11 @@ export default function HistoryScreen() {
         ) : null}
 
         <FormMessage message={undoError ?? error} />
-        <FormMessage message={buyAgainNotice} tone="success" />
+        <FormMessage
+          message={buyAgainNotice}
+          tone="success"
+          onDismiss={() => setBuyAgainNotice(null)}
+        />
 
         {bought.length === 0 ? (
           <EmptyState

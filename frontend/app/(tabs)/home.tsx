@@ -250,9 +250,13 @@ export default function HomeScreen() {
                   />
                 </View>
               )}
-              {!isEditingName ? (
+              {!isEditingName && nameSuccess ? (
                 <View className="mt-2">
-                  <FormMessage message={nameSuccess} tone="success" />
+                  <FormMessage
+                    message={nameSuccess}
+                    tone="success"
+                    onDismiss={() => setNameSuccess(null)}
+                  />
                 </View>
               ) : null}
             </View>

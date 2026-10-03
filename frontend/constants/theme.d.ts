@@ -57,6 +57,14 @@ export function headerIconFrameStyle(
   backgroundColor: string;
 };
 
+export function headerActionStyle(
+  scheme: ThemeScheme,
+  palette?: ThemeColors,
+): {
+  backgroundColor: string;
+  color: string;
+};
+
 export const spacing: {
   xs: number;
   sm: number;

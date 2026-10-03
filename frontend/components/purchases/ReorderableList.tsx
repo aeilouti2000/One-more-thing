@@ -33,7 +33,10 @@ export function ReorderableList({
 
   // Sync before paint so list switches don't flash the previous rows for a frame.
   useLayoutEffect(() => {
-    if (!dragging.current) setRows(items);
+    if (!dragging.current) {
+      heights.current = [];
+      setRows(items);
+    }
   }, [items]);
 
   function hold(active: boolean) {

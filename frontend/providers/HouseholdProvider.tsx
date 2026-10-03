@@ -62,7 +62,11 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         return null;
       }
       setHousehold(next);
-      setHomes(next ? listed.homes : []);
+      if (!next) {
+        setHomes([]);
+      } else if (!listed.error) {
+        setHomes(listed.homes);
+      }
       setError(listed.error);
       setIsLoading(false);
       return next;

@@ -10,6 +10,8 @@ import { Item } from "./item.entity";
 import { Staple } from "./staple.entity";
 
 const FALLBACK_CATEGORY = "other";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type CategoryView = {
   id: string;
@@ -87,7 +89,7 @@ export class CategoriesService {
     if ((ITEM_CATEGORIES as readonly string[]).includes(categoryId)) {
       const hidden = await this.hidden.findOne({ where: { homeId, categoryId } });
       if (!hidden) return;
-    } else {
+    } else if (UUID_RE.test(categoryId)) {
       const custom = await this.custom.findOne({ where: { id: categoryId, homeId } });
       if (custom) return;
     }

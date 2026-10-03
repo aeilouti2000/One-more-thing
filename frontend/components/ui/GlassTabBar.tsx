@@ -1,4 +1,5 @@
 import type { BottomTabBarProps } from "expo-router/js-tabs";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
   Keyboard,
@@ -21,8 +22,8 @@ import { useTheme } from "@/providers/ThemeProvider";
 
 type Slot = { x: number; width: number; content: number };
 
-const CONTENT_PAD = 14;
-const EDGE_GAP = 6;
+const CONTENT_PAD = 16;
+const EDGE_GAP = 7;
 const MOVE_MS = 280;
 let lastTabIndex: number | null = null;
 
@@ -118,7 +119,14 @@ export function GlassTabBar({
   if (hidden || keyboardOpen) return null;
 
   const dark = scheme === "dark";
-  const pillBackground = withAlpha(colors.accent, dark ? 0.55 : 0.28);
+  const pillFill = dark
+    ? withAlpha(colors.white, 0.1)
+    : withAlpha(colors.accent, 0.14);
+  const pillTint = withAlpha(colors.accent, dark ? 0.28 : 0.18);
+  const pillBorder = withAlpha(colors.accent, dark ? 0.55 : 0.38);
+  const pillSheen = dark
+    ? ([withAlpha(colors.white, 0.2), withAlpha(colors.white, 0)] as const)
+    : ([withAlpha(colors.white, 0.65), withAlpha(colors.white, 0.05)] as const);
 
   return (
     <View
@@ -149,10 +157,21 @@ export function GlassTabBar({
           pointerEvents="none"
           style={[
             styles.pill,
-            { backgroundColor: pillBackground },
+            {
+              backgroundColor: pillFill,
+              borderColor: pillBorder,
+            },
             indicator,
           ]}
-        />
+        >
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: pillTint }]} />
+          <LinearGradient
+            colors={[...pillSheen]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
         <View
           accessibilityRole="tablist"
           collapsable={false}
@@ -247,7 +266,7 @@ const styles = StyleSheet.create({
   label: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
+    gap: 3,
   },
   pill: {
     position: "absolute",
@@ -255,5 +274,7 @@ const styles = StyleSheet.create({
     bottom: EDGE_GAP,
     left: 0,
     borderRadius: tabBar.radius - EDGE_GAP,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    overflow: "hidden",
   },
 });

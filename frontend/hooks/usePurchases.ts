@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   addItem as insertItem,
@@ -56,16 +56,21 @@ export function usePurchases(): UsePurchasesResult {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const refreshSequenceRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const sequence = ++refreshSequenceRef.current;
     if (!household) {
+      if (refreshSequenceRef.current !== sequence) return;
       setPurchases([]);
       setError(null);
       setIsLoading(false);
       return;
     }
 
-    const { items, error: fetchError } = await fetchHomeItems(household.id);
+    const homeId = household.id;
+    const { items, error: fetchError } = await fetchHomeItems(homeId);
+    if (refreshSequenceRef.current !== sequence) return;
     setPurchases(items);
     setError(fetchError);
     setIsLoading(false);

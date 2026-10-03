@@ -106,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      await unregisterPushDevice();
       await changeAccountPassword(currentPassword, newPassword);
       return { error: null };
     } catch (error) {

@@ -177,6 +177,7 @@ function StaplesBody() {
           quantity: nextQuantity,
           category: match.category,
           urgent: match.urgent,
+          notes: match.notes ?? undefined,
         })
       : await addItem({
           homeId: household.id,

@@ -107,7 +107,9 @@ export class ItemsService {
     item.quantity = input.quantity;
     item.category = input.category;
     item.urgent = input.urgent;
-    item.notes = blankToNull(input.notes);
+    if (input.notes !== undefined) {
+      item.notes = blankToNull(input.notes);
+    }
     const saved = await this.items.save(item);
     if (becameUrgent) {
       await placeNeededItem(this.items, saved.homeId, saved.id, "top", saved.listId);

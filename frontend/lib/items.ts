@@ -97,13 +97,24 @@ export async function addItem(input: NewItemInput) {
 
 export async function updateItemDetails(itemId: string, input: UpdateItemInput) {
   try {
-    await api.patch(`/items/${itemId}`, {
+    const body: {
+      name: string;
+      quantity: number;
+      category: PurchaseCategory;
+      urgent: boolean;
+      notes?: string;
+    } = {
       name: input.name.trim(),
       quantity: input.quantity,
       category: input.category,
-      notes: input.notes?.trim() || "",
       urgent: input.urgent === true,
-    });
+    };
+    // Only send notes when the caller provided them so quantity/urgent
+    // updates do not wipe existing notes on the server.
+    if (typeof input.notes === "string") {
+      body.notes = input.notes.trim();
+    }
+    await api.patch(`/items/${itemId}`, body);
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };

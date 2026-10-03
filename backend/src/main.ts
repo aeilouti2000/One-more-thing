@@ -16,7 +16,12 @@ async function bootstrap() {
     .filter(Boolean);
 
   app.setGlobalPrefix("api");
-  app.use(helmet());
+  // Allow cross-origin browser clients (Expo web) to call the API.
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    }),
+  );
   app.enableCors({ origin: origins.length > 0 ? origins : true });
   app.useGlobalPipes(
     new ValidationPipe({

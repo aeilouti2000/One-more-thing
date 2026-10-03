@@ -117,13 +117,7 @@ export function QuickAddBar({
       <View className="flex-row items-center gap-2 px-4 py-2">
         <View className="relative h-11 min-w-0 flex-1 justify-center">
           {showHint ? (
-            <View
-              pointerEvents="none"
-              style={[
-                styles.hintRow,
-                { flexDirection: isRTL ? "row-reverse" : "row" },
-              ]}
-            >
+            <View pointerEvents="none" style={styles.hintRow}>
               <TypewriterText
                 phrases={phrases}
                 active={showHint}
@@ -136,8 +130,7 @@ export function QuickAddBar({
                   styles.caret,
                   {
                     backgroundColor: colors.muted,
-                    marginLeft: isRTL ? 0 : 2,
-                    marginRight: isRTL ? 2 : 0,
+                    marginStart: 2,
                   },
                   caretStyle,
                 ]}
@@ -168,7 +161,7 @@ export function QuickAddBar({
           className="h-9 w-9 items-center justify-center rounded-full active:opacity-80"
           style={{ backgroundColor: scheme === "dark" ? colors.paper : colors.mist }}
         >
-          <Ionicons name="create-outline" size={18} color={colors.accent} />
+          <DetailsAddIcon color={colors.accent} plusColor={colors.onAccent} />
         </Pressable>
         <Animated.View style={pulseStyle}>
           <Pressable
@@ -193,6 +186,21 @@ export function QuickAddBar({
             )}
           </Pressable>
         </Animated.View>
+      </View>
+    </View>
+  );
+}
+
+function DetailsAddIcon({ color, plusColor }: { color: string; plusColor: string }) {
+  return (
+    <View style={styles.detailsIcon} accessibilityElementsHidden>
+      <View style={[styles.detailsCard, { borderColor: color }]}>
+        <View style={[styles.detailsLine, { backgroundColor: color, width: 10 }]} />
+        <View style={[styles.detailsLine, { backgroundColor: color, width: 7 }]} />
+        <View style={[styles.detailsLine, { backgroundColor: color, width: 9 }]} />
+      </View>
+      <View style={[styles.detailsPlus, { backgroundColor: color }]}>
+        <Ionicons name="add" size={9} color={plusColor} />
       </View>
     </View>
   );
@@ -312,6 +320,7 @@ function TypewriterText({
 const styles = StyleSheet.create({
   hintRow: {
     ...StyleSheet.absoluteFill,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
     zIndex: 1,
@@ -324,5 +333,36 @@ const styles = StyleSheet.create({
   input: {
     zIndex: 2,
     backgroundColor: "transparent",
+  },
+  detailsIcon: {
+    width: 18,
+    height: 18,
+  },
+  detailsCard: {
+    position: "absolute",
+    left: 0,
+    top: 1,
+    width: 13,
+    height: 15,
+    borderWidth: 1.5,
+    borderRadius: 3,
+    paddingHorizontal: 2,
+    paddingTop: 2.5,
+    gap: 2,
+  },
+  detailsLine: {
+    height: 1.5,
+    borderRadius: 1,
+    opacity: 0.9,
+  },
+  detailsPlus: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

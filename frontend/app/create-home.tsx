@@ -18,7 +18,7 @@ export default function CreateHomeScreen() {
   const { signOut } = useAuth();
   const { t } = useI18n();
   const { refresh, adoptHome } = useHousehold();
-  const [name, setName] = useState(t("homeNamePlaceholder"));
+  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
