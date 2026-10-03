@@ -3,6 +3,7 @@ import { useFocusEffect } from "expo-router";
 import {
   addItem as insertItem,
   deleteItems,
+  moveItems,
   reorderItems,
   fetchHomeItems,
   markItemBought,
@@ -39,6 +40,7 @@ type UsePurchasesResult = {
   undoBought: (id: string) => Promise<{ error: string | null }>;
   markManyBought: (entries: BoughtCostEntry[] | string[]) => Promise<{ error: string | null }>;
   deleteMany: (ids: string[]) => Promise<{ error: string | null }>;
+  moveMany: (ids: string[], listId: string) => Promise<{ error: string | null }>;
   reorderNeeded: (ids: string[]) => Promise<{ error: string | null }>;
 };
 
@@ -204,6 +206,25 @@ export function usePurchases(): UsePurchasesResult {
     [user],
   );
 
+  const moveMany = useCallback(
+    async (ids: string[], listId: string) => {
+      if (!user) {
+        return { error: translate("errorNeedLogin") };
+      }
+
+      const result = await moveItems(ids, listId);
+      if (!result.error) {
+        setPurchases((current) =>
+          current.map((item) => (ids.includes(item.id) ? { ...item, listId } : item)),
+        );
+        emitListChanged();
+      }
+
+      return result;
+    },
+    [user],
+  );
+
   const reorderNeeded = useCallback(
     async (ids: string[]) => {
       if (!user) {
@@ -252,6 +273,7 @@ export function usePurchases(): UsePurchasesResult {
     undoBought,
     markManyBought,
     deleteMany,
+    moveMany,
     reorderNeeded,
   };
 }

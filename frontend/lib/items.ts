@@ -182,3 +182,13 @@ export async function deleteItems(itemIds: string[]) {
     return { error: formatAppError(error) };
   }
 }
+
+export async function moveItems(itemIds: string[], listId: string) {
+  if (itemIds.length === 0) return { error: null };
+  try {
+    await api.post("/items/move", { ids: itemIds, listId });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}

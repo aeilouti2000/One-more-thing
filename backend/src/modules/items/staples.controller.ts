@@ -38,6 +38,7 @@ export class StaplesController {
               unit: body.unit,
               notes: body.notes,
               urgent: body.urgent,
+              listId: body.listId,
             },
             { notify },
           ),

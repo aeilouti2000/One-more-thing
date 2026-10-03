@@ -59,10 +59,19 @@ export async function createStaple(
     urgent: boolean;
     intervalDays: StapleInterval;
     addNow: boolean;
+    listId?: string;
   },
 ) {
   try {
-    await api.post(`/homes/${homeId}/staples`, input);
+    await api.post(`/homes/${homeId}/staples`, {
+      name: input.name,
+      quantity: input.quantity,
+      category: input.category,
+      urgent: input.urgent,
+      intervalDays: input.intervalDays,
+      addNow: input.addNow,
+      listId: input.listId,
+    });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };

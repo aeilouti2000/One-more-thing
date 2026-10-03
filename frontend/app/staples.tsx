@@ -20,7 +20,9 @@ import { floatedCardStyle, withAlpha } from "@/constants/theme";
 import { useCategories } from "@/providers/CategoriesProvider";
 import { useHousehold } from "@/hooks/useHousehold";
 import { addItem, fetchHomeItems, updateItemDetails } from "@/lib/items";
+import { resolvePreferredListId } from "@/lib/list-storage";
 import { emitListChanged } from "@/lib/list-sync";
+import { fetchLists, listLabel } from "@/lib/lists";
 import { parseQuantity } from "@/lib/validation";
 import {
   createStaple,
@@ -87,7 +89,9 @@ function StaplesBody() {
   const [isAdding, setIsAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
-  const [listCounts, setListCounts] = useState<Record<string, number>>({});
+  const [listPresence, setListPresence] = useState<
+    Record<string, { count: number; listName: string }>
+  >({});
   const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
@@ -122,6 +126,16 @@ function StaplesBody() {
 
     setIsSaving(true);
     setError(null);
+    let listId: string | undefined;
+    if (addNow) {
+      const listsResult = await fetchLists(household.id);
+      if (listsResult.error) {
+        setIsSaving(false);
+        setError(listsResult.error);
+        return;
+      }
+      listId = resolvePreferredListId(listsResult.lists, household.id) ?? undefined;
+    }
     const result = await createStaple(household.id, {
       name: name.trim(),
       quantity: parsed,
@@ -129,6 +143,7 @@ function StaplesBody() {
       urgent,
       intervalDays,
       addNow,
+      listId,
     });
     setIsSaving(false);
     if (result.error) {
@@ -158,16 +173,24 @@ function StaplesBody() {
     if (!household || !user || addingId) return;
     setAddingId(staple.id);
     setError(null);
-    const listed = await fetchHomeItems(household.id);
-    if (listed.error) {
+    const [listed, listsResult] = await Promise.all([
+      fetchHomeItems(household.id),
+      fetchLists(household.id),
+    ]);
+    if (listed.error || listsResult.error) {
       setAddingId(null);
-      setError(listed.error);
+      setError(listed.error ?? listsResult.error);
       return;
     }
 
+    const listId = resolvePreferredListId(listsResult.lists, household.id) ?? undefined;
+    const targetList = listId
+      ? listsResult.lists.find((list) => list.id === listId) ?? null
+      : null;
     const match = listed.items.find(
       (item) =>
         item.status === "needed" &&
+        (!listId || item.listId === listId) &&
         item.name.trim().toLowerCase() === staple.name.trim().toLowerCase(),
     );
     const nextQuantity = match ? match.quantity + staple.quantity : staple.quantity;
@@ -187,6 +210,7 @@ function StaplesBody() {
           category: staple.category,
           unit: staple.unit,
           urgent: staple.urgent,
+          listId,
         });
 
     setAddingId(null);
@@ -196,7 +220,11 @@ function StaplesBody() {
     }
 
     const copies = Math.max(1, Math.round(nextQuantity / staple.quantity));
-    setListCounts((current) => ({ ...current, [staple.id]: copies }));
+    const presenceName = listLabel(targetList?.name ?? t("defaultList"), t("defaultList"));
+    setListPresence((current) => ({
+      ...current,
+      [staple.id]: { count: copies, listName: presenceName },
+    }));
     emitListChanged();
   }
 
@@ -352,9 +380,12 @@ function StaplesBody() {
                     </AppText>
                     <View className="mt-2.5 flex-row flex-wrap items-center gap-2">
                       <MetaChip label={t("nextDue", { date: due })} />
-                      {listCounts[staple.id] ? (
+                      {listPresence[staple.id] ? (
                         <MetaChip
-                          label={t("pinnedOnList", { count: listCounts[staple.id] })}
+                          label={t("pinnedOnList", {
+                            name: listPresence[staple.id].listName,
+                            count: listPresence[staple.id].count,
+                          })}
                           accent
                         />
                       ) : null}

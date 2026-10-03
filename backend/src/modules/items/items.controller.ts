@@ -9,6 +9,7 @@ import {
   ItemIdsDto,
   MarkBoughtDto,
   MarkBoughtItemsDto,
+  MoveItemsDto,
   UpdateItemCostDto,
   UpdateItemDto,
 } from "./dto";
@@ -143,5 +144,10 @@ export class ItemsController {
   @Post("items/delete")
   removeMany(@CurrentUser() user: User, @Body() body: ItemIdsDto) {
     return this.items.removeMany(user.id, body.ids);
+  }
+
+  @Post("items/move")
+  moveMany(@CurrentUser() user: User, @Body() body: MoveItemsDto) {
+    return this.items.moveMany(user.id, body.ids, body.listId);
   }
 }

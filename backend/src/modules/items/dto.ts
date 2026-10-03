@@ -131,6 +131,16 @@ export class ItemIdsDto {
   ids: string[];
 }
 
+export class MoveItemsDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID("all", { each: true })
+  ids: string[];
+
+  @IsUUID()
+  listId: string;
+}
+
 export class CreateCategoryDto {
   @IsString()
   @MinLength(1)

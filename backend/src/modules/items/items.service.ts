@@ -253,6 +253,40 @@ export class ItemsService {
     return { deleted: uniqueIds.length };
   }
 
+  async moveMany(userId: string, ids: string[], listId: string) {
+    const uniqueIds = [...new Set(ids)];
+    const membership = await this.homes.requireMembership(userId);
+    const list = await this.shoppingLists.findOne({
+      where: { id: listId, homeId: membership.homeId, deletedAt: IsNull() },
+    });
+    if (!list) {
+      throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
+    }
+
+    const rows = await this.items.find({
+      where: { id: In(uniqueIds), homeId: membership.homeId, status: "needed" },
+    });
+    if (rows.length !== uniqueIds.length) {
+      throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
+    }
+
+    let moved = 0;
+    for (const item of rows) {
+      if (item.listId === list.id) continue;
+      item.listId = list.id;
+      await this.items.save(item);
+      await placeNeededItem(
+        this.items,
+        membership.homeId,
+        item.id,
+        item.urgent ? "top" : "after-urgent",
+        list.id,
+      );
+      moved += 1;
+    }
+    return { moved, listId: list.id };
+  }
+
   async lists(userId: string, homeId: string) {
     await this.homes.requireMembership(userId, homeId);
     const rows = await this.shoppingLists.find({
