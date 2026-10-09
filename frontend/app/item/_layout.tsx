@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { RequireSession } from "@/components/auth/RequireSession";
+import { RequireSession } from "@/features/auth/components/require-session";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export default function ItemLayout() {

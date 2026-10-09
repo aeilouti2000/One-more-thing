@@ -1,4 +1,4 @@
-import "@/lib/session-storage";
+import "@/features/auth/utils/session-storage";
 import { type FontScaleLevel } from "@/constants/font";
 
 const FONT_SCALE_STORAGE_KEY = "one-more-thing.font-scale";

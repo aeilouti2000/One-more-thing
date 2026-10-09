@@ -1,5 +1,5 @@
 import { translate, type Locale } from "@/constants/i18n";
-import type { PurchaseCategory } from "@/types/purchase";
+import type { PurchaseCategory } from "@/features/items/types/purchase";
 
 export const PURCHASE_CATEGORIES: {
   id: PurchaseCategory;

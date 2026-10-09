@@ -1,7 +1,7 @@
 import { Redirect } from "expo-router";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
-import { useHousehold } from "@/hooks/useHousehold";
-import { useAuth } from "@/providers/AuthProvider";
+import { useHousehold } from "@/features/homes/hooks/use-household";
+import { useAuth } from "@/features/auth/providers/auth-provider";
 
 export default function Index() {
   const { user, isLoading: isAuthLoading } = useAuth();

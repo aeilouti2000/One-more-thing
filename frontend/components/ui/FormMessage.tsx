@@ -20,9 +20,8 @@ export function FormMessage({
   onDismiss,
 }: FormMessageProps) {
   useI18n();
-  const [visible, setVisible] = useState(true);
+  const [dismissedMessage, setDismissedMessage] = useState<string | null>(null);
   const onDismissRef = useRef(onDismiss);
-  onDismissRef.current = onDismiss;
 
   const hideAfter =
     autoHideMs === undefined
@@ -31,19 +30,26 @@ export function FormMessage({
         : null
       : autoHideMs;
 
+  if (!message && dismissedMessage !== null) {
+    setDismissedMessage(null);
+  }
+
   useEffect(() => {
-    setVisible(true);
+    onDismissRef.current = onDismiss;
+  });
+
+  useEffect(() => {
     if (!message || hideAfter == null) return;
 
     const timer = setTimeout(() => {
-      setVisible(false);
+      setDismissedMessage(message);
       onDismissRef.current?.();
     }, hideAfter);
 
     return () => clearTimeout(timer);
   }, [message, hideAfter]);
 
-  if (!message || !visible) {
+  if (!message || dismissedMessage === message) {
     return null;
   }
 

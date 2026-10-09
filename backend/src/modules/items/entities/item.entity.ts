@@ -1,0 +1,118 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from "typeorm";
+import { User } from "../../../users/user.entity";
+import { Home } from "../../homes/entities/home.entity";
+import { ShoppingList } from "./shopping-list.entity";
+
+export const ITEM_CATEGORIES = [
+  "vegetables",
+  "meat",
+  "supermarket",
+  "pharmacy",
+  "coffee",
+  "other",
+] as const;
+
+export type ItemCategory = string;
+export type ItemStatus = "needed" | "bought";
+
+const quantityTransformer = {
+  to: (value: number) => value,
+  from: (value: string | number) => Number(value),
+};
+
+const nullableMoneyTransformer = {
+  to: (value: number | null) => value,
+  from: (value: string | number | null) => {
+    if (value === null || value === undefined) return null;
+    const next = Number(value);
+    return Number.isFinite(next) ? next : null;
+  },
+};
+
+@Entity("items")
+export class Item {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column({ name: "home_id", type: "uuid" })
+  homeId: string;
+
+  @ManyToOne(() => Home, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "home_id" })
+  home: Home;
+
+  @Column({ name: "list_id", type: "uuid" })
+  listId: string;
+
+  @ManyToOne(() => ShoppingList, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "list_id" })
+  list: ShoppingList;
+
+  @Column()
+  name: string;
+
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    transformer: quantityTransformer,
+  })
+  quantity: number;
+
+  @Column({ type: "varchar", nullable: true })
+  unit: string | null;
+
+  @Column({ type: "varchar" })
+  category: ItemCategory;
+
+  @Column({ type: "varchar", nullable: true })
+  notes: string | null;
+
+  @Column({ type: "varchar", default: "needed" })
+  status: ItemStatus;
+
+  @Column({ type: "boolean", default: false })
+  urgent: boolean;
+
+  @Column({ name: "sort_order", type: "int", default: 0 })
+  sortOrder: number;
+
+  @Column({ name: "urgent_before_bought", type: "boolean", default: false })
+  urgentBeforeBought: boolean;
+
+  @Column({ name: "added_by", type: "uuid" })
+  addedBy: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "added_by" })
+  addedByUser: User;
+
+  @Column({ name: "bought_by", type: "uuid", nullable: true })
+  boughtBy: string | null;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "bought_by" })
+  boughtByUser: User | null;
+
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" })
+  createdAt: Date;
+
+  @Column({ name: "bought_at", type: "timestamptz", nullable: true })
+  boughtAt: Date | null;
+
+  @Column({
+    type: "numeric",
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: nullableMoneyTransformer,
+  })
+  cost: number | null;
+}

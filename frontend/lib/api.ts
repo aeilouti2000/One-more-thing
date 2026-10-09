@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
-import "@/lib/session-storage";
+import "@/features/auth/utils/session-storage";
 
 function resolveApiUrl() {
   const configured = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api").replace(/\/$/, "");
@@ -168,6 +168,15 @@ async function request<T>(path: string, init: RequestInit = {}, auth = true, all
   }
 
   if (response.status === 401 && auth && allowRefresh) {
+    const unauthorized = await response
+      .clone()
+      .json()
+      .catch(() => null);
+    const unauthorizedError = errorFromBody(unauthorized, response.status);
+    if (unauthorizedError.code && unauthorizedError.code !== "NOT_SIGNED_IN" && unauthorizedError.code !== "INVALID_TOKEN") {
+      throw unauthorizedError;
+    }
+
     refreshTask ??= refreshSession().finally(() => {
       refreshTask = null;
     });
@@ -229,6 +238,11 @@ export async function updateProfile(input: { name?: string; email?: string }) {
   if (session) writeSession({ ...session, user });
   else emit(user);
   return user;
+}
+
+export async function deleteAccount(password: string) {
+  await api.delete("/auth/me", { password });
+  clearSession();
 }
 
 export async function signOut() {

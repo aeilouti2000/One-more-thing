@@ -1,4 +1,5 @@
-import { noticeCopy } from "./notifications.service";
+import { describe, expect, it } from "@jest/globals";
+import { noticeCopy } from "./services/notifications.service";
 
 describe("noticeCopy", () => {
   it("describes a new item and an urgent mark", () => {
@@ -11,5 +12,13 @@ describe("noticeCopy", () => {
       body: "Alex marked Milk urgent",
     });
     expect(noticeCopy("ar", "added_urgent", "أحمد", "حليب").title).toBe("عنصر عاجل");
+    expect(noticeCopy("en", "due", "", "Milk")).toEqual({
+      title: "Back on the list",
+      body: "Milk is due",
+    });
+    expect(noticeCopy("ar", "due", "", "حليب")).toEqual({
+      title: "عاد إلى القائمة",
+      body: "حان موعد حليب",
+    });
   });
 });

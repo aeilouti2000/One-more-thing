@@ -1,4 +1,4 @@
-import "@/lib/session-storage";
+import "@/features/auth/utils/session-storage";
 import { DEFAULT_ACCENT, normalizeHex, type ThemeScheme } from "@/constants/theme";
 
 const THEME_STORAGE_KEY = "one-more-thing.theme";

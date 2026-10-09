@@ -15,10 +15,10 @@ import { TabBlurProvider } from "@/components/ui/TabBlurTarget";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { requiredAppUpdate } from "@/lib/app-release";
-import { AuthProvider } from "@/providers/AuthProvider";
-import { CategoriesProvider } from "@/providers/CategoriesProvider";
-import { HouseholdProvider } from "@/providers/HouseholdProvider";
-import { NotificationsProvider } from "@/providers/NotificationsProvider";
+import { AuthProvider } from "@/features/auth/providers/auth-provider";
+import { CategoriesProvider } from "@/features/items/providers/categories-provider";
+import { HouseholdProvider } from "@/features/homes/providers/household-provider";
+import { NotificationsProvider } from "@/features/notifications/providers/notifications-provider";
 import { FontScaleProvider } from "@/providers/FontScaleProvider";
 import { LanguageProvider } from "@/providers/LanguageProvider";
 import { ThemeProvider, useTheme } from "@/providers/ThemeProvider";
@@ -44,7 +44,7 @@ function ThemedNavigation() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="item" />
         <Stack.Screen name="trip" />
-        <Stack.Screen name="staples" />
+        <Stack.Screen name="pins" />
         <Stack.Screen name="legal" />
       </Stack>
     </>

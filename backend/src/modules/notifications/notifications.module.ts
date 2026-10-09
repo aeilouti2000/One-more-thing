@@ -1,14 +1,19 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { HomeMember } from "../homes/home-member.entity";
-import { NotificationsController } from "./notifications.controller";
-import { NotificationsService } from "./notifications.service";
-import { PushToken } from "./push-token.entity";
+import { HomeMember } from "../homes/entities/home-member.entity";
+import { NotificationsController } from "./controllers/notifications.controller";
+import { PushToken } from "./entities/push-token.entity";
+import { NOTIFICATIONS_REPOSITORY } from "./repo/notifications-repo/notifications.repository";
+import { TypeormNotificationsRepository } from "./repo/notifications-repo/typeorm-notifications.repository";
+import { NotificationsService } from "./services/notifications.service";
 
 @Module({
   imports: [TypeOrmModule.forFeature([PushToken, HomeMember])],
   controllers: [NotificationsController],
-  providers: [NotificationsService],
+  providers: [
+    NotificationsService,
+    { provide: NOTIFICATIONS_REPOSITORY, useClass: TypeormNotificationsRepository },
+  ],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

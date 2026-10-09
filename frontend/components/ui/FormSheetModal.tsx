@@ -31,13 +31,16 @@ type FormSheetModalProps = {
 
 export function FormSheetModal({ visible, onClose, onShow, children }: FormSheetModalProps) {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [trackedVisible, setTrackedVisible] = useState(visible);
   const scrollRef = useRef<ScrollView>(null);
 
+  if (visible !== trackedVisible) {
+    setTrackedVisible(visible);
+    if (!visible) setKeyboardHeight(0);
+  }
+
   useEffect(() => {
-    if (!visible) {
-      setKeyboardHeight(0);
-      return;
-    }
+    if (!visible) return;
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
     const show = Keyboard.addListener(showEvent, (event) => {

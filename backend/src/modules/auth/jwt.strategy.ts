@@ -1,11 +1,9 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
-import { InjectRepository } from "@nestjs/typeorm";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import { Repository } from "typeorm";
 import type { AppConfig } from "../../config/env";
-import { User } from "../../users/user.entity";
+import { AUTH_REPOSITORY, type IAuthRepository } from "./repo/auth-repo/auth.repository";
 
 type AccessPayload = { sub: string; email: string };
 
@@ -13,7 +11,7 @@ type AccessPayload = { sub: string; email: string };
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     config: ConfigService<AppConfig, true>,
-    @InjectRepository(User) private readonly users: Repository<User>,
+    @Inject(AUTH_REPOSITORY) private readonly auth: IAuthRepository,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -23,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: AccessPayload) {
-    const user = await this.users.findOne({ where: { id: payload.sub } });
+    const user = await this.auth.findUserById(payload.sub);
     if (!user) {
       throw new UnauthorizedException({ code: "NOT_SIGNED_IN", message: "Sign in required" });
     }

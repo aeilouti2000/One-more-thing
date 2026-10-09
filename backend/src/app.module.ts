@@ -4,7 +4,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "./modules/auth/auth.module";
-import { RefreshToken } from "./modules/auth/refresh-token.entity";
+import { RefreshToken } from "./modules/auth/entities/refresh-token.entity";
 import { type AppConfig, validateEnv } from "./config/env";
 import { ItemSortOrder1740000000006 } from "./database/migrations/1740000000006-ItemSortOrder";
 import { CustomCategories1740000000008 } from "./database/migrations/1740000000008-CustomCategories";
@@ -19,17 +19,17 @@ import { DropEmailConfirmation1740000000001 } from "./database/migrations/174000
 import { Init1740000000000 } from "./database/migrations/1740000000000-Init";
 import { AppReleaseController } from "./app-release.controller";
 import { HealthController } from "./health.controller";
-import { HomeMember } from "./modules/homes/home-member.entity";
-import { Home } from "./modules/homes/home.entity";
+import { HomeMember } from "./modules/homes/entities/home-member.entity";
+import { Home } from "./modules/homes/entities/home.entity";
 import { HomesModule } from "./modules/homes/homes.module";
-import { CustomCategory } from "./modules/items/custom-category.entity";
-import { HiddenCategory } from "./modules/items/hidden-category.entity";
-import { Item } from "./modules/items/item.entity";
-import { ShoppingList } from "./modules/items/shopping-list.entity";
-import { Staple } from "./modules/items/staple.entity";
+import { CustomCategory } from "./modules/items/entities/custom-category.entity";
+import { HiddenCategory } from "./modules/items/entities/hidden-category.entity";
+import { Item } from "./modules/items/entities/item.entity";
+import { Pin } from "./modules/items/entities/pin.entity";
+import { ShoppingList } from "./modules/items/entities/shopping-list.entity";
 import { ItemsModule } from "./modules/items/items.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
-import { PushToken } from "./modules/notifications/push-token.entity";
+import { PushToken } from "./modules/notifications/entities/push-token.entity";
 import { User } from "./users/user.entity";
 
 @Module({
@@ -56,7 +56,7 @@ import { User } from "./users/user.entity";
             HomeMember,
             Item,
             ShoppingList,
-            Staple,
+            Pin,
             PushToken,
             CustomCategory,
             HiddenCategory,

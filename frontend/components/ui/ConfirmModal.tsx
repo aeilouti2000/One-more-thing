@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import type { ReactNode } from "react";
 import { ActivityIndicator, Modal, Pressable, View } from "react-native";
 import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
@@ -16,6 +17,7 @@ type ConfirmModalProps = {
   icon?: keyof typeof Ionicons.glyphMap;
   error?: string | null;
   loading?: boolean;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -29,6 +31,7 @@ export function ConfirmModal({
   icon = "warning-outline",
   error,
   loading = false,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -76,6 +79,8 @@ export function ConfirmModal({
           >
             {message}
           </AppText>
+
+          {children}
 
           <FormMessage message={error} />
 

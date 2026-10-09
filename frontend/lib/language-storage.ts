@@ -1,4 +1,4 @@
-import "@/lib/session-storage";
+import "@/features/auth/utils/session-storage";
 import type { Locale } from "@/constants/i18n";
 
 const LANGUAGE_STORAGE_KEY = "one-more-thing.language";

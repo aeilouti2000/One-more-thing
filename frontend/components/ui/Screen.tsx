@@ -7,10 +7,11 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { Dimensions, RefreshControl, ScrollView, View } from "react-native";
+import { Dimensions, Platform, RefreshControl, ScrollView, View } from "react-native";
 import {
   Gesture,
   GestureDetector,
+  RefreshControl as GestureRefreshControl,
   ScrollView as GestureScrollView,
 } from "react-native-gesture-handler";
 import Animated, {
@@ -259,6 +260,22 @@ export function Screen({
   );
   /* eslint-enable react-hooks/refs */
 
+  // Android 0.85+ defaults nested scrolling on. Inside a gesture-handler scroll
+  // view that leaves the refresh spinner on screen after the pull ends.
+  const nestedScrollEnabled = Platform.OS === "android" ? false : undefined;
+  // The gesture-handler scroll view waits on its own RefreshControl. The web
+  // build of that control is only a placeholder view.
+  const SwipeRefreshControl = Platform.OS === "web" ? RefreshControl : GestureRefreshControl;
+  const refreshControl = onRefresh ? (
+    <SwipeRefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      tintColor={colors.accent}
+      colors={[colors.accent]}
+      progressBackgroundColor={scheme === "dark" ? colors.deep : colors.white}
+    />
+  ) : undefined;
+
   const scrollContent = onSwipe ? (
     <ScreenSwipeContext.Provider value={swipeContext}>
       {children}
@@ -281,16 +298,8 @@ export function Screen({
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            onRefresh ? (
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={colors.accent}
-                colors={[colors.accent]}
-              />
-            ) : undefined
-          }
+          nestedScrollEnabled={nestedScrollEnabled}
+          refreshControl={refreshControl}
         >
           {scrollContent}
         </GestureScrollView>
@@ -331,6 +340,7 @@ export function Screen({
           contentContainerClassName={padding}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={nestedScrollEnabled}
           refreshControl={
             onRefresh ? (
               <RefreshControl
@@ -338,6 +348,7 @@ export function Screen({
                 onRefresh={onRefresh}
                 tintColor={colors.accent}
                 colors={[colors.accent]}
+                progressBackgroundColor={scheme === "dark" ? colors.deep : colors.white}
               />
             ) : undefined
           }

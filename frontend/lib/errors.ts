@@ -39,6 +39,9 @@ export function formatAppError(
   if (code === "HOST_CANNOT_LEAVE") {
     return translate("errorHostCannotLeave");
   }
+  if (code === "ONLY_HOST_CAN_RENAME") {
+    return translate("errorHostCannotRename");
+  }
   if (code === "UNKNOWN_INVITE_CODE") {
     return translate("errorUnknownInvite");
   }
@@ -57,8 +60,8 @@ export function formatAppError(
   if (code === "UNDO_EXPIRED") {
     return translate("errorUndoExpired");
   }
-  if (code === "STAPLE_LIMIT") {
-    return translate("errorStapleLimit");
+  if (code === "PIN_LIMIT") {
+    return translate("errorPinLimit");
   }
   if (code === "LIST_NAME_REQUIRED") {
     return translate("errorEnterListName");
