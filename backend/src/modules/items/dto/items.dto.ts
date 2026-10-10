@@ -124,11 +124,39 @@ export class CreatePinDto extends CreateItemDto {
   addNow?: boolean;
 }
 
+export class UpdatePinDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  name: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  category: ItemCategory;
+
+  @IsBoolean()
+  urgent: boolean;
+
+  @IsIn(PIN_INTERVALS)
+  intervalDays: PinInterval;
+}
+
 export class ItemIdsDto {
   @IsArray()
   @ArrayNotEmpty()
   @IsUUID("all", { each: true })
   ids: string[];
+}
+
+export class SetUrgentItemsDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID("all", { each: true })
+  ids: string[];
+
+  @IsBoolean()
+  urgent: boolean;
 }
 
 export class MoveItemsDto {

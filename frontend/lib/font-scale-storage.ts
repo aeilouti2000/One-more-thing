@@ -1,5 +1,5 @@
 import "@/features/auth/utils/session-storage";
-import { type FontScaleLevel } from "@/constants/font";
+import { fontScales, type FontScaleLevel } from "@/constants/font";
 
 const FONT_SCALE_STORAGE_KEY = "one-more-thing.font-scale";
 
@@ -17,7 +17,7 @@ function storage() {
 export function readStoredFontScale(): FontScaleLevel {
   try {
     const value = storage()?.getItem(FONT_SCALE_STORAGE_KEY);
-    if (value === "small" || value === "medium" || value === "large") return value;
+    if (value != null && value in fontScales) return value as FontScaleLevel;
     return "medium";
   } catch {
     return "medium";

@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { CategoryChip } from "@/features/items/components/category-chip";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
 import { UrgentToggle } from "@/features/items/components/urgent-toggle";
-import { StatusBadge, UrgentBadge } from "@/features/items/components/status-badge";
+import { StatusBadge } from "@/features/items/components/status-badge";
 import { AppText } from "@/components/ui/AppText";
 import { EditButton } from "@/components/ui/EditButton";
 import { AppButton } from "@/components/ui/AppButton";
@@ -216,7 +216,13 @@ export default function ItemDetailScreen() {
         <View className="flex-row items-center justify-between rounded-3xl bg-cove-paper px-5 py-4">
           <AppText className="text-base text-cove-muted">{t("status")}</AppText>
           <View className="flex-row items-center gap-2">
-            {item.urgent && item.status !== "bought" ? <UrgentBadge /> : null}
+            {item.urgent && item.status !== "bought" ? (
+              <View className="rounded-full px-3 py-1" style={{ backgroundColor: "rgba(248, 113, 113, 0.18)" }}>
+                <AppText className="text-xs font-semibold" style={{ color: "#F87171" }}>
+                  {t("urgent")}
+                </AppText>
+              </View>
+            ) : null}
             <StatusBadge status={item.status} />
           </View>
         </View>

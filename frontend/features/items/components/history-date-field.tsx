@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState, type ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { useRef, useState, type ReactNode } from "react";
+import { Dimensions, Modal, Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { FrostedFill } from "@/components/ui/BlurBackdrop";
+import { GlassFill } from "@/components/ui/BlurBackdrop";
+import { floatedCardStyle } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -14,8 +15,10 @@ type HistoryDateFieldProps = {
 
 export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldProps) {
   const { t, locale } = useI18n();
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const [open, setOpen] = useState(false);
+  const [anchorTop, setAnchorTop] = useState(0);
+  const rowRef = useRef<View>(null);
   const [cursor, setCursor] = useState(() => startOfMonth(value ?? new Date()));
   const language = locale === "ar" ? "ar" : "en";
   const selected = value !== null;
@@ -35,18 +38,34 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
     setOpen(false);
   }
 
+  function toggleCalendar() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setCursor(startOfMonth(value ?? new Date()));
+    const node = rowRef.current;
+    if (!node) {
+      setOpen(true);
+      return;
+    }
+    node.measureInWindow((_x, y, _width, height) => {
+      setAnchorTop(y + height + 8);
+      setOpen(true);
+    });
+  }
+
+  const screenHeight = Dimensions.get("window").height;
+
   return (
     <View className="mb-5 gap-2">
-      <View className="flex-row flex-nowrap items-center gap-2">
+      <View ref={rowRef} collapsable={false} className="flex-row flex-wrap items-center gap-2">
         {leading}
         <Pressable
-          onPress={() => {
-            setCursor(startOfMonth(value ?? new Date()));
-            setOpen((current) => !current);
-          }}
+          onPress={toggleCalendar}
           accessibilityRole="button"
           accessibilityLabel={t("historyPickDate")}
-          className="h-10 min-w-0 flex-1 flex-row items-center justify-center gap-1.5 rounded-full px-2.5 active:opacity-80"
+          className="max-w-full flex-row items-center justify-center gap-1.5 rounded-full px-3 py-2.5 active:opacity-80"
           style={{
             backgroundColor: selected ? colors.accent : colors.paper,
             borderWidth: 1,
@@ -59,24 +78,47 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
             color={selected ? colors.onAccent : colors.accent}
           />
           <AppText
-            numberOfLines={1}
-            className="shrink text-xs font-semibold"
+            className="text-xs font-semibold"
             style={{ color: selected ? colors.onAccent : colors.ink }}
           >
             {label}
           </AppText>
         </Pressable>
       </View>
-      {open ? (
-        <View
-          className="overflow-hidden rounded-3xl px-3 py-3"
-          style={{
-            width: "100%",
-            borderWidth: 1,
-            borderColor: colors.line,
-          }}
-        >
-          <FrostedFill />
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setOpen(false)}
+      >
+        <View className="flex-1">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("close")}
+            onPress={() => setOpen(false)}
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+            }}
+          />
+          <View
+            onStartShouldSetResponder={() => true}
+            className="absolute overflow-hidden rounded-3xl px-3 py-3"
+            style={[
+              floatedCardStyle(scheme, colors),
+              {
+                top: Math.max(12, Math.min(anchorTop, screenHeight - 360)),
+                left: 20,
+                right: 20,
+              },
+            ]}
+          >
+          <GlassFill soft neutral />
           <View className="mb-3 flex-row items-center justify-between">
             <Pressable
               onPress={() => setCursor(shiftMonth(cursor, -1))}
@@ -141,7 +183,7 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
                       className="text-sm font-medium"
                       style={{
                         color: disabled
-                          ? colors.line
+                          ? colors.muted
                           : isSelected
                             ? colors.onAccent
                             : colors.ink,
@@ -154,8 +196,9 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
               );
             })}
           </View>
+          </View>
         </View>
-      ) : null}
+      </Modal>
     </View>
   );
 }

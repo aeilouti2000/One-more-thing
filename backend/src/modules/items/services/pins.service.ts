@@ -87,6 +87,37 @@ export class PinsService {
     return toView(pin);
   }
 
+  async update(
+    userId: string,
+    pinId: string,
+    input: {
+      name: string;
+      category: ItemCategory;
+      urgent: boolean;
+      intervalDays: PinInterval;
+    },
+  ) {
+    const membership = await this.homes.requireMembership(userId);
+    const pin = await this.pins.findInHome(pinId, membership.homeId);
+    if (!pin) {
+      throw new DomainError(
+        "PIN_NOT_FOUND",
+        "Pinned item not found",
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    await this.categories.assertUsable(membership.homeId, input.category);
+    pin.name = input.name.trim();
+    pin.category = input.category;
+    pin.urgent = input.urgent;
+    if (pin.intervalDays !== input.intervalDays) {
+      const now = new Date();
+      pin.intervalDays = input.intervalDays;
+      pin.nextDueAt = advanceDue(now, input.intervalDays, now);
+    }
+    return toView(await this.pins.save(pin));
+  }
+
   async remove(userId: string, pinId: string) {
     const membership = await this.homes.requireMembership(userId);
     const pin = await this.pins.findInHome(pinId, membership.homeId);
@@ -112,6 +143,9 @@ export class PinsService {
     const due = await this.pins.findDue(homeId);
     if (due.length === 0) return;
 
+    const list = await this.lists.findFirstActive(homeId);
+    if (!list) return;
+
     const needed = await this.items.findNeeded(homeId);
     const names = new Set(needed.map((item) => item.name.trim().toLowerCase()));
     const now = new Date();
@@ -127,8 +161,6 @@ export class PinsService {
       const key = pin.name.trim().toLowerCase();
       if (names.has(key)) continue;
 
-      const list = await this.lists.findFirstActive(homeId);
-      if (!list) continue;
       const created = await this.items.insert({
         homeId,
         listId: list.id,

@@ -5,9 +5,10 @@ import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 const LEVELS: { id: FontScaleLevel; sample: number }[] = [
-  { id: "small", sample: 14 },
-  { id: "medium", sample: 18 },
-  { id: "large", sample: 24 },
+  { id: "small", sample: 13 },
+  { id: "medium", sample: 16 },
+  { id: "large", sample: 20 },
+  { id: "xl", sample: 26 },
 ];
 
 export function FontSizeBar() {
@@ -18,6 +19,7 @@ export function FontSizeBar() {
     small: t("textSizeSmall"),
     medium: t("textSizeMedium"),
     large: t("textSizeLarge"),
+    xl: t("textSizeXl"),
   } as const;
 
   return (
@@ -36,7 +38,7 @@ export function FontSizeBar() {
             accessibilityLabel={labels[option.id]}
             accessibilityState={{ selected }}
             onPress={() => setLevel(option.id)}
-            className={`flex-1 items-center justify-end rounded-2xl px-3.5 py-2.5 active:opacity-80 ${
+            className={`min-w-0 flex-1 items-center justify-end rounded-2xl px-1 py-2.5 active:opacity-80 ${
               selected ? "bg-cove-accent" : "bg-cove-paper"
             }`}
           >
@@ -53,12 +55,16 @@ export function FontSizeBar() {
             </Text>
             <Text
               allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
               style={{
                 marginTop: 2,
                 fontFamily: appFont.medium,
                 fontSize: 12,
                 lineHeight: 16,
                 color: selected ? colors.onAccent : colors.muted,
+                textAlign: "center",
               }}
             >
               {labels[option.id]}

@@ -59,6 +59,7 @@ export async function createPin(
     urgent: boolean;
     intervalDays: PinInterval;
     addNow: boolean;
+    unit?: string;
     listId?: string;
   },
 ) {
@@ -70,7 +71,30 @@ export async function createPin(
       urgent: input.urgent,
       intervalDays: input.intervalDays,
       addNow: input.addNow,
+      unit: input.unit?.trim() || undefined,
       listId: input.listId,
+    });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}
+
+export async function updatePin(
+  pinId: string,
+  input: {
+    name: string;
+    category: PurchaseCategory;
+    urgent: boolean;
+    intervalDays: PinInterval;
+  },
+) {
+  try {
+    await api.patch(`/pins/${pinId}`, {
+      name: input.name,
+      category: input.category,
+      urgent: input.urgent,
+      intervalDays: input.intervalDays,
     });
     return { error: null };
   } catch (error) {

@@ -44,5 +44,11 @@ function insertAfterUrgent(rest: Item[], item: Item) {
 }
 
 function writeOrder(items: Repository<Item>, ids: string[]) {
-  return Promise.all(ids.map((id, sortOrder) => items.update({ id }, { sortOrder })));
+  if (ids.length === 0) return Promise.resolve();
+  const cases = ids.map((_, index) => `WHEN $${index + 1}::uuid THEN ${index}`).join(" ");
+  const inList = ids.map((_, index) => `$${index + 1}::uuid`).join(", ");
+  return items.query(
+    `UPDATE items SET sort_order = CASE id ${cases} ELSE sort_order END WHERE id IN (${inList})`,
+    ids,
+  );
 }

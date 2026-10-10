@@ -2,21 +2,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  type SharedValue,
+} from "react-native-reanimated";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/features/items/types/purchase";
 
-type DragHandleCallbacks = {
-  index: number;
-  onHold: (active: boolean) => void;
-  onBegin: (index: number) => void;
-  onMove: (dy: number) => void;
-  onFinish: (dy: number) => void;
-  onLongPress?: () => void;
-};
-
-const dragHandles = new Map<number, DragHandleCallbacks>();
-let nextDragHandleId = 1;
+const GAP = 12;
+const SHIFT_MS = 160;
+const SETTLE_MS = 150;
 
 type ReorderableListProps = {
   items: Purchase[];
@@ -24,8 +25,49 @@ type ReorderableListProps = {
   onReorder: (ids: string[]) => void;
   onDragChange?: (dragging: boolean) => void;
   onItemLongPress?: (id: string) => void;
-  renderRow: (purchase: Purchase, handle: ReactNode) => ReactNode;
+  renderRow: (purchase: Purchase, handle: ReactNode, index: number) => ReactNode;
 };
+
+function rowHeight(heights: number[], index: number) {
+  "worklet";
+  const height = heights[index] ?? 0;
+  return height > 0 ? height : 88;
+}
+
+function computeTarget(from: number, dy: number, tops: number[], heights: number[]) {
+  "worklet";
+  if (from < 0 || tops.length === 0) return Math.max(0, from);
+  const movingMid = (tops[from] ?? 0) + dy + rowHeight(heights, from) / 2;
+  let to = from;
+  if (dy > 0) {
+    for (let index = from + 1; index < tops.length; index += 1) {
+      const mid = (tops[index] ?? 0) + rowHeight(heights, index) / 2;
+      if (movingMid > mid) to = index;
+      else break;
+    }
+  } else if (dy < 0) {
+    for (let index = from - 1; index >= 0; index -= 1) {
+      const mid = (tops[index] ?? 0) + rowHeight(heights, index) / 2;
+      if (movingMid < mid) to = index;
+      else break;
+    }
+  }
+  return to;
+}
+
+function settleOffset(from: number, to: number, tops: number[], heights: number[]) {
+  "worklet";
+  if (from < 0 || to === from || tops.length === 0) return 0;
+  if (to > from) {
+    return (
+      (tops[to] ?? 0) +
+      rowHeight(heights, to) -
+      (tops[from] ?? 0) -
+      rowHeight(heights, from)
+    );
+  }
+  return (tops[to] ?? 0) - (tops[from] ?? 0);
+}
 
 export function ReorderableList({
   items,
@@ -36,156 +78,310 @@ export function ReorderableList({
   renderRow,
 }: ReorderableListProps) {
   const [rows, setRows] = useState(items);
-  const [drag, setDrag] = useState<{ index: number; dy: number; height: number } | null>(null);
   const dragging = useRef(false);
-  const dragRef = useRef<{ index: number; dy: number; height: number } | null>(null);
+  const committed = useRef(false);
+  const pendingReset = useRef(false);
   const heights = useRef<number[]>([]);
   const rowsRef = useRef(rows);
+  const onReorderRef = useRef(onReorder);
+  const onDragChangeRef = useRef(onDragChange);
+  const onLongPressRef = useRef(onItemLongPress);
+  const dragY = useSharedValue(0);
+  const activeIndex = useSharedValue(-1);
+  const targetIndex = useSharedValue(-1);
+  const settling = useSharedValue(false);
+  const heightsSV = useSharedValue<number[]>([]);
+  const topsSV = useSharedValue<number[]>([]);
+
   useLayoutEffect(() => {
     rowsRef.current = rows;
+    onReorderRef.current = onReorder;
+    onDragChangeRef.current = onDragChange;
+    onLongPressRef.current = onItemLongPress;
   });
 
-  // Sync before paint so list switches don't flash the previous rows for a frame.
-  useLayoutEffect(() => {
-    if (!dragging.current) {
-      heights.current = [];
-      setRows(items);
+  function publishMetrics() {
+    const count = rowsRef.current.length;
+    const measured = heights.current.slice(0, count);
+    while (measured.length < count) measured.push(0);
+    const tops: number[] = [];
+    let y = 0;
+    for (let index = 0; index < count; index += 1) {
+      tops.push(y);
+      y += rowHeight(measured, index) + GAP;
     }
+    heightsSV.value = measured;
+    topsSV.value = tops;
+  }
+
+  // Sync before paint so list switches don't flash the previous rows for a frame.
+  // Same ids keep their measured heights; only a real order change clears them.
+  useLayoutEffect(() => {
+    if (dragging.current) return;
+    const current = rowsRef.current;
+    const sameOrder =
+      items.length === current.length &&
+      items.every((item, index) => item.id === current[index]?.id);
+    if (sameOrder) {
+      if (items.some((item, index) => item !== current[index])) setRows(items);
+      return;
+    }
+    heights.current = [];
+    setRows(items);
   }, [items]);
 
+  useLayoutEffect(() => {
+    if (!pendingReset.current) return;
+    pendingReset.current = false;
+    activeIndex.value = -1;
+    targetIndex.value = -1;
+    dragY.value = 0;
+    settling.value = false;
+    publishMetrics();
+  });
+
   function hold(active: boolean) {
-    if (active) onDragChange?.(true);
-    else if (!dragging.current) onDragChange?.(false);
+    if (active) onDragChangeRef.current?.(true);
+    else if (!dragging.current) onDragChangeRef.current?.(false);
   }
 
-  function begin(index: number) {
-    const next = { index, dy: 0, height: (heights.current[index] || 88) + 12 };
+  function beginDrag() {
+    committed.current = false;
     dragging.current = true;
-    dragRef.current = next;
-    setDrag(next);
-    onDragChange?.(true);
+    onDragChangeRef.current?.(true);
   }
 
-  function move(dy: number) {
-    if (!dragRef.current) return;
-    const next = { ...dragRef.current, dy };
-    dragRef.current = next;
-    setDrag(next);
-  }
-
-  function finish(dy: number) {
-    const current = dragRef.current;
-    if (!dragging.current || !current) return;
+  function commit(from: number, to: number) {
+    if (committed.current) return;
+    committed.current = true;
+    const current = rowsRef.current;
+    const next = current.slice();
+    const fromIndex = Math.max(0, Math.min(next.length - 1, from));
+    const toIndex = Math.max(0, Math.min(next.length - 1, to));
+    if (fromIndex !== toIndex && next[fromIndex]) {
+      const [moved] = next.splice(fromIndex, 1);
+      if (moved) next.splice(toIndex, 0, moved);
+      const measured = heights.current.slice();
+      const [height] = measured.splice(fromIndex, 1);
+      if (height !== undefined) measured.splice(toIndex, 0, height);
+      heights.current = measured;
+      onReorderRef.current(next.map((item) => item.id));
+    }
     dragging.current = false;
-    dragRef.current = null;
-    const shift = Math.round(dy / current.height);
-    const to = Math.max(0, Math.min(rowsRef.current.length - 1, current.index + shift));
-    const next = rowsRef.current.slice();
-    const [moved] = next.splice(current.index, 1);
-    if (moved) next.splice(to, 0, moved);
+    pendingReset.current = true;
+    onDragChangeRef.current?.(false);
     setRows(next);
-    setDrag(null);
-    onDragChange?.(false);
-    if (moved && to !== current.index) onReorder(next.map((item) => item.id));
   }
-
-  const target =
-    drag === null
-      ? -1
-      : Math.max(0, Math.min(rows.length - 1, drag.index + Math.round(drag.dy / drag.height)));
 
   return (
-    <View className="gap-3">
-      {rows.map((purchase, index) => {
-        let shift = 0;
-        if (drag && index !== drag.index) {
-          if (drag.index < target && index > drag.index && index <= target) shift = -drag.height;
-          if (drag.index > target && index < drag.index && index >= target) shift = drag.height;
-        }
-        const translateY = drag && index === drag.index ? drag.dy : shift;
-
-        return (
-          <View
-            key={purchase.id}
-            onLayout={(event) => {
-              heights.current[index] = event.nativeEvent.layout.height;
-            }}
-            style={{
-              transform: [{ translateY }],
-              zIndex: drag && index === drag.index ? 2 : 0,
-            }}
-          >
-            {renderRow(
-              purchase,
-              enabled ? (
-                <DragHandle
-                  index={index}
-                  onHold={hold}
-                  onBegin={begin}
-                  onMove={move}
-                  onFinish={finish}
-                  onLongPress={
-                    onItemLongPress ? () => onItemLongPress(purchase.id) : undefined
-                  }
-                />
-              ) : null,
-            )}
-          </View>
-        );
-      })}
+    <View style={{ gap: GAP }}>
+      {rows.map((purchase, index) => (
+        <ReorderRow
+          key={purchase.id}
+          index={index}
+          dragY={dragY}
+          activeIndex={activeIndex}
+          targetIndex={targetIndex}
+          heightsSV={heightsSV}
+          onLayout={(height) => {
+            if (heights.current[index] === height) return;
+            heights.current[index] = height;
+            if (!dragging.current) publishMetrics();
+          }}
+        >
+          {renderRow(
+            purchase,
+            enabled ? (
+              <DragHandle
+                index={index}
+                dragY={dragY}
+                activeIndex={activeIndex}
+                targetIndex={targetIndex}
+                settling={settling}
+                topsSV={topsSV}
+                heightsSV={heightsSV}
+                onHold={hold}
+                onBegin={beginDrag}
+                onCommit={commit}
+                onLongPress={
+                  onItemLongPress ? () => onLongPressRef.current?.(purchase.id) : undefined
+                }
+              />
+            ) : null,
+            index,
+          )}
+        </ReorderRow>
+      ))}
     </View>
+  );
+}
+
+function ReorderRow({
+  index,
+  dragY,
+  activeIndex,
+  targetIndex,
+  heightsSV,
+  onLayout,
+  children,
+}: {
+  index: number;
+  dragY: SharedValue<number>;
+  activeIndex: SharedValue<number>;
+  targetIndex: SharedValue<number>;
+  heightsSV: SharedValue<number[]>;
+  onLayout: (height: number) => void;
+  children: ReactNode;
+}) {
+  const indexSV = useSharedValue(index);
+  const shift = useSharedValue(0);
+
+  useLayoutEffect(() => {
+    indexSV.value = index;
+  }, [index, indexSV]);
+
+  useAnimatedReaction(
+    () => {
+      const from = activeIndex.value;
+      const row = indexSV.value;
+      if (from < 0 || row === from) return 0;
+      const to = targetIndex.value;
+      const span = rowHeight(heightsSV.value, from) + GAP;
+      if (from < to && row > from && row <= to) return -span;
+      if (from > to && row < from && row >= to) return span;
+      return 0;
+    },
+    (next) => {
+      if (activeIndex.value < 0) {
+        shift.value = 0;
+        return;
+      }
+      shift.value = withTiming(next, {
+        duration: SHIFT_MS,
+        easing: Easing.out(Easing.cubic),
+      });
+    },
+  );
+
+  const style = useAnimatedStyle(() => {
+    const draggingThis = activeIndex.value === indexSV.value;
+    return {
+      transform: [
+        {
+          translateY:
+            activeIndex.value < 0 ? 0 : draggingThis ? dragY.value : shift.value,
+        },
+      ],
+      zIndex: draggingThis ? 20 : 0,
+      elevation: draggingThis ? 12 : 0,
+    };
+  });
+
+  return (
+    <Animated.View
+      collapsable={false}
+      style={style}
+      onLayout={(event) => onLayout(event.nativeEvent.layout.height)}
+    >
+      {children}
+    </Animated.View>
   );
 }
 
 function DragHandle({
   index,
+  dragY,
+  activeIndex,
+  targetIndex,
+  settling,
+  topsSV,
+  heightsSV,
   onHold,
   onBegin,
-  onMove,
-  onFinish,
+  onCommit,
   onLongPress,
 }: {
   index: number;
+  dragY: SharedValue<number>;
+  activeIndex: SharedValue<number>;
+  targetIndex: SharedValue<number>;
+  settling: SharedValue<boolean>;
+  topsSV: SharedValue<number[]>;
+  heightsSV: SharedValue<number[]>;
   onHold: (active: boolean) => void;
-  onBegin: (index: number) => void;
-  onMove: (dy: number) => void;
-  onFinish: (dy: number) => void;
+  onBegin: () => void;
+  onCommit: (from: number, to: number) => void;
   onLongPress?: () => void;
 }) {
   const { colors } = useTheme();
   const { t } = useI18n();
-  const [handleId] = useState(() => nextDragHandleId++);
+  const indexSV = useSharedValue(index);
+  const callbacks = useRef({ onHold, onBegin, onCommit, onLongPress });
+
   useLayoutEffect(() => {
-    dragHandles.set(handleId, { index, onHold, onBegin, onMove, onFinish, onLongPress });
+    indexSV.value = index;
+    callbacks.current = { onHold, onBegin, onCommit, onLongPress };
   });
-  useLayoutEffect(() => {
-    return () => {
-      dragHandles.delete(handleId);
-    };
-  }, [handleId]);
-  const gesture = useMemo(
-    () =>
-      Gesture.Exclusive(
-        Gesture.Pan()
-          .runOnJS(true)
-          .activeOffsetY([-8, 8])
-          .onStart(() => {
-            const current = dragHandles.get(handleId);
-            current?.onBegin(current.index);
-          })
-          .onUpdate((event) => dragHandles.get(handleId)?.onMove(event.translationY))
-          .onFinalize((event) => dragHandles.get(handleId)?.onFinish(event.translationY)),
-        Gesture.LongPress()
-          .runOnJS(true)
-          .minDuration(350)
-          .onStart(() => {
-            const current = dragHandles.get(handleId);
-            current?.onHold(false);
-            current?.onLongPress?.();
-          }),
-      ),
-    [handleId],
-  );
+
+  const gesture = useMemo(() => {
+    const hold = (active: boolean) => callbacks.current.onHold(active);
+    const begin = () => callbacks.current.onBegin();
+    const commitDrag = (from: number, to: number) => callbacks.current.onCommit(from, to);
+    const longPress = () => callbacks.current.onLongPress?.();
+
+    return Gesture.Exclusive(
+      Gesture.Pan()
+        .activeOffsetY([-8, 8])
+        .onStart(() => {
+          "worklet";
+          if (settling.value) return;
+          dragY.value = 0;
+          activeIndex.value = indexSV.value;
+          targetIndex.value = indexSV.value;
+          runOnJS(begin)();
+        })
+        .onUpdate((event) => {
+          "worklet";
+          if (settling.value || activeIndex.value < 0) return;
+          dragY.value = event.translationY;
+          const next = computeTarget(
+            activeIndex.value,
+            event.translationY,
+            topsSV.value,
+            heightsSV.value,
+          );
+          if (next !== targetIndex.value) targetIndex.value = next;
+        })
+        .onFinalize((event, success) => {
+          "worklet";
+          if (activeIndex.value < 0 || settling.value) return;
+          settling.value = true;
+          const from = activeIndex.value;
+          const to = success
+            ? computeTarget(from, event.translationY, topsSV.value, heightsSV.value)
+            : from;
+          targetIndex.value = to;
+          const dest = settleOffset(from, to, topsSV.value, heightsSV.value);
+          dragY.value = withTiming(
+            dest,
+            { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) },
+            () => {
+              "worklet";
+              runOnJS(commitDrag)(from, to);
+            },
+          );
+        }),
+      Gesture.LongPress()
+        .minDuration(350)
+        .onStart(() => {
+          "worklet";
+          runOnJS(hold)(false);
+          runOnJS(longPress)();
+        }),
+    );
+    // Shared values are stable. JS callbacks are read through the ref at call time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex, dragY, heightsSV, indexSV, settling, targetIndex, topsSV]);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -193,9 +389,9 @@ function DragHandle({
         accessibilityRole="button"
         accessibilityLabel={t("reorderItem")}
         className="justify-center py-1"
-        onTouchStart={() => dragHandles.get(handleId)?.onHold(true)}
-        onTouchEnd={() => dragHandles.get(handleId)?.onHold(false)}
-        onTouchCancel={() => dragHandles.get(handleId)?.onHold(false)}
+        onTouchStart={() => callbacks.current.onHold(true)}
+        onTouchEnd={() => callbacks.current.onHold(false)}
+        onTouchCancel={() => callbacks.current.onHold(false)}
       >
         <Ionicons name="reorder-three" size={22} color={colors.muted} />
       </View>

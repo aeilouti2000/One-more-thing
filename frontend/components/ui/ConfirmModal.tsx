@@ -4,7 +4,7 @@ import { ActivityIndicator, Modal, Pressable, View } from "react-native";
 import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { floatedCardStyle, iconSize } from "@/constants/theme";
+import { floatedCardStyle, iconSize, withAlpha } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -37,8 +37,8 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
-  const danger = "#F87171";
-  const dangerSoft = "rgba(248, 113, 113, 0.18)";
+  const danger = scheme === "dark" ? "#F07178" : "#C2414A";
+  const dangerSoft = scheme === "dark" ? "rgba(240, 113, 120, 0.16)" : "rgba(194, 65, 74, 0.1)";
 
   return (
     <Modal
@@ -57,7 +57,7 @@ export function ConfirmModal({
           className="w-full max-w-md gap-4 overflow-hidden rounded-3xl p-5"
           style={floatedCardStyle(scheme, colors)}
         >
-          <GlassFill />
+          <GlassFill soft neutral />
           <View className="flex-row items-center gap-3">
             <View
               className="h-12 w-12 items-center justify-center rounded-full"
@@ -92,7 +92,10 @@ export function ConfirmModal({
               disabled={loading}
               onPress={onCancel}
               className="flex-1 items-center rounded-2xl px-3 py-3 active:opacity-80"
-              style={{ backgroundColor: colors.mist }}
+              style={{
+                backgroundColor:
+                  scheme === "dark" ? withAlpha(colors.white, 0.08) : "#F4F5F7",
+              }}
             >
               <AppText
                 className="text-sm font-semibold"

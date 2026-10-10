@@ -183,6 +183,16 @@ export async function deleteItems(itemIds: string[]) {
   }
 }
 
+export async function setItemsUrgent(itemIds: string[], urgent: boolean) {
+  if (itemIds.length === 0) return { error: null };
+  try {
+    await api.post("/items/urgent", { ids: itemIds, urgent });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}
+
 export async function moveItems(itemIds: string[], listId: string) {
   if (itemIds.length === 0) return { error: null };
   try {

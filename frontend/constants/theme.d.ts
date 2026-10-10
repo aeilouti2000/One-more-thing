@@ -43,6 +43,12 @@ export function floatedCardStyle(
 ): {
   borderWidth: number;
   borderColor: string;
+  backgroundColor: string;
+  shadowColor: string;
+  shadowOffset: { width: number; height: number };
+  shadowOpacity: number;
+  shadowRadius: number;
+  elevation: number;
 };
 
 export function headerIconFrameStyle(

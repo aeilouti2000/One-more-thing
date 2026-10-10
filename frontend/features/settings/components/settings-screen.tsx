@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Linking, Pressable, Switch, View } from "react-native";
@@ -30,6 +30,15 @@ import { useAuth } from "@/features/auth/providers/auth-provider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { HOME_CURRENCIES, type CostSettings, type HomeCurrency } from "@/features/homes/types/household";
+import {
+  readSwipeActions,
+  subscribeSwipeActions,
+  SWIPE_ACTION_IDS,
+  SWIPE_ACTION_TONE,
+  writeSwipeActions,
+  type SwipeAction,
+  type SwipeActionPrefs,
+} from "@/features/items/utils/swipe-actions";
 
 export default function SettingsScreen() {
   const { user, signOut, changePassword, updateProfile, deleteAccount } = useAuth();
@@ -488,11 +497,38 @@ export default function SettingsScreen() {
         <SettingsCard
           icon="options-outline"
           title={t("appSettings")}
-          summary={`${t("pinsTitle")} · ${t("listAlerts")}`}
+          summary={`${t("categories")} · ${t("pinsTitle")} · ${t("listAlerts")}`}
           open={openCard === "app"}
           onToggle={() => toggleCard("app")}
           colors={colors}
         >
+          <CardBlock>
+            <Pressable
+              onPress={() => router.push("/categories")}
+              accessibilityRole="button"
+              accessibilityLabel={t("categories")}
+              className="flex-row items-center justify-between gap-3 active:opacity-80"
+            >
+              <View className="min-w-0 flex-1">
+                <AppText className="text-base font-semibold text-cove-ink">
+                  {t("categories")}
+                </AppText>
+                <AppText className="mt-1 text-sm text-cove-muted">
+                  {t("categoriesSettingsBody")}
+                </AppText>
+              </View>
+              <Ionicons
+                name={isRTL ? "chevron-back" : "chevron-forward"}
+                size={iconSize.sm}
+                color={colors.muted}
+              />
+            </Pressable>
+          </CardBlock>
+
+          <CardBlock>
+            <SwipeActionSettings />
+          </CardBlock>
+
           <CardBlock>
             <Pressable
               onPress={() => router.push("/pins")}
@@ -781,6 +817,196 @@ export default function SettingsScreen() {
         />
       </ConfirmModal>
     </Screen>
+  );
+}
+
+function swipeActionLabel(
+  action: SwipeAction,
+  t: (key: "markSelectedBought" | "pinSelected" | "moveSelected" | "markSelectedUrgent" | "delete") => string,
+) {
+  if (action === "buy") return t("markSelectedBought");
+  if (action === "pin") return t("pinSelected");
+  if (action === "move") return t("moveSelected");
+  if (action === "urgent") return t("markSelectedUrgent");
+  return t("delete");
+}
+
+function swipeActionHint(
+  action: SwipeAction,
+  t: (
+    key: "swipeBuyHint" | "swipePinHint" | "swipeMoveHint" | "swipeUrgentHint" | "swipeDeleteHint",
+  ) => string,
+) {
+  if (action === "buy") return t("swipeBuyHint");
+  if (action === "pin") return t("swipePinHint");
+  if (action === "move") return t("swipeMoveHint");
+  if (action === "urgent") return t("swipeUrgentHint");
+  return t("swipeDeleteHint");
+}
+
+function SwipeActionGlyph({ action, color, size = 18 }: { action: SwipeAction; color: string; size?: number }) {
+  if (action === "buy") return <MaterialCommunityIcons name="cart-check" size={size} color={color} />;
+  if (action === "pin") return <MaterialCommunityIcons name="pin" size={size} color={color} />;
+  if (action === "move") return <Ionicons name="swap-horizontal" size={size} color={color} />;
+  if (action === "urgent") return <Ionicons name="flash" size={size} color={color} />;
+  return <Ionicons name="trash-outline" size={size} color={color} />;
+}
+
+function SwipeActionSettings() {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  const [prefs, setPrefs] = useState<SwipeActionPrefs>(readSwipeActions);
+  const [open, setOpen] = useState(false);
+  const [openSide, setOpenSide] = useState<"left" | "right" | null>(null);
+
+  useEffect(() => subscribeSwipeActions(setPrefs), []);
+
+  function label(action: SwipeAction) {
+    return swipeActionLabel(action, t);
+  }
+
+  function choose(side: "left" | "right", action: SwipeAction) {
+    if (prefs[side] === action) return;
+    const other = side === "left" ? "right" : "left";
+    const next: SwipeActionPrefs =
+      prefs[other] === action
+        ? { left: prefs.right, right: prefs.left }
+        : { ...prefs, [side]: action };
+    setPrefs(writeSwipeActions(next));
+  }
+
+  function sideCard(side: "left" | "right") {
+    const selected = prefs[side];
+    const tone = SWIPE_ACTION_TONE[selected];
+    const expanded = openSide === side;
+    const title = side === "left" ? t("swipeLeft") : t("swipeRight");
+    return (
+      <View className="overflow-hidden rounded-2xl bg-cove-paper">
+        <Pressable
+          onPress={() => setOpenSide(expanded ? null : side)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={title}
+          className="flex-row items-center gap-3 px-3 py-3 active:opacity-80"
+        >
+          <Ionicons
+            name={side === "left" ? "arrow-back" : "arrow-forward"}
+            size={18}
+            color={tone.fg}
+          />
+          <View className="min-w-0 flex-1">
+            <AppText className="text-base font-semibold text-cove-ink">{title}</AppText>
+            <AppText className="mt-0.5 text-sm font-medium" style={{ color: tone.fg }} numberOfLines={1}>
+              {label(selected)}
+            </AppText>
+          </View>
+          <View
+            className="h-9 w-9 items-center justify-center rounded-xl"
+            style={{ backgroundColor: tone.bg }}
+          >
+            <SwipeActionGlyph action={selected} color={tone.fg} />
+          </View>
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={iconSize.sm}
+            color={colors.ink}
+          />
+        </Pressable>
+        {expanded ? (
+          <View className="gap-1.5 px-2 pb-2">
+            {SWIPE_ACTION_IDS.map((action) => {
+              const active = selected === action;
+              const meta = SWIPE_ACTION_TONE[action];
+              return (
+                <Pressable
+                  key={action}
+                  onPress={() => choose(side, action)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${title}, ${label(action)}`}
+                  className="flex-row items-center gap-3 rounded-2xl px-2.5 py-2 active:opacity-80"
+                  style={{ backgroundColor: active ? meta.bg : colors.mist }}
+                >
+                  <View
+                    className="h-9 w-9 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: active ? "rgba(255,255,255,0.55)" : meta.bg }}
+                  >
+                    <SwipeActionGlyph action={action} color={meta.fg} />
+                  </View>
+                  <View className="min-w-0 flex-1">
+                    <AppText
+                      className="text-sm font-semibold"
+                      style={{ color: active ? meta.fg : colors.ink }}
+                    >
+                      {label(action)}
+                    </AppText>
+                    <AppText className="text-xs" style={{ color: active ? meta.fg : colors.muted }}>
+                      {swipeActionHint(action, t)}
+                    </AppText>
+                  </View>
+                  {active ? <Ionicons name="checkmark-circle" size={20} color={meta.fg} /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <Pressable
+        onPress={() => {
+          setOpen((current) => !current);
+          setOpenSide(null);
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        className="flex-row items-center justify-between gap-3 active:opacity-80"
+      >
+        <View className="min-w-0 flex-1">
+          <AppText className="text-base font-semibold text-cove-ink">{t("swipeActions")}</AppText>
+          {open ? (
+            <AppText className="mt-1 text-sm text-cove-muted">{t("swipeActionsBody")}</AppText>
+          ) : (
+            <View className="mt-1 flex-row items-center gap-3" style={{ direction: "ltr" }}>
+              <View className="min-w-0 flex-1 flex-row items-center gap-1.5">
+                <Ionicons name="arrow-back" size={14} color={colors.muted} />
+                <View
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: SWIPE_ACTION_TONE[prefs.left].fg }}
+                />
+                <AppText className="min-w-0 flex-1 text-sm text-cove-muted" numberOfLines={1}>
+                  {label(prefs.left)}
+                </AppText>
+              </View>
+              <View className="min-w-0 flex-1 flex-row items-center gap-1.5">
+                <Ionicons name="arrow-forward" size={14} color={colors.muted} />
+                <View
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: SWIPE_ACTION_TONE[prefs.right].fg }}
+                />
+                <AppText className="min-w-0 flex-1 text-sm text-cove-muted" numberOfLines={1}>
+                  {label(prefs.right)}
+                </AppText>
+              </View>
+            </View>
+          )}
+        </View>
+        <Ionicons
+          name={open ? "chevron-up" : "chevron-down"}
+          size={iconSize.sm}
+          color={colors.ink}
+        />
+      </Pressable>
+      {open ? (
+        <View className="mt-4 gap-2.5">
+          {sideCard("left")}
+          {sideCard("right")}
+        </View>
+      ) : null}
+    </View>
   );
 }
 

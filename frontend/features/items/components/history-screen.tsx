@@ -20,7 +20,7 @@ import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeLi
 import { canUndoBought } from "@/features/items/utils/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { headerActionStyle, headerIconFrameStyle, iconSize } from "@/constants/theme";
+import { floatedCardStyle, headerActionStyle, headerIconFrameStyle, iconSize } from "@/constants/theme";
 import type { Purchase } from "@/features/items/types/purchase";
 
 type HistoryRange = "all" | "today" | "week" | "month";
@@ -30,7 +30,7 @@ type Anchor = { x: number; y: number; width: number; height: number };
 const HISTORY_RANGES: HistoryRange[] = ["all", "today", "week", "month"];
 
 export default function HistoryScreen() {
-  const { bought, isLoading, error, refresh, undoBought, addItem } = usePurchases();
+  const { bought, isLoading, error, refresh, undoBought, addItem, deleteMany } = usePurchases();
   const { household } = useHousehold();
   const { t, locale, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
@@ -40,7 +40,7 @@ export default function HistoryScreen() {
   const [undoId, setUndoId] = useState<string | null>(null);
   const [buyAgainId, setBuyAgainId] = useState<string | null>(null);
   const [buyAgainNotice, setBuyAgainNotice] = useState<string | null>(null);
-  const [range, setRange] = useState<HistoryRange>("all");
+  const [range, setRange] = useState<HistoryRange>("month");
   const [mode, setMode] = useState<HistoryMode>("list");
   const [activeLists, setActiveLists] = useState<HomeList[]>([]);
   const [historyLists, setHistoryLists] = useState<HistoryList[]>([]);
@@ -77,13 +77,17 @@ export default function HistoryScreen() {
       return a.name.localeCompare(b.name);
     });
   }, [historyLists, bought, activeLists]);
-  const visible = bought.filter((item) => {
-    const inList = listId === "all" || item.listId === listId;
-    const inDate = pickedDate
-      ? sameLocalDay(item.boughtAt, pickedDate)
-      : boughtInRange(item.boughtAt, range, now);
-    return inList && inDate;
-  });
+  const visible = useMemo(
+    () =>
+      bought.filter((item) => {
+        const inList = listId === "all" || item.listId === listId;
+        const inDate = pickedDate
+          ? sameLocalDay(item.boughtAt, pickedDate)
+          : boughtInRange(item.boughtAt, range, now);
+        return inList && inDate;
+      }),
+    [bought, listId, now, pickedDate, range],
+  );
 
   const openItem = openItemId ? (bought.find((item) => item.id === openItemId) ?? null) : null;
   const spend = useMemo(
@@ -111,11 +115,9 @@ export default function HistoryScreen() {
   const [listsHomeId, setListsHomeId] = useState<string | null>(homeId);
   if (homeId !== listsHomeId) {
     setListsHomeId(homeId);
-    if (!homeId) {
-      setActiveLists([]);
-      setHistoryLists([]);
-      setListId("all");
-    }
+    setActiveLists([]);
+    setHistoryLists([]);
+    setListId("all");
   }
 
   if (listId !== "all" && !filterLists.some((list) => list.id === listId)) {
@@ -173,6 +175,7 @@ export default function HistoryScreen() {
   }
 
   async function buyAgain(purchase: Purchase) {
+    if (buyAgainId) return;
     setBuyAgainId(purchase.id);
     setUndoError(null);
     setBuyAgainNotice(null);
@@ -288,7 +291,7 @@ export default function HistoryScreen() {
             onChange={(date) => setPickedDate(date)}
             leading={
               <>
-                <View ref={listButtonRef} collapsable={false} className="min-w-0 flex-1">
+                <View ref={listButtonRef} collapsable={false} className="max-w-full">
                   <ChoiceButton
                     icon="list-outline"
                     selected={listId !== "all"}
@@ -304,10 +307,10 @@ export default function HistoryScreen() {
                     onPress={() => openAnchored(listButtonRef, setListAnchor, setIsChoosingList)}
                   />
                 </View>
-                <View ref={rangeButtonRef} collapsable={false} className="min-w-0 flex-1">
+                <View ref={rangeButtonRef} collapsable={false} className="max-w-full">
                   <ChoiceButton
                     icon="time-outline"
-                    selected={pickedDate !== null || range !== "all"}
+                    selected={pickedDate !== null || range !== "month"}
                     label={pickedLabel ?? rangeLabel[range]}
                     onPress={() => openAnchored(rangeButtonRef, setRangeAnchor, setIsChoosingRange)}
                   />
@@ -374,9 +377,8 @@ export default function HistoryScreen() {
                     ? () => void undo(purchase.id)
                     : undefined
                 }
-                onBuyAgain={
-                  buyAgainId === purchase.id ? undefined : () => void buyAgain(purchase)
-                }
+                buyAgainBusy={buyAgainId === purchase.id}
+                onBuyAgain={() => void buyAgain(purchase)}
               />
             ))}
           </View>
@@ -387,6 +389,7 @@ export default function HistoryScreen() {
         purchase={openItem}
         visible={openItem !== null}
         onClose={() => setOpenItemId(null)}
+        onDelete={openItem ? () => deleteMany([openItem.id]) : undefined}
       />
 
       <OptionMenu
@@ -441,6 +444,10 @@ function InvoiceView({
 }) {
   const { t } = useI18n();
   const { colors, scheme } = useTheme();
+  const boughtOn = new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+    month: "short",
+    day: "numeric",
+  });
 
   if (items.length === 0) {
     return (
@@ -464,12 +471,7 @@ function InvoiceView({
 
       <View className="mt-4 gap-0">
         {items.map((item, index) => {
-          const when = item.boughtAt
-            ? new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
-                month: "short",
-                day: "numeric",
-              }).format(new Date(item.boughtAt))
-            : "";
+          const when = item.boughtAt ? boughtOn.format(new Date(item.boughtAt)) : "";
           const qty = item.unit ? `${item.quantity} ${item.unit}` : String(item.quantity);
           return (
             <Pressable
@@ -527,7 +529,7 @@ function ChoiceButton({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="h-10 w-full min-w-0 flex-row items-center justify-center gap-1.5 rounded-full px-2.5 active:opacity-80"
+      className="max-w-full flex-row items-center justify-center gap-1.5 rounded-full px-3 py-2.5 active:opacity-80"
       style={{
         backgroundColor: selected ? colors.accent : colors.paper,
         borderWidth: 1,
@@ -536,8 +538,7 @@ function ChoiceButton({
     >
       <Ionicons name={icon} size={15} color={selected ? colors.onAccent : colors.accent} />
       <AppText
-        numberOfLines={1}
-        className="shrink text-xs font-semibold"
+        className="text-xs font-semibold"
         style={{ color: selected ? colors.onAccent : colors.ink }}
       >
         {label}
@@ -563,7 +564,7 @@ function OptionMenu({
   onSelect: (id: string) => void;
   onClose: () => void;
 }) {
-  const { colors, shadow } = useTheme();
+  const { colors, scheme, shadow } = useTheme();
   const frame = menuFrame(anchor, isRTL);
 
   return (
@@ -585,10 +586,10 @@ function OptionMenu({
           }}
         >
           <View
-            className="overflow-hidden rounded-3xl border border-cove-line"
-            style={{ maxHeight: frame.maxHeight }}
+            className="overflow-hidden rounded-3xl"
+            style={[floatedCardStyle(scheme, colors), { maxHeight: frame.maxHeight }]}
           >
-            <GlassFill soft />
+            <GlassFill soft neutral />
             <ScrollView
               bounces={false}
               style={{ flexGrow: 0, maxHeight: frame.maxHeight }}

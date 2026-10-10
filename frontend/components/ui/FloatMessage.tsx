@@ -1,6 +1,7 @@
 import { View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { GlassFill } from "@/components/ui/BlurBackdrop";
+import { floatedCardStyle } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export function FloatMessage({
@@ -10,21 +11,15 @@ export function FloatMessage({
   message: string;
   tone?: "error" | "success";
 }) {
-  const { colors } = useTheme();
-  const color = tone === "success" ? colors.accent : "#F87171";
+  const { colors, scheme } = useTheme();
+  const color = tone === "success" ? colors.accent : scheme === "dark" ? "#F07178" : "#C2414A";
 
   return (
     <View
-      className="max-w-full overflow-hidden rounded-full border border-cove-line px-4 py-3"
-      style={{
-        elevation: 8,
-        shadowColor: "#000000",
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-      }}
+      className="max-w-full overflow-hidden rounded-full px-4 py-3"
+      style={floatedCardStyle(scheme, colors)}
     >
-      <GlassFill />
+      <GlassFill soft neutral />
       <AppText
         className="text-center text-sm font-semibold"
         style={{ color }}

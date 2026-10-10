@@ -279,24 +279,28 @@ function getColors(scheme, accentHex = DEFAULT_ACCENT) {
 function glassFieldStyle(scheme, palette = getColors(scheme)) {
   if (scheme === "dark") {
     return {
-      backgroundColor: withAlpha(palette.ice, 0.72),
-      borderColor: withAlpha(palette.accent, 0.28),
+      backgroundColor: withAlpha(palette.white, 0.06),
+      borderColor: withAlpha(palette.white, 0.12),
     };
   }
 
   return {
-    backgroundColor: withAlpha(palette.white, 0.96),
-    borderColor: withAlpha(palette.accent, 0.28),
+    backgroundColor: "#F4F5F7",
+    borderColor: withAlpha("#12141A", 0.1),
   };
 }
 
 function floatedCardStyle(scheme, palette = getColors(scheme)) {
+  const dark = scheme === "dark";
   return {
     borderWidth: 1,
-    borderColor:
-      scheme === "dark"
-        ? withAlpha(palette.accent, 0.24)
-        : withAlpha(palette.accent, 0.22),
+    borderColor: dark ? withAlpha(palette.white, 0.1) : withAlpha("#12141A", 0.08),
+    backgroundColor: dark ? palette.paper : palette.white,
+    shadowColor: "#12141A",
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: dark ? 0.42 : 0.12,
+    shadowRadius: 28,
+    elevation: 12,
   };
 }
 

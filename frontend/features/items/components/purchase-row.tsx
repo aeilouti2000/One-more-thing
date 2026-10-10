@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { formatMoney } from "@/features/items/utils/currency";
@@ -10,16 +10,21 @@ import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/features/items/types/purchase";
 import { StatusBadge } from "./status-badge";
 
+const CARD_RADIUS = 24;
+const SELECTION_BORDER = 2;
+
 type PurchaseRowProps = {
   purchase: Purchase;
   onPress?: () => void;
   onLongPress?: () => void;
   onUndo?: () => void;
   onBuyAgain?: () => void;
+  buyAgainBusy?: boolean;
   onChangeQuantity?: (quantity: number) => void;
   quantityBusy?: boolean;
   selected?: boolean;
   leading?: ReactNode;
+  showCategory?: boolean;
 };
 
 export function PurchaseRow({
@@ -28,16 +33,19 @@ export function PurchaseRow({
   onLongPress,
   onUndo,
   onBuyAgain,
+  buyAgainBusy = false,
   onChangeQuantity,
   quantityBusy = false,
   selected = false,
   leading,
+  showCategory = true,
 }: PurchaseRowProps) {
-  const { t } = useI18n();
+  const { t, isRTL } = useI18n();
   const { household } = useHousehold();
   const categoryLabel = useCategoryLabel(purchase.category);
   const { colors, scheme } = useTheme();
   const showsStepper = !selected && Boolean(onChangeQuantity) && purchase.status === "needed";
+  const isUrgent = purchase.urgent && purchase.status !== "bought";
   const quantityLabel = purchase.unit
     ? `${purchase.quantity} ${purchase.unit}`
     : `${purchase.quantity}`;
@@ -46,12 +54,16 @@ export function PurchaseRow({
       ? formatMoney(purchase.cost, household.currency, t("noPrice"))
       : null;
 
+  const cardRadius = {
+    borderTopLeftRadius: CARD_RADIUS,
+    borderTopRightRadius: CARD_RADIUS,
+    borderBottomLeftRadius: CARD_RADIUS,
+    borderBottomRightRadius: CARD_RADIUS,
+  };
+
   return (
     <View
       pointerEvents="box-none"
-      className={`rounded-3xl border-2 ${
-        selected ? "border-cove-accent bg-cove-mist" : "border-transparent bg-cove-paper"
-      }`}
       style={
         selected
           ? undefined
@@ -60,44 +72,90 @@ export function PurchaseRow({
               shadowOpacity: scheme === "dark" ? 0.28 : 0.08,
               shadowRadius: 10,
               shadowOffset: { width: 0, height: 4 },
-              elevation: 2,
             }
       }
     >
+      <View
+        pointerEvents="box-none"
+        style={{
+          ...cardRadius,
+          backgroundColor: selected ? colors.mist : colors.paper,
+          elevation: 2,
+        }}
+      >
+      <View
+        pointerEvents="box-none"
+        style={{
+          ...cardRadius,
+          overflow: "hidden",
+          backgroundColor: selected ? colors.mist : colors.paper,
+        }}
+      >
+      {isUrgent ? (
+        <View
+          pointerEvents="none"
+          accessibilityLabel={t("urgent")}
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            width: 6,
+            backgroundColor: "#F87171",
+            ...(isRTL ? { right: 0 } : { left: 0 }),
+          }}
+        />
+      ) : null}
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
         delayLongPress={350}
         accessibilityRole="button"
-        accessibilityLabel={purchase.name}
+        accessibilityLabel={[
+          purchase.name,
+          isUrgent ? t("urgent") : null,
+          purchase.notes?.trim() ? t("notes") : null,
+        ]
+          .filter(Boolean)
+          .join(", ")}
         accessibilityState={{ selected }}
         style={StyleSheet.absoluteFill}
       />
-      <View pointerEvents="box-none" className="px-4 py-3.5">
-        <View pointerEvents="box-none" className="flex-row items-start gap-3">
+      <View pointerEvents="box-none" className="px-[18px] py-4">
+        <View pointerEvents="box-none" className="flex-row items-center gap-3">
           {leading ? (
-            <View pointerEvents="box-none" className="pt-1">
+            <View pointerEvents="box-none">
               {leading}
             </View>
           ) : null}
           <View pointerEvents="box-none" className="min-w-0 flex-1 gap-2.5">
-            <View pointerEvents="box-none" className="flex-row items-start gap-2">
-              <View pointerEvents="none" className="min-w-0 flex-1">
-                <AppText numberOfLines={2} className="text-base font-semibold text-cove-ink">
+            <View pointerEvents="box-none" className="flex-row items-center gap-2">
+              <View pointerEvents="none" className="min-w-0 flex-1 flex-row items-center gap-1.5">
+                <AppText
+                  numberOfLines={1}
+                  className="shrink text-base font-semibold text-cove-ink"
+                  style={{ includeFontPadding: false, textAlignVertical: "center" }}
+                >
                   {purchase.name}
                 </AppText>
+                {purchase.notes?.trim() ? (
+                  <Ionicons
+                    name="document-text-outline"
+                    size={15}
+                    color={colors.muted}
+                    accessibilityLabel={t("notes")}
+                  />
+                ) : null}
               </View>
               {selected ? (
-                <View pointerEvents="none" className="pt-0.5">
+                <View pointerEvents="none">
                   <Ionicons name="checkmark-circle" size={26} color={colors.accent} />
                 </View>
               ) : showsStepper && onChangeQuantity ? (
-                <View pointerEvents="box-none" className="flex-row items-center gap-1.5 pt-0.5">
+                <View pointerEvents="box-none" className="flex-row items-center gap-1.5">
                   <Pressable
                     onPress={() => {
                       if (quantityBusy || purchase.quantity <= 1) return;
-                      const next = purchase.quantity - 1;
-                      onChangeQuantity(next < 1 ? 1 : next);
+                      onChangeQuantity(-1);
                     }}
                     onLongPress={onLongPress}
                     delayLongPress={350}
@@ -117,8 +175,8 @@ export function PurchaseRow({
                   </View>
                   <Pressable
                     onPress={() => {
-                      if (quantityBusy) return;
-                      onChangeQuantity(purchase.quantity + 1);
+                      if (quantityBusy || purchase.quantity >= 9999) return;
+                      onChangeQuantity(1);
                     }}
                     onLongPress={onLongPress}
                     delayLongPress={350}
@@ -132,32 +190,54 @@ export function PurchaseRow({
                   </Pressable>
                 </View>
               ) : (
-                <View pointerEvents="none" className="pt-0.5">
-                  <AppText className="text-sm font-semibold text-cove-muted">{quantityLabel}</AppText>
+                <View pointerEvents="box-none" className="flex-row items-center gap-1.5">
+                  {onUndo ? (
+                    <Pressable
+                      onPress={onUndo}
+                      onLongPress={onLongPress}
+                      delayLongPress={350}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("undoBought")}
+                      hitSlop={6}
+                      className="h-8 w-8 items-center justify-center rounded-full border border-cove-line active:opacity-80"
+                      style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.paper }}
+                    >
+                      <Ionicons name="arrow-undo-outline" size={16} color={colors.accent} />
+                    </Pressable>
+                  ) : null}
+                  {onBuyAgain || buyAgainBusy ? (
+                    <Pressable
+                      disabled={buyAgainBusy || !onBuyAgain}
+                      onPress={onBuyAgain}
+                      onLongPress={onLongPress}
+                      delayLongPress={350}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("buyAgain")}
+                      hitSlop={6}
+                      className={`h-8 w-8 items-center justify-center rounded-full bg-cove-accent ${
+                        buyAgainBusy ? "opacity-40" : "active:opacity-80"
+                      }`}
+                    >
+                      {buyAgainBusy ? (
+                        <ActivityIndicator size="small" color={colors.onAccent} />
+                      ) : (
+                        <Ionicons name="cart-outline" size={16} color={colors.onAccent} />
+                      )}
+                    </Pressable>
+                  ) : (
+                    <View pointerEvents="none">
+                      <AppText className="text-sm font-semibold text-cove-muted">{quantityLabel}</AppText>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
+            {showCategory || purchase.status === "bought" ? (
             <View pointerEvents="none" className="flex-row items-center gap-1.5 overflow-hidden">
-              <View className="min-w-0 overflow-hidden rounded-full bg-cove-mist px-2.5 py-1">
-                <AppText numberOfLines={1} className="text-xs font-semibold text-cove-accent">
-                  {categoryLabel}
-                </AppText>
-              </View>
-              {purchase.notes?.trim() ? (
-                <View
-                  accessibilityLabel={t("notes")}
-                  className="h-6 w-6 items-center justify-center rounded-full bg-cove-mist"
-                >
-                  <Ionicons name="document-text-outline" size={14} color={colors.accent} />
-                </View>
-              ) : null}
-              {purchase.urgent && purchase.status !== "bought" ? (
-                <View
-                  className="rounded-full px-2.5 py-1"
-                  style={{ backgroundColor: "rgba(248, 113, 113, 0.18)" }}
-                >
-                  <AppText className="text-xs font-semibold" style={{ color: "#F87171" }}>
-                    {t("urgent")}
+              {showCategory ? (
+                <View className="min-w-0 overflow-hidden rounded-full bg-cove-mist px-2.5 py-1">
+                  <AppText numberOfLines={1} className="text-xs font-semibold text-cove-accent">
+                    {categoryLabel}
                   </AppText>
                 </View>
               ) : null}
@@ -168,28 +248,25 @@ export function PurchaseRow({
                 </View>
               ) : null}
             </View>
+            ) : null}
           </View>
         </View>
-        {onUndo || onBuyAgain ? (
-          <View pointerEvents="box-none" className="mt-3 flex-row flex-wrap gap-4">
-            {onUndo ? (
-              <Pressable onPress={onUndo} className="active:opacity-80">
-                <AppText className="text-sm font-semibold text-cove-accent">{t("undoBought")}</AppText>
-              </Pressable>
-            ) : null}
-            {onBuyAgain ? (
-              <Pressable
-                onPress={onBuyAgain}
-                accessibilityRole="button"
-                accessibilityLabel={t("buyAgain")}
-                className="active:opacity-80"
-              >
-                <AppText className="text-sm font-semibold text-cove-accent">{t("buyAgain")}</AppText>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
       </View>
+      </View>
+      </View>
+      {selected ? (
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              ...cardRadius,
+              borderWidth: SELECTION_BORDER,
+              borderColor: colors.accent,
+            },
+          ]}
+        />
+      ) : null}
     </View>
   );
 }

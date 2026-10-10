@@ -1,39 +1,91 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import * as Haptics from "expo-haptics";
-import { ActivityIndicator, BackHandler, Dimensions, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
-import { CategoryFilter } from "@/features/items/components/category-filter";
+import {
+  ActivityIndicator,
+  BackHandler,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  SlideInUp,
+  SlideOutUp,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AddItemCard } from "@/features/items/components/add-item-card";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
 import { ItemDetailCard } from "@/features/items/components/item-detail-card";
 import { PurchaseRow } from "@/features/items/components/purchase-row";
 import { QuickAddBar } from "@/features/items/components/quick-add-bar";
 import { ReorderableList } from "@/features/items/components/reorderable-list";
+import { SwipeableItem } from "@/features/items/components/swipeable-item";
+import {
+  readSwipeActions,
+  subscribeSwipeActions,
+  type SwipeAction,
+  type SwipeActionPrefs,
+} from "@/features/items/utils/swipe-actions";
 import { AppText } from "@/components/ui/AppText";
-import { BlurBackdrop, FrostedBlur, FrostedFill, GlassFill } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { ListsHeaderIcon } from "@/components/ui/ListsHeaderIcon";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
-import { Screen, SwipeSlideContent } from "@/components/ui/Screen";
+import { Screen } from "@/components/ui/Screen";
 import { useTabBarVisibility } from "@/components/ui/TabBarVisibility";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
-import { createList, deleteList, fetchLists, listLabel, renameList, type HomeList } from "@/features/items/api/lists";
-import { resolvePreferredListId, writeStoredListId } from "@/features/items/utils/list-storage";
-import { formatNeededShare, shareNeededText } from "@/features/items/utils/share-list";
-import { createPin, fetchPins, type PinInterval } from "@/features/items/api/pins";
+import {
+  createList,
+  deleteList,
+  fetchLists,
+  listLabel,
+  renameList,
+  type HomeList,
+} from "@/features/items/api/lists";
+import {
+  resolvePreferredListId,
+  writeStoredListId,
+} from "@/features/items/utils/list-storage";
+import {
+  createPin,
+  fetchPins,
+  type PinInterval,
+} from "@/features/items/api/pins";
 import { pinnedNotice } from "@/features/items/utils/pin-notice";
 import { scaleFontSize, singleLineInput } from "@/constants/font";
 import { useFontScale } from "@/providers/FontScaleProvider";
-import { iconSize, floatedCardStyle, tabBar, withAlpha } from "@/constants/theme";
+import {
+  iconSize,
+  floatedCardStyle,
+  tabBar,
+  withAlpha,
+} from "@/constants/theme";
 import { useHousehold } from "@/features/homes/hooks/use-household";
+import { CategoryFilter } from "@/features/items/components/category-filter";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
+import { useCategoryLabel } from "@/features/items/providers/categories-provider";
+import type { Purchase, PurchaseCategory } from "@/features/items/types/purchase";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import type { PurchaseCategory } from "@/features/items/types/purchase";
 
 export default function ItemsScreen() {
   const { household, refresh: refreshHome } = useHousehold();
@@ -46,6 +98,7 @@ export default function ItemsScreen() {
     markManyBought,
     deleteMany,
     moveMany,
+    setManyUrgent,
     updateItem,
     reorderNeeded,
     addItem,
@@ -53,13 +106,13 @@ export default function ItemsScreen() {
   const { colors, scheme } = useTheme();
   const { setHidden: setTabBarHidden } = useTabBarVisibility();
   const { t, isRTL } = useI18n();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { scale } = useFontScale();
   const quickInputStyle = {
     ...singleLineInput,
     fontSize: scaleFontSize(Number(singleLineInput.fontSize), scale),
   };
-  const [category, setCategory] = useState<PurchaseCategory | "all">("all");
-  const [isChoosingCategory, setIsChoosingCategory] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busyAction, setBusyAction] = useState<
@@ -69,26 +122,47 @@ export default function ItemsScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isMovingToList, setIsMovingToList] = useState(false);
-  const [shareNotice, setShareNotice] = useState<string | null>(null);
   const [floatMessage, setFloatMessage] = useState<string | null>(null);
   const [floatTone, setFloatTone] = useState<"error" | "success">("error");
-  const [adjustingId, setAdjustingId] = useState<string | null>(null);
+  const itemsRef = useRef(needed);
+  itemsRef.current = needed;
+  const pendingQuantity = useRef(new Map<string, number>());
+  const quantityJobs = useRef(new Map<string, Promise<void>>());
   const [isDragging, setIsDragging] = useState(false);
+  const [swipeActions, setSwipeActions] =
+    useState<SwipeActionPrefs>(readSwipeActions);
+  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
+  const [confirmDeleteIds, setConfirmDeleteIds] = useState<string[] | null>(
+    null,
+  );
+  const [moveIds, setMoveIds] = useState<string[] | null>(null);
   const [quickName, setQuickName] = useState("");
   const [isQuickAdding, setIsQuickAdding] = useState(false);
   const [lists, setLists] = useState<HomeList[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [isChoosingList, setIsChoosingList] = useState(false);
-  const [listMenuFrame, setListMenuFrame] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const listButtonRef = useRef<View>(null);
+  const [listMenuMounted, setListMenuMounted] = useState(false);
   const listsLoadSeq = useRef(0);
   const [isCreatingList, setIsCreatingList] = useState(false);
   const [editingListId, setEditingListId] = useState<string | null>(null);
-  const [listPendingDelete, setListPendingDelete] = useState<HomeList | null>(null);
+  const [listPendingDelete, setListPendingDelete] = useState<HomeList | null>(
+    null,
+  );
   const [listName, setListName] = useState("");
   const [listFormError, setListFormError] = useState<string | null>(null);
   const [isSavingList, setIsSavingList] = useState(false);
   const [isDeletingList, setIsDeletingList] = useState(false);
+  const [quickCategory, setQuickCategory] = useState<PurchaseCategory | "all">(
+    "all",
+  );
+  const [isChoosingCategory, setIsChoosingCategory] = useState(false);
+  const [categoryAnchor, setCategoryAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const categoryButtonRef = useRef<View>(null);
   const [isAddingDetails, setIsAddingDetails] = useState(false);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [bulkCostIds, setBulkCostIds] = useState<string[] | null>(null);
@@ -97,25 +171,44 @@ export default function ItemsScreen() {
     ? (purchases.find((item) => item.id === openItemId) ?? null)
     : null;
 
-  const listItems = selectedListId
-    ? needed.filter((item) => item.listId === selectedListId)
-    : [];
+  const listItems = useMemo(
+    () =>
+      selectedListId
+        ? needed.filter((item) => item.listId === selectedListId)
+        : [],
+    [needed, selectedListId],
+  );
+  const visibleItems = useMemo(
+    () =>
+      quickCategory === "all"
+        ? listItems
+        : listItems.filter((item) => item.category === quickCategory),
+    [listItems, quickCategory],
+  );
   const headerButton = {
     backgroundColor: scheme === "dark" ? colors.accent : colors.white,
     icon: scheme === "dark" ? colors.onAccent : colors.accent,
   };
-  const visibleItems =
-    category === "all"
-      ? listItems
-      : listItems.filter((item) => item.category === category);
+  const headerFg = scheme === "dark" ? colors.ink : colors.onAccent;
+  const selectedCategoryLabel = useCategoryLabel(
+    quickCategory === "all" ? "" : quickCategory,
+  );
+  const quickCategoryLabel =
+    quickCategory === "all" ? t("all") : selectedCategoryLabel;
+  const addCategory: PurchaseCategory =
+    quickCategory === "all" ? "other" : quickCategory;
   const isSelecting = selectedIds.size > 0;
-  const selectedItems = needed.filter((item) => selectedIds.has(item.id));
+  const selectedItems = useMemo(
+    () => needed.filter((item) => selectedIds.has(item.id)),
+    [needed, selectedIds],
+  );
   const allSelectedUrgent =
     selectedItems.length > 0 && selectedItems.every((item) => item.urgent);
 
   function rememberList(homeId: string, listId: string) {
-    setSelectedListId(listId);
     writeStoredListId(homeId, listId);
+    if (listId === selectedListId) return;
+    setSelectedListId(listId);
   }
 
   async function loadLists(homeId: string) {
@@ -168,6 +261,7 @@ export default function ItemsScreen() {
 
   function startSelection(id: string) {
     void Haptics.selectionAsync();
+    setOpenSwipeId(null);
     toggleSelection(id);
   }
 
@@ -196,13 +290,40 @@ export default function ItemsScreen() {
     }
   }
 
-  async function pinSelection() {
-    if (!household) return;
+  useEffect(() => subscribeSwipeActions(setSwipeActions), []);
+
+  const lockSwipes = isSelecting || isDragging;
+  const [swipesWereLocked, setSwipesWereLocked] = useState(lockSwipes);
+  if (lockSwipes !== swipesWereLocked) {
+    setSwipesWereLocked(lockSwipes);
+    if (lockSwipes) setOpenSwipeId(null);
+  }
+
+  function askDelete(ids: string[]) {
+    if (ids.length === 0) return;
+    setConfirmDeleteIds(ids);
+    setActionError(null);
+    setIsConfirmingDelete(true);
+  }
+
+  function askMove(ids: string[]) {
+    if (ids.length === 0) return;
+    if (lists.filter((list) => list.id !== selectedListId).length === 0) {
+      setFloatTone("error");
+      setFloatMessage(t("moveNeedsList"));
+      return;
+    }
+    setMoveIds(ids);
+    setActionError(null);
+    setIsMovingToList(true);
+  }
+
+  async function pinIds(ids: string[]) {
+    if (!household || ids.length === 0) return;
     setBusyAction("pin");
     setActionError(null);
-    setShareNotice(null);
 
-    const selected = needed.filter((item) => selectedIds.has(item.id));
+    const selected = needed.filter((item) => ids.includes(item.id));
     const existing = await fetchPins(household.id);
     if (existing.error) {
       setBusyAction(null);
@@ -231,6 +352,7 @@ export default function ItemsScreen() {
         name: item.name,
         quantity: item.quantity,
         category: item.category,
+        unit: item.unit,
         urgent: item.urgent,
         intervalDays,
         addNow: false,
@@ -249,8 +371,8 @@ export default function ItemsScreen() {
     setFloatMessage(pinnedNotice(t, intervalDays));
   }
 
-  async function markSelectionBought() {
-    const ids = [...selectedIds];
+  async function markBoughtIds(ids: string[]) {
+    if (ids.length === 0) return;
     if (
       household?.costsEnabled &&
       household.askCostOnBulkBuy !== false &&
@@ -262,7 +384,9 @@ export default function ItemsScreen() {
     await completeBulkBought(ids.map((id) => ({ id, cost: null })));
   }
 
-  async function completeBulkBought(entries: { id: string; cost: number | null }[]) {
+  async function completeBulkBought(
+    entries: { id: string; cost: number | null }[],
+  ) {
     setBusyAction("bought");
     setActionError(null);
     const result = await markManyBought(entries);
@@ -287,27 +411,24 @@ export default function ItemsScreen() {
     [bulkCostIds, needed],
   );
 
-  async function markSelectionUrgent() {
+  async function markUrgentIds(ids: string[]) {
+    if (ids.length === 0) return;
     setBusyAction("urgent");
     setActionError(null);
 
-    const selected = needed.filter((item) => selectedIds.has(item.id));
-    const toMark = selected.filter((item) => !item.urgent);
-    const nextUrgent = toMark.length > 0;
-    const targets = nextUrgent ? toMark : selected;
-
-    for (const item of targets) {
-      const result = await updateItem(item.id, {
-        name: item.name,
-        quantity: item.quantity,
-        category: item.category,
-        urgent: nextUrgent,
-      });
-      if (result.error) {
-        setBusyAction(null);
-        setActionError(result.error);
-        return;
-      }
+    const selected = needed.filter((item) => ids.includes(item.id));
+    const nextUrgent = selected.some((item) => !item.urgent);
+    const targets = nextUrgent
+      ? selected.filter((item) => !item.urgent)
+      : selected;
+    const result = await setManyUrgent(
+      targets.map((item) => item.id),
+      nextUrgent,
+    );
+    if (result.error) {
+      setBusyAction(null);
+      setActionError(result.error);
+      return;
     }
 
     setBusyAction(null);
@@ -315,42 +436,40 @@ export default function ItemsScreen() {
     setIsConfirmingDelete(false);
   }
 
-  async function shareList() {
-    if (listItems.length === 0) return;
-    setShareNotice(null);
+  function changeQuantity(id: string, delta: number) {
+    const item = itemsRef.current.find((purchase) => purchase.id === id);
+    if (!item) return;
+    const current = pendingQuantity.current.get(id) ?? item.quantity;
+    const quantity = Math.min(9999, Math.max(1, current + delta));
+    if (quantity === current) return;
+    pendingQuantity.current.set(id, quantity);
     setActionError(null);
-    const message = formatNeededShare(listItems, {
-      title: t("shareListTitle"),
-      urgent: t("urgent"),
+    const previous = quantityJobs.current.get(id) ?? Promise.resolve();
+    const job = previous.then(async () => {
+      const latest = itemsRef.current.find((purchase) => purchase.id === id) ?? item;
+      const next = pendingQuantity.current.get(id);
+      if (next === undefined) return;
+      const result = await updateItem(id, {
+        name: latest.name,
+        quantity: next,
+        category: latest.category,
+        urgent: latest.urgent,
+        notes: latest.notes,
+      });
+      if (pendingQuantity.current.get(id) === next) pendingQuantity.current.delete(id);
+      if (result.error) {
+        pendingQuantity.current.delete(id);
+        setActionError(result.error);
+      }
     });
-    try {
-      const result = await shareNeededText(message);
-      if (result === "copied") setShareNotice(t("sharedCopied"));
-    } catch (shareError) {
-      if (shareError instanceof Error && shareError.name === "AbortError") return;
-      setActionError(t("errorGeneric"));
-    }
+    quantityJobs.current.set(id, job);
   }
 
-  async function changeQuantity(id: string, quantity: number) {
-    const item = needed.find((purchase) => purchase.id === id);
-    if (!item || quantity < 1) return;
-    setAdjustingId(id);
-    setActionError(null);
-    const result = await updateItem(id, {
-      name: item.name,
-      quantity,
-      category: item.category,
-      urgent: item.urgent,
-    });
-    setAdjustingId(null);
-    if (result.error) setActionError(result.error);
-  }
-
-  async function deleteSelection() {
+  async function deleteIds(ids: string[]) {
+    if (ids.length === 0) return;
     setBusyAction("delete");
     setActionError(null);
-    const result = await deleteMany([...selectedIds]);
+    const result = await deleteMany(ids);
     setBusyAction(null);
 
     if (result.error) {
@@ -359,24 +478,29 @@ export default function ItemsScreen() {
     }
 
     setSelectedIds(new Set());
+    setConfirmDeleteIds(null);
     setIsConfirmingDelete(false);
   }
 
-  async function moveSelectionToList(list: HomeList) {
-    if (busyAction || selectedIds.size === 0) return;
+  async function moveIdsToList(list: HomeList) {
+    const ids = moveIds ?? [...selectedIds];
+    if (busyAction || ids.length === 0) return;
     setBusyAction("move");
     setActionError(null);
-    const result = await moveMany([...selectedIds], list.id);
+    const result = await moveMany(ids, list.id);
     setBusyAction(null);
     if (result.error) {
       setActionError(result.error);
       return;
     }
     setIsMovingToList(false);
+    setMoveIds(null);
     setSelectedIds(new Set());
     setIsConfirmingDelete(false);
     setFloatTone("success");
-    setFloatMessage(t("movedNotice", { name: listLabel(list.name, t("defaultList")) }));
+    setFloatMessage(
+      t("movedNotice", { name: listLabel(list.name, t("defaultList")) }),
+    );
   }
 
   useEffect(() => {
@@ -385,15 +509,19 @@ export default function ItemsScreen() {
     return () => clearTimeout(timer);
   }, [floatMessage]);
 
+  useEffect(() => {
+    if (isChoosingList || !listMenuMounted) return;
+    const timer = setTimeout(() => setListMenuMounted(false), 220);
+    return () => clearTimeout(timer);
+  }, [isChoosingList, listMenuMounted]);
+
   const homeId = household?.id;
   useEffect(() => {
-    if (!homeId) {
-      queueMicrotask(() => {
-        setLists([]);
-        setSelectedListId(null);
-      });
-      return;
-    }
+    queueMicrotask(() => {
+      setLists([]);
+      setSelectedListId(null);
+    });
+    if (!homeId) return;
     // Fetch lists when the active home changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async load updates list state on completion
     void loadLists(homeId);
@@ -412,38 +540,61 @@ export default function ItemsScreen() {
         setIsConfirmingDelete(false);
         return true;
       };
-      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
       return () => subscription.remove();
     }, [isSelecting]),
   );
 
-  const canSwipeList = useCallback(
-    (direction: "next" | "previous") => {
-      if (isSelecting || isDragging || lists.length < 2) return false;
-      const index = lists.findIndex((list) => list.id === selectedListId);
-      if (index < 0) return false;
-      const step = direction === "next" ? (isRTL ? -1 : 1) : isRTL ? 1 : -1;
-      return Boolean(lists[index + step]);
-    },
-    [isDragging, isRTL, isSelecting, lists, selectedListId],
-  );
+  const rowHandlers = useRef({
+    askDelete,
+    markBoughtIds,
+    pinIds,
+    markUrgentIds,
+    askMove,
+    startSelection,
+    toggleSelection,
+    changeQuantity,
+  });
+  rowHandlers.current = {
+    askDelete,
+    markBoughtIds,
+    pinIds,
+    markUrgentIds,
+    askMove,
+    startSelection,
+    toggleSelection,
+    changeQuantity,
+  };
 
-  const onSwipeList = useCallback(
-    (direction: "next" | "previous") => {
-      if (isSelecting || isDragging || lists.length < 2) return;
-      const index = lists.findIndex((list) => list.id === selectedListId);
-      const step = direction === "next" ? (isRTL ? -1 : 1) : isRTL ? 1 : -1;
-      const next = lists[index + step];
-      if (!next || !homeId) return;
-      setSelectedListId(next.id);
-      writeStoredListId(homeId, next.id);
-      setCategory("all");
-      setSelectedIds(new Set());
-      setIsConfirmingDelete(false);
-      void Haptics.selectionAsync();
-    },
-    [homeId, isDragging, isRTL, isSelecting, lists, selectedListId],
-  );
+  const revealRow = useCallback((id: string, open: boolean) => {
+    setOpenSwipeId((current) => (open ? id : current === id ? null : current));
+  }, []);
+
+  const actOnRow = useCallback((id: string, action: SwipeAction) => {
+    const handlers = rowHandlers.current;
+    setOpenSwipeId(null);
+    if (action === "delete") handlers.askDelete([id]);
+    else if (action === "buy") void handlers.markBoughtIds([id]);
+    else if (action === "pin") void handlers.pinIds([id]);
+    else if (action === "urgent") void handlers.markUrgentIds([id]);
+    else handlers.askMove([id]);
+  }, []);
+
+  const pressRow = useCallback((id: string, selecting: boolean) => {
+    if (selecting) rowHandlers.current.toggleSelection(id);
+    else setOpenItemId(id);
+  }, []);
+
+  const longPressRow = useCallback((id: string) => {
+    rowHandlers.current.startSelection(id);
+  }, []);
+
+  const changeRowQuantity = useCallback((id: string, quantity: number) => {
+    void rowHandlers.current.changeQuantity(id, quantity);
+  }, []);
 
   if (isLoading && needed.length === 0 && !error) {
     return <LoadingScreen />;
@@ -457,7 +608,7 @@ export default function ItemsScreen() {
     const result = await addItem({
       name,
       quantity: 1,
-      category: category === "all" ? "other" : category,
+      category: addCategory,
       urgent: false,
       listId: selectedListId ?? undefined,
     });
@@ -468,8 +619,6 @@ export default function ItemsScreen() {
     }
     setQuickName("");
   }
-
-  const listEmpty = listItems.length === 0;
 
   function closeListForm() {
     if (isSavingList) return;
@@ -520,12 +669,13 @@ export default function ItemsScreen() {
     }
     if (editingListId) {
       setLists((current) =>
-        current.map((list) => (list.id === result.list!.id ? result.list! : list)),
+        current.map((list) =>
+          list.id === result.list!.id ? result.list! : list,
+        ),
       );
     } else {
       setLists((current) => [...current, result.list!]);
       rememberList(household.id, result.list.id);
-      setCategory("all");
     }
     setListName("");
     setEditingListId(null);
@@ -550,7 +700,6 @@ export default function ItemsScreen() {
       if (next) writeStoredListId(household.id, next);
       return next;
     });
-    setCategory("all");
     setSelectedIds(new Set());
     setIsConfirmingDelete(false);
     setListPendingDelete(null);
@@ -559,109 +708,37 @@ export default function ItemsScreen() {
 
   const currentList = lists.find((list) => list.id === selectedListId) ?? null;
 
-  function listActions() {
-    if (isSelecting) return null;
+  const shopDisabled = visibleItems.length === 0 || !selectedListId;
 
-    return (
-      <View className="mb-5 flex-row gap-2">
-        <ListAction
-          label={t("shop")}
-          disabled={listEmpty || !selectedListId}
-          onPress={() => {
-            if (!selectedListId) return;
-            router.push({
-              pathname: "/trip",
-              params: {
-                listId: selectedListId,
-                listName: currentList?.name ?? "",
-              },
-            });
-          }}
-          icon={
-            <View className="h-10 w-10 items-center justify-center rounded-2xl bg-cove-accent">
-              <MaterialCommunityIcons name="cart-check" size={18} color={colors.onAccent} />
-            </View>
-          }
-        />
-        <ListAction
-          label={t("share")}
-          disabled={listEmpty}
-          onPress={() => void shareList()}
-          icon={
-            <View
-              className="h-10 w-10 items-center justify-center rounded-2xl"
-              style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.mist }}
-            >
-              <Ionicons name="share-social" size={18} color={colors.accent} />
-            </View>
-          }
-        />
-        <ListAction
-          label={t("pin")}
-          onPress={() => router.push("/pins")}
-          icon={
-            <View
-              className="h-10 w-10 items-center justify-center rounded-2xl"
-              style={{
-                backgroundColor: scheme === "dark" ? colors.soft : colors.mist,
-                transform: [{ rotate: isRTL ? "28deg" : "-28deg" }],
-              }}
-            >
-              <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
-            </View>
-          }
-        />
-        <CategoryFilter
-          value={category}
-          open={isChoosingCategory}
-          onOpen={() => setIsChoosingCategory(true)}
-          onClose={() => setIsChoosingCategory(false)}
-          onChange={(next) => {
-            setCategory(next);
-            setSelectedIds(new Set());
-            setIsConfirmingDelete(false);
-          }}
-        />
-      </View>
-    );
-  }
-
-  function openListMenu() {
-    const node = listButtonRef.current;
-    if (!node) {
-      setIsChoosingList(true);
-      return;
-    }
-    node.measureInWindow((x, y, width, height) => {
-      setListMenuFrame({ x, y, width, height });
-      setIsChoosingList(true);
+  function openShop() {
+    if (!selectedListId || visibleItems.length === 0) return;
+    router.push({
+      pathname: "/trip",
+      params: {
+        listId: selectedListId,
+        listName: currentList?.name ?? "",
+        category: quickCategory === "all" ? "" : quickCategory,
+      },
     });
   }
 
-  function listMenuStyle() {
-    const screen = Dimensions.get("window");
-    const width = Math.min(screen.width - 32, 420);
-    const top = listMenuFrame.height ? listMenuFrame.y + listMenuFrame.height + 10 : 88;
-    const aligned = listMenuFrame.width
-      ? listMenuFrame.x + listMenuFrame.width - width
-      : screen.width - width - 16;
-    const left = Math.max(16, Math.min(aligned, screen.width - width - 16));
-    return {
-      top,
-      left,
-      width,
-      maxHeight: Math.max(220, screen.height - top - 24),
-      zIndex: 1,
-    };
+  function openListMenu() {
+    setListMenuMounted(true);
+    setIsChoosingList(true);
+  }
+
+  function closeListMenu() {
+    setIsChoosingList(false);
   }
 
   const header = (
     <ScreenHeader
       flush={!isSelecting}
       compact={isSelecting}
-      icon={isSelecting ? undefined : <ListsHeaderIcon />}
       title={
-        isSelecting ? t("selectedCount", { count: selectedIds.size }) : undefined
+        isSelecting
+          ? t("selectedCount", { count: selectedIds.size })
+          : undefined
       }
       subtitle={isSelecting ? t("selectMoreItems") : undefined}
       right={
@@ -673,58 +750,58 @@ export default function ItemsScreen() {
             className="h-11 w-11 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: headerButton.backgroundColor }}
           >
-            <Ionicons name="close" size={iconSize.md} color={headerButton.icon} />
+            <Ionicons
+              name="close"
+              size={iconSize.md}
+              color={headerButton.icon}
+            />
           </Pressable>
-        ) : (
-          <View ref={listButtonRef} collapsable={false}>
-            <Pressable
-              onPress={openListMenu}
-              accessibilityRole="button"
-              accessibilityLabel={t("chooseList")}
-              className="h-11 w-11 items-center justify-center overflow-hidden rounded-full active:opacity-80"
-              style={{ backgroundColor: "transparent" }}
-            >
-              <FrostedBlur style={StyleSheet.absoluteFill} />
-              <View
-                pointerEvents="none"
-                style={[
-                  StyleSheet.absoluteFill,
-                  {
-                    backgroundColor:
-                      scheme === "dark"
-                        ? withAlpha(colors.accent, 0.35)
-                        : withAlpha(colors.white, 0.45),
-                  },
-                ]}
-              />
-              <Ionicons name="list" size={22} color={headerButton.icon} />
-            </Pressable>
-          </View>
-        )
+        ) : undefined
       }
     >
       {isSelecting ? null : (
-        <View className="min-w-0 flex-1">
-          <AppText
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.65}
-            className="text-3xl font-semibold tracking-tight"
-            style={{ color: scheme === "dark" ? colors.ink : colors.onAccent }}
-          >
-            {household?.name ?? t("yourItems")}
-          </AppText>
-          <AppText
-            numberOfLines={1}
-            className="mt-1 text-base"
-            style={{ color: scheme === "dark" ? colors.muted : "rgba(255,255,255,0.92)" }}
-            accessibilityLabel={t("stillToGet", { count: listItems.length })}
-          >
-            {t("stillToGet", { count: listItems.length })}
-            {currentList
-              ? ` · ${listLabel(currentList.name, t("defaultList"))}`
-              : ""}
-          </AppText>
+        <View className="min-w-0 flex-1 flex-row items-center gap-3">
+          <ListsHeaderIcon />
+          <View className="min-w-0 flex-1">
+            <View className="flex-row items-start justify-between gap-3">
+              <AppText
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+                className="min-w-0 flex-1 text-3xl font-semibold tracking-tight"
+                style={{ color: headerFg }}
+              >
+                {household?.name ?? t("yourItems")}
+              </AppText>
+              {currentList ? (
+                <View className="max-w-[46%] shrink pt-2">
+                  <Pressable
+                    onPress={openListMenu}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("chooseList")}
+                    className="flex-row items-center gap-0.5 active:opacity-80"
+                  >
+                    <AppText
+                      numberOfLines={1}
+                      className="shrink text-base font-semibold"
+                      style={{ color: headerFg }}
+                    >
+                      {listLabel(currentList.name, t("defaultList"))}
+                    </AppText>
+                    <Ionicons name="chevron-down" size={16} color={headerFg} />
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+            <AppText
+              className="mt-1 text-sm font-medium"
+              style={{ color: headerFg }}
+            >
+              {currentList
+                ? `${t("stillToGet", { count: listItems.length })} · ${listLabel(currentList.name, t("defaultList"))}`
+                : t("stillToGet", { count: listItems.length })}
+            </AppText>
+          </View>
         </View>
       )}
     </ScreenHeader>
@@ -748,54 +825,119 @@ export default function ItemsScreen() {
             busyAction={busyAction}
             disabled={isApplyingAction}
             clearUrgent={allSelectedUrgent}
-            canMove={lists.filter((list) => list.id !== selectedListId).length > 0}
-            onBought={() => void markSelectionBought()}
-            onPin={() => void pinSelection()}
-            onUrgent={() => void markSelectionUrgent()}
-            onMove={() => {
-              setActionError(null);
-              setIsMovingToList(true);
-            }}
-            onDelete={() => {
-              setActionError(null);
-              setIsConfirmingDelete(true);
-            }}
+            canMove={
+              lists.filter((list) => list.id !== selectedListId).length > 0
+            }
+            onBought={() => void markBoughtIds([...selectedIds])}
+            onPin={() => void pinIds([...selectedIds])}
+            onUrgent={() => void markUrgentIds([...selectedIds])}
+            onMove={() => askMove([...selectedIds])}
+            onDelete={() => askDelete([...selectedIds])}
           />
         ) : null
       }
-      canSwipe={canSwipeList}
-      onSwipe={onSwipeList}
     >
       {isSelecting ? null : header}
 
-      {shareNotice && !isSelecting ? (
-        <View className="mb-5">
-          <FormMessage
-            message={shareNotice}
-            tone="success"
-            onDismiss={() => setShareNotice(null)}
-          />
-        </View>
-      ) : null}
-
-      {listActions()}
-
       {isSelecting ? null : (
-        <QuickAddBar
-          value={quickName}
-          onChangeText={setQuickName}
-          onSubmit={() => void quickAdd()}
-          onOpenDetails={() => setIsAddingDetails(true)}
-          busy={isQuickAdding}
-          inputStyle={quickInputStyle}
-        />
+        <>
+          <QuickAddBar
+            value={quickName}
+            onChangeText={setQuickName}
+            onSubmit={() => void quickAdd()}
+            onOpenDetails={() => setIsAddingDetails(true)}
+            busy={isQuickAdding}
+            inputStyle={quickInputStyle}
+          />
+          <View className="mb-4 flex-row flex-wrap items-center gap-2">
+            <View ref={categoryButtonRef} collapsable={false} className="max-w-full">
+            <Pressable
+              onPress={() => {
+                const node = categoryButtonRef.current;
+                if (!node) {
+                  setIsChoosingCategory(true);
+                  return;
+                }
+                node.measureInWindow((x, y, width, height) => {
+                  setCategoryAnchor({ x, y, width, height });
+                  setIsChoosingCategory(true);
+                });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={quickCategoryLabel}
+              className="max-w-full flex-row items-center gap-1 rounded-xl px-3 py-1.5 active:opacity-80"
+              style={{ backgroundColor: colors.paper }}
+            >
+              <AppText
+                className="shrink text-sm font-semibold"
+                style={{ color: colors.ink }}
+              >
+                {quickCategoryLabel}
+              </AppText>
+              <Ionicons name="chevron-down" size={14} color={colors.muted} />
+            </Pressable>
+            </View>
+            <Pressable
+              onPress={() => router.push("/pins")}
+              accessibilityRole="button"
+              accessibilityLabel={t("pin")}
+              className="max-w-full flex-row items-center gap-1 rounded-xl px-3 py-1.5 active:opacity-80"
+              style={{ backgroundColor: colors.paper }}
+            >
+              <MaterialCommunityIcons name="pin" size={16} color={colors.ink} />
+              <AppText
+                className="shrink text-sm font-semibold"
+                style={{ color: colors.ink }}
+              >
+                {t("pin")}
+              </AppText>
+            </Pressable>
+            <Pressable
+              disabled={shopDisabled}
+              onPress={openShop}
+              accessibilityRole="button"
+              accessibilityLabel={t("shopTheseItems")}
+              accessibilityState={{ disabled: shopDisabled }}
+              className={`max-w-full flex-row items-center gap-1 rounded-xl px-3 py-1.5 ${
+                shopDisabled ? "opacity-45" : "active:opacity-80"
+              }`}
+              style={{ backgroundColor: colors.accent }}
+            >
+              <MaterialCommunityIcons
+                name="cart"
+                size={16}
+                color={colors.onAccent}
+              />
+              <AppText
+                className="shrink text-sm font-semibold"
+                style={{ color: colors.onAccent }}
+              >
+                {t("shopTheseItems")}
+              </AppText>
+            </Pressable>
+          </View>
+          <CategoryFilter
+            layout="none"
+            manage={false}
+            anchor={categoryAnchor}
+            value={quickCategory}
+            open={isChoosingCategory}
+            onOpen={() => setIsChoosingCategory(true)}
+            onClose={() => setIsChoosingCategory(false)}
+            onChange={(next) => {
+              setQuickCategory(next);
+              setSelectedIds(new Set());
+              setIsConfirmingDelete(false);
+            }}
+          />
+        </>
       )}
 
       <FormMessage
-        message={isConfirmingDelete ? error : actionError ?? error}
+        message={isConfirmingDelete ? error : (actionError ?? error)}
       />
 
-      <SwipeSlideContent>
+      <View>
         {visibleItems.length === 0 ? (
           <EmptyState
             title={t("nothingToBuy")}
@@ -806,40 +948,45 @@ export default function ItemsScreen() {
             items={visibleItems}
             enabled={!isSelecting}
             onDragChange={setIsDragging}
-            onItemLongPress={startSelection}
+            onItemLongPress={longPressRow}
             onReorder={(ids) => void reorderNeeded(ids)}
-            renderRow={(purchase, handle) => (
-              <PurchaseRow
+            renderRow={(purchase, handle, index) => (
+              <ShoppingRow
                 purchase={purchase}
-                leading={isSelecting ? null : handle}
+                index={index}
+                handle={handle}
+                swipeEnabled={!isSelecting && !isDragging}
+                revealed={openSwipeId === purchase.id}
+                leftAction={swipeActions.left}
+                rightAction={swipeActions.right}
                 selected={selectedIds.has(purchase.id)}
-                onLongPress={() => startSelection(purchase.id)}
-                onPress={() =>
-                  isSelecting ? toggleSelection(purchase.id) : setOpenItemId(purchase.id)
-                }
-                quantityBusy={adjustingId === purchase.id}
-                onChangeQuantity={
-                  isSelecting
-                    ? undefined
-                    : (quantity) => void changeQuantity(purchase.id, quantity)
-                }
+                selecting={isSelecting}
+                quantityBusy={false}
+                onReveal={revealRow}
+                onAction={actOnRow}
+                onPress={pressRow}
+                onLongPress={longPressRow}
+                onChangeQuantity={changeRowQuantity}
               />
             )}
           />
         )}
-      </SwipeSlideContent>
+      </View>
 
       <ConfirmModal
         visible={isConfirmingDelete}
         title={t("deleteItemsTitle")}
-        message={t("deleteItemsMessage", { count: selectedIds.size })}
+        message={t("deleteItemsMessage", {
+          count: confirmDeleteIds?.length ?? selectedIds.size,
+        })}
         confirmLabel={t("delete")}
         cancelLabel={t("cancel")}
         icon="trash-outline"
         error={actionError}
         loading={isApplyingAction}
-        onConfirm={() => void deleteSelection()}
+        onConfirm={() => void deleteIds(confirmDeleteIds ?? [...selectedIds])}
         onCancel={() => {
+          setConfirmDeleteIds(null);
           setIsConfirmingDelete(false);
           setActionError(null);
         }}
@@ -848,7 +995,7 @@ export default function ItemsScreen() {
       <AddItemCard
         visible={isAddingDetails}
         listId={selectedListId}
-        initialCategory={category === "all" ? "vegetables" : category}
+        initialCategory={addCategory}
         initialName={quickName}
         onClose={() => setIsAddingDetails(false)}
         onSaved={() => setQuickName("")}
@@ -868,7 +1015,9 @@ export default function ItemsScreen() {
         errorMessage={actionError}
         onConfirm={(entries) => void completeBulkBought(entries)}
         onSkip={() =>
-          void completeBulkBought((bulkCostIds ?? []).map((id) => ({ id, cost: null })))
+          void completeBulkBought(
+            (bulkCostIds ?? []).map((id) => ({ id, cost: null })),
+          )
         }
         onClose={() => {
           if (busyAction === "bought") return;
@@ -904,6 +1053,7 @@ export default function ItemsScreen() {
         onRequestClose={() => {
           if (busyAction === "move") return;
           setIsMovingToList(false);
+          setMoveIds(null);
           setActionError(null);
         }}
       >
@@ -912,6 +1062,7 @@ export default function ItemsScreen() {
             onPress={() => {
               if (busyAction === "move") return;
               setIsMovingToList(false);
+              setMoveIds(null);
               setActionError(null);
             }}
             disabled={busyAction === "move"}
@@ -920,8 +1071,10 @@ export default function ItemsScreen() {
             className="w-full max-w-md gap-3 overflow-hidden rounded-3xl p-5"
             style={floatedCardStyle(scheme, colors)}
           >
-            <GlassFill soft />
-            <AppText className="text-xl font-semibold text-cove-ink">{t("moveToList")}</AppText>
+            <GlassFill soft neutral />
+            <AppText className="text-xl font-semibold text-cove-ink">
+              {t("moveToList")}
+            </AppText>
             <FormMessage message={actionError} />
             <ScrollView
               keyboardShouldPersistTaps="handled"
@@ -934,18 +1087,26 @@ export default function ItemsScreen() {
                   <Pressable
                     key={list.id}
                     disabled={busyAction === "move"}
-                    onPress={() => void moveSelectionToList(list)}
+                    onPress={() => void moveIdsToList(list)}
                     accessibilityRole="button"
                     accessibilityLabel={listLabel(list.name, t("defaultList"))}
                     className={`mb-1 h-12 flex-row items-center gap-3 rounded-2xl px-3 ${
                       busyAction === "move" ? "opacity-45" : "active:opacity-80"
                     }`}
                     style={{
-                      backgroundColor: withAlpha(colors.accent, scheme === "dark" ? 0.18 : 0.1),
+                      backgroundColor:
+                        scheme === "dark" ? colors.mist : "#F4F5F7",
                     }}
                   >
-                    <Ionicons name="list-outline" size={20} color={colors.accent} />
-                    <AppText numberOfLines={1} className="min-w-0 flex-1 text-base text-cove-ink">
+                    <Ionicons
+                      name="list-outline"
+                      size={20}
+                      color={colors.accent}
+                    />
+                    <AppText
+                      numberOfLines={1}
+                      className="min-w-0 flex-1 text-base text-cove-ink"
+                    >
                       {listLabel(list.name, t("defaultList"))}
                     </AppText>
                     {busyAction === "move" ? (
@@ -977,7 +1138,7 @@ export default function ItemsScreen() {
             className="w-full max-w-md gap-4 overflow-hidden rounded-3xl p-5"
             style={floatedCardStyle(scheme, colors)}
           >
-            <GlassFill soft />
+            <GlassFill soft neutral />
             <AppText className="text-xl font-semibold text-cove-ink">
               {editingListId ? t("editList") : t("newList")}
             </AppText>
@@ -998,13 +1159,18 @@ export default function ItemsScreen() {
               disabled={!listName.trim() || isSavingList}
               onPress={() => void saveList()}
               className={`items-center rounded-2xl bg-cove-accent px-3 py-3 ${
-                !listName.trim() || isSavingList ? "opacity-45" : "active:opacity-80"
+                !listName.trim() || isSavingList
+                  ? "opacity-45"
+                  : "active:opacity-80"
               }`}
             >
               {isSavingList ? (
                 <ActivityIndicator color={colors.onAccent} />
               ) : (
-                <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
+                <AppText
+                  className="text-sm font-semibold"
+                  style={{ color: colors.onAccent }}
+                >
                   {editingListId ? t("saveChanges") : t("createList")}
                 </AppText>
               )}
@@ -1014,104 +1180,239 @@ export default function ItemsScreen() {
       </Modal>
 
       <Modal
-        visible={isChoosingList}
+        visible={listMenuMounted}
         transparent
-        animationType="fade"
+        animationType="none"
         statusBarTranslucent
-        onRequestClose={() => setIsChoosingList(false)}
+        onRequestClose={closeListMenu}
       >
-        <View className="flex-1">
-          <BlurBackdrop onPress={() => setIsChoosingList(false)} />
-          <View
-            className="absolute overflow-hidden rounded-3xl border border-cove-line p-3"
-            style={listMenuStyle()}
-          >
-            <GlassFill soft />
-            <AppText className="mb-2 px-1 text-base font-semibold text-cove-ink">
-              {t("yourLists")}
-            </AppText>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              bounces={false}
-              style={{ flexGrow: 0, maxHeight: Math.max(96, listMenuStyle().maxHeight - 132) }}
+        <View className="flex-1" style={{ direction: isRTL ? "rtl" : "ltr" }}>
+          {isChoosingList ? (
+            <Animated.View
+              entering={FadeIn.duration(160)}
+              exiting={FadeOut.duration(160)}
+              style={StyleSheet.absoluteFill}
             >
-              {lists.map((list) => {
-                const selected = list.id === selectedListId;
-                const label = listLabel(list.name, t("defaultList"));
-                return (
-                  <View
-                    key={list.id}
-                    className="mb-1 flex-row items-center rounded-2xl px-2"
-                    style={{
-                      backgroundColor: selected
-                        ? withAlpha(colors.accent, scheme === "dark" ? 0.28 : 0.16)
-                        : "transparent",
-                    }}
-                  >
-                    <Pressable
-                      onPress={() => {
-                        if (household) rememberList(household.id, list.id);
-                        setCategory("all");
-                        setSelectedIds(new Set());
-                        setIsChoosingList(false);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      className="h-12 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-80"
-                    >
-                      <Ionicons
-                        name={selected ? "checkmark-circle" : "ellipse-outline"}
-                        size={22}
-                        color={selected ? colors.accent : colors.muted}
-                      />
-                      <AppText
-                        numberOfLines={1}
-                        className="min-w-0 flex-1 text-base"
-                        style={{ color: colors.ink }}
-                      >
-                        {label}
-                      </AppText>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => openRenameList(list)}
-                      accessibilityRole="button"
-                      accessibilityLabel={t("editListName")}
-                      hitSlop={8}
-                      className="h-10 w-10 items-center justify-center active:opacity-70"
-                    >
-                      <Ionicons name="create-outline" size={18} color={colors.accent} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => askDeleteList(list)}
-                      accessibilityRole="button"
-                      accessibilityLabel={t("deleteList")}
-                      hitSlop={8}
-                      className="h-10 w-10 items-center justify-center active:opacity-70"
-                    >
-                      <Ionicons name="trash-outline" size={18} color="#F87171" />
-                    </Pressable>
-                  </View>
-                );
-              })}
-            </ScrollView>
-            <Pressable
-              onPress={openCreateList}
-              accessibilityRole="button"
-              accessibilityLabel={t("newList")}
-              className="mt-2 h-12 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80"
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("close")}
+                onPress={closeListMenu}
+                style={[
+                  StyleSheet.absoluteFill,
+                  { backgroundColor: "rgba(0, 0, 0, 0.4)" },
+                ]}
+              />
+            </Animated.View>
+          ) : null}
+          {isChoosingList ? (
+            <Animated.View
+              entering={SlideInUp.duration(220)}
+              exiting={SlideOutUp.duration(180)}
               style={{
-                backgroundColor: scheme === "dark" ? colors.soft : colors.mist,
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                maxHeight: windowHeight * 0.72,
+                backgroundColor: colors.paper,
+                borderBottomLeftRadius: 28,
+                borderBottomRightRadius: 28,
+                paddingTop: insets.top + 12,
+                paddingBottom: 8,
+                shadowColor: "#000000",
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.16,
+                shadowRadius: 18,
+                elevation: 8,
               }}
             >
-              <Ionicons name="add" size={20} color={colors.accent} />
-              <AppText className="text-base font-semibold" style={{ color: colors.accent }}>
-                {t("newList")}
-              </AppText>
-            </Pressable>
-          </View>
+              <View className="flex-row items-center justify-between px-5 pb-2">
+                <AppText className="text-base font-semibold text-cove-ink">
+                  {t("yourLists")}
+                </AppText>
+                <Pressable
+                  onPress={closeListMenu}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("close")}
+                  hitSlop={10}
+                  className="h-9 w-9 items-center justify-center active:opacity-70"
+                >
+                  <Ionicons name="chevron-up" size={20} color={colors.muted} />
+                </Pressable>
+              </View>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                bounces={false}
+                style={{ flexGrow: 0 }}
+              >
+                {lists.map((list) => {
+                  const selected = list.id === selectedListId;
+                  const label = listLabel(list.name, t("defaultList"));
+                  return (
+                    <View
+                      key={list.id}
+                      className="flex-row items-center"
+                      style={{
+                        borderTopWidth: StyleSheet.hairlineWidth,
+                        borderTopColor: colors.line,
+                      }}
+                    >
+                      <Pressable
+                        onPress={() => {
+                          if (household) rememberList(household.id, list.id);
+                          setSelectedIds(new Set());
+                          closeListMenu();
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        className="h-14 min-w-0 flex-1 flex-row items-center gap-3 px-5 active:opacity-80"
+                      >
+                        <AppText
+                          numberOfLines={1}
+                          className={`min-w-0 flex-1 text-base ${selected ? "font-semibold" : "font-medium"}`}
+                          style={{ color: colors.ink }}
+                        >
+                          {label}
+                        </AppText>
+                        {selected ? (
+                          <Ionicons
+                            name="checkmark"
+                            size={18}
+                            color={colors.accent}
+                          />
+                        ) : null}
+                      </Pressable>
+                      <Pressable
+                        onPress={() => openRenameList(list)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t("editListName")}
+                        hitSlop={6}
+                        className="h-14 w-11 items-center justify-center active:opacity-70"
+                      >
+                        <Ionicons
+                          name="create-outline"
+                          size={18}
+                          color={colors.muted}
+                        />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => askDeleteList(list)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t("deleteList")}
+                        hitSlop={6}
+                        className="h-14 w-11 items-center justify-center active:opacity-70"
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={18}
+                          color="#F87171"
+                        />
+                      </Pressable>
+                    </View>
+                  );
+                })}
+                <Pressable
+                  onPress={openCreateList}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("newList")}
+                  className="h-14 flex-row items-center gap-2 px-5 active:opacity-80"
+                  style={{
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: colors.line,
+                  }}
+                >
+                  <Ionicons name="add" size={20} color={colors.accent} />
+                  <AppText
+                    className="text-base font-semibold"
+                    style={{ color: colors.accent }}
+                  >
+                    {t("newList")}
+                  </AppText>
+                </Pressable>
+              </ScrollView>
+            </Animated.View>
+          ) : null}
         </View>
       </Modal>
     </Screen>
+  );
+}
+
+type ShoppingRowProps = {
+  purchase: Purchase;
+  index: number;
+  handle: ReactNode;
+  swipeEnabled: boolean;
+  revealed: boolean;
+  leftAction: SwipeAction;
+  rightAction: SwipeAction;
+  selected: boolean;
+  selecting: boolean;
+  quantityBusy: boolean;
+  onReveal: (id: string, open: boolean) => void;
+  onAction: (id: string, action: SwipeAction) => void;
+  onPress: (id: string, selecting: boolean) => void;
+  onLongPress: (id: string) => void;
+  onChangeQuantity: (id: string, quantity: number) => void;
+};
+
+const ShoppingRow = memo(function ShoppingRow({
+  purchase,
+  handle,
+  swipeEnabled,
+  revealed,
+  leftAction,
+  rightAction,
+  selected,
+  selecting,
+  quantityBusy,
+  onReveal,
+  onAction,
+  onPress,
+  onLongPress,
+  onChangeQuantity,
+}: ShoppingRowProps) {
+  return (
+    <SwipeableItem
+      enabled={swipeEnabled}
+      revealed={revealed}
+      leftAction={leftAction}
+      rightAction={rightAction}
+      onReveal={(open) => onReveal(purchase.id, open)}
+      onAction={(action) => onAction(purchase.id, action)}
+    >
+      <PurchaseRow
+        purchase={purchase}
+        showCategory={false}
+        leading={selecting ? null : handle}
+        selected={selected}
+        onLongPress={() => onLongPress(purchase.id)}
+        onPress={() => onPress(purchase.id, selecting)}
+        quantityBusy={quantityBusy}
+        onChangeQuantity={
+          selecting ? undefined : (quantity) => onChangeQuantity(purchase.id, quantity)
+        }
+      />
+    </SwipeableItem>
+  );
+}, shoppingRowPropsEqual);
+
+function shoppingRowPropsEqual(prev: ShoppingRowProps, next: ShoppingRowProps) {
+  return (
+    prev.purchase === next.purchase &&
+    prev.index === next.index &&
+    prev.swipeEnabled === next.swipeEnabled &&
+    prev.revealed === next.revealed &&
+    prev.leftAction === next.leftAction &&
+    prev.rightAction === next.rightAction &&
+    prev.selected === next.selected &&
+    prev.selecting === next.selecting &&
+    prev.quantityBusy === next.quantityBusy &&
+    prev.onReveal === next.onReveal &&
+    prev.onAction === next.onAction &&
+    prev.onPress === next.onPress &&
+    prev.onLongPress === next.onLongPress &&
+    prev.onChangeQuantity === next.onChangeQuantity
   );
 }
 
@@ -1168,6 +1469,8 @@ function SelectionBar({
             <View style={selectionStyles.iconSlot}>{icon}</View>
             <AppText
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
               style={[selectionStyles.label, { color }]}
             >
               {label}
@@ -1193,7 +1496,10 @@ function SelectionBar({
           selectionStyles.shell,
           {
             borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
-            backgroundColor: withAlpha(dark ? colors.deep : colors.mist, dark ? 0.55 : 0.72),
+            backgroundColor: withAlpha(
+              dark ? colors.deep : colors.mist,
+              dark ? 0.55 : 0.72,
+            ),
           },
         ]}
       >
@@ -1203,15 +1509,25 @@ function SelectionBar({
             t("markSelectedBought"),
             busyAction === "bought",
             onBought,
-            <MaterialCommunityIcons name="cart-check" size={20} color={actionColor} />,
+            <MaterialCommunityIcons
+              name="cart-check"
+              size={20}
+              color={actionColor}
+            />,
             actionColor,
           )}
           {actionButton(
             t("pinSelected"),
             busyAction === "pin",
             onPin,
-            <View style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}>
-              <MaterialCommunityIcons name="pin" size={18} color={actionColor} />
+            <View
+              style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}
+            >
+              <MaterialCommunityIcons
+                name="pin"
+                size={18}
+                color={actionColor}
+              />
             </View>,
             actionColor,
           )}
@@ -1229,7 +1545,12 @@ function SelectionBar({
             onUrgent,
             clearUrgent ? (
               <View style={selectionStyles.iconSlot}>
-                <Ionicons name="flash" size={18} color={danger} style={{ opacity: 0.45 }} />
+                <Ionicons
+                  name="flash"
+                  size={18}
+                  color={danger}
+                  style={{ opacity: 0.45 }}
+                />
                 <View
                   pointerEvents="none"
                   style={[selectionStyles.strike, { backgroundColor: danger }]}
@@ -1299,36 +1620,3 @@ const selectionStyles = StyleSheet.create({
     transform: [{ rotate: "-38deg" }],
   },
 });
-
-function ListAction({
-  label,
-  icon,
-  onPress,
-  disabled = false,
-}: {
-  label: string;
-  icon: ReactNode;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      disabled={disabled}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      className={`min-h-[76px] flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-3xl border border-cove-line px-1 py-2 ${
-        disabled ? "opacity-45" : "active:opacity-80"
-      }`}
-    >
-      <FrostedFill />
-      {icon}
-      <AppText
-        numberOfLines={1}
-        className="text-center text-xs font-semibold leading-4 text-cove-ink"
-      >
-        {label}
-      </AppText>
-    </Pressable>
-  );
-}

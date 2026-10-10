@@ -159,13 +159,11 @@ function CostField({
         {
           flexDirection: isRTL ? "row-reverse" : "row",
           backgroundColor:
-            scheme === "dark"
-              ? withAlpha(colors.ice, 0.78)
-              : withAlpha(colors.white, 0.94),
+            scheme === "dark" ? withAlpha(colors.white, 0.06) : "#F4F5F7",
           borderColor:
             scheme === "dark"
-              ? withAlpha(colors.accent, 0.3)
-              : withAlpha(colors.accent, 0.22),
+              ? withAlpha(colors.white, 0.12)
+              : withAlpha("#12141A", 0.1),
         },
       ]}
     >
@@ -252,22 +250,9 @@ function CostSheetBody({
   return (
     <View
       className="w-full max-w-sm overflow-hidden rounded-3xl p-5"
-      style={[
-        floatedCardStyle(scheme, colors),
-        {
-          borderColor: withAlpha(
-            colors.accent,
-            scheme === "dark" ? 0.26 : 0.18,
-          ),
-          shadowColor: colors.deep,
-          shadowOpacity: scheme === "dark" ? 0.35 : 0.1,
-          shadowRadius: 24,
-          shadowOffset: { width: 0, height: 12 },
-          elevation: 10,
-        },
-      ]}
+      style={floatedCardStyle(scheme, colors)}
     >
-      <GlassFill soft />
+      <GlassFill soft neutral />
 
       <View
         className="mb-5 items-center gap-3"
@@ -329,15 +314,13 @@ function CostSheetBody({
               key={item.id}
               className="gap-2 rounded-2xl px-3 py-3"
               style={{
-                backgroundColor: withAlpha(
-                  colors.mist,
-                  scheme === "dark" ? 0.55 : 0.7,
-                ),
+                backgroundColor:
+                  scheme === "dark" ? withAlpha(colors.white, 0.04) : "#F4F5F7",
                 borderWidth: 1,
-                borderColor: withAlpha(
-                  colors.line,
-                  scheme === "dark" ? 0.45 : 0.55,
-                ),
+                borderColor:
+                  scheme === "dark"
+                    ? withAlpha(colors.white, 0.1)
+                    : withAlpha("#12141A", 0.08),
               }}
             >
               <AppText
@@ -393,10 +376,7 @@ function CostSheetBody({
             loading ? "opacity-45" : "active:opacity-80"
           }`}
           style={{
-            backgroundColor: withAlpha(
-              colors.mist,
-              scheme === "dark" ? 0.7 : 0.9,
-            ),
+            backgroundColor: scheme === "dark" ? colors.mist : "#F4F5F7",
           }}
         >
           <AppText className="text-xs font-semibold text-cove-ink">

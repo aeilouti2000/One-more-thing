@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { BackHandler, Pressable, View, type LayoutChangeEvent } from "react-native";
+import { AppState, BackHandler, Pressable, View, type LayoutChangeEvent } from "react-native";
 import Animated, {
   Easing,
   Extrapolation,
@@ -49,15 +49,17 @@ export default function TripScreen() {
 }
 
 function TripBody() {
-  const { needed, bought, isLoading, error, refresh, markBought, undoBought, updateCost } =
+  const { needed, bought, isLoading, error, refresh, markBought, undoBought, updateCosts } =
     usePurchases();
   const { household } = useHousehold();
   const { t, locale } = useI18n();
   const { categories } = useCategories();
   const { colors } = useTheme();
   const navigation = useNavigation();
-  const params = useLocalSearchParams<{ listId?: string; listName?: string }>();
+  const params = useLocalSearchParams<{ listId?: string; listName?: string; category?: string }>();
   const listId = typeof params.listId === "string" && params.listId.length > 0 ? params.listId : null;
+  const category =
+    typeof params.category === "string" && params.category.length > 0 ? params.category : null;
   const listName =
     typeof params.listName === "string" && params.listName.length > 0
       ? listLabel(params.listName, t("defaultList"))
@@ -80,19 +82,28 @@ function TripBody() {
   const askTripCostsRef = useRef(false);
 
   const tripItems = useMemo(
-    () => (listId ? needed.filter((item) => item.listId === listId) : needed),
-    [listId, needed],
+    () =>
+      needed.filter((item) => {
+        if (listId && item.listId !== listId) return false;
+        if (category && item.category !== category) return false;
+        return true;
+      }),
+    [category, listId, needed],
   );
 
   const recent = bought.find((item) => item.id === undoId && canUndoBought(item.boughtAt, now));
-  const urgent = tripItems.filter((item) => item.urgent);
-  const groups = categories
-    .map((category) => ({
-      id: category.id,
-      title: category.builtin ? getCategoryLabel(category.id, locale) : (category.name ?? category.id),
-      items: tripItems.filter((item) => !item.urgent && item.category === category.id),
-    }))
-    .filter((group) => group.items.length > 0);
+  const urgent = useMemo(() => tripItems.filter((item) => item.urgent), [tripItems]);
+  const groups = useMemo(
+    () =>
+      categories
+        .map((entry) => ({
+          id: entry.id,
+          title: entry.builtin ? getCategoryLabel(entry.id, locale) : (entry.name ?? entry.id),
+          items: tripItems.filter((item) => !item.urgent && item.category === entry.id),
+        }))
+        .filter((group) => group.items.length > 0),
+    [categories, locale, tripItems],
+  );
 
   const askCostOnCheck =
     household?.costsEnabled === true && household.askCostOnSingleBuy !== false;
@@ -253,6 +264,7 @@ function TripBody() {
       };
       const sub = BackHandler.addEventListener("hardwareBackPress", onHardwareBack);
       const timer = setInterval(() => {
+        if (AppState.currentState !== "active") return;
         void refresh();
       }, TRIP_REFRESH_MS);
       return () => {
@@ -281,14 +293,12 @@ function TripBody() {
   async function saveTripCosts(entries: { id: string; cost: number | null }[]) {
     setIsSavingCosts(true);
     setActionError(null);
-    for (const entry of entries) {
-      if (entry.cost === null) continue;
-      const result = await updateCost(entry.id, entry.cost);
-      if (result.error) {
-        setIsSavingCosts(false);
-        setActionError(result.error);
-        return;
-      }
+    const priced = entries.filter((entry) => entry.cost !== null);
+    const result = await updateCosts(priced);
+    if (result.error) {
+      setIsSavingCosts(false);
+      setActionError(result.error);
+      return;
     }
     setIsSavingCosts(false);
     setTripCostOpen(false);

@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { ActivityIndicator, Modal, Pressable, TextInput, View } from "react-native";
+import { ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, View } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { RequireSession } from "@/features/auth/components/require-session";
 import { CategoryField } from "@/features/items/components/category-field";
+import { CategoryFilter } from "@/features/items/components/category-filter";
 import { UrgentToggle } from "@/features/items/components/urgent-toggle";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
-import { BlurBackdrop, FrostedFill, GlassFill } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
@@ -17,26 +18,22 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { getCategoryLabel } from "@/constants/categories";
-import { scaleFontSize, singleLineInput } from "@/constants/font";
-import { floatedCardStyle, withAlpha } from "@/constants/theme";
+import { floatedCardStyle, glassFieldStyle, withAlpha } from "@/constants/theme";
 import { useCategories } from "@/features/items/providers/categories-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
-import { addItem, fetchHomeItems, updateItemDetails } from "@/features/items/api/items";
+import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { resolvePreferredListId } from "@/features/items/utils/list-storage";
-import { emitListChanged } from "@/features/items/utils/list-sync";
 import { fetchLists, listLabel } from "@/features/items/api/lists";
-import { parseQuantity } from "@/lib/validation";
 import { pinnedNotice } from "@/features/items/utils/pin-notice";
 import {
   createPin,
   deletePin,
   fetchPins,
   PIN_INTERVALS,
+  updatePin,
   type Pin,
   type PinInterval,
 } from "@/features/items/api/pins";
-import { useAuth } from "@/features/auth/providers/auth-provider";
-import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { TranslationKey } from "@/constants/i18n";
@@ -60,17 +57,12 @@ export default function PinsScreen() {
 }
 
 function PinsBody() {
-  const { user } = useAuth();
+  const { needed, addItem, updateItem } = usePurchases();
   const { household } = useHousehold();
   const { t, locale, isRTL } = useI18n();
   const { categories } = useCategories();
   const { colors, scheme, shadow } = useTheme();
   const dark = scheme === "dark";
-  const { scale } = useFontScale();
-  const searchInputStyle = {
-    ...singleLineInput,
-    fontSize: scaleFontSize(Number(singleLineInput.fontSize), scale),
-  };
 
   function categoryName(id: string) {
     const match = categories.find((item) => item.id === id);
@@ -82,20 +74,20 @@ function PinsBody() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState("1");
   const [category, setCategory] = useState<PurchaseCategory>("supermarket");
   const [urgent, setUrgent] = useState(false);
   const [intervalDays, setIntervalDays] = useState<PinInterval>(7);
   const [addNow, setAddNow] = useState(true);
-  const [quantityError, setQuantityError] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingPin, setEditingPin] = useState<Pin | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [listPresence, setListPresence] = useState<
     Record<string, { count: number; listName: string }>
   >({});
-  const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<PurchaseCategory | "all">("all");
+  const [isChoosingCategory, setIsChoosingCategory] = useState(false);
   const [pinPendingDelete, setPinPendingDelete] = useState<Pin | null>(null);
   const [floatMessage, setFloatMessage] = useState<string | null>(null);
 
@@ -119,18 +111,32 @@ function PinsBody() {
 
   async function onSave() {
     if (!household) return;
-    const parsed = parseQuantity(quantity);
     if (!name.trim()) {
       setError(t("errorEnterItemName"));
-      return;
-    }
-    if (parsed === null) {
-      setQuantityError(t("errorQuantityMin"));
       return;
     }
 
     setIsSaving(true);
     setError(null);
+    if (editingPin) {
+      const result = await updatePin(editingPin.id, {
+        name: name.trim(),
+        category,
+        urgent,
+        intervalDays,
+      });
+      setIsSaving(false);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setIsAdding(false);
+      setEditingPin(null);
+      setFloatMessage(t("pinUpdated"));
+      await load();
+      return;
+    }
+
     let listId: string | undefined;
     if (addNow) {
       const listsResult = await fetchLists(household.id);
@@ -143,7 +149,7 @@ function PinsBody() {
     }
     const result = await createPin(household.id, {
       name: name.trim(),
-      quantity: parsed,
+      quantity: 1,
       category,
       urgent,
       intervalDays,
@@ -156,7 +162,6 @@ function PinsBody() {
       return;
     }
     setName("");
-    setQuantity("1");
     setUrgent(false);
     setIsAdding(false);
     setFloatMessage(pinnedNotice(t, intervalDays));
@@ -171,27 +176,40 @@ function PinsBody() {
 
   function closeForm() {
     setIsAdding(false);
+    setEditingPin(null);
     setError(null);
-    setQuantityError(undefined);
   }
 
   function openForm() {
+    setEditingPin(null);
+    setName("");
+    setCategory("supermarket");
+    setUrgent(false);
+    setIntervalDays(7);
+    setAddNow(true);
     setError(null);
-    setQuantityError(undefined);
+    setIsAdding(true);
+  }
+
+  function openEdit(pin: Pin) {
+    setEditingPin(pin);
+    setName(pin.name);
+    setCategory(pin.category);
+    setUrgent(pin.urgent);
+    setIntervalDays(pin.intervalDays);
+    setAddNow(false);
+    setError(null);
     setIsAdding(true);
   }
 
   async function onAddToList(pin: Pin) {
-    if (!household || !user || addingId) return;
+    if (!household || addingId) return;
     setAddingId(pin.id);
     setError(null);
-    const [listed, listsResult] = await Promise.all([
-      fetchHomeItems(household.id),
-      fetchLists(household.id),
-    ]);
-    if (listed.error || listsResult.error) {
+    const listsResult = await fetchLists(household.id);
+    if (listsResult.error) {
       setAddingId(null);
-      setError(listed.error ?? listsResult.error);
+      setError(listsResult.error);
       return;
     }
 
@@ -199,15 +217,14 @@ function PinsBody() {
     const targetList = listId
       ? listsResult.lists.find((list) => list.id === listId) ?? null
       : null;
-    const match = listed.items.find(
+    const match = needed.find(
       (item) =>
-        item.status === "needed" &&
         (!listId || item.listId === listId) &&
         item.name.trim().toLowerCase() === pin.name.trim().toLowerCase(),
     );
     const nextQuantity = match ? match.quantity + pin.quantity : pin.quantity;
     const result = match
-      ? await updateItemDetails(match.id, {
+      ? await updateItem(match.id, {
           name: match.name,
           quantity: nextQuantity,
           category: match.category,
@@ -215,8 +232,6 @@ function PinsBody() {
           notes: match.notes ?? undefined,
         })
       : await addItem({
-          homeId: household.id,
-          userId: user.id,
           name: pin.name,
           quantity: pin.quantity,
           category: pin.category,
@@ -237,7 +252,6 @@ function PinsBody() {
       ...current,
       [pin.id]: { count: copies, listName: presenceName },
     }));
-    emitListChanged();
   }
 
   async function onRemove(id: string) {
@@ -257,10 +271,10 @@ function PinsBody() {
     return <LoadingScreen />;
   }
 
-  const normalizedQuery = query.trim().toLowerCase();
-  const visiblePins = normalizedQuery
-    ? pins.filter((pin) => pin.name.toLowerCase().includes(normalizedQuery))
-    : pins;
+  const visiblePins =
+    categoryFilter === "all"
+      ? pins
+      : pins.filter((pin) => pin.category === categoryFilter);
 
   return (
     <Screen
@@ -306,36 +320,16 @@ function PinsBody() {
       {isAdding ? null : <FormMessage message={error} />}
 
       {pins.length > 0 ? (
-        <View className="mb-4 overflow-hidden rounded-3xl border border-cove-line">
-          <FrostedFill />
-          <View className="flex-row items-center gap-2 px-4 py-2">
-            <Ionicons name="search" size={18} color={colors.muted} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t("searchPinnedPlaceholder")}
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              textAlign={isRTL ? "right" : "left"}
-              textAlignVertical="center"
-              allowFontScaling={false}
-              style={searchInputStyle}
-              className="h-11 min-w-0 flex-1 text-cove-ink"
-              accessibilityLabel={t("searchPinned")}
-            />
-            {query.trim() ? (
-              <Pressable
-                onPress={() => setQuery("")}
-                accessibilityRole="button"
-                accessibilityLabel={t("cancel")}
-                className="h-9 w-9 items-center justify-center rounded-full active:opacity-80"
-                style={{ backgroundColor: scheme === "dark" ? colors.paper : colors.mist }}
-              >
-                <Ionicons name="close" size={18} color={colors.muted} />
-              </Pressable>
-            ) : null}
-          </View>
+        <View className="mb-4">
+          <CategoryFilter
+            layout="bar"
+            manage={false}
+            value={categoryFilter}
+            open={isChoosingCategory}
+            onOpen={() => setIsChoosingCategory(true)}
+            onClose={() => setIsChoosingCategory(false)}
+            onChange={setCategoryFilter}
+          />
         </View>
       ) : null}
 
@@ -343,14 +337,11 @@ function PinsBody() {
         <EmptyState title={t("pinsEmpty")} message={t("pinsEmptyBody")} />
       ) : visiblePins.length === 0 ? (
         <View className="mb-8">
-          <EmptyState title={t("searchPinnedEmpty")} message={t("searchPinnedEmptyBody")} />
+          <EmptyState title={t("filterPinnedEmpty")} message={t("filterPinnedEmptyBody")} />
         </View>
       ) : (
         <View className="mb-6 gap-3">
           {visiblePins.map((pin) => {
-            const quantityLabel = pin.unit
-              ? `${pin.quantity} ${pin.unit}`
-              : `x${pin.quantity}`;
             const due = new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
               month: "short",
               day: "numeric",
@@ -360,9 +351,11 @@ function PinsBody() {
             const busy = isAddingThis || isRemovingThis;
 
             return (
-              <View
+              <Pressable
                 key={pin.id}
-                className="rounded-3xl bg-cove-paper px-4 py-4"
+                onPress={() => openEdit(pin)}
+                accessibilityRole="button"
+                className="rounded-3xl bg-cove-paper px-3.5 py-3 active:opacity-80"
                 style={{
                   shadowColor: scheme === "dark" ? "#000000" : colors.ink,
                   shadowOpacity: scheme === "dark" ? 0.28 : 0.08,
@@ -371,29 +364,16 @@ function PinsBody() {
                   elevation: 2,
                 }}
               >
-                <View className="flex-row items-start gap-3">
-                  <View
-                    className="mt-0.5 h-10 w-10 items-center justify-center rounded-2xl"
-                    style={{
-                      backgroundColor:
-                        scheme === "dark" ? withAlpha(colors.accent, 0.22) : colors.mist,
-                    }}
-                  >
-                    <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
-                  </View>
-                  <View className="min-w-0 flex-1">
-                    <AppText
-                      numberOfLines={2}
-                      className="text-base font-semibold text-cove-ink"
-                    >
+                <View className="flex-row items-center gap-3">
+                  <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
+                  <View className="min-w-0 flex-1 gap-1.5">
+                    <AppText numberOfLines={1} className="text-base font-semibold text-cove-ink">
                       {pin.name}
                     </AppText>
-                    <AppText className="mt-1 text-sm text-cove-muted">
-                      {quantityLabel} · {categoryName(pin.category)} ·{" "}
-                      {t(intervalKeys[pin.intervalDays])}
-                    </AppText>
-                    <View className="mt-2.5 flex-row flex-wrap items-center gap-2">
-                      <MetaChip label={t("nextDue", { date: due })} />
+                    <View className="flex-row flex-wrap items-center gap-1.5">
+                      <MetaChip label={categoryName(pin.category)} />
+                      <MetaChip label={t(intervalKeys[pin.intervalDays])} />
+                      <MetaChip label={due} />
                       {listPresence[pin.id] ? (
                         <MetaChip
                           label={t("pinnedOnList", {
@@ -405,71 +385,44 @@ function PinsBody() {
                       ) : null}
                     </View>
                   </View>
+                  <View className="flex-row items-center gap-1">
+                    <Pressable
+                      disabled={busy}
+                      onPress={() => void onAddToList(pin)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("addPinnedToList")}
+                      className={`h-9 w-9 items-center justify-center rounded-full ${
+                        busy ? "opacity-45" : "active:opacity-80"
+                      }`}
+                      style={{ backgroundColor: colors.accent }}
+                    >
+                      {isAddingThis ? (
+                        <ActivityIndicator color={colors.onAccent} size="small" />
+                      ) : (
+                        <Ionicons name="add" size={18} color={colors.onAccent} />
+                      )}
+                    </Pressable>
+                    <Pressable
+                      disabled={busy}
+                      onPress={() => {
+                        setError(null);
+                        setPinPendingDelete(pin);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("removePin")}
+                      className={`h-9 w-9 items-center justify-center rounded-full ${
+                        busy ? "opacity-45" : "active:opacity-80"
+                      }`}
+                    >
+                      {isRemovingThis ? (
+                        <ActivityIndicator color={danger} size="small" />
+                      ) : (
+                        <Ionicons name="trash-outline" size={18} color={colors.muted} />
+                      )}
+                    </Pressable>
+                  </View>
                 </View>
-
-                <View className="mt-4 flex-row gap-2">
-                  <Pressable
-                    disabled={busy}
-                    onPress={() => void onAddToList(pin)}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("addPinnedToList")}
-                    className={`h-11 flex-row items-center justify-center gap-1.5 rounded-2xl px-4 ${
-                      busy ? "opacity-45" : "active:opacity-80"
-                    }`}
-                    style={{
-                      backgroundColor: withAlpha(colors.accent, scheme === "dark" ? 0.18 : 0.12),
-                      borderWidth: 1,
-                      borderColor: withAlpha(
-                        scheme === "dark" ? colors.muted : colors.accent,
-                        scheme === "dark" ? 0.4 : 0.28,
-                      ),
-                    }}
-                  >
-                    {isAddingThis ? (
-                      <ActivityIndicator color={colors.accent} size="small" />
-                    ) : (
-                      <>
-                        <Ionicons name="add" size={16} color={colors.accent} />
-                        <AppText
-                          numberOfLines={1}
-                          className="text-sm font-semibold text-cove-accent"
-                        >
-                          {t("addPinnedToList")}
-                        </AppText>
-                      </>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    disabled={busy}
-                    onPress={() => {
-                      setError(null);
-                      setPinPendingDelete(pin);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("removePin")}
-                    className={`h-11 flex-row items-center justify-center gap-1.5 rounded-2xl px-4 ${
-                      busy ? "opacity-45" : "active:opacity-80"
-                    }`}
-                    style={{
-                      backgroundColor:
-                        scheme === "dark" ? "rgba(248, 113, 113, 0.18)" : "rgba(248, 113, 113, 0.12)",
-                      borderWidth: 1,
-                      borderColor: "rgba(248, 113, 113, 0.45)",
-                    }}
-                  >
-                    {isRemovingThis ? (
-                      <ActivityIndicator color={danger} size="small" />
-                    ) : (
-                      <>
-                        <Ionicons name="trash-outline" size={16} color={danger} />
-                        <AppText className="text-sm font-semibold" style={{ color: danger }}>
-                          {t("removePin")}
-                        </AppText>
-                      </>
-                    )}
-                  </Pressable>
-                </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -492,92 +445,50 @@ function PinsBody() {
             className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
             style={floatedCardStyle(scheme, colors)}
           >
-            <GlassFill soft />
-            <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">
-              <AppText className="text-lg font-semibold text-cove-ink">{t("addPin")}</AppText>
-            </View>
+            <GlassFill soft neutral />
+            <AppText className="mb-6 text-lg font-semibold text-cove-ink">
+              {editingPin ? t("editPin") : t("addPin")}
+            </AppText>
             <View className="gap-4">
-              <View className="flex-row items-stretch gap-3">
-                <View className="min-w-0 flex-1">
-                  <AppTextField
-                    compact
-                    glass
-                    label={t("itemNameLabel")}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder={t("itemNamePlaceholder")}
-                    userText
-                  />
-                </View>
-                <View className="w-20">
-                  <AppTextField
-                    compact
-                    glass
-                    label={t("quantity")}
-                    value={quantity}
-                    onChangeText={(value) => {
-                      setQuantity(value);
-                      setQuantityError(undefined);
-                    }}
-                    placeholder="1"
-                    keyboardType="decimal-pad"
-                    error={quantityError}
-                  />
-                </View>
-              </View>
+              <AppTextField
+                compact
+                glass
+                label={t("itemNameLabel")}
+                value={name}
+                onChangeText={setName}
+                placeholder={t("itemNamePlaceholder")}
+                userText
+              />
               <CategoryField glass value={category} onChange={setCategory} />
-              <View className="gap-1.5">
-                <AppText className="text-xs font-medium text-cove-muted">
-                  {t("pinInterval")}
-                </AppText>
-                <View className="flex-row flex-wrap gap-2">
-                  {PIN_INTERVALS.map((days) => {
-                    const selected = intervalDays === days;
-                    return (
-                      <Pressable
-                        key={days}
-                        onPress={() => setIntervalDays(days)}
-                        accessibilityRole="button"
-                        className="rounded-full px-3 py-1.5 active:opacity-80"
-                        style={{ backgroundColor: selected ? colors.accent : colors.mist }}
-                      >
-                        <AppText
-                          className="text-xs font-medium"
-                          style={{ color: selected ? colors.onAccent : colors.ink }}
-                        >
-                          {t(intervalKeys[days])}
-                        </AppText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
+              <IntervalField value={intervalDays} onChange={setIntervalDays} />
               <UrgentToggle compact value={urgent} onValueChange={setUrgent} />
-              <Pressable
-                onPress={() => setAddNow((value) => !value)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: addNow }}
-                className="flex-row items-center gap-3"
-              >
-                <View
-                  className={`h-6 w-6 items-center justify-center rounded-md ${
-                    addNow ? "bg-cove-accent" : "bg-cove-line"
-                  }`}
+              {editingPin ? null : (
+                <Pressable
+                  onPress={() => setAddNow((value) => !value)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: addNow }}
+                  className="flex-row items-center gap-3"
                 >
-                  {addNow ? (
-                    <AppText className="text-xs font-semibold" style={{ color: colors.onAccent }}>
-                      ✓
-                    </AppText>
-                  ) : null}
-                </View>
-                <AppText className="text-base text-cove-ink">{t("addToListNow")}</AppText>
-              </Pressable>
+                  <View
+                    className={`h-6 w-6 items-center justify-center rounded-md ${
+                      addNow ? "bg-cove-accent" : "bg-cove-line"
+                    }`}
+                  >
+                    {addNow ? (
+                      <AppText className="text-xs font-semibold" style={{ color: colors.onAccent }}>
+                        ✓
+                      </AppText>
+                    ) : null}
+                  </View>
+                  <AppText className="text-base text-cove-ink">{t("addToListNow")}</AppText>
+                </Pressable>
+              )}
               <FormMessage message={error} />
             </View>
             <View className="mt-8 gap-3">
               <AppButton
                 compact
-                label={t("addPin")}
+                label={editingPin ? t("saveChanges") : t("addPin")}
                 disabled={!name.trim()}
                 loading={isSaving}
                 onPress={() => void onSave()}
@@ -616,12 +527,146 @@ function PinsBody() {
   );
 }
 
+function IntervalField({
+  value,
+  onChange,
+}: {
+  value: PinInterval;
+  onChange: (days: PinInterval) => void;
+}) {
+  const { t } = useI18n();
+  const { colors, scheme, shadow } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(
+    null,
+  );
+  const fieldRef = useRef<View>(null);
+  const frame = intervalMenuFrame(anchor);
+
+  function openMenu() {
+    const node = fieldRef.current;
+    if (!node) {
+      setOpen(true);
+      return;
+    }
+    node.measureInWindow((x, y, width, height) => {
+      setAnchor({ x, y, width, height });
+      setOpen(true);
+    });
+  }
+
+  return (
+    <>
+      <View className="gap-1.5">
+        <AppText className="text-xs font-medium text-cove-muted">{t("pinInterval")}</AppText>
+        <View ref={fieldRef} collapsable={false}>
+          <Pressable
+            onPress={openMenu}
+            accessibilityRole="button"
+            className="h-10 flex-row items-center justify-between rounded-2xl border px-3 active:opacity-80"
+            style={glassFieldStyle(scheme, colors)}
+          >
+            <AppText className="text-sm font-medium text-cove-ink">
+              {t(intervalKeys[value])}
+            </AppText>
+            <Ionicons name="chevron-down" size={16} color={colors.muted} />
+          </Pressable>
+        </View>
+      </View>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setOpen(false)}
+      >
+        <View className="flex-1">
+          <BlurBackdrop onPress={() => setOpen(false)} />
+          <View
+            className="absolute"
+            style={{
+              top: frame.top,
+              left: frame.left,
+              width: frame.width,
+              borderRadius: 24,
+              shadowColor: shadow.color,
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.16,
+              shadowRadius: 16,
+              elevation: 8,
+            }}
+          >
+            <View
+              className="overflow-hidden rounded-3xl"
+              style={floatedCardStyle(scheme, colors)}
+            >
+              <GlassFill soft neutral />
+              <ScrollView
+                bounces={false}
+                style={{ flexGrow: 0 }}
+                contentContainerStyle={{ gap: 4, padding: 8 }}
+              >
+                {PIN_INTERVALS.map((days) => {
+                  const selected = days === value;
+                  return (
+                    <Pressable
+                      key={days}
+                      onPress={() => {
+                        onChange(days);
+                        setOpen(false);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      className="flex-row items-center justify-between rounded-2xl px-3 py-3 active:opacity-80"
+                      style={{ backgroundColor: selected ? colors.accent : "transparent" }}
+                    >
+                      <AppText
+                        className="text-sm font-medium"
+                        style={{ color: selected ? colors.onAccent : colors.ink }}
+                      >
+                        {t(intervalKeys[days])}
+                      </AppText>
+                      {selected ? (
+                        <Ionicons name="checkmark" size={16} color={colors.onAccent} />
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+function intervalMenuFrame(anchor: { x: number; y: number; width: number; height: number } | null) {
+  const screen = Dimensions.get("window");
+  const gap = 8;
+  const estimated = PIN_INTERVALS.length * 48 + 16;
+  if (!anchor) {
+    const width = screen.width - 32;
+    return { top: 96, left: 16, width };
+  }
+
+  const width = Math.min(Math.max(anchor.width, 180), screen.width - 32);
+  const left = Math.max(16, Math.min(anchor.x, screen.width - width - 16));
+  const spaceBelow = screen.height - (anchor.y + anchor.height + gap) - 16;
+  const openUp = spaceBelow < estimated;
+  const top = openUp
+    ? Math.max(16, anchor.y - gap - estimated)
+    : anchor.y + anchor.height + gap;
+
+  return { top, left, width };
+}
+
 function MetaChip({ label, accent = false }: { label: string; accent?: boolean }) {
   const { colors, scheme } = useTheme();
 
   return (
     <View
-      className="rounded-full px-2.5 py-1"
+      className="rounded-full px-2 py-0.5"
       style={{
         backgroundColor: accent
           ? withAlpha(colors.accent, scheme === "dark" ? 0.22 : 0.14)
@@ -632,7 +677,7 @@ function MetaChip({ label, accent = false }: { label: string; accent?: boolean }
     >
       <AppText
         className="text-xs font-medium"
-        style={{ color: accent ? colors.accent : colors.ink }}
+        style={{ color: accent ? colors.accent : colors.muted }}
       >
         {label}
       </AppText>

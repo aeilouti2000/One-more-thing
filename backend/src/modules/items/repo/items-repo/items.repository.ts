@@ -29,6 +29,12 @@ export interface IItemsRepository {
     boughtAt: Date,
     cost: number | null,
   ): Promise<number>;
+  markNeededBoughtMany(
+    homeId: string,
+    userId: string,
+    boughtAt: Date,
+    entries: { id: string; cost: number | null }[],
+  ): Promise<number>;
   deleteInHome(ids: string[], homeId: string): Promise<void>;
   findNeededByIds(ids: string[], homeId: string): Promise<Item[]>;
   deleteNeededOnList(homeId: string, listId: string): Promise<void>;

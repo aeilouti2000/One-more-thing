@@ -3,9 +3,10 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { CategoryField } from "@/features/items/components/category-field";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
-import { StatusBadge, UrgentBadge } from "@/features/items/components/status-badge";
+import { StatusBadge } from "@/features/items/components/status-badge";
 import { UrgentToggle } from "@/features/items/components/urgent-toggle";
 import { AppButton } from "@/components/ui/AppButton";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -26,9 +27,10 @@ type ItemDetailCardProps = {
   purchase: Purchase | null;
   visible: boolean;
   onClose: () => void;
+  onDelete?: () => Promise<{ error: string | null }>;
 };
 
-export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardProps) {
+export function ItemDetailCard({ purchase, visible, onClose, onDelete }: ItemDetailCardProps) {
   const { updateItem, updateCost, markBought } = usePurchases();
   const { household } = useHousehold();
   const { t } = useI18n();
@@ -38,6 +40,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
   const [category, setCategory] = useState<PurchaseCategory>("vegetables");
   const [urgent, setUrgent] = useState(false);
   const [pinned, setPinned] = useState(false);
+  const [pinBaseline, setPinBaseline] = useState(false);
   const [pinnedPinId, setPinnedPinId] = useState<string | null>(null);
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +48,9 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
   const [editingOpen, setEditingOpen] = useState(false);
   const [costPromptOpen, setCostPromptOpen] = useState(false);
   const [editCostOpen, setEditCostOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const editable = purchase?.status === "needed";
   const askSingleCost =
     household?.costsEnabled === true && household.askCostOnSingleBuy !== false;
@@ -56,6 +62,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
     setCategory(item.category);
     setUrgent(item.urgent);
     setPinned(false);
+    setPinBaseline(false);
     setPinnedPinId(null);
     setQuantityError(undefined);
     setEditingOpen(false);
@@ -68,12 +75,29 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
     const match = existing.pins.find(
       (pin) => pin.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
     );
+    const isPinned = Boolean(match);
     setPinnedPinId(match?.id ?? null);
-    setPinned(Boolean(match));
+    setPinned(isPinned);
+    setPinBaseline(isPinned);
   }
 
   function close() {
-    if (isSubmitting) return;
+    if (isSubmitting || deleteBusy) return;
+    setDeleteOpen(false);
+    onClose();
+  }
+
+  async function confirmDelete() {
+    if (!onDelete || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    const result = await onDelete();
+    setDeleteBusy(false);
+    if (result.error) {
+      setDeleteError(result.error);
+      return;
+    }
+    setDeleteOpen(false);
     onClose();
   }
 
@@ -175,7 +199,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
   return (
     <>
       <FormSheetModal
-        visible={visible && purchase !== null && !costPromptOpen && !editCostOpen}
+        visible={visible && purchase !== null && !costPromptOpen && !editCostOpen && !deleteOpen}
         onClose={close}
         onShow={() => {
           if (!purchase) return;
@@ -183,6 +207,8 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
           setError(null);
           setCostPromptOpen(false);
           setEditCostOpen(false);
+          setDeleteOpen(false);
+          setDeleteError(null);
           void loadPin(purchase);
         }}
       >
@@ -193,6 +219,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
             costsEnabled={household?.costsEnabled === true}
             error={error}
             onEditCost={() => setEditCostOpen(true)}
+            onAskDelete={onDelete ? () => setDeleteOpen(true) : undefined}
             onClose={close}
           />
         ) : (
@@ -204,6 +231,7 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
             category={category}
             urgent={urgent}
             pinned={pinned}
+            pinBaseline={pinBaseline}
             quantityError={quantityError}
             error={error}
             isSubmitting={isSubmitting}
@@ -271,6 +299,23 @@ export function ItemDetailCard({ purchase, visible, onClose }: ItemDetailCardPro
           }}
         />
       ) : null}
+
+      <ConfirmModal
+        visible={deleteOpen && purchase !== null}
+        title={t("deleteHistoryTitle")}
+        message={t("deleteHistoryMessage")}
+        confirmLabel={t("delete")}
+        cancelLabel={t("cancel")}
+        icon="trash-outline"
+        error={deleteError}
+        loading={deleteBusy}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => {
+          if (deleteBusy) return;
+          setDeleteOpen(false);
+          setDeleteError(null);
+        }}
+      />
     </>
   );
 }
@@ -283,6 +328,7 @@ function EditItemForm({
   category,
   urgent,
   pinned,
+  pinBaseline,
   quantityError,
   error,
   isSubmitting,
@@ -304,6 +350,7 @@ function EditItemForm({
   category: PurchaseCategory;
   urgent: boolean;
   pinned: boolean;
+  pinBaseline: boolean;
   quantityError?: string;
   error: string | null;
   isSubmitting: boolean;
@@ -325,6 +372,18 @@ function EditItemForm({
   const quantityLabel = purchase?.unit
     ? `${quantity} ${purchase.unit}`
     : quantity;
+  const parsedQuantity = parseQuantity(quantity);
+  const hasChanges = Boolean(
+    purchase &&
+      (name.trim() !== purchase.name.trim() ||
+        (parsedQuantity === null
+          ? quantity.trim() !== String(purchase.quantity)
+          : parsedQuantity !== purchase.quantity) ||
+        notes.trim() !== (purchase.notes ?? "").trim() ||
+        category !== purchase.category ||
+        urgent !== purchase.urgent ||
+        pinned !== pinBaseline),
+  );
 
   useEffect(() => {
     if (editingOpen) {
@@ -337,14 +396,18 @@ function EditItemForm({
       className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
       style={floatedCardStyle(scheme, colors)}
     >
-      <GlassFill soft />
+      <GlassFill soft neutral />
       <View className="mb-5 flex-row items-start justify-between gap-4">
-        <AppText
-          className="min-w-0 flex-1 text-lg font-semibold text-cove-ink"
-          numberOfLines={2}
-        >
-          {name.trim() || purchase?.name || t("item")}
-        </AppText>
+        <View className="min-w-0 flex-1">
+          <AppText className="text-lg font-semibold text-cove-ink" numberOfLines={2}>
+            {name.trim() || purchase?.name || t("item")}
+          </AppText>
+          {purchase?.urgent && purchase.status !== "bought" ? (
+            <AppText className="mt-1 text-xs font-semibold" style={{ color: "#F87171" }}>
+              {t("urgent")}
+            </AppText>
+          ) : null}
+        </View>
         {purchase ? (
           <View className="shrink-0 items-end">
             <AppText
@@ -374,7 +437,6 @@ function EditItemForm({
           {!editingOpen ? (
             <View className="gap-3">
               <View className="flex-row flex-wrap items-center gap-2">
-                {urgent ? <UrgentBadge /> : null}
                 <SummaryChip label={`${t("quantity")}: ${quantityLabel}`} />
                 <SummaryChip label={categoryLabel} />
                 {pinned ? <SummaryChip label={t("pinSelected")} /> : null}
@@ -390,15 +452,13 @@ function EditItemForm({
           <View
             className="overflow-hidden rounded-2xl"
             style={{
-              backgroundColor: withAlpha(
-                scheme === "dark" ? colors.muted : colors.accent,
-                scheme === "dark" ? 0.18 : 0.12,
-              ),
+              backgroundColor:
+                scheme === "dark" ? withAlpha(colors.white, 0.04) : "#F4F5F7",
               borderWidth: 1,
-              borderColor: withAlpha(
-                scheme === "dark" ? colors.muted : colors.accent,
-                scheme === "dark" ? 0.45 : 0.32,
-              ),
+              borderColor:
+                scheme === "dark"
+                  ? withAlpha(colors.white, 0.1)
+                  : withAlpha("#12141A", 0.08),
             }}
           >
             <Pressable
@@ -416,15 +476,7 @@ function EditItemForm({
             </Pressable>
 
             {editingOpen ? (
-              <View
-                className="gap-4 border-t border-cove-line px-4 pb-4 pt-3"
-                style={{
-                  borderTopColor: withAlpha(
-                    scheme === "dark" ? colors.muted : colors.accent,
-                    scheme === "dark" ? 0.28 : 0.2,
-                  ),
-                }}
-              >
+              <View className="gap-4 px-4 pb-4 pt-1">
                 <View className="flex-row items-stretch gap-3">
                   <View className="min-w-0 flex-1">
                     <AppTextField
@@ -473,23 +525,6 @@ function EditItemForm({
                   userText
                   onFocus={() => formSheet?.scrollToEnd()}
                 />
-                <Pressable
-                  disabled={isSubmitting || !name.trim()}
-                  onPress={onSubmit}
-                  accessibilityRole="button"
-                  className={`h-11 items-center justify-center rounded-2xl px-3 ${
-                    isSubmitting || !name.trim() ? "opacity-50" : "active:opacity-80"
-                  }`}
-                  style={{ backgroundColor: scheme === "dark" ? colors.mist : colors.paper }}
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color={colors.accent} />
-                  ) : (
-                    <AppText className="text-sm font-semibold text-cove-accent">
-                      {t("saveChanges")}
-                    </AppText>
-                  )}
-                </Pressable>
               </View>
             ) : null}
           </View>
@@ -497,15 +532,19 @@ function EditItemForm({
           <FormMessage message={error} />
 
           <Pressable
-            disabled={isSubmitting}
-            onPress={onMarkBought}
+            disabled={isSubmitting || (hasChanges && !name.trim())}
+            onPress={hasChanges ? onSubmit : onMarkBought}
             accessibilityRole="button"
             className={`mt-2 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-cove-accent px-3 ${
-              isSubmitting ? "opacity-50" : "active:opacity-80"
+              isSubmitting || (hasChanges && !name.trim()) ? "opacity-50" : "active:opacity-80"
             }`}
           >
             {isSubmitting ? (
               <ActivityIndicator color={colors.onAccent} />
+            ) : hasChanges ? (
+              <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
+                {t("saveChanges")}
+              </AppText>
             ) : (
               <>
                 <MaterialCommunityIcons name="cart-check" size={18} color={colors.onAccent} />
@@ -540,6 +579,7 @@ function HistoryItemCard({
   costsEnabled,
   error,
   onEditCost,
+  onAskDelete,
   onClose,
 }: {
   purchase: Purchase;
@@ -547,6 +587,7 @@ function HistoryItemCard({
   costsEnabled: boolean;
   error: string | null;
   onEditCost: () => void;
+  onAskDelete?: () => void;
   onClose: () => void;
 }) {
   const { t, locale, isRTL } = useI18n();
@@ -585,7 +626,7 @@ function HistoryItemCard({
       className="w-full max-w-md gap-6 overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
       style={floatedCardStyle(scheme, colors)}
     >
-      <GlassFill soft />
+      <GlassFill soft neutral />
       <View className="-mx-7 flex-row items-center gap-3 border-b border-cove-line px-7 pb-5">
         <AppText
           className="min-w-0 flex-1 text-xl font-semibold tracking-tight text-cove-ink"
@@ -593,15 +634,33 @@ function HistoryItemCard({
         >
           {purchase.name}
         </AppText>
-        <View className="flex-row items-center gap-2">
-          {purchase.urgent ? <UrgentBadge /> : null}
-          <StatusBadge status={purchase.status} />
-        </View>
+        {onAskDelete ? (
+          <Pressable
+            onPress={onAskDelete}
+            accessibilityRole="button"
+            accessibilityLabel={t("delete")}
+            hitSlop={8}
+            className="h-10 w-10 items-center justify-center rounded-full active:opacity-80"
+            style={{
+              backgroundColor:
+                scheme === "dark" ? "rgba(240, 113, 120, 0.16)" : "rgba(194, 65, 74, 0.1)",
+            }}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={18}
+              color={scheme === "dark" ? "#F07178" : "#C2414A"}
+            />
+          </Pressable>
+        ) : null}
+        <StatusBadge status={purchase.status} />
       </View>
 
       <View
         className="overflow-hidden rounded-2xl px-4"
-        style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.ice }}
+        style={{
+          backgroundColor: scheme === "dark" ? withAlpha(colors.white, 0.04) : "#F4F5F7",
+        }}
       >
         {facts.map((fact, index) => (
           <View
@@ -609,7 +668,13 @@ function HistoryItemCard({
             className="flex-row items-center justify-between gap-4 py-3"
             style={
               index < facts.length - 1
-                ? { borderBottomWidth: 1, borderBottomColor: colors.line }
+                ? {
+                    borderBottomWidth: 1,
+                    borderBottomColor:
+                      scheme === "dark"
+                        ? withAlpha(colors.white, 0.08)
+                        : withAlpha("#12141A", 0.08),
+                  }
                 : undefined
             }
           >

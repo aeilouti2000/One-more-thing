@@ -10,6 +10,7 @@ import {
   MarkBoughtDto,
   MarkBoughtItemsDto,
   MoveItemsDto,
+  SetUrgentItemsDto,
   UpdateItemCostDto,
   UpdateItemDto,
 } from "../dto/items.dto";
@@ -149,5 +150,10 @@ export class ItemsController {
   @Post("items/move")
   moveMany(@CurrentUser() user: User, @Body() body: MoveItemsDto) {
     return this.items.moveMany(user.id, body.ids, body.listId);
+  }
+
+  @Post("items/urgent")
+  setUrgent(@CurrentUser() user: User, @Body() body: SetUrgentItemsDto) {
+    return this.items.setManyUrgent(user.id, body.ids, body.urgent);
   }
 }

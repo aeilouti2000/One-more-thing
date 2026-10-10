@@ -17,6 +17,7 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { requiredAppUpdate } from "@/lib/app-release";
 import { AuthProvider } from "@/features/auth/providers/auth-provider";
 import { CategoriesProvider } from "@/features/items/providers/categories-provider";
+import { PurchasesProvider } from "@/features/items/hooks/use-purchases";
 import { HouseholdProvider } from "@/features/homes/providers/household-provider";
 import { NotificationsProvider } from "@/features/notifications/providers/notifications-provider";
 import { FontScaleProvider } from "@/providers/FontScaleProvider";
@@ -45,6 +46,7 @@ function ThemedNavigation() {
         <Stack.Screen name="item" />
         <Stack.Screen name="trip" />
         <Stack.Screen name="pins" />
+        <Stack.Screen name="categories" />
         <Stack.Screen name="legal" />
       </Stack>
     </>
@@ -90,6 +92,7 @@ export default function RootLayout() {
             <NotificationsProvider>
               <HouseholdProvider>
                 <CategoriesProvider>
+                <PurchasesProvider>
                 <GestureHandlerRootView style={{ flex: 1 }}>
                   <BlurScreen>
                     <TabBlurProvider>
@@ -97,6 +100,7 @@ export default function RootLayout() {
                     </TabBlurProvider>
                   </BlurScreen>
                 </GestureHandlerRootView>
+                </PurchasesProvider>
                 </CategoriesProvider>
               </HouseholdProvider>
             </NotificationsProvider>

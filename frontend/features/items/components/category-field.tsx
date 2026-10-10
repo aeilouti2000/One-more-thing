@@ -6,7 +6,7 @@ import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { useCategories, useCategoryLabel } from "@/features/items/providers/categories-provider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { glassFieldStyle } from "@/constants/theme";
+import { floatedCardStyle, glassFieldStyle } from "@/constants/theme";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
 
 type Anchor = { x: number; y: number; width: number; height: number };
@@ -83,10 +83,10 @@ export function CategoryField({ value, onChange, glass = false }: CategoryFieldP
             }}
           >
             <View
-              className="overflow-hidden rounded-3xl border border-cove-line"
-              style={{ maxHeight: frame.maxHeight }}
+              className="overflow-hidden rounded-3xl"
+              style={[floatedCardStyle(scheme, colors), { maxHeight: frame.maxHeight }]}
             >
-              <GlassFill soft />
+              <GlassFill soft neutral />
               <ScrollView
                 bounces={false}
                 style={{ flexGrow: 0, maxHeight: frame.maxHeight }}

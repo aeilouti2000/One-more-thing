@@ -205,16 +205,12 @@ export class ItemsService {
     }
 
     const now = new Date();
-    let updated = 0;
-    for (const [id, cost] of unique) {
-      updated += await this.items.markNeededBought(
-        id,
-        membership.homeId,
-        userId,
-        now,
-        normalizeCost(cost),
-      );
-    }
+    const updated = await this.items.markNeededBoughtMany(
+      membership.homeId,
+      userId,
+      now,
+      uniqueIds.map((id) => ({ id, cost: normalizeCost(unique.get(id)) })),
+    );
     return { updated };
   }
 
@@ -227,6 +223,43 @@ export class ItemsService {
     }
     await this.items.deleteInHome(uniqueIds, membership.homeId);
     return { deleted: uniqueIds.length };
+  }
+
+  async setManyUrgent(userId: string, ids: string[], urgent: boolean) {
+    const uniqueIds = [...new Set(ids)];
+    const membership = await this.homes.requireMembership(userId);
+    const rows = await this.items.findNeededByIds(uniqueIds, membership.homeId);
+    if (rows.length !== uniqueIds.length) {
+      throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
+    }
+
+    const became: Item[] = [];
+    for (const item of rows) {
+      if (item.urgent === urgent) continue;
+      item.urgent = urgent;
+      const saved = await this.items.save(item);
+      if (urgent) became.push(saved);
+    }
+
+    for (const item of became) {
+      await this.items.placeNeeded(item.homeId, item.id, "top", item.listId);
+    }
+
+    if (became.length > 0) {
+      const actorName = (await this.items.findUserName(userId)) ?? "Member";
+      await Promise.all(
+        became.map((item) =>
+          this.notifications.notifyItemUrgent({
+            homeId: item.homeId,
+            actorId: userId,
+            actorName,
+            itemName: item.name,
+          }),
+        ),
+      );
+    }
+
+    return { updated: uniqueIds.length };
   }
 
   async moveMany(userId: string, ids: string[], listId: string) {

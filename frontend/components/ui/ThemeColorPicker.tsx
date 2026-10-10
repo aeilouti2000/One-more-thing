@@ -8,9 +8,11 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
+import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { FormSheetModal } from "@/components/ui/FormSheetModal";
 import {
   DEFAULT_ACCENT,
+  floatedCardStyle,
   getColors,
   hexToHsl,
   withAlpha,
@@ -229,7 +231,11 @@ export function ThemeColorPicker() {
       ) : null}
 
       <FormSheetModal visible={open} onClose={closePicker}>
-        <View className="rounded-3xl bg-cove-paper px-4 py-4">
+        <View
+          className="overflow-hidden rounded-3xl px-4 py-4"
+          style={floatedCardStyle(scheme, colors)}
+        >
+          <GlassFill soft neutral />
           <View className="mb-4 flex-row items-center gap-3">
             <View
               style={{

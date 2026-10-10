@@ -61,6 +61,40 @@ export class TypeormItemsRepository implements IItemsRepository {
     return result.affected ?? 0;
   }
 
+  async markNeededBoughtMany(
+    homeId: string,
+    userId: string,
+    boughtAt: Date,
+    entries: { id: string; cost: number | null }[],
+  ) {
+    if (entries.length === 0) return 0;
+    const cases = entries
+      .map((entry, index) => {
+        const cost = entry.cost === null ? "NULL" : String(entry.cost);
+        return `WHEN $${index + 1}::uuid THEN ${cost}`;
+      })
+      .join(" ");
+    const inList = entries.map((_, index) => `$${index + 1}::uuid`).join(", ");
+    const userParam = entries.length + 1;
+    const timeParam = entries.length + 2;
+    const homeParam = entries.length + 3;
+    const result: unknown = await this.items.query(
+      `UPDATE items
+       SET status = 'bought',
+           urgent_before_bought = urgent,
+           urgent = false,
+           bought_by = $${userParam}::uuid,
+           bought_at = $${timeParam},
+           cost = CASE id ${cases} ELSE cost END
+       WHERE home_id = $${homeParam}::uuid
+         AND status = 'needed'
+         AND id IN (${inList})`,
+      [...entries.map((entry) => entry.id), userId, boughtAt, homeId],
+    );
+    if (Array.isArray(result)) return Number(result[1] ?? 0);
+    return Number((result as { rowCount?: number }).rowCount ?? 0);
+  }
+
   async deleteInHome(ids: string[], homeId: string) {
     await this.items.delete({ id: In(ids), homeId });
   }

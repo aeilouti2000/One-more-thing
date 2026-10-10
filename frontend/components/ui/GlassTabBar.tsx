@@ -228,7 +228,9 @@ export function GlassTabBar({
                   {options.tabBarIcon?.({ focused, color, size: 22 })}
                   <AppText
                     numberOfLines={1}
-                    style={{ color, fontSize: tabBar.labelSize, fontWeight: "600" }}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}
+                    style={{ color, fontSize: tabBar.labelSize, fontWeight: "600", textAlign: "center" }}
                   >
                     {label}
                   </AppText>

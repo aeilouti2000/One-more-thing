@@ -109,12 +109,6 @@ export function Screen({
       ? "px-5 pb-10 pt-4"
       : "px-5 pb-10 pt-2";
 
-  // Stable context identity — avoid re-renders from inline onSwipe props.
-  const swipeContext = useMemo(
-    (): ScreenSwipeContextValue => ({ translateX }),
-    [translateX],
-  );
-
   useEffect(() => {
     swipeRef.current = onSwipe;
   }, [onSwipe]);
@@ -259,6 +253,12 @@ export function Screen({
     [],
   );
   /* eslint-enable react-hooks/refs */
+
+  // Stable context identity — avoid re-renders from inline onSwipe props.
+  const swipeContext = useMemo(
+    (): ScreenSwipeContextValue => ({ translateX }),
+    [translateX],
+  );
 
   // Android 0.85+ defaults nested scrolling on. Inside a gesture-handler scroll
   // view that leaves the refresh spinner on screen after the pull ends.

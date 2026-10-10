@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { CurrentUser } from "../../../common/current-user.decorator";
 import { User } from "../../../users/user.entity";
-import { CreatePinDto } from "../dto/items.dto";
+import { CreatePinDto, UpdatePinDto } from "../dto/items.dto";
 import { ItemsService } from "../services/items.service";
 import { PinsService } from "../services/pins.service";
 
@@ -43,6 +43,15 @@ export class PinsController {
             { notify },
           ),
     );
+  }
+
+  @Patch("pins/:pinId")
+  update(
+    @CurrentUser() user: User,
+    @Param("pinId", ParseUUIDPipe) pinId: string,
+    @Body() body: UpdatePinDto,
+  ) {
+    return this.pins.update(user.id, pinId, body);
   }
 
   @Delete("pins/:pinId")

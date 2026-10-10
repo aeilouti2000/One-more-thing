@@ -167,10 +167,8 @@ function AddItemForm({
       className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
       style={floatedCardStyle(scheme, colors)}
     >
-      <GlassFill soft />
-      <View className="-mx-7 mb-6 border-b border-cove-line px-7 pb-5">
-        <AppText className="text-lg font-semibold text-cove-ink">{t("addItem")}</AppText>
-      </View>
+      <GlassFill soft neutral />
+      <AppText className="mb-6 text-lg font-semibold text-cove-ink">{t("addItem")}</AppText>
       <View className="gap-4">
         <View className="flex-row items-stretch gap-3">
           <View className="min-w-0 flex-1">

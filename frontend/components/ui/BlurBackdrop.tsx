@@ -31,9 +31,11 @@ type BlurBackdropProps = {
 function SolidFrost({
   style,
   soft = false,
+  neutral = false,
 }: {
   style?: StyleProp<ViewStyle>;
   soft?: boolean;
+  neutral?: boolean;
 }) {
   const { scheme, colors } = useTheme();
   const dark = scheme === "dark";
@@ -44,11 +46,15 @@ function SolidFrost({
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor: soft
+            backgroundColor: neutral
               ? dark
                 ? colors.paper
-                : "rgba(255, 255, 255, 0.96)"
-              : colors.paper,
+                : colors.white
+              : soft
+                ? dark
+                  ? colors.paper
+                  : "rgba(255, 255, 255, 0.96)"
+                : colors.paper,
           },
         ]}
       />
@@ -56,7 +62,9 @@ function SolidFrost({
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor: withAlpha(colors.accent, soft ? (dark ? 0.12 : 0.08) : dark ? 0.16 : 0.1),
+            backgroundColor: neutral
+              ? withAlpha(dark ? colors.white : "#12141A", dark ? 0.03 : 0.02)
+              : withAlpha(colors.accent, soft ? (dark ? 0.12 : 0.08) : dark ? 0.16 : 0.1),
           },
         ]}
       />
@@ -77,7 +85,7 @@ export function FrostedBlur({ style }: { style?: StyleProp<ViewStyle> }) {
           style,
           {
             backgroundColor:
-              scheme === "dark" ? "rgba(19, 34, 56, 0.96)" : "rgba(255, 255, 255, 0.96)",
+              scheme === "dark" ? "rgba(18, 18, 18, 0.96)" : "rgba(255, 255, 255, 0.96)",
           },
         ]}
       />
@@ -100,10 +108,12 @@ export function GlassFill({
   style,
   soft = false,
   screenBlur = false,
+  neutral = false,
 }: {
   style?: StyleProp<ViewStyle>;
   soft?: boolean;
   screenBlur?: boolean;
+  neutral?: boolean;
 }) {
   const { colors, scheme } = useTheme();
   const screenTarget = useTabBlurTarget();
@@ -113,7 +123,7 @@ export function GlassFill({
   const androidBlur = Platform.OS === "android" && screenBlur && screenTarget != null;
 
   if (Platform.OS === "android" && !androidBlur) {
-    return <SolidFrost style={style} soft={soft} />;
+    return <SolidFrost style={style} soft={soft} neutral={neutral} />;
   }
 
   const intensity = soft
@@ -148,10 +158,12 @@ export function GlassFill({
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor: withAlpha(
-              colors.accent,
-              soft ? (dark ? 0.06 : 0.08) : dark ? 0.22 : 0.24,
-            ),
+            backgroundColor: neutral
+              ? withAlpha(dark ? colors.paper : colors.white, dark ? 0.88 : 0.92)
+              : withAlpha(
+                  colors.accent,
+                  soft ? (dark ? 0.06 : 0.08) : dark ? 0.22 : 0.24,
+                ),
           },
         ]}
       />
@@ -175,7 +187,7 @@ export function FrostedFill() {
           StyleSheet.absoluteFill,
           {
             backgroundColor:
-              scheme === "dark" ? "rgba(19, 34, 56, 0.58)" : "rgba(255, 255, 255, 0.5)",
+              scheme === "dark" ? "rgba(0, 0, 0, 0.55)" : "rgba(255, 255, 255, 0.5)",
           },
         ]}
       />
@@ -193,8 +205,7 @@ export function BlurBackdrop({ onPress, disabled = false }: BlurBackdropProps) {
       style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor:
-            scheme === "dark" ? "rgba(7, 14, 28, 0.62)" : "rgba(13, 71, 161, 0.34)",
+          backgroundColor: scheme === "dark" ? "rgba(0, 0, 0, 0.62)" : "rgba(0, 0, 0, 0.4)",
         },
       ]}
     />

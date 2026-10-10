@@ -28,9 +28,10 @@ export const textSizes = {
 } as const;
 
 export const fontScales = {
-  small: 0.9,
-  medium: 1,
-  large: 1.15,
+  small: 0.8,
+  medium: 0.9,
+  large: 1,
+  xl: 1.15,
 } as const;
 
 /** Arabic glyphs read larger than Latin at the same setting, so the default sits a little lower. */
