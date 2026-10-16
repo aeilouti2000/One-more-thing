@@ -2,7 +2,7 @@
   "expo": {
     "name": "One More Thing",
     "slug": "one-more-thing",
-    "version": "2.1.3",
+    "version": "2.1.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "onemorething",
@@ -13,7 +13,7 @@
     "android": {
       "package": "com.onemorething.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 29,
+      "versionCode": 30,
       "adaptiveIcon": {
         "backgroundColor": "#0E4088",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
