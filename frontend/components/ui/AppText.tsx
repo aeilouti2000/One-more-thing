@@ -1,6 +1,6 @@
 import { StyleSheet, Text, type TextProps, type TextStyle } from "react-native";
 import { appFontFamily, scaleFontSize, textSizes } from "@/constants/font";
-import { preserveSpaces } from "@/constants/text";
+import { hasArabicScript, preserveSpaces } from "@/constants/text";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 
@@ -20,6 +20,7 @@ export function AppText({
 }: TextProps & { className?: string }) {
   const { isRTL } = useI18n();
   const { scale } = useFontScale();
+  const arabic = isRTL || hasArabicScript(children);
   const flat = StyleSheet.flatten(style);
   const fromClass = sizeFromClass(className);
   const fontSize = typeof flat?.fontSize === "number" ? flat.fontSize : fromClass?.fontSize;
@@ -29,7 +30,7 @@ export function AppText({
   const scaled: TextStyle | null = scaledSize
     ? {
         fontSize: scaledSize,
-        lineHeight: isRTL
+        lineHeight: arabic
           ? Math.max(scaledLine ?? 0, Math.round(scaledSize * 1.8))
           : scaledLine,
       }
@@ -43,13 +44,13 @@ export function AppText({
       style={[
         preserveSpaces,
         {
-          writingDirection: isRTL ? "rtl" : "ltr",
-          includeFontPadding: isRTL,
+          writingDirection: arabic ? "rtl" : "ltr",
           textAlignVertical: "center",
         },
         style,
         scaled,
         { fontFamily: appFontFamily(flat?.fontWeight), fontWeight: "400" },
+        arabic ? { includeFontPadding: true } : { includeFontPadding: false },
       ]}
     >
       {children}

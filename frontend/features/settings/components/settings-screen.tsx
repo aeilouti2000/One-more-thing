@@ -10,11 +10,12 @@ import { EditButton } from "@/components/ui/EditButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { FontSizeBar } from "@/components/ui/FontSizeBar";
 import { LanguagePicker } from "@/components/ui/LanguagePicker";
+import { SegmentedToggle } from "@/components/ui/SegmentedToggle";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { ThemeColorPicker } from "@/components/ui/ThemeColorPicker";
 import { LOCALES } from "@/constants/i18n";
-import { headerIconFrameStyle, iconSize, type ThemeScheme } from "@/constants/theme";
+import { headerIconFrameStyle, iconSize } from "@/constants/theme";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { updateCostSettings } from "@/features/homes/api/homes";
 import {
@@ -242,10 +243,6 @@ export default function SettingsScreen() {
   const displayName = user?.name?.trim() || t("member");
   const displayUsername = user?.email ?? t("noEmail");
   const languageLabel = LOCALES.find((item) => item.id === locale)?.label ?? t("language");
-  const themes: { id: ThemeScheme; label: string }[] = [
-    { id: "light", label: t("light") },
-    { id: "dark", label: t("dark") },
-  ];
   const costsSummary = household?.costsEnabled ? t("trackCosts") : t("costsSectionBody");
 
   return (
@@ -725,29 +722,15 @@ export default function SettingsScreen() {
         >
           <CardBlock>
             <AppText className="mb-3 text-sm font-medium text-cove-muted">{t("theme")}</AppText>
-            <View className="flex-row gap-2">
-              {themes.map((option) => {
-                const selected = scheme === option.id;
-                return (
-                  <Pressable
-                    key={option.id}
-                    onPress={() => setScheme(option.id)}
-                    className={`flex-1 items-center rounded-2xl px-4 py-3 ${
-                      selected ? "bg-cove-accent" : "bg-cove-paper"
-                    }`}
-                  >
-                    <AppText
-                      className={`text-base font-semibold ${
-                        selected ? "" : "text-cove-ink"
-                      }`}
-                      style={selected ? { color: colors.onAccent } : undefined}
-                    >
-                      {option.label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <SegmentedToggle
+              value={scheme}
+              options={[
+                { id: "light", label: t("light") },
+                { id: "dark", label: t("dark") },
+              ]}
+              onChange={setScheme}
+              accessibilityLabel={t("theme")}
+            />
             <View className="mt-5">
               <ThemeColorPicker />
             </View>

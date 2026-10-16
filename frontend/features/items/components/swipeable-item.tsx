@@ -124,14 +124,14 @@ export function SwipeableItem({
         onLayout={(event) => {
           widthSV.value = event.nativeEvent.layout.width;
         }}
-        style={{ borderRadius: 24 }}
+        style={{ borderRadius: 16 }}
       >
         <View pointerEvents={openAction ? "none" : "auto"}>{children}</View>
         <Animated.View
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: leftBg, borderRadius: 24, overflow: "hidden" },
+            { backgroundColor: leftBg, borderRadius: 16, overflow: "hidden" },
             leftStyle,
           ]}
         >
@@ -141,7 +141,7 @@ export function SwipeableItem({
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: rightBg, borderRadius: 24, overflow: "hidden" },
+            { backgroundColor: rightBg, borderRadius: 16, overflow: "hidden" },
             rightStyle,
           ]}
         >

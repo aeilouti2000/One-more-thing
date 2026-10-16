@@ -10,8 +10,11 @@ import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/features/items/types/purchase";
 import { StatusBadge } from "./status-badge";
 
-const CARD_RADIUS = 24;
+const CARD_RADIUS = 16;
 const SELECTION_BORDER = 2;
+const URGENT_COLOR = "#F43F5E";
+const URGENT_FLAG = 48;
+const URGENT_BAND = 20;
 
 type PurchaseRowProps = {
   purchase: Purchase;
@@ -91,20 +94,7 @@ export function PurchaseRow({
           backgroundColor: selected ? colors.mist : colors.paper,
         }}
       >
-      {isUrgent ? (
-        <View
-          pointerEvents="none"
-          accessibilityLabel={t("urgent")}
-          style={{
-            position: "absolute",
-            top: 0,
-            bottom: 0,
-            width: 6,
-            backgroundColor: "#F87171",
-            ...(isRTL ? { right: 0 } : { left: 0 }),
-          }}
-        />
-      ) : null}
+      {isUrgent ? <UrgentCornerFlag isRTL={isRTL} label={t("urgent")} /> : null}
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
@@ -120,7 +110,15 @@ export function PurchaseRow({
         accessibilityState={{ selected }}
         style={StyleSheet.absoluteFill}
       />
-      <View pointerEvents="box-none" className="px-[18px] py-4">
+      <View
+        pointerEvents="box-none"
+        style={{
+          paddingTop: 16,
+          paddingBottom: 16,
+          paddingStart: 18,
+          paddingEnd: isUrgent ? 20 : 18,
+        }}
+      >
         <View pointerEvents="box-none" className="flex-row items-center gap-3">
           {leading ? (
             <View pointerEvents="box-none">
@@ -133,7 +131,6 @@ export function PurchaseRow({
                 <AppText
                   numberOfLines={1}
                   className="shrink text-base font-semibold text-cove-ink"
-                  style={{ includeFontPadding: false, textAlignVertical: "center" }}
                 >
                   {purchase.name}
                 </AppText>
@@ -267,6 +264,46 @@ export function PurchaseRow({
           ]}
         />
       ) : null}
+    </View>
+  );
+}
+
+function UrgentCornerFlag({ isRTL, label }: { isRTL: boolean; label: string }) {
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityLabel={label}
+      style={{
+        position: "absolute",
+        top: 0,
+        width: URGENT_FLAG,
+        height: URGENT_FLAG,
+        overflow: "hidden",
+        zIndex: 2,
+        ...(isRTL ? { left: 0 } : { right: 0 }),
+      }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          top: -1,
+          width: URGENT_FLAG * 1.5,
+          height: URGENT_BAND,
+          backgroundColor: URGENT_COLOR,
+          alignItems: "center",
+          justifyContent: "center",
+          ...(isRTL
+            ? { left: -26, transform: [{ rotate: "-45deg" }] }
+            : { right: -26, transform: [{ rotate: "45deg" }] }),
+        }}
+      >
+        <Ionicons
+          name="flame"
+          size={12}
+          color="#FFFFFF"
+          style={{ transform: [{ rotate: isRTL ? "45deg" : "-45deg" }] }}
+        />
+      </View>
     </View>
   );
 }

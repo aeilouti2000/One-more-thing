@@ -1,15 +1,8 @@
 import type { BottomTabBarProps } from "expo-router/js-tabs";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
-import {
-  Keyboard,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, {
-  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -24,19 +17,14 @@ type Slot = { x: number; width: number; content: number };
 
 const CONTENT_PAD = 16;
 const EDGE_GAP = 7;
-const MOVE_MS = 280;
-let lastTabIndex: number | null = null;
+const MOVE_MS = 250;
 
 function pillFrame(slot: Slot | undefined, rowWidth: number) {
-  "worklet";
   if (!slot || slot.width <= 0 || slot.content <= 0 || rowWidth <= 0) return null;
-  const contentLeft = slot.x + (slot.width - slot.content) / 2;
-  const contentRight = contentLeft + slot.content;
-  let left = contentLeft - CONTENT_PAD;
-  let right = contentRight + CONTENT_PAD;
-  left = Math.max(left, EDGE_GAP);
-  right = Math.min(right, rowWidth - EDGE_GAP);
-  return { left, width: Math.max(right - left, slot.content) };
+  const center = slot.x + slot.width / 2;
+  const room = Math.min(center - EDGE_GAP, rowWidth - EDGE_GAP - center);
+  const width = Math.min(slot.content + CONTENT_PAD * 2, Math.max(0, room * 2));
+  return { left: center - width / 2, width };
 }
 
 export function GlassTabBar({
@@ -50,10 +38,32 @@ export function GlassTabBar({
   const insets = useSafeAreaInsets();
   const { colors, scheme, shadow } = useTheme();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const slots = useSharedValue<Slot[]>([]);
-  const rowWidth = useSharedValue(0);
-  const progress = useSharedValue(lastTabIndex ?? state.index);
+  const pillLeft = useSharedValue(0);
+  const pillWidth = useSharedValue(0);
   const measured = useRef<Slot[]>([]);
+  const rowW = useRef(0);
+  const indexRef = useRef(state.index);
+  const placed = useRef(false);
+  const animating = useRef(false);
+
+  function goTo(index: number, animated: boolean) {
+    const frame = pillFrame(measured.current[index], rowW.current);
+    if (!frame) return;
+    if (!placed.current || !animated) {
+      if (animating.current && !animated) return;
+      pillLeft.value = frame.left;
+      pillWidth.value = frame.width;
+      placed.current = true;
+      return;
+    }
+    animating.current = true;
+    pillLeft.value = withTiming(frame.left, { duration: MOVE_MS });
+    pillWidth.value = withTiming(frame.width, { duration: MOVE_MS });
+    setTimeout(() => {
+      animating.current = false;
+      goTo(indexRef.current, false);
+    }, MOVE_MS + 16);
+  }
 
   function saveSlot(index: number, patch: Partial<Slot>) {
     const prev = measured.current[index] ?? { x: 0, width: 0, content: 0 };
@@ -68,12 +78,14 @@ export function GlassTabBar({
     const next = measured.current.slice();
     next[index] = nextSlot;
     measured.current = next;
-    slots.set(next.map((slot) => slot ?? { x: 0, width: 0, content: 0 }));
+    if (!placed.current && index === state.index) goTo(index, false);
   }
 
   useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
     const show = Keyboard.addListener(showEvent, () => setKeyboardOpen(true));
     const hide = Keyboard.addListener(hideEvent, () => setKeyboardOpen(false));
     return () => {
@@ -83,38 +95,15 @@ export function GlassTabBar({
   }, []);
 
   useEffect(() => {
-    const previous = lastTabIndex;
-    lastTabIndex = state.index;
-    progress.set(
-      withTiming(state.index, {
-        duration: previous == null || previous === state.index ? 0 : MOVE_MS,
-        easing: Easing.bezier(0.22, 0.9, 0.24, 1),
-      }),
-    );
-  }, [progress, state.index]);
+    indexRef.current = state.index;
+    goTo(state.index, placed.current);
+  }, [state.index]);
 
-  const indicator = useAnimatedStyle(() => {
-    const data = slots.value;
-    const max = data.length - 1;
-    if (max < 0) return { opacity: 0 };
-
-    const p = Math.min(Math.max(progress.value, 0), max);
-    const i0 = Math.floor(p);
-    const t = p - i0;
-    const from = pillFrame(data[i0], rowWidth.value);
-    const to = t === 0 ? from : pillFrame(data[Math.min(i0 + 1, max)], rowWidth.value);
-    if (from == null || to == null) return { opacity: 0 };
-
-    const left = from.left + (to.left - from.left) * t;
-    const width = from.width + (to.width - from.width) * t;
-    const stretch = Math.sin(t * Math.PI) * Math.abs(to.left - from.left) * 0.45;
-
-    return {
-      opacity: 1,
-      width: width + stretch,
-      transform: [{ translateX: left - stretch / 2 }],
-    };
-  });
+  const indicator = useAnimatedStyle(() => ({
+    opacity: pillWidth.value > 0 ? 1 : 0,
+    width: pillWidth.value,
+    left: pillLeft.value,
+  }));
 
   if (hidden || keyboardOpen) return null;
 
@@ -148,7 +137,10 @@ export function GlassTabBar({
           styles.shell,
           {
             borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
-            backgroundColor: withAlpha(dark ? colors.deep : colors.mist, dark ? 0.55 : 0.72),
+            backgroundColor: withAlpha(
+              dark ? colors.deep : colors.mist,
+              dark ? 0.55 : 0.72,
+            ),
           },
         ]}
       >
@@ -164,7 +156,9 @@ export function GlassTabBar({
             indicator,
           ]}
         >
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: pillTint }]} />
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: pillTint }]}
+          />
           <LinearGradient
             colors={[...pillSheen]}
             start={{ x: 0.5, y: 0 }}
@@ -177,7 +171,9 @@ export function GlassTabBar({
           collapsable={false}
           onLayout={(event) => {
             const width = event.nativeEvent.layout.width;
-            if (width > 0) rowWidth.set(width);
+            if (width <= 0) return;
+            rowW.current = width;
+            goTo(indexRef.current, false);
           }}
           style={[StyleSheet.absoluteFill, styles.row]}
         >
@@ -195,7 +191,9 @@ export function GlassTabBar({
                 key={route.key}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: focused }}
-                accessibilityLabel={typeof label === "string" ? label : route.name}
+                accessibilityLabel={
+                  typeof label === "string" ? label : route.name
+                }
                 onPress={() => {
                   const event = navigation.emit({
                     type: "tabPress",
@@ -230,7 +228,12 @@ export function GlassTabBar({
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.75}
-                    style={{ color, fontSize: tabBar.labelSize, fontWeight: "600", textAlign: "center" }}
+                    style={{
+                      color,
+                      fontSize: tabBar.labelSize,
+                      fontWeight: "600",
+                      textAlign: "center",
+                    }}
                   >
                     {label}
                   </AppText>

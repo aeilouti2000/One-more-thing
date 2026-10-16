@@ -849,8 +849,8 @@ export default function ItemsScreen() {
             busy={isQuickAdding}
             inputStyle={quickInputStyle}
           />
-          <View className="mb-4 flex-row flex-wrap items-center gap-2">
-            <View ref={categoryButtonRef} collapsable={false} className="max-w-full">
+          <View className="mb-4 flex-row items-center gap-2">
+            <View ref={categoryButtonRef} collapsable={false} className="min-w-0 flex-1">
             <Pressable
               onPress={() => {
                 const node = categoryButtonRef.current;
@@ -865,11 +865,16 @@ export default function ItemsScreen() {
               }}
               accessibilityRole="button"
               accessibilityLabel={quickCategoryLabel}
-              className="max-w-full flex-row items-center gap-1 rounded-xl px-3 py-1.5 active:opacity-80"
-              style={{ backgroundColor: colors.paper }}
+              className="w-full flex-row items-center justify-center gap-1 rounded-xl px-3 py-1.5 active:opacity-80"
+              style={{
+                backgroundColor: colors.paper,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: colors.line,
+              }}
             >
               <AppText
-                className="shrink text-sm font-semibold"
+                numberOfLines={1}
+                className="min-w-0 shrink text-sm font-semibold"
                 style={{ color: colors.ink }}
               >
                 {quickCategoryLabel}
@@ -881,12 +886,16 @@ export default function ItemsScreen() {
               onPress={() => router.push("/pins")}
               accessibilityRole="button"
               accessibilityLabel={t("pin")}
-              className="max-w-full flex-row items-center gap-1 rounded-xl px-3 py-1.5 active:opacity-80"
-              style={{ backgroundColor: colors.paper }}
+              className="flex-row items-center gap-1 rounded-xl px-3 py-1.5 active:opacity-80"
+              style={{
+                backgroundColor: colors.paper,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: colors.line,
+              }}
             >
               <MaterialCommunityIcons name="pin" size={16} color={colors.ink} />
               <AppText
-                className="shrink text-sm font-semibold"
+                className="text-sm font-semibold"
                 style={{ color: colors.ink }}
               >
                 {t("pin")}
@@ -898,10 +907,14 @@ export default function ItemsScreen() {
               accessibilityRole="button"
               accessibilityLabel={t("shopTheseItems")}
               accessibilityState={{ disabled: shopDisabled }}
-              className={`max-w-full flex-row items-center gap-1 rounded-xl px-3 py-1.5 ${
+              className={`flex-row items-center gap-1 rounded-xl px-3 py-1.5 ${
                 shopDisabled ? "opacity-45" : "active:opacity-80"
               }`}
-              style={{ backgroundColor: colors.accent }}
+              style={{
+                backgroundColor: colors.accent,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: withAlpha(colors.onAccent, 0.28),
+              }}
             >
               <MaterialCommunityIcons
                 name="cart"
@@ -909,7 +922,7 @@ export default function ItemsScreen() {
                 color={colors.onAccent}
               />
               <AppText
-                className="shrink text-sm font-semibold"
+                className="text-sm font-semibold"
                 style={{ color: colors.onAccent }}
               >
                 {t("shopTheseItems")}
