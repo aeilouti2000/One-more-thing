@@ -1,6 +1,8 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import "@/features/auth/utils/session-storage";
+import { clearCurrentProfileCache } from "@/features/offline/profile-cache";
+import { withTimeout } from "@/lib/with-timeout";
 
 function resolveApiUrl() {
   const configured = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api").replace(/\/$/, "");
@@ -206,12 +208,18 @@ export const api = {
 export async function restoreSession() {
   const session = readSession();
   if (!session) return null;
+  void refreshStoredProfile(session);
+  return session.user;
+}
+
+async function refreshStoredProfile(session: AuthSession) {
   try {
-    const user = await api.get<AuthUser>("/auth/me");
-    writeSession({ ...session, user });
-    return user;
+    const user = await withTimeout(api.get<AuthUser>("/auth/me"), 8000);
+    const current = readSession();
+    if (!current || current.user.id !== session.user.id) return;
+    writeSession({ ...current, user });
   } catch {
-    return readSession()?.user ?? null;
+    // Keep the stored profile so the app can open with no connection.
   }
 }
 
@@ -229,6 +237,7 @@ export async function signUp(name: string, email: string, password: string) {
 
 export async function changePassword(currentPassword: string, newPassword: string) {
   await api.post("/auth/change-password", { currentPassword, newPassword });
+  clearCurrentProfileCache();
   clearSession();
 }
 
@@ -242,11 +251,13 @@ export async function updateProfile(input: { name?: string; email?: string }) {
 
 export async function deleteAccount(password: string) {
   await api.delete("/auth/me", { password });
+  clearCurrentProfileCache();
   clearSession();
 }
 
 export async function signOut() {
   const session = readSession();
+  clearCurrentProfileCache();
   clearSession();
   if (!session) return;
   await api.post("/auth/logout", { refreshToken: session.refreshToken }, false).catch(() => undefined);

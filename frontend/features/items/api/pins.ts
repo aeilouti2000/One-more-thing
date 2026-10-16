@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
-import { formatAppError } from "@/lib/errors";
+import { formatAppError, isOfflineError } from "@/lib/errors";
+import { readCachedPins, writeCachedPins } from "@/features/offline/profile-cache";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
 
 export const PIN_INTERVALS = [1, 7, 14, 30] as const;
@@ -43,9 +44,14 @@ function toPin(row: PinResponse): Pin {
 
 export async function fetchPins(homeId: string) {
   try {
-    const rows = await api.get<PinResponse[]>(`/homes/${homeId}/pins`);
-    return { pins: rows.map(toPin), error: null };
+    const pins = (await api.get<PinResponse[]>(`/homes/${homeId}/pins`)).map(toPin);
+    writeCachedPins(homeId, pins);
+    return { pins, error: null };
   } catch (error) {
+    if (isOfflineError(error)) {
+      const cached = readCachedPins<Pin>(homeId);
+      if (cached) return { pins: cached, error: null };
+    }
     return { pins: [] as Pin[], error: formatAppError(error) };
   }
 }

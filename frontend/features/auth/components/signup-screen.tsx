@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { router, type Href } from "expo-router";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
+import {
+  AuthBrand,
+  AuthButton,
+  AuthField,
+  AuthFrame,
+  AuthHeading,
+  AuthLegal,
+  AuthLink,
+} from "@/features/auth/components/auth-frame";
 import { GuestOnly } from "@/features/auth/components/guest-only";
-import { AppButton } from "@/components/ui/AppButton";
-import { AppLogo } from "@/components/ui/AppLogo";
-import { AppText } from "@/components/ui/AppText";
-import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { Screen } from "@/components/ui/Screen";
-import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { formatAppError } from "@/lib/errors";
 import { isValidUsername } from "@/lib/validation";
 import { useAuth } from "@/features/auth/providers/auth-provider";
@@ -28,9 +31,6 @@ export default function SignupScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const canSubmit =
-    name.trim().length > 0 && username.trim().length > 0 && password.length >= 6;
-
   function clearFieldError(field: "name" | "username" | "password") {
     if (fieldErrors[field]) {
       setFieldErrors((current) => ({ ...current, [field]: undefined }));
@@ -42,10 +42,14 @@ export default function SignupScreen() {
     if (!name.trim()) {
       nextFieldErrors.name = t("errorEnterName");
     }
-    if (!isValidUsername(username)) {
+    if (!username.trim()) {
+      nextFieldErrors.username = t("errorEnterUsername");
+    } else if (!isValidUsername(username)) {
       nextFieldErrors.username = t("errorInvalidEmail");
     }
-    if (password.length < 6) {
+    if (!password) {
+      nextFieldErrors.password = t("errorEnterPassword");
+    } else if (password.length < 6) {
       nextFieldErrors.password = t("errorPasswordTooShort");
     }
     if (nextFieldErrors.name || nextFieldErrors.username || nextFieldErrors.password) {
@@ -74,79 +78,60 @@ export default function SignupScreen() {
 
   return (
     <GuestOnly>
-      <Screen>
-        <ScreenHeader title={t("signupTitle")} subtitle={t("signupSubtitle")} showBack />
-
-        <View className="mb-3 items-center">
-          <AppLogo size={64} />
-        </View>
-
-        <View className="gap-3">
-          <AppTextField
+      <AuthFrame>
+        <AuthBrand />
+        <AuthHeading title={t("signupTitle")} subtitle={t("signupSubtitle")} />
+        <View style={{ marginTop: 26, gap: 14 }}>
+          <AuthField
             label={t("yourName")}
-            hint={t("nameHint")}
+            placeholder={t("namePlaceholder")}
             value={name}
             onChangeText={(value) => {
               setName(value);
               clearFieldError("name");
             }}
-            placeholder={t("namePlaceholder")}
             autoComplete="name"
-            userText
             error={fieldErrors.name}
           />
-          <AppTextField
+          <AuthField
             label={t("username")}
-            hint={t("usernameHint")}
+            placeholder={t("usernamePlaceholder")}
             value={username}
             onChangeText={(value) => {
               setUsername(value);
               clearFieldError("username");
             }}
-            placeholder={t("usernamePlaceholder")}
             autoCapitalize="none"
             autoComplete="username"
             autoCorrect={false}
             error={fieldErrors.username}
           />
-          <AppTextField
+          <AuthField
             label={t("password")}
-            hint={t("passwordHint")}
+            placeholder={t("passwordMinPlaceholder")}
             value={password}
             onChangeText={(value) => {
               setPassword(value);
               clearFieldError("password");
             }}
-            placeholder={t("passwordMinPlaceholder")}
             secureTextEntry
             autoCapitalize="none"
             autoComplete="new-password"
             error={fieldErrors.password}
           />
           <FormMessage message={error} />
-          <View className="mt-4">
-            <AppButton
-              label={t("createAccount")}
-              disabled={!canSubmit}
-              loading={isSubmitting}
-              onPress={() => void onSubmit()}
-            />
-          </View>
-          <Pressable onPress={() => router.push("/login")} className="items-center py-0.5">
-            <AppText className="text-base text-cove-accent">
-              {t("alreadyHaveAccount")}
-            </AppText>
-          </Pressable>
-          <View className="flex-row flex-wrap justify-center gap-x-4 pt-0.5">
-            <Pressable onPress={() => router.push("/legal/privacy" as Href)}>
-              <AppText className="text-sm text-cove-muted">{t("privacyPolicy")}</AppText>
-            </Pressable>
-            <Pressable onPress={() => router.push("/legal/terms" as Href)}>
-              <AppText className="text-sm text-cove-muted">{t("terms")}</AppText>
-            </Pressable>
-          </View>
+          <AuthButton
+            label={t("createAccount")}
+            loading={isSubmitting}
+            onPress={() => void onSubmit()}
+          />
+          <AuthLink label={t("alreadyHaveAccount")} onPress={() => router.push("/login")} />
+          <AuthLegal
+            onPrivacy={() => router.push("/legal/privacy" as Href)}
+            onTerms={() => router.push("/legal/terms" as Href)}
+          />
         </View>
-      </Screen>
+      </AuthFrame>
     </GuestOnly>
   );
 }

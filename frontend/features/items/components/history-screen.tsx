@@ -17,6 +17,7 @@ import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { formatMoney, sumKnownCosts } from "@/features/items/utils/currency";
 import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeList } from "@/features/items/api/lists";
+import { readCachedHistoryLists, readCachedLists } from "@/features/offline/profile-cache";
 import { canUndoBought } from "@/features/items/utils/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -115,8 +116,8 @@ export default function HistoryScreen() {
   const [listsHomeId, setListsHomeId] = useState<string | null>(homeId);
   if (homeId !== listsHomeId) {
     setListsHomeId(homeId);
-    setActiveLists([]);
-    setHistoryLists([]);
+    setActiveLists(homeId ? (readCachedLists<HomeList>(homeId) ?? []) : []);
+    setHistoryLists(homeId ? (readCachedHistoryLists<HistoryList>(homeId) ?? []) : []);
     setListId("all");
   }
 
@@ -131,8 +132,8 @@ export default function HistoryScreen() {
       void Promise.all([fetchLists(homeId), fetchHistoryLists(homeId)]).then(
         ([active, history]) => {
           if (cancelled) return;
-          setActiveLists(active.lists);
-          setHistoryLists(history.lists);
+          if (!active.error) setActiveLists(active.lists);
+          if (!history.error) setHistoryLists(history.lists);
         },
       );
       return () => {
@@ -222,8 +223,8 @@ export default function HistoryScreen() {
           fetchLists(household.id),
           fetchHistoryLists(household.id),
         ]);
-        setActiveLists(active.lists);
-        setHistoryLists(history.lists);
+        if (!active.error) setActiveLists(active.lists);
+        if (!history.error) setHistoryLists(history.lists);
       } else {
         setActiveLists([]);
         setHistoryLists([]);

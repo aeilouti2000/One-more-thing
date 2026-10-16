@@ -13,7 +13,6 @@ import { StatusBar } from "expo-status-bar";
 import { BlurScreen } from "@/components/ui/BlurBackdrop";
 import { TabBlurProvider } from "@/components/ui/TabBlurTarget";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
-import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { requiredAppUpdate } from "@/lib/app-release";
 import { AuthProvider } from "@/features/auth/providers/auth-provider";
 import { CategoriesProvider } from "@/features/items/providers/categories-provider";
@@ -54,23 +53,20 @@ function ThemedNavigation() {
 }
 
 function UpdateGate() {
-  const [release, setRelease] = useState<"checking" | "ok" | { downloadUrl: string | null }>(
-    "checking",
-  );
+  const [release, setRelease] = useState<{ downloadUrl: string | null } | null>(null);
 
   useEffect(() => {
     let active = true;
     void requiredAppUpdate().then((update) => {
-      if (!active) return;
-      setRelease(update ?? "ok");
+      if (!active || !update) return;
+      setRelease(update);
     });
     return () => {
       active = false;
     };
   }, []);
 
-  if (release === "checking") return <LoadingScreen />;
-  if (release !== "ok") return <ForceUpdate downloadUrl={release.downloadUrl} />;
+  if (release) return <ForceUpdate downloadUrl={release.downloadUrl} />;
   return <ThemedNavigation />;
 }
 

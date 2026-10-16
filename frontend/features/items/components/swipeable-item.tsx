@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
+import { useScreenSwipeGesture } from "@/components/ui/Screen";
 import { useI18n } from "@/providers/LanguageProvider";
 import { SWIPE_ACTION_TONE, type SwipeAction } from "@/features/items/utils/swipe-actions";
 
@@ -36,6 +37,7 @@ export function SwipeableItem({
   children,
 }: SwipeableItemProps) {
   const { t } = useI18n();
+  const screenSwipe = useScreenSwipeGesture();
   const [settled, setSettled] = useState<"left" | "right" | null>(null);
   const widthSV = useSharedValue(0);
   const travel = useSharedValue(0);
@@ -70,7 +72,7 @@ export function SwipeableItem({
 
   const gesture = useMemo(() => {
     const report = (direction: number) => settle(direction);
-    return Gesture.Pan()
+    const pan = Gesture.Pan()
       .enabled(enabled)
       .activeOffsetX([-18, 18])
       .failOffsetY([-14, 14])
@@ -96,9 +98,12 @@ export function SwipeableItem({
           runOnJS(report)(direction);
         });
       });
+    // A swipe on the card belongs to the item action, not the list pager.
+    if (enabled && screenSwipe) pan.blocksExternalGesture(screenSwipe);
+    return pan;
     // Shared values are stable. Callbacks are read through the ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging, enabled, resting, travel, widthSV]);
+  }, [dragging, enabled, resting, screenSwipe, travel, widthSV]);
 
   const leftBg = SWIPE_ACTION_TONE[leftAction].bg;
   const rightBg = SWIPE_ACTION_TONE[rightAction].bg;

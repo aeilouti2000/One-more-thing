@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { router } from "expo-router";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
+import {
+  AuthBrand,
+  AuthButton,
+  AuthField,
+  AuthFrame,
+  AuthHeading,
+  AuthLink,
+} from "@/features/auth/components/auth-frame";
 import { GuestOnly } from "@/features/auth/components/guest-only";
-import { AppButton } from "@/components/ui/AppButton";
-import { AppLogo } from "@/components/ui/AppLogo";
-import { AppText } from "@/components/ui/AppText";
-import { AppTextField } from "@/components/ui/AppTextField";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { Screen } from "@/components/ui/Screen";
-import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { formatAppError } from "@/lib/errors";
 import { isValidLoginName } from "@/lib/validation";
 import { useAuth } from "@/features/auth/providers/auth-provider";
@@ -19,21 +21,37 @@ export default function LoginScreen() {
   const { t } = useI18n();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const canSubmit = username.trim().length > 0 && password.length > 0;
+  function clearFieldError(field: "username" | "password") {
+    if (fieldErrors[field]) {
+      setFieldErrors((current) => ({ ...current, [field]: undefined }));
+    }
+  }
 
   async function onSubmit() {
-    if (!isValidLoginName(username)) {
-      setError(t("errorInvalidEmail"));
+    const nextFieldErrors: { username?: string; password?: string } = {};
+    if (!username.trim()) {
+      nextFieldErrors.username = t("errorEnterUsername");
+    } else if (!isValidLoginName(username)) {
+      nextFieldErrors.username = t("errorInvalidEmail");
+    }
+    if (!password) {
+      nextFieldErrors.password = t("errorEnterPassword");
+    }
+    if (nextFieldErrors.username || nextFieldErrors.password) {
+      setFieldErrors(nextFieldErrors);
+      setError(null);
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
+    setFieldErrors({});
     try {
-      const result = await signIn(username, password);
+      const result = await signIn(username.trim(), password);
       if (result.error) {
         setError(result.error);
         return;
@@ -49,50 +67,45 @@ export default function LoginScreen() {
 
   return (
     <GuestOnly>
-      <Screen>
-        <ScreenHeader
-          title={t("loginTitle")}
-          subtitle={t("loginSubtitle")}
-          showBack
-        />
-
-        <View className="mb-6 items-center">
-          <AppLogo size={88} />
-        </View>
-
-        <View className="gap-6">
-          <AppTextField
+      <AuthFrame>
+        <AuthBrand />
+        <AuthHeading title={t("loginTitle")} subtitle={t("loginSubtitle")} />
+        <View style={{ marginTop: 26, gap: 16 }}>
+          <AuthField
             label={t("username")}
-            value={username}
-            onChangeText={setUsername}
             placeholder={t("usernamePlaceholder")}
+            value={username}
+            onChangeText={(value) => {
+              setUsername(value);
+              clearFieldError("username");
+            }}
             autoCapitalize="none"
             autoComplete="username"
             autoCorrect={false}
+            error={fieldErrors.username}
           />
-          <AppTextField
+          <AuthField
             label={t("password")}
-            value={password}
-            onChangeText={setPassword}
             placeholder={t("passwordPlaceholder")}
+            value={password}
+            onChangeText={(value) => {
+              setPassword(value);
+              clearFieldError("password");
+            }}
             secureTextEntry
             autoCapitalize="none"
             autoComplete="password"
+            error={fieldErrors.password}
           />
           <FormMessage message={error} />
-          <AppButton
+          <AuthButton
             label={t("logIn")}
-            disabled={!canSubmit}
             loading={isSubmitting}
             onPress={() => void onSubmit()}
           />
-          <Pressable onPress={() => router.push("/signup")} className="items-center py-1">
-            <AppText className="text-base text-cove-accent">
-              {t("newHere")}
-            </AppText>
-          </Pressable>
+          <AuthLink label={t("newHere")} onPress={() => router.push("/signup")} />
         </View>
-      </Screen>
+      </AuthFrame>
     </GuestOnly>
   );
 }

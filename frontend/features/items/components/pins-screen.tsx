@@ -24,6 +24,7 @@ import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { resolvePreferredListId } from "@/features/items/utils/list-storage";
 import { fetchLists, listLabel } from "@/features/items/api/lists";
+import { readCachedPins } from "@/features/offline/profile-cache";
 import { pinnedNotice } from "@/features/items/utils/pin-notice";
 import {
   createPin,
@@ -97,7 +98,17 @@ function PinsBody() {
       setIsLoading(false);
       return;
     }
+    const cached = readCachedPins<Pin>(household.id);
+    if (cached) {
+      setPins(cached);
+      setError(null);
+      setIsLoading(false);
+    }
     const result = await fetchPins(household.id);
+    if (result.error && cached) {
+      setIsLoading(false);
+      return;
+    }
     setPins(result.pins);
     setError(result.error);
     setIsLoading(false);

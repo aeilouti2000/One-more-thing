@@ -13,6 +13,7 @@ import {
   GestureDetector,
   RefreshControl as GestureRefreshControl,
   ScrollView as GestureScrollView,
+  type GestureType,
 } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -42,6 +43,7 @@ type ScreenSwipeContextValue = {
 };
 
 const ScreenSwipeContext = createContext<ScreenSwipeContextValue | null>(null);
+const ScreenSwipeGestureContext = createContext<GestureType | null>(null);
 
 type ScreenProps = {
   children: ReactNode;
@@ -57,19 +59,26 @@ type ScreenProps = {
   canSwipe?: (direction: SwipeDirection) => boolean;
 };
 
+export function useScreenSwipeGesture() {
+  return useContext(ScreenSwipeGestureContext);
+}
+
 export function SwipeSlideContent({ children }: { children: ReactNode }) {
-  const swipe = useContext(ScreenSwipeContext);
+  const translateX = useContext(ScreenSwipeContext)?.translateX;
   const slideStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: swipe?.translateX.value ?? 0 }],
+    transform: [{ translateX: translateX?.value ?? 0 }],
   }));
 
-  if (!swipe) {
+  if (!translateX) {
     return <>{children}</>;
   }
 
   return (
-    <View style={{ overflow: "hidden", width: "100%" }}>
-      <Animated.View needsOffscreenAlphaCompositing style={slideStyle}>
+    <View style={{ overflow: "hidden", alignSelf: "stretch" }}>
+      <Animated.View
+        needsOffscreenAlphaCompositing
+        style={[{ width: "100%" }, slideStyle]}
+      >
         {children}
       </Animated.View>
     </View>
@@ -103,11 +112,11 @@ export function Screen({
   const headerSurface = scheme === "dark" ? colors.deep : colors.accent;
   const padding = tabBarInset
     ? top
-      ? "px-5 pb-32 pt-4"
-      : "px-5 pb-32 pt-2"
+      ? "px-4 pb-32 pt-4"
+      : "px-4 pb-32 pt-2"
     : top
-      ? "px-5 pb-10 pt-4"
-      : "px-5 pb-10 pt-2";
+      ? "px-4 pb-10 pt-4"
+      : "px-4 pb-10 pt-2";
 
   useEffect(() => {
     swipeRef.current = onSwipe;
@@ -175,18 +184,19 @@ export function Screen({
   }
 
   /* eslint-disable react-hooks/refs -- gesture callback reads latest handlers via refs */
-  const swipe = useMemo(
+  const listPan = useMemo(
     () =>
-      Gesture.Simultaneous(
-        Gesture.Pan()
-          .activeOffsetX([-SWIPE_ACTIVE_X, SWIPE_ACTIVE_X])
-          .failOffsetY([-SWIPE_FAIL_Y, SWIPE_FAIL_Y])
-          .onUpdate((event) => {
-            "worklet";
-            if (isAnimating.value) return;
-            translateX.set(event.translationX);
-          })
-          .onEnd((event) => {
+      Gesture.Pan()
+        .activeOffsetX([-SWIPE_ACTIVE_X, SWIPE_ACTIVE_X])
+        .failOffsetY([-SWIPE_FAIL_Y, SWIPE_FAIL_Y])
+        .onUpdate((event) => {
+          "worklet";
+          if (isAnimating.value) return;
+          const goingNext = event.translationX < 0;
+          const allowed = goingNext ? canNext.value === 1 : canPrev.value === 1;
+          translateX.set(allowed ? event.translationX : 0);
+        })
+        .onEnd((event) => {
             "worklet";
             if (isAnimating.value) return;
 
@@ -246,11 +256,13 @@ export function Screen({
               );
             }
           }),
-        Gesture.Native(),
-      ),
     // Shared values + refs stay valid for the gesture lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
+  );
+  const swipe = useMemo(
+    () => Gesture.Simultaneous(listPan, Gesture.Native()),
+    [listPan],
   );
   /* eslint-enable react-hooks/refs */
 
@@ -278,7 +290,9 @@ export function Screen({
 
   const scrollContent = onSwipe ? (
     <ScreenSwipeContext.Provider value={swipeContext}>
-      {children}
+      <ScreenSwipeGestureContext.Provider value={listPan}>
+        {children}
+      </ScreenSwipeGestureContext.Provider>
     </ScreenSwipeContext.Provider>
   ) : (
     children
@@ -292,6 +306,7 @@ export function Screen({
           scrollEnabled={scrollEnabled}
           removeClippedSubviews={false}
           contentContainerStyle={{
+            width: "100%",
             paddingHorizontal: spacing.screen,
             paddingTop: top ? spacing.lg : spacing.sm,
             paddingBottom: tabBarInset ? 128 : 40,
@@ -367,7 +382,7 @@ export function Screen({
       {floating ? (
         <View
           pointerEvents="box-none"
-          className="absolute inset-x-0 bottom-28 items-center px-5"
+          className="absolute inset-x-0 bottom-28 items-center px-4"
         >
           {floating}
         </View>
@@ -375,7 +390,7 @@ export function Screen({
       {dock ? (
         <View
           pointerEvents="box-none"
-          className="absolute inset-x-5"
+          className="absolute inset-x-4"
           style={{ bottom: dockBottom, zIndex: 30 }}
         >
           {dock}

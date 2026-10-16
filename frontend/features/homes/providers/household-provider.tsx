@@ -8,8 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { formatAppError } from "@/lib/errors";
+import { formatAppError, isOfflineError, isOfflineMessage } from "@/lib/errors";
 import { fetchMyHomes, fetchMyHousehold } from "@/features/homes/api/homes";
+import { readCachedHousehold, writeCachedHousehold } from "@/features/offline/profile-cache";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 import type { HomeSummary, Household } from "@/features/homes/types/household";
 
@@ -33,12 +34,31 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const currentUserIdRef = useRef(user?.id ?? null);
   const requestSequenceRef = useRef(0);
+  const userId = user?.id ?? null;
+  const [trackedUserId, setTrackedUserId] = useState<string | null | undefined>(undefined);
+
+  if (!isAuthLoading && userId !== trackedUserId) {
+    setTrackedUserId(userId);
+    if (!userId) {
+      setHousehold(null);
+      setHomes([]);
+      setError(null);
+      setIsLoading(false);
+    } else {
+      const cached = readCachedHousehold();
+      setHousehold(cached?.household ?? null);
+      setHomes(cached?.homes ?? []);
+      setError(null);
+      setIsLoading(!cached);
+    }
+  }
 
   const adoptHome = useCallback((next: Household) => {
     requestSequenceRef.current += 1;
     setHousehold(next);
     setError(null);
     setIsLoading(false);
+    writeCachedHousehold(next);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -66,8 +86,11 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         setHomes([]);
       } else if (!listed.error) {
         setHomes(listed.homes);
+      } else if (isOfflineMessage(listed.error)) {
+        const cachedHomes = readCachedHousehold()?.homes ?? [];
+        if (cachedHomes.length > 0) setHomes(cachedHomes);
       }
-      setError(listed.error);
+      setError(listed.error && isOfflineMessage(listed.error) ? null : listed.error);
       setIsLoading(false);
       return next;
     } catch (error) {
@@ -76,6 +99,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         requestSequenceRef.current !== requestSequence
       ) {
         return null;
+      }
+      const cached = isOfflineError(error) ? readCachedHousehold() : null;
+      if (cached?.household) {
+        setHousehold(cached.household);
+        setHomes(cached.homes);
+        setError(null);
+        setIsLoading(false);
+        return cached.household;
       }
       setError(formatAppError(error));
       setIsLoading(false);

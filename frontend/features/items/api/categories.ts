@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
-import { formatAppError } from "@/lib/errors";
+import { formatAppError, isOfflineError } from "@/lib/errors";
+import { readCachedCategories, writeCachedCategories } from "@/features/offline/profile-cache";
 
 export type HomeCategory = {
   id: string;
@@ -10,8 +11,13 @@ export type HomeCategory = {
 export async function fetchCategories(homeId: string) {
   try {
     const categories = await api.get<HomeCategory[]>(`/homes/${homeId}/categories`);
+    writeCachedCategories(homeId, categories);
     return { categories, error: null };
   } catch (error) {
+    if (isOfflineError(error)) {
+      const cached = readCachedCategories<HomeCategory>(homeId);
+      if (cached) return { categories: cached, error: null };
+    }
     return { categories: [] as HomeCategory[], error: formatAppError(error) };
   }
 }

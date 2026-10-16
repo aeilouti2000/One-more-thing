@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import {
   memo,
@@ -23,10 +24,16 @@ import {
   View,
 } from "react-native";
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
+  interpolate,
   SlideInUp,
   SlideOutUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AddItemCard } from "@/features/items/components/add-item-card";
@@ -49,8 +56,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { ListsHeaderIcon } from "@/components/ui/ListsHeaderIcon";
-import { LoadingScreen } from "@/components/ui/LoadingScreen";
-import { Screen } from "@/components/ui/Screen";
+import { Screen, SwipeSlideContent } from "@/components/ui/Screen";
 import { useTabBarVisibility } from "@/components/ui/TabBarVisibility";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import {
@@ -65,6 +71,7 @@ import {
   resolvePreferredListId,
   writeStoredListId,
 } from "@/features/items/utils/list-storage";
+import { readCachedLists, writeCachedLists } from "@/features/offline/profile-cache";
 import {
   createPin,
   fetchPins,
@@ -140,6 +147,7 @@ export default function ItemsScreen() {
   const [isQuickAdding, setIsQuickAdding] = useState(false);
   const [lists, setLists] = useState<HomeList[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [arrivingListId, setArrivingListId] = useState<string | null>(null);
   const [isChoosingList, setIsChoosingList] = useState(false);
   const [listMenuMounted, setListMenuMounted] = useState(false);
   const listsLoadSeq = useRef(0);
@@ -216,6 +224,19 @@ export default function ItemsScreen() {
     const result = await fetchLists(homeId);
     if (sequence !== listsLoadSeq.current) return;
     if (result.error) {
+      const cached = readCachedLists<HomeList>(homeId);
+      if (cached) {
+        setLists(cached);
+        setSelectedListId((current) => {
+          const next =
+            current && cached.some((list) => list.id === current)
+              ? current
+              : resolvePreferredListId(cached, homeId);
+          if (next) writeStoredListId(homeId, next);
+          return next;
+        });
+        return;
+      }
       setActionError(result.error);
       return;
     }
@@ -515,14 +536,33 @@ export default function ItemsScreen() {
     return () => clearTimeout(timer);
   }, [isChoosingList, listMenuMounted]);
 
-  const homeId = household?.id;
-  useEffect(() => {
-    queueMicrotask(() => {
+  const homeId = household?.id ?? null;
+  const [listsHomeId, setListsHomeId] = useState<string | null | undefined>(undefined);
+  if (homeId !== listsHomeId) {
+    setListsHomeId(homeId);
+    if (!homeId) {
       setLists([]);
       setSelectedListId(null);
-    });
+    } else {
+      const cached = readCachedLists<HomeList>(homeId);
+      if (!cached) {
+        setLists([]);
+        setSelectedListId(null);
+      } else {
+        const next =
+          selectedListId && cached.some((list) => list.id === selectedListId)
+            ? selectedListId
+            : resolvePreferredListId(cached, homeId);
+        setLists(cached);
+        setSelectedListId(next);
+        if (next) writeStoredListId(homeId, next);
+      }
+    }
+  }
+
+  useEffect(() => {
     if (!homeId) return;
-    // Fetch lists when the active home changes.
+    // Lists arrive after the request. The saved copy is applied during render.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async load updates list state on completion
     void loadLists(homeId);
   }, [homeId]);
@@ -596,9 +636,40 @@ export default function ItemsScreen() {
     void rowHandlers.current.changeQuantity(id, quantity);
   }, []);
 
-  if (isLoading && needed.length === 0 && !error) {
-    return <LoadingScreen />;
-  }
+  const listIndex = lists.findIndex((list) => list.id === selectedListId);
+
+  const canSwipeLists = useCallback(
+    (direction: "next" | "previous") => {
+      if (isSelecting || isDragging || lists.length < 2 || listIndex < 0) {
+        return false;
+      }
+      const forward = direction === "next" ? !isRTL : isRTL;
+      return forward ? listIndex < lists.length - 1 : listIndex > 0;
+    },
+    [isDragging, isRTL, isSelecting, listIndex, lists.length],
+  );
+
+  const swipeLists = useCallback(
+    (direction: "next" | "previous") => {
+      if (!household) return;
+      const forward = direction === "next" ? !isRTL : isRTL;
+      const next = lists[listIndex + (forward ? 1 : -1)];
+      if (!next) return;
+      writeStoredListId(household.id, next.id);
+      setArrivingListId(next.id);
+      setSelectedListId(next.id);
+      setSelectedIds(new Set());
+      setOpenSwipeId(null);
+      void Haptics.selectionAsync();
+    },
+    [household, isRTL, listIndex, lists],
+  );
+
+  useEffect(() => {
+    if (!arrivingListId || arrivingListId !== selectedListId || isLoading) return;
+    const timer = setTimeout(() => setArrivingListId(null), 420);
+    return () => clearTimeout(timer);
+  }, [arrivingListId, isLoading, selectedListId]);
 
   async function quickAdd() {
     const name = quickName.trim();
@@ -668,13 +739,19 @@ export default function ItemsScreen() {
       return;
     }
     if (editingListId) {
-      setLists((current) =>
-        current.map((list) =>
+      setLists((current) => {
+        const next = current.map((list) =>
           list.id === result.list!.id ? result.list! : list,
-        ),
-      );
+        );
+        writeCachedLists(household.id, next);
+        return next;
+      });
     } else {
-      setLists((current) => [...current, result.list!]);
+      setLists((current) => {
+        const next = [...current, result.list!];
+        writeCachedLists(household.id, next);
+        return next;
+      });
       rememberList(household.id, result.list.id);
     }
     setListName("");
@@ -695,6 +772,7 @@ export default function ItemsScreen() {
     const removedId = listPendingDelete.id;
     const remaining = lists.filter((list) => list.id !== removedId);
     setLists(remaining);
+    writeCachedLists(household.id, remaining);
     setSelectedListId((current) => {
       const next = current === removedId ? (remaining[0]?.id ?? null) : current;
       if (next) writeStoredListId(household.id, next);
@@ -707,8 +785,12 @@ export default function ItemsScreen() {
   }
 
   const currentList = lists.find((list) => list.id === selectedListId) ?? null;
+  const listArriving = arrivingListId !== null && arrivingListId === selectedListId;
+  const awaitingItems = isLoading && needed.length === 0 && !error;
+  const showListSkeleton = awaitingItems || listArriving;
 
-  const shopDisabled = visibleItems.length === 0 || !selectedListId;
+  const shopDisabled =
+    showListSkeleton || visibleItems.length === 0 || !selectedListId;
 
   function openShop() {
     if (!selectedListId || visibleItems.length === 0) return;
@@ -764,15 +846,23 @@ export default function ItemsScreen() {
           <ListsHeaderIcon />
           <View className="min-w-0 flex-1">
             <View className="flex-row items-start justify-between gap-3">
-              <AppText
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.65}
-                className="min-w-0 flex-1 text-3xl font-semibold tracking-tight"
-                style={{ color: headerFg }}
-              >
-                {household?.name ?? t("yourItems")}
-              </AppText>
+              {!household && awaitingItems ? (
+                <ShimmerBlock
+                  width={168}
+                  height={28}
+                  tone={withAlpha(headerFg, 0.4)}
+                />
+              ) : (
+                <AppText
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                  className="min-w-0 flex-1 text-3xl font-semibold tracking-tight"
+                  style={{ color: headerFg }}
+                >
+                  {household?.name ?? t("yourItems")}
+                </AppText>
+              )}
               {currentList ? (
                 <View className="max-w-[46%] shrink pt-2">
                   <Pressable
@@ -791,16 +881,30 @@ export default function ItemsScreen() {
                     <Ionicons name="chevron-down" size={16} color={headerFg} />
                   </Pressable>
                 </View>
+              ) : awaitingItems ? (
+                <View className="shrink pt-2">
+                  <ShimmerBlock
+                    width={72}
+                    height={16}
+                    tone={withAlpha(headerFg, 0.4)}
+                  />
+                </View>
               ) : null}
             </View>
-            <AppText
-              className="mt-1 text-sm font-medium"
-              style={{ color: headerFg }}
-            >
-              {currentList
-                ? `${t("stillToGet", { count: listItems.length })} · ${listLabel(currentList.name, t("defaultList"))}`
-                : t("stillToGet", { count: listItems.length })}
-            </AppText>
+            {showListSkeleton ? (
+              <HeaderInfoShimmer color={headerFg} />
+            ) : (
+              <Animated.View entering={FadeIn.duration(220)}>
+                <AppText
+                  className="mt-1 text-sm font-medium"
+                  style={{ color: headerFg }}
+                >
+                  {currentList
+                    ? `${t("stillToGet", { count: listItems.length })} · ${listLabel(currentList.name, t("defaultList"))}`
+                    : t("stillToGet", { count: listItems.length })}
+                </AppText>
+              </Animated.View>
+            )}
           </View>
         </View>
       )}
@@ -813,6 +917,8 @@ export default function ItemsScreen() {
       scrollEnabled={!isDragging}
       refreshing={isRefreshing}
       onRefresh={() => void onRefresh()}
+      onSwipe={swipeLists}
+      canSwipe={canSwipeLists}
       floating={
         floatMessage ? (
           <FloatMessage message={floatMessage} tone={floatTone} />
@@ -950,13 +1056,19 @@ export default function ItemsScreen() {
         message={isConfirmingDelete ? error : (actionError ?? error)}
       />
 
-      <View>
-        {visibleItems.length === 0 ? (
-          <EmptyState
-            title={t("nothingToBuy")}
-            message={t("nothingToBuyBody")}
-          />
+      <SwipeSlideContent>
+      <View style={{ paddingTop: 4, paddingBottom: 10 , marginHorizontal: 2}}>
+        {showListSkeleton ? (
+          <ListSkeleton />
+        ) : visibleItems.length === 0 ? (
+          <Animated.View entering={FadeIn.duration(240)}>
+            <EmptyState
+              title={t("nothingToBuy")}
+              message={t("nothingToBuyBody")}
+            />
+          </Animated.View>
         ) : (
+          <Animated.View entering={FadeIn.duration(280)}>
           <ReorderableList
             items={visibleItems}
             enabled={!isSelecting}
@@ -983,8 +1095,10 @@ export default function ItemsScreen() {
               />
             )}
           />
+          </Animated.View>
         )}
       </View>
+      </SwipeSlideContent>
 
       <ConfirmModal
         visible={isConfirmingDelete}
@@ -1348,6 +1462,106 @@ export default function ItemsScreen() {
         </View>
       </Modal>
     </Screen>
+  );
+}
+
+function ShimmerBlock({
+  width,
+  height,
+  tone,
+  highlight = "rgba(255,255,255,0.72)",
+}: {
+  width: number;
+  height: number;
+  tone: string;
+  highlight?: string;
+}) {
+  const travel = useSharedValue(0);
+  useEffect(() => {
+    travel.value = withRepeat(
+      withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.cubic) }),
+      -1,
+      false,
+    );
+  }, [travel]);
+  const sheen = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(travel.value, [0, 1], [-width * 0.7, width]) },
+    ],
+  }));
+
+  return (
+    <View
+      style={{
+        width,
+        height,
+        borderRadius: height / 2,
+        overflow: "hidden",
+        backgroundColor: tone,
+      }}
+    >
+      <Animated.View
+        style={[
+          {
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            width: Math.max(36, width * 0.62),
+          },
+          sheen,
+        ]}
+      >
+        <LinearGradient
+          colors={["transparent", highlight, "transparent"]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+function HeaderInfoShimmer({ color }: { color: string }) {
+  const tone = withAlpha(color, 0.2);
+  const highlight = withAlpha(color, 0.78);
+
+  return (
+    <View className="mt-2 flex-row items-center gap-2">
+      <ShimmerBlock width={118} height={11} tone={tone} highlight={highlight} />
+      <View
+        style={{
+          width: 3,
+          height: 3,
+          borderRadius: 2,
+          backgroundColor: withAlpha(color, 0.45),
+        }}
+      />
+      <ShimmerBlock width={52} height={11} tone={tone} highlight={highlight} />
+    </View>
+  );
+}
+
+function ListSkeleton() {
+  const { colors, scheme } = useTheme();
+  const tone = scheme === "dark" ? colors.mist : "#E7EBF0";
+
+  return (
+    <View className="gap-3">
+      {[0, 1, 2, 3].map((index) => (
+        <View
+          key={index}
+          className="flex-row items-center gap-3 rounded-2xl px-[18px] py-4"
+          style={{ backgroundColor: colors.paper }}
+        >
+          <View className="min-w-0 flex-1 gap-2.5">
+            <ShimmerBlock width={index % 2 === 0 ? 168 : 132} height={14} tone={tone} />
+            <ShimmerBlock width={index % 2 === 0 ? 96 : 72} height={10} tone={tone} />
+          </View>
+          <ShimmerBlock width={32} height={32} tone={tone} />
+        </View>
+      ))}
+    </View>
   );
 }
 

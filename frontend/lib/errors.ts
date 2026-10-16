@@ -4,6 +4,27 @@ export function logError(scope: string, error: unknown) {
   console.error(`[${scope}]`, error);
 }
 
+export function isOfflineError(error: unknown) {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String(error.code)
+      : "";
+  if (code === "NETWORK") return true;
+  const message = error instanceof Error ? error.message : "";
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("network") ||
+    lower.includes("fetch") ||
+    lower.includes("internet") ||
+    lower.includes("offline") ||
+    lower.includes("timed out")
+  );
+}
+
+export function isOfflineMessage(message: string | null | undefined) {
+  return !!message && message === translate("errorNetwork");
+}
+
 export function formatAppError(
   error: unknown,
   fallback = translate("errorGeneric"),

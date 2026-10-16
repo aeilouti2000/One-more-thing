@@ -26,12 +26,14 @@ import {
   type UpdateItemInput,
 } from "@/features/items/api/items";
 import { translate } from "@/constants/i18n";
+import { isOfflineMessage } from "@/lib/errors";
 import {
   emitListChanged,
   onListChanged,
 } from "@/features/items/utils/list-sync";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { useAuth } from "@/features/auth/providers/auth-provider";
+import { readCachedItems, writeCachedItems } from "@/features/offline/profile-cache";
 import type { Purchase, PurchaseStatus } from "@/features/items/types/purchase";
 
 type AddItemValues = Omit<NewItemInput, "homeId" | "userId">;
@@ -111,10 +113,21 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
 
   if (homeId !== trackedHomeId) {
     setTrackedHomeId(homeId);
-    setPurchases([]);
     setError(null);
-    setIsLoading(true);
+    if (!homeId) {
+      setPurchases([]);
+      setIsLoading(false);
+    } else {
+      const cached = readCachedItems(homeId);
+      setPurchases(cached ?? []);
+      setIsLoading(cached === null);
+    }
   }
+
+  const rememberItems = useCallback((items: Purchase[]) => {
+    const activeHome = homeIdRef.current;
+    if (activeHome) writeCachedItems(activeHome, items);
+  }, []);
 
   const refresh = useCallback(() => {
     wantedRef.current += 1;
@@ -144,8 +157,15 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
             }
             if (revision.current !== seen || wantedRef.current !== ticket)
               continue;
-            setPurchases(items);
-            setError(fetchError);
+            if (fetchError && isOfflineMessage(fetchError)) {
+              const cached = readCachedItems(activeHome);
+              setPurchases(cached ?? []);
+              setError(cached ? null : fetchError);
+            } else {
+              setPurchases(items);
+              setError(fetchError);
+              if (!fetchError) writeCachedItems(activeHome, items);
+            }
             setIsLoading(false);
           }
           if (wantedRef.current !== ticket || homeIdRef.current !== activeHome)
@@ -227,9 +247,10 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
       if (result.error) await refresh();
+      else rememberItems(purchasesRef.current);
       return result;
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const updateItem = useCallback(
@@ -265,10 +286,13 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
       if (result.error) await refresh();
-      else if (becameUrgent) emitListChanged();
+      else {
+        rememberItems(purchasesRef.current);
+        if (becameUrgent) emitListChanged();
+      }
       return result;
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const updateCost = useCallback(
@@ -285,9 +309,10 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
       if (result.error) await refresh();
+      else rememberItems(purchasesRef.current);
       return result;
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const updateCosts = useCallback(
@@ -313,9 +338,10 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         await refresh();
         return { error: failed.error };
       }
+      rememberItems(purchasesRef.current);
       return { error: null };
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const undoBought = useCallback(
@@ -328,11 +354,13 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       } finally {
         endLocalChange();
       }
-      if (!result.error) emitListChanged();
-      else await refresh();
+      if (!result.error) {
+        rememberItems(purchasesRef.current);
+        emitListChanged();
+      } else await refresh();
       return result;
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const markManyBought = useCallback(
@@ -364,9 +392,10 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
       if (result.error) await refresh();
+      else rememberItems(purchasesRef.current);
       return result;
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const deleteMany = useCallback(
@@ -384,9 +413,10 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
       if (result.error) await refresh();
+      else rememberItems(purchasesRef.current);
       return result;
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const moveMany = useCallback(
@@ -406,10 +436,13 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
       if (result.error) await refresh();
-      else emitListChanged();
+      else {
+        rememberItems(purchasesRef.current);
+        emitListChanged();
+      }
       return result;
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const setManyUrgent = useCallback(
@@ -431,10 +464,13 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
       if (result.error) await refresh();
-      else emitListChanged();
+      else {
+        rememberItems(purchasesRef.current);
+        emitListChanged();
+      }
       return result;
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const reorderNeeded = useCallback(
@@ -463,9 +499,10 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
       if (result.error) await refresh();
+      else rememberItems(purchasesRef.current);
       return result;
     },
-    [noteLocalChange, refresh, user],
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const needed = useMemo(

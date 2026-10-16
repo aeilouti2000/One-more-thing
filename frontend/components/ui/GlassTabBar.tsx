@@ -65,6 +65,11 @@ export function GlassTabBar({
     }, MOVE_MS + 16);
   }
 
+  const goToRef = useRef(goTo);
+  useEffect(() => {
+    goToRef.current = goTo;
+  });
+
   function saveSlot(index: number, patch: Partial<Slot>) {
     const prev = measured.current[index] ?? { x: 0, width: 0, content: 0 };
     const nextSlot = { ...prev, ...patch };
@@ -96,7 +101,7 @@ export function GlassTabBar({
 
   useEffect(() => {
     indexRef.current = state.index;
-    goTo(state.index, placed.current);
+    goToRef.current(state.index, placed.current);
   }, [state.index]);
 
   const indicator = useAnimatedStyle(() => ({

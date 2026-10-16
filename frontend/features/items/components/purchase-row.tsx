@@ -67,25 +67,16 @@ export function PurchaseRow({
   return (
     <View
       pointerEvents="box-none"
-      style={
-        selected
-          ? undefined
-          : {
-              shadowColor: scheme === "dark" ? "#000000" : colors.ink,
-              shadowOpacity: scheme === "dark" ? 0.28 : 0.08,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 4 },
-            }
-      }
+      style={{
+        ...cardRadius,
+        backgroundColor: selected ? colors.mist : colors.paper,
+        shadowColor: scheme === "dark" ? "#000000" : colors.ink,
+        shadowOpacity: selected ? 0 : scheme === "dark" ? 0.22 : 0.045,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: selected ? 0 : 1,
+      }}
     >
-      <View
-        pointerEvents="box-none"
-        style={{
-          ...cardRadius,
-          backgroundColor: selected ? colors.mist : colors.paper,
-          elevation: 2,
-        }}
-      >
       <View
         pointerEvents="box-none"
         style={{
@@ -248,7 +239,6 @@ export function PurchaseRow({
             ) : null}
           </View>
         </View>
-      </View>
       </View>
       </View>
       {selected ? (

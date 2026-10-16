@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { api } from "@/lib/api";
+import { withTimeout } from "@/lib/with-timeout";
 
 type AppRelease = {
   minVersion: string | null;
@@ -27,7 +28,7 @@ export function isOlderVersion(installed: string, required: string) {
 export async function requiredAppUpdate() {
   if (Platform.OS === "web") return null;
   try {
-    const release = await api.get<AppRelease>("/app/release", false);
+    const release = await withTimeout(api.get<AppRelease>("/app/release", false), 2500);
     if (!release.minVersion) return null;
     if (!isOlderVersion(installedAppVersion(), release.minVersion)) return null;
     return { downloadUrl: release.downloadUrl };

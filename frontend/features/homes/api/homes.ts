@@ -1,5 +1,10 @@
 import { api, ApiError } from "@/lib/api";
-import { formatAppError } from "@/lib/errors";
+import { formatAppError, isOfflineError } from "@/lib/errors";
+import {
+  readCachedHousehold,
+  writeCachedHomes,
+  writeCachedHousehold,
+} from "@/features/offline/profile-cache";
 import type { CostSettings, HomeSummary, Household } from "@/features/homes/types/household";
 
 export function alreadyHasHome(message: string | null | undefined) {
@@ -20,10 +25,18 @@ function withCostDefaults(home: Household): Household {
 
 export async function fetchMyHousehold(): Promise<Household | null> {
   try {
-    const home = await api.get<Household>("/homes/mine");
-    return withCostDefaults(home);
+    const home = withCostDefaults(await api.get<Household>("/homes/mine"));
+    writeCachedHousehold(home);
+    return home;
   } catch (error) {
-    if (error instanceof ApiError && error.code === "NO_HOME") return null;
+    if (error instanceof ApiError && error.code === "NO_HOME") {
+      writeCachedHousehold(null);
+      return null;
+    }
+    if (isOfflineError(error)) {
+      const cached = readCachedHousehold();
+      if (cached?.household) return cached.household;
+    }
     throw error;
   }
 }
@@ -86,8 +99,13 @@ export async function updateCostSettings(homeId: string, settings: Partial<CostS
 export async function fetchMyHomes() {
   try {
     const homes = await api.get<HomeSummary[]>("/homes");
+    writeCachedHomes(homes);
     return { homes, error: null };
   } catch (error) {
+    if (isOfflineError(error)) {
+      const cached = readCachedHousehold();
+      if (cached) return { homes: cached.homes, error: null };
+    }
     return { homes: [] as HomeSummary[], error: formatAppError(error) };
   }
 }

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
 import { createCategory, deleteCategory, fetchCategories, type HomeCategory } from "@/features/items/api/categories";
+import { readCachedCategories, writeCachedCategories } from "@/features/offline/profile-cache";
 import { useHousehold } from "@/features/homes/providers/household-provider";
 import { useI18n } from "@/providers/LanguageProvider";
 
@@ -35,6 +36,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   if (homeId !== trackedHomeId) {
     setTrackedHomeId(homeId);
     if (!homeId) setCategories(builtinCategories);
+    else setCategories(readCachedCategories<HomeCategory>(homeId) ?? builtinCategories);
   }
 
   useEffect(() => {
@@ -54,7 +56,11 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       if (!homeId) return null;
       const result = await createCategory(homeId, name);
       if (result.category) {
-        setCategories((current) => [...current, result.category]);
+        setCategories((current) => {
+          const next = [...current, result.category];
+          writeCachedCategories(homeId, next);
+          return next;
+        });
       }
       return result.error;
     },
@@ -66,7 +72,11 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       if (!homeId) return null;
       const result = await deleteCategory(homeId, id);
       if (!result.error) {
-        setCategories((current) => current.filter((item) => item.id !== id));
+        setCategories((current) => {
+          const next = current.filter((item) => item.id !== id);
+          writeCachedCategories(homeId, next);
+          return next;
+        });
       }
       return result.error;
     },

@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
-import { formatAppError } from "@/lib/errors";
+import { formatAppError, isOfflineError } from "@/lib/errors";
+import { readCachedItems } from "@/features/offline/profile-cache";
 import type { Purchase, PurchaseCategory } from "@/features/items/types/purchase";
 
 export type NewItemInput = {
@@ -71,9 +72,13 @@ function toPurchase(item: ItemResponse): Purchase {
 
 export async function fetchHomeItems(homeId: string) {
   try {
-    const items = await api.get<ItemResponse[]>(`/homes/${homeId}/items`);
-    return { items: items.map(toPurchase), error: null };
+    const items = (await api.get<ItemResponse[]>(`/homes/${homeId}/items`)).map(toPurchase);
+    return { items, error: null };
   } catch (error) {
+    if (isOfflineError(error)) {
+      const cached = readCachedItems(homeId);
+      if (cached) return { items: cached, error: null };
+    }
     return { items: [] as Purchase[], error: formatAppError(error) };
   }
 }
