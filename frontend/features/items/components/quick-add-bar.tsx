@@ -121,7 +121,13 @@ export function QuickAddBar({
       <View className="flex-row items-center gap-2 px-4 py-2">
         <View className="relative h-11 min-w-0 flex-1 justify-center">
           {showHint ? (
-            <View pointerEvents="none" style={styles.hintRow}>
+            <View
+              pointerEvents="none"
+              style={[
+                styles.hintRow,
+                isRTL ? { flexDirection: "row-reverse" } : null,
+              ]}
+            >
               <TypewriterText
                 phrases={phrases}
                 active={showHint}

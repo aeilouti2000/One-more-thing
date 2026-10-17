@@ -26,10 +26,18 @@ type FormSheetModalProps = {
   visible: boolean;
   onClose: () => void;
   onShow?: () => void;
+  /** Hide the native modal without closing, so a camera or photo picker can present. */
+  covered?: boolean;
   children: ReactNode;
 };
 
-export function FormSheetModal({ visible, onClose, onShow, children }: FormSheetModalProps) {
+export function FormSheetModal({
+  visible,
+  onClose,
+  onShow,
+  covered = false,
+  children,
+}: FormSheetModalProps) {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [trackedVisible, setTrackedVisible] = useState(visible);
   const scrollRef = useRef<ScrollView>(null);
@@ -87,7 +95,7 @@ export function FormSheetModal({ visible, onClose, onShow, children }: FormSheet
 
   return (
     <Modal
-      visible={visible}
+      visible={visible && !covered}
       transparent
       animationType="fade"
       statusBarTranslucent

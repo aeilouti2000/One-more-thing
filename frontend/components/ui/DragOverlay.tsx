@@ -75,7 +75,6 @@ export function DragOverlayProvider({ children }: { children: ReactNode }) {
       },
       dismiss() {
         ticket.current += 1;
-        shown.value = 0;
         setNode(null);
       },
     }),

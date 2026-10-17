@@ -17,6 +17,7 @@ export default function PrivacyPolicyScreen() {
         <LegalParagraph>{t("privacy2")}</LegalParagraph>
         <LegalParagraph>{t("privacy3")}</LegalParagraph>
         <LegalParagraph>{t("privacy4")}</LegalParagraph>
+        <LegalParagraph>{t("privacy5")}</LegalParagraph>
       </View>
     </Screen>
   );

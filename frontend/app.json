@@ -53,7 +53,15 @@
           "defaultChannel": "list-updates"
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "One More Thing reads a receipt photo on this phone to fill prices. The photo is not uploaded.",
+          "cameraPermission": "One More Thing uses the camera to read a receipt on this phone. The photo is not uploaded.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

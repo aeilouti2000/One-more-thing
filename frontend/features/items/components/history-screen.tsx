@@ -16,6 +16,7 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { formatMoney, sumKnownCosts } from "@/features/items/utils/currency";
+import { groupPurchasesIntoTrips } from "@/features/items/utils/trips";
 import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeList } from "@/features/items/api/lists";
 import { readCachedHistoryLists, readCachedLists } from "@/features/offline/profile-cache";
 import { canUndoBought } from "@/features/items/utils/share-list";
@@ -54,6 +55,7 @@ export default function HistoryScreen() {
   const listButtonRef = useRef<View>(null);
   const rangeButtonRef = useRef<View>(null);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
+  const [openTripId, setOpenTripId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const costsEnabled = household?.costsEnabled === true;
   const currency = household?.currency ?? "JOD";
@@ -95,6 +97,9 @@ export default function HistoryScreen() {
     () => sumKnownCosts(visible.map((item) => item.cost)),
     [visible],
   );
+  const trips = useMemo(() => groupPurchasesIntoTrips(visible), [visible]);
+  const openTrip = trips.find((trip) => trip.id === openTripId) ?? null;
+  if (openTripId && !openTrip) setOpenTripId(null);
   const pickedLabel = pickedDate
     ? new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
         year: "numeric",
@@ -162,12 +167,14 @@ export default function HistoryScreen() {
       if (!costsEnabled) return;
       const toInvoice = direction === "next" ? !isRTL : isRTL;
       setMode(toInvoice ? "invoice" : "list");
+      setOpenTripId(null);
       void Haptics.selectionAsync();
     },
     [costsEnabled, isRTL],
   );
 
   async function undo(id: string) {
+    if (undoId) return;
     setUndoId(id);
     setUndoError(null);
     const result = await undoBought(id);
@@ -267,6 +274,7 @@ export default function HistoryScreen() {
             <Pressable
               onPress={() => {
                 setMode((current) => (current === "list" ? "invoice" : "list"));
+                setOpenTripId(null);
                 void Haptics.selectionAsync();
               }}
               accessibilityRole="button"
@@ -355,16 +363,46 @@ export default function HistoryScreen() {
                 : t("historyFilterEmptyBody")
             }
           />
+        ) : mode === "invoice" && openTrip ? (
+          <View className="gap-3">
+            <Pressable
+              onPress={() => setOpenTripId(null)}
+              accessibilityRole="button"
+              accessibilityLabel={t("invoiceAllTrips")}
+              className="flex-row items-center gap-1 self-start active:opacity-80"
+              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+            >
+              <Ionicons
+                name={isRTL ? "chevron-forward" : "chevron-back"}
+                size={iconSize.sm}
+                color={colors.accent}
+              />
+              <AppText className="text-sm font-semibold text-cove-accent">
+                {t("invoiceAllTrips")}
+              </AppText>
+            </Pressable>
+            <InvoiceView
+              items={openTrip.items}
+              currency={currency}
+              periodTitle={formatTripWhen(openTrip.startedAt, locale)}
+              listTitle={listLabel(openTrip.listName, t("defaultList"))}
+              locale={locale}
+              total={openTrip.total}
+              priced={openTrip.priced}
+              count={openTrip.count}
+              onPressItem={(purchase) => setOpenItemId(purchase.id)}
+            />
+          </View>
         ) : mode === "invoice" ? (
-          <InvoiceView
-            items={visible}
+          <TripInvoiceList
+            trips={trips}
             currency={currency}
-            periodTitle={periodTitle}
             locale={locale}
-            total={spend.total}
-            priced={spend.priced}
-            count={spend.count}
-            onPressItem={(purchase) => setOpenItemId(purchase.id)}
+            isRTL={isRTL}
+            onOpen={(id) => {
+              setOpenTripId(id);
+              void Haptics.selectionAsync();
+            }}
           />
         ) : (
           <View className="gap-3">
@@ -424,10 +462,88 @@ export default function HistoryScreen() {
   );
 }
 
+function TripInvoiceList({
+  trips,
+  currency,
+  locale,
+  isRTL,
+  onOpen,
+}: {
+  trips: ReturnType<typeof groupPurchasesIntoTrips>;
+  currency: string;
+  locale: string;
+  isRTL: boolean;
+  onOpen: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+
+  if (trips.length === 0) {
+    return <EmptyState title={t("invoiceEmpty")} message={t("invoiceEmptyBody")} />;
+  }
+
+  return (
+    <View className="gap-3">
+      {trips.map((trip) => (
+        <Pressable
+          key={trip.id}
+          onPress={() => onOpen(trip.id)}
+          accessibilityRole="button"
+          className="rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
+        >
+          <View
+            className="items-center justify-between gap-3"
+            style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+          >
+            <View className="min-w-0 flex-1">
+              <AppText
+                className="text-base font-semibold text-cove-ink"
+                style={{ textAlign: isRTL ? "right" : "left" }}
+              >
+                {formatTripWhen(trip.startedAt, locale)}
+              </AppText>
+              <AppText
+                className="mt-1 text-xs text-cove-muted"
+                style={{ textAlign: isRTL ? "right" : "left" }}
+              >
+                {listLabel(trip.listName, t("defaultList"))}
+                {" · "}
+                {t("invoiceTripCount", { count: trip.count })}
+              </AppText>
+            </View>
+            <View className="items-center gap-1" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+              <AppText className="text-base font-semibold" style={{ color: colors.accent }}>
+                {formatMoney(trip.total, currency)}
+              </AppText>
+              <Ionicons
+                name={isRTL ? "chevron-back" : "chevron-forward"}
+                size={iconSize.sm}
+                color={colors.muted}
+              />
+            </View>
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function formatTripWhen(value: string, locale: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function InvoiceView({
   items,
   currency,
   periodTitle,
+  listTitle,
   locale,
   total,
   priced,
@@ -437,6 +553,7 @@ function InvoiceView({
   items: Purchase[];
   currency: string;
   periodTitle: string;
+  listTitle?: string;
   locale: string;
   total: number;
   priced: number;
@@ -462,6 +579,9 @@ function InvoiceView({
       style={{ backgroundColor: scheme === "dark" ? colors.paper : colors.paper }}
     >
       <AppText className="text-lg font-semibold text-cove-ink">{periodTitle}</AppText>
+      {listTitle ? (
+        <AppText className="mt-1 text-sm text-cove-muted">{listTitle}</AppText>
+      ) : null}
       <AppText className="mt-1 text-sm text-cove-muted">
         {t("costSummary", {
           priced,

@@ -478,11 +478,9 @@ export default function ItemsScreen() {
         urgent: latest.urgent,
         notes: latest.notes,
       });
-      if (pendingQuantity.current.get(id) === next) pendingQuantity.current.delete(id);
-      if (result.error) {
-        pendingQuantity.current.delete(id);
-        setActionError(result.error);
-      }
+      const stillLatest = pendingQuantity.current.get(id) === next;
+      if (stillLatest) pendingQuantity.current.delete(id);
+      if (result.error && stillLatest) setActionError(result.error);
     });
     quantityJobs.current.set(id, job);
   }

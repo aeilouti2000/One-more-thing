@@ -1,0 +1,13 @@
+{
+  "name": "receipt-ocr",
+  "version": "1.0.0",
+  "description": "On-device receipt text recognition. Nothing leaves the phone.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "license": "MIT",
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

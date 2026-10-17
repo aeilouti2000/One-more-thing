@@ -32,6 +32,15 @@ export function formatMoney(
   return `${symbol} ${amount.toFixed(decimals)}`;
 }
 
+export function formatCostInput(amount: number, currency: string | undefined | null) {
+  if (!Number.isFinite(amount)) return "";
+  const decimals = currencyDecimals(currency);
+  return amount
+    .toFixed(decimals)
+    .replace(/(\.\d*?)0+$/, "$1")
+    .replace(/\.$/, "");
+}
+
 export function parseCostInput(raw: string): number | null {
   const trimmed = raw.trim().replace(",", ".");
   if (!trimmed) return null;

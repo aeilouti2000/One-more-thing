@@ -348,16 +348,30 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       if (!user) return { error: translate("errorNeedLogin") };
       const endLocalChange = noteLocalChange();
+      setPurchases((current) =>
+        current.map((item) =>
+          item.id === id && item.status === "bought"
+            ? {
+                ...item,
+                status: "needed",
+                boughtAt: undefined,
+                boughtByName: undefined,
+                cost: null,
+              }
+            : item,
+        ),
+      );
       let result: { error: string | null };
       try {
         result = await undoItemBought(id);
       } finally {
         endLocalChange();
       }
-      if (!result.error) {
+      if (result.error) await refresh();
+      else {
         rememberItems(purchasesRef.current);
         emitListChanged();
-      } else await refresh();
+      }
       return result;
     },
     [noteLocalChange, refresh, rememberItems, user],

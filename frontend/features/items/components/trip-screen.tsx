@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AppState, BackHandler, Pressable, View, type LayoutChangeEvent } from "react-native";
+import { AppState, Alert, BackHandler, Platform, Pressable, View, type LayoutChangeEvent } from "react-native";
 import Animated, {
   Easing,
   Extrapolation,
@@ -30,6 +30,7 @@ import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { listLabel } from "@/features/items/api/lists";
 import { canUndoBought, formatNeededShare, shareNeededText } from "@/features/items/utils/share-list";
+import { readReceiptPhoto, type ReceiptScan } from "@/features/items/utils/scan-receipt";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/features/items/types/purchase";
@@ -71,12 +72,17 @@ function TripBody() {
   const [tripCostOpen, setTripCostOpen] = useState(false);
   const [singleCostItem, setSingleCostItem] = useState<Purchase | null>(null);
   const [isSavingCosts, setIsSavingCosts] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [receiptCover, setReceiptCover] = useState(false);
+  const [receiptScan, setReceiptScan] = useState<ReceiptScan | null>(null);
   const [frozenTripCostItems, setFrozenTripCostItems] = useState<
-    { id: string; name: string; initialCost?: number | null }[] | null
+    { id: string; name: string; quantity?: number; initialCost?: number | null }[] | null
   >(null);
   const [sessionNames, setSessionNames] = useState(() => new Map<string, string>());
   const singleCostResolver = useRef<((value: number | null | undefined) => void) | null>(null);
   const inflightChecks = useRef(0);
+  const undoing = useRef(false);
+  const scanStarting = useRef(false);
   const allowLeaveRef = useRef(false);
   const tripCostOpenRef = useRef(false);
   const askTripCostsRef = useRef(false);
@@ -119,11 +125,15 @@ function TripBody() {
 
   const liveTripCostItems = useMemo(
     () =>
-      unpricedSessionIds.map((id) => ({
-        id,
-        name: sessionNames.get(id) ?? bought.find((item) => item.id === id)?.name ?? id,
-        initialCost: bought.find((item) => item.id === id)?.cost,
-      })),
+      unpricedSessionIds.map((id) => {
+        const item = bought.find((row) => row.id === id);
+        return {
+          id,
+          name: sessionNames.get(id) ?? item?.name ?? id,
+          quantity: item?.quantity,
+          initialCost: item?.cost,
+        };
+      }),
     [bought, sessionNames, unpricedSessionIds],
   );
 
@@ -178,9 +188,9 @@ function TripBody() {
     [singleCostItem],
   );
 
-  function noteInflight(delta: number) {
+  const noteInflight = useCallback((delta: number) => {
     inflightChecks.current = Math.max(0, inflightChecks.current + delta);
-  }
+  }, []);
 
   async function checkOff(id: string, cost: number | null = null) {
     setActionError(null);
@@ -204,9 +214,11 @@ function TripBody() {
   }
 
   async function undoLast() {
-    if (!recent) return;
+    if (!recent || undoing.current) return;
+    undoing.current = true;
     setActionError(null);
     const result = await undoBought(recent.id);
+    undoing.current = false;
     if (result.error) {
       setActionError(result.error);
       return;
@@ -230,7 +242,7 @@ function TripBody() {
   }
 
   function leaveTrip() {
-    if (isSavingCosts) return;
+    if (isSavingCosts || isScanning || receiptCover) return;
     if (singleCostResolver.current) {
       resolveSingleCost(undefined);
       return;
@@ -303,7 +315,68 @@ function TripBody() {
     setIsSavingCosts(false);
     setTripCostOpen(false);
     setFrozenTripCostItems(null);
+    setReceiptScan(null);
     exitTrip();
+  }
+
+  function chooseReceiptPhoto() {
+    if (isSavingCosts || isScanning || receiptCover) return;
+    setReceiptCover(true);
+    setTimeout(() => {
+      Alert.alert(
+        t("scanReceipt"),
+        t("scanReceiptChoose"),
+        [
+          {
+            text: t("scanReceiptCamera"),
+            onPress: () => {
+              scanStarting.current = true;
+              void runReceiptScan("camera");
+            },
+          },
+          {
+            text: t("scanReceiptLibrary"),
+            onPress: () => {
+              scanStarting.current = true;
+              void runReceiptScan("library");
+            },
+          },
+          {
+            text: t("cancel"),
+            style: "cancel",
+            onPress: () => {
+              scanStarting.current = false;
+              setReceiptCover(false);
+            },
+          },
+        ],
+        {
+          cancelable: true,
+          onDismiss: () => {
+            if (!scanStarting.current) setReceiptCover(false);
+          },
+        },
+      );
+    }, 320);
+  }
+
+  async function runReceiptScan(source: "camera" | "library") {
+    setIsScanning(true);
+    setActionError(null);
+    const outcome = await readReceiptPhoto({
+      source,
+      preferArabic: locale === "ar",
+      items: tripCostItems,
+    });
+    setIsScanning(false);
+    setReceiptCover(false);
+    scanStarting.current = false;
+    if (!outcome.ok) {
+      if (outcome.error) setActionError(t(outcome.error));
+      return;
+    }
+    setReceiptScan(outcome.scan);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   if (isLoading && tripItems.length === 0 && bought.length === 0 && !error) {
@@ -386,18 +459,24 @@ function TripBody() {
         currency={household?.currency ?? "JOD"}
         items={tripCostItems}
         loading={isSavingCosts}
+        scanning={isScanning}
+        covered={receiptCover}
+        onScan={Platform.OS === "web" ? undefined : chooseReceiptPhoto}
+        receipt={receiptScan}
         errorMessage={actionError}
         skipLabel={t("skipCostsForNow")}
         onConfirm={(entries) => void saveTripCosts(entries)}
         onSkip={() => {
           setTripCostOpen(false);
           setFrozenTripCostItems(null);
+          setReceiptScan(null);
           exitTrip();
         }}
         onClose={() => {
-          if (isSavingCosts) return;
+          if (isSavingCosts || isScanning) return;
           setTripCostOpen(false);
           setFrozenTripCostItems(null);
+          setReceiptScan(null);
           exitTrip();
         }}
       />
@@ -456,6 +535,7 @@ function TripCheckRow({
   const locked = useRef(false);
   const pendingCost = useRef<number | null>(null);
   const mounted = useRef(true);
+  const held = useRef(false);
   const [leaving, setLeaving] = useState(false);
   const contentHeight = useSharedValue(0);
   const check = useSharedValue(0);
@@ -466,8 +546,11 @@ function TripCheckRow({
     mounted.current = true;
     return () => {
       mounted.current = false;
+      if (!held.current) return;
+      held.current = false;
+      onInflight(-1);
     };
-  }, []);
+  }, [onInflight]);
 
   function onContentLayout(event: LayoutChangeEvent) {
     if (locked.current) return;
@@ -488,13 +571,15 @@ function TripCheckRow({
     });
   }
 
-  function finishInflight() {
+  function releaseInflight() {
+    if (!held.current) return;
+    held.current = false;
     onInflight(-1);
   }
 
   function commit() {
     void onCheck(pendingCost.current).then((ok) => {
-      finishInflight();
+      releaseInflight();
       if (!ok && mounted.current) restore();
     });
   }
@@ -514,14 +599,19 @@ function TripCheckRow({
   }
 
   async function playExit() {
-    if (locked.current) return;
+    if (locked.current || held.current) return;
+    held.current = true;
     onInflight(1);
     const cost = await onAskCost();
     if (cost === undefined) {
-      onInflight(-1);
+      releaseInflight();
       return;
     }
     pendingCost.current = cost;
+    if (!mounted.current) {
+      void onCheck(cost);
+      return;
+    }
     startExit();
   }
 
