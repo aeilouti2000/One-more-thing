@@ -60,6 +60,12 @@ export function formatAppError(
   if (code === "HOST_CANNOT_LEAVE") {
     return translate("errorHostCannotLeave");
   }
+  if (code === "ONLY_HOST_CAN_DELETE") {
+    return translate("errorOnlyHostCanDelete");
+  }
+  if (code === "LAST_HOME") {
+    return translate("errorLastHome");
+  }
   if (code === "ONLY_HOST_CAN_RENAME") {
     return translate("errorHostCannotRename");
   }

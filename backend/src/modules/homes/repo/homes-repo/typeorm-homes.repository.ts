@@ -173,6 +173,64 @@ export class TypeormHomesRepository implements IHomesRepository {
     });
   }
 
+  deleteOwnedHome(userId: string, homeId: string) {
+    return this.dataSource.transaction(async (manager) => {
+      const members = manager.getRepository(HomeMember);
+      const membership = await members.findOne({ where: { userId, homeId } });
+      if (!membership) {
+        throw new DomainError("NOT_HOME_MEMBER", "You do not belong to this home", HttpStatus.FORBIDDEN);
+      }
+      if (membership.role !== "owner") {
+        throw new DomainError(
+          "ONLY_HOST_CAN_DELETE",
+          "Only the host can delete this home",
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      const mine = await members.find({
+        where: { userId },
+        order: { createdAt: "ASC" },
+      });
+      if (mine.length <= 1) {
+        throw new DomainError(
+          "LAST_HOME",
+          "You have to stay in a home.",
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const people = await members.find({ where: { homeId } });
+      const users = manager.getRepository(User);
+      for (const person of people) {
+        const account = await users.findOne({
+          where: { id: person.userId },
+          select: { id: true, activeHomeId: true },
+        });
+        if (account?.activeHomeId !== homeId) continue;
+        const memberships =
+          person.userId === userId
+            ? mine
+            : await members.find({
+                where: { userId: person.userId },
+                order: { createdAt: "ASC" },
+              });
+        const next = memberships.find((row) => row.homeId !== homeId);
+        await users.update(person.userId, { activeHomeId: next?.homeId ?? null });
+      }
+
+      await manager.getRepository(Home).delete(homeId);
+
+      const actor = await users.findOne({
+        where: { id: userId },
+        select: { id: true, activeHomeId: true },
+      });
+      return {
+        home: actor?.activeHomeId ? await this.loadHousehold(actor.activeHomeId, manager) : null,
+      };
+    });
+  }
+
   async deletePartner(homeId: string, memberId: string) {
     const result = await this.members.delete({ homeId, userId: memberId, role: "partner" });
     return result.affected ?? 0;

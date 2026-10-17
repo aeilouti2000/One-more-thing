@@ -16,14 +16,14 @@ import { useTheme } from "@/providers/ThemeProvider";
 type Slot = { x: number; width: number; content: number };
 
 const CONTENT_PAD = 16;
-const EDGE_GAP = 7;
+const EDGE_GAP = 1;
 const MOVE_MS = 250;
 
-function pillFrame(slot: Slot | undefined, rowWidth: number) {
-  if (!slot || slot.width <= 0 || slot.content <= 0 || rowWidth <= 0) return null;
+function pillFrame(slot: Slot | undefined, rowWidth: number, content: number) {
+  if (!slot || slot.width <= 0 || content <= 0 || rowWidth <= 0) return null;
   const center = slot.x + slot.width / 2;
   const room = Math.min(center - EDGE_GAP, rowWidth - EDGE_GAP - center);
-  const width = Math.min(slot.content + CONTENT_PAD * 2, Math.max(0, room * 2));
+  const width = Math.min(content + CONTENT_PAD * 2, Math.max(0, room * 2));
   return { left: center - width / 2, width };
 }
 
@@ -46,8 +46,16 @@ export function GlassTabBar({
   const placed = useRef(false);
   const animating = useRef(false);
 
+  function widestContent() {
+    let max = 0;
+    for (const slot of measured.current) {
+      if (slot && slot.content > max) max = slot.content;
+    }
+    return max;
+  }
+
   function goTo(index: number, animated: boolean) {
-    const frame = pillFrame(measured.current[index], rowW.current);
+    const frame = pillFrame(measured.current[index], rowW.current, widestContent());
     if (!frame) return;
     if (!placed.current || !animated) {
       if (animating.current && !animated) return;
@@ -83,7 +91,7 @@ export function GlassTabBar({
     const next = measured.current.slice();
     next[index] = nextSlot;
     measured.current = next;
-    if (!placed.current && index === state.index) goTo(index, false);
+    if (placed.current || index === indexRef.current) goTo(indexRef.current, false);
   }
 
   useEffect(() => {
@@ -114,9 +122,9 @@ export function GlassTabBar({
 
   const dark = scheme === "dark";
   const pillFill = dark
-    ? withAlpha(colors.white, 0.1)
+    ? withAlpha(colors.white, 0.0)
     : withAlpha(colors.accent, 0.14);
-  const pillTint = withAlpha(colors.accent, dark ? 0.28 : 0.18);
+  const pillTint = withAlpha(colors.accent, dark ? 0.1 : 0.1);
   const pillBorder = withAlpha(colors.accent, dark ? 0.55 : 0.38);
   const pillSheen = dark
     ? ([withAlpha(colors.white, 0.2), withAlpha(colors.white, 0)] as const)
@@ -284,7 +292,7 @@ const styles = StyleSheet.create({
     bottom: EDGE_GAP,
     left: 0,
     borderRadius: tabBar.radius - EDGE_GAP,
-    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderWidth: 0.2,
     overflow: "hidden",
   },
 });

@@ -69,6 +69,11 @@ export class HomesController {
     return this.homes.updateCostSettings(user.id, homeId, body);
   }
 
+  @Delete(":homeId")
+  deleteHome(@CurrentUser() user: User, @Param("homeId", ParseUUIDPipe) homeId: string) {
+    return this.homes.deleteHome(user.id, homeId);
+  }
+
   @Delete(":homeId/members/:memberId")
   removeMember(
     @CurrentUser() user: User,

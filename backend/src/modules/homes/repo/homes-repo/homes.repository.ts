@@ -38,6 +38,7 @@ export interface IHomesRepository {
   updateHome(homeId: string, patch: Partial<Home>): Promise<void>;
   setActiveHome(userId: string, homeId: string | null): Promise<void>;
   leave(userId: string, homeId: string): Promise<{ home: Household | null }>;
+  deleteOwnedHome(userId: string, homeId: string): Promise<{ home: Household | null }>;
   deletePartner(homeId: string, memberId: string): Promise<number>;
   findUser(userId: string): Promise<User | null>;
 }

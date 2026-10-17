@@ -17,6 +17,7 @@ type ConfirmModalProps = {
   icon?: keyof typeof Ionicons.glyphMap;
   error?: string | null;
   loading?: boolean;
+  alert?: boolean;
   children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
@@ -31,6 +32,7 @@ export function ConfirmModal({
   icon = "warning-outline",
   error,
   loading = false,
+  alert = false,
   children,
   onConfirm,
   onCancel,
@@ -84,6 +86,17 @@ export function ConfirmModal({
 
           <FormMessage message={error} />
 
+          {alert ? (
+            <Pressable
+              onPress={onCancel}
+              className="items-center rounded-2xl px-3 py-3 active:opacity-80"
+              style={{ backgroundColor: colors.accent }}
+            >
+              <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
+                {cancelLabel}
+              </AppText>
+            </Pressable>
+          ) : (
           <View
             className="gap-3"
             style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
@@ -119,6 +132,7 @@ export function ConfirmModal({
               )}
             </Pressable>
           </View>
+          )}
         </View>
       </View>
     </Modal>

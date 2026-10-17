@@ -18,6 +18,7 @@ import { useHousehold } from "@/features/homes/hooks/use-household";
 import {
   createHome,
   joinHome,
+  deleteHome,
   leaveHome,
   removeHomeMember,
   switchHome,
@@ -53,6 +54,10 @@ export default function HomeScreen() {
   const [isLeaving, setIsLeaving] = useState(false);
   const [leaveHomeId, setLeaveHomeId] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [deleteHomeId, setDeleteHomeId] = useState<string | null>(null);
+  const [isDeletingHome, setIsDeletingHome] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [lastHomeAlert, setLastHomeAlert] = useState(false);
   const [floatMessage, setFloatMessage] = useState<string | null>(null);
   const [floatTone, setFloatTone] = useState<"error" | "success">("success");
 
@@ -197,6 +202,40 @@ export default function HomeScreen() {
     await refresh();
   }
 
+  function askDeleteHome(homeId: string) {
+    if (homeCards.length <= 1) {
+      setLastHomeAlert(true);
+      return;
+    }
+    setDeleteError(null);
+    setDeleteHomeId(homeId);
+  }
+
+  async function deleteSelectedHome() {
+    if (!deleteHomeId) return;
+    setIsDeletingHome(true);
+    setDeleteError(null);
+    const result = await deleteHome(deleteHomeId);
+    setIsDeletingHome(false);
+
+    if (result.code === "LAST_HOME") {
+      setDeleteHomeId(null);
+      setLastHomeAlert(true);
+      return;
+    }
+    if (result.error) {
+      setDeleteError(result.error);
+      return;
+    }
+
+    setDeleteHomeId(null);
+    if (result.home) {
+      adoptHome(result.home);
+      setExpandedId(result.home.id);
+    }
+    await refresh();
+  }
+
   const householdId = household?.id ?? null;
   const [expandedFor, setExpandedFor] = useState<string | null>(householdId);
   if (householdId && householdId !== expandedFor) {
@@ -211,6 +250,7 @@ export default function HomeScreen() {
   }, [floatMessage]);
 
   const leavingHome = homeCards.find((home) => home.id === leaveHomeId);
+  const deletingHome = homeCards.find((home) => home.id === deleteHomeId);
 
   if (isLoading && !household && !error) {
     return <LoadingScreen />;
@@ -283,6 +323,7 @@ export default function HomeScreen() {
                     setLeaveError(null);
                     setLeaveHomeId(home.id);
                   }}
+                  onDelete={() => askDeleteHome(home.id)}
                 />
               ))}
             </SectionCard>
@@ -415,6 +456,33 @@ export default function HomeScreen() {
           setLeaveHomeId(null);
           setLeaveError(null);
         }}
+      />
+      <ConfirmModal
+        visible={deleteHomeId !== null}
+        title={t("deleteHomeTitle", { name: deletingHome?.name ?? household?.name ?? "" })}
+        message={t("deleteHomeMessage")}
+        confirmLabel={t("deleteHome")}
+        cancelLabel={t("cancel")}
+        icon="trash-outline"
+        error={deleteError}
+        loading={isDeletingHome}
+        onConfirm={() => void deleteSelectedHome()}
+        onCancel={() => {
+          if (isDeletingHome) return;
+          setDeleteHomeId(null);
+          setDeleteError(null);
+        }}
+      />
+      <ConfirmModal
+        visible={lastHomeAlert}
+        alert
+        title={t("lastHomeTitle")}
+        message={t("lastHomeMessage")}
+        confirmLabel={t("close")}
+        cancelLabel={t("close")}
+        icon="home-outline"
+        onConfirm={() => setLastHomeAlert(false)}
+        onCancel={() => setLastHomeAlert(false)}
       />
     </Screen>
   );

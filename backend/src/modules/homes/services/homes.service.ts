@@ -103,6 +103,22 @@ export class HomesService {
     return this.homes.leave(userId, homeId);
   }
 
+  async deleteHome(userId: string, homeId: string) {
+    const membership = await this.requireMembership(userId, homeId);
+    if (membership.role !== "owner") {
+      throw new DomainError(
+        "ONLY_HOST_CAN_DELETE",
+        "Only the host can delete this home",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    const mine = await this.homes.listForUser(userId);
+    if (mine.length <= 1) {
+      throw new DomainError("LAST_HOME", "You have to stay in a home.", HttpStatus.BAD_REQUEST);
+    }
+    return this.homes.deleteOwnedHome(userId, homeId);
+  }
+
   async removeMember(actorId: string, homeId: string, memberId: string) {
     if (memberId === actorId) {
       throw new DomainError("HOST_CANNOT_REMOVE_SELF", "The host cannot remove themselves", HttpStatus.BAD_REQUEST);

@@ -11,6 +11,7 @@ import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { BlurScreen } from "@/components/ui/BlurBackdrop";
+import { DragOverlayProvider } from "@/components/ui/DragOverlay";
 import { TabBlurProvider } from "@/components/ui/TabBlurTarget";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
 import { requiredAppUpdate } from "@/lib/app-release";
@@ -90,11 +91,13 @@ export default function RootLayout() {
                 <CategoriesProvider>
                 <PurchasesProvider>
                 <GestureHandlerRootView style={{ flex: 1 }}>
-                  <BlurScreen>
-                    <TabBlurProvider>
-                      <UpdateGate />
-                    </TabBlurProvider>
-                  </BlurScreen>
+                  <DragOverlayProvider>
+                    <BlurScreen>
+                      <TabBlurProvider>
+                        <UpdateGate />
+                      </TabBlurProvider>
+                    </BlurScreen>
+                  </DragOverlayProvider>
                 </GestureHandlerRootView>
                 </PurchasesProvider>
                 </CategoriesProvider>

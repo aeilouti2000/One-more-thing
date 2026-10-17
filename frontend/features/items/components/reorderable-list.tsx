@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
+import { useDragOverlay } from "@/components/ui/DragOverlay";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -25,7 +26,12 @@ type ReorderableListProps = {
   onReorder: (ids: string[]) => void;
   onDragChange?: (dragging: boolean) => void;
   onItemLongPress?: (id: string) => void;
-  renderRow: (purchase: Purchase, handle: ReactNode, index: number) => ReactNode;
+  renderRow: (
+    purchase: Purchase,
+    handle: ReactNode,
+    index: number,
+    preview?: boolean,
+  ) => ReactNode;
 };
 
 function rowHeight(heights: number[], index: number) {
@@ -86,7 +92,11 @@ export function ReorderableList({
   const onReorderRef = useRef(onReorder);
   const onDragChangeRef = useRef(onDragChange);
   const onLongPressRef = useRef(onItemLongPress);
-  const dragY = useSharedValue(0);
+  const renderRowRef = useRef(renderRow);
+  const rowRefs = useRef(new Map<string, View>());
+  const overlay = useDragOverlay();
+  const dragY = overlay.y;
+  const dragX = overlay.x;
   const activeIndex = useSharedValue(-1);
   const targetIndex = useSharedValue(-1);
   const settling = useSharedValue(false);
@@ -98,7 +108,10 @@ export function ReorderableList({
     onReorderRef.current = onReorder;
     onDragChangeRef.current = onDragChange;
     onLongPressRef.current = onItemLongPress;
+    renderRowRef.current = renderRow;
   });
+
+  useEffect(() => () => overlay.dismiss(), [overlay]);
 
   function publishMetrics() {
     const count = rowsRef.current.length;
@@ -133,8 +146,10 @@ export function ReorderableList({
   useLayoutEffect(() => {
     if (!pendingReset.current) return;
     pendingReset.current = false;
+    overlay.dismiss();
     activeIndex.value = -1;
     targetIndex.value = -1;
+    dragX.value = 0;
     dragY.value = 0;
     settling.value = false;
     publishMetrics();
@@ -145,10 +160,25 @@ export function ReorderableList({
     else if (!dragging.current) onDragChangeRef.current?.(false);
   }
 
-  function beginDrag() {
+  function beginDrag(index: number) {
     committed.current = false;
     dragging.current = true;
     onDragChangeRef.current?.(true);
+    const purchase = rowsRef.current[index];
+    const node = purchase ? rowRefs.current.get(purchase.id) : null;
+    if (!purchase || !node) return;
+    const preview = renderRowRef.current(purchase, <StaticHandle />, index, true);
+    node.measureInWindow((x, y, width, height) => {
+      if (!dragging.current) return;
+      // The row may already be translated, and that shift is inside this
+      // measurement. The overlay adds the same shift again, so remove it here.
+      overlay.present(preview, {
+        x: x - dragX.value,
+        y: y - dragY.value,
+        width,
+        height,
+      });
+    });
   }
 
   function commit(from: number, to: number) {
@@ -178,11 +208,14 @@ export function ReorderableList({
       {rows.map((purchase, index) => (
         <ReorderRow
           key={purchase.id}
+          id={purchase.id}
           index={index}
           dragY={dragY}
+          shown={overlay.shown}
           activeIndex={activeIndex}
           targetIndex={targetIndex}
           heightsSV={heightsSV}
+          rowRefs={rowRefs}
           onLayout={(height) => {
             if (heights.current[index] === height) return;
             heights.current[index] = height;
@@ -194,6 +227,7 @@ export function ReorderableList({
             enabled ? (
               <DragHandle
                 index={index}
+                dragX={dragX}
                 dragY={dragY}
                 activeIndex={activeIndex}
                 targetIndex={targetIndex}
@@ -201,7 +235,7 @@ export function ReorderableList({
                 topsSV={topsSV}
                 heightsSV={heightsSV}
                 onHold={hold}
-                onBegin={beginDrag}
+                onBegin={() => beginDrag(index)}
                 onCommit={commit}
                 onLongPress={
                   onItemLongPress ? () => onLongPressRef.current?.(purchase.id) : undefined
@@ -217,19 +251,25 @@ export function ReorderableList({
 }
 
 function ReorderRow({
+  id,
   index,
   dragY,
+  shown,
   activeIndex,
   targetIndex,
   heightsSV,
+  rowRefs,
   onLayout,
   children,
 }: {
+  id: string;
   index: number;
   dragY: SharedValue<number>;
+  shown: SharedValue<number>;
   activeIndex: SharedValue<number>;
   targetIndex: SharedValue<number>;
   heightsSV: SharedValue<number[]>;
+  rowRefs: { current: Map<string, View> };
   onLayout: (height: number) => void;
   children: ReactNode;
 }) {
@@ -273,12 +313,17 @@ function ReorderRow({
         },
       ],
       zIndex: draggingThis ? 20 : 0,
-      elevation: draggingThis ? 12 : 0,
+      elevation: draggingThis && shown.value > 0 ? 0 : draggingThis ? 12 : 0,
+      opacity: draggingThis && shown.value > 0 ? 0 : 1,
     };
   });
 
   return (
     <Animated.View
+      ref={(node: View | null) => {
+        if (node) rowRefs.current.set(id, node);
+        else rowRefs.current.delete(id);
+      }}
       collapsable={false}
       style={style}
       onLayout={(event) => onLayout(event.nativeEvent.layout.height)}
@@ -290,6 +335,7 @@ function ReorderRow({
 
 function DragHandle({
   index,
+  dragX,
   dragY,
   activeIndex,
   targetIndex,
@@ -302,6 +348,7 @@ function DragHandle({
   onLongPress,
 }: {
   index: number;
+  dragX: SharedValue<number>;
   dragY: SharedValue<number>;
   activeIndex: SharedValue<number>;
   targetIndex: SharedValue<number>;
@@ -335,6 +382,7 @@ function DragHandle({
         .onStart(() => {
           "worklet";
           if (settling.value) return;
+          dragX.value = 0;
           dragY.value = 0;
           activeIndex.value = indexSV.value;
           targetIndex.value = indexSV.value;
@@ -343,6 +391,7 @@ function DragHandle({
         .onUpdate((event) => {
           "worklet";
           if (settling.value || activeIndex.value < 0) return;
+          dragX.value = event.translationX;
           dragY.value = event.translationY;
           const next = computeTarget(
             activeIndex.value,
@@ -362,6 +411,10 @@ function DragHandle({
             : from;
           targetIndex.value = to;
           const dest = settleOffset(from, to, topsSV.value, heightsSV.value);
+          dragX.value = withTiming(0, {
+            duration: SETTLE_MS,
+            easing: Easing.out(Easing.cubic),
+          });
           dragY.value = withTiming(
             dest,
             { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) },
@@ -381,7 +434,7 @@ function DragHandle({
     );
     // Shared values are stable. JS callbacks are read through the ref at call time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex, dragY, heightsSV, indexSV, settling, targetIndex, topsSV]);
+  }, [activeIndex, dragX, dragY, heightsSV, indexSV, settling, targetIndex, topsSV]);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -396,5 +449,14 @@ function DragHandle({
         <Ionicons name="reorder-three" size={22} color={colors.muted} />
       </View>
     </GestureDetector>
+  );
+}
+
+function StaticHandle() {
+  const { colors } = useTheme();
+  return (
+    <View className="justify-center py-1">
+      <Ionicons name="reorder-three" size={22} color={colors.muted} />
+    </View>
   );
 }

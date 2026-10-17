@@ -203,6 +203,7 @@ export default function ItemsScreen() {
   );
   const quickCategoryLabel =
     quickCategory === "all" ? t("all") : selectedCategoryLabel;
+  const categoryLabelIsLong = quickCategoryLabel.trim().length > 6;
   const addCategory: PurchaseCategory =
     quickCategory === "all" ? "other" : quickCategory;
   const isSelecting = selectedIds.size > 0;
@@ -954,87 +955,91 @@ export default function ItemsScreen() {
             onOpenDetails={() => setIsAddingDetails(true)}
             busy={isQuickAdding}
             inputStyle={quickInputStyle}
+            footer={
+              <View
+                className="flex-row items-center gap-2 px-3 pb-3 pt-1"
+                style={{ direction: isRTL ? "rtl" : "ltr" }}
+              >
+                <View
+                  ref={categoryButtonRef}
+                  collapsable={false}
+                  className={categoryLabelIsLong ? "min-w-0 flex-1" : "shrink-0"}
+                >
+                  <Pressable
+                    onPress={() => {
+                      const node = categoryButtonRef.current;
+                      if (!node) {
+                        setIsChoosingCategory(true);
+                        return;
+                      }
+                      node.measureInWindow((x, y, width, height) => {
+                        setCategoryAnchor({ x, y, width, height });
+                        setIsChoosingCategory(true);
+                      });
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={quickCategoryLabel}
+                    className={`${categoryLabelIsLong ? "w-full" : ""} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2 active:opacity-60`}
+                    style={{
+                      backgroundColor: withAlpha(colors.accent, 0.12),
+                      minWidth: 100,
+                    }}
+                  >
+                    <AppText
+                      numberOfLines={1}
+                      className="shrink text-sm font-semibold"
+                      style={{ color: colors.ink }}
+                    >
+                      {quickCategoryLabel}
+                    </AppText>
+                    <Ionicons name="chevron-down" size={14} color={colors.ink} />
+                  </Pressable>
+                </View>
+                <Pressable
+                  onPress={() => router.push("/pins")}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("pin")}
+                  className={`${categoryLabelIsLong ? "shrink-0" : "min-w-0 flex-1"} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2 active:opacity-60`}
+                  style={{ backgroundColor: withAlpha(colors.accent, 0.12) }}
+                >
+                  <MaterialCommunityIcons name="pin" size={16} color={colors.ink} />
+                  <AppText
+                    numberOfLines={1}
+                    className="shrink text-sm font-semibold"
+                    style={{ color: colors.ink }}
+                  >
+                    {t("pin")}
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  disabled={shopDisabled}
+                  onPress={openShop}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("shopWithCount", {
+                    count: visibleItems.length,
+                  })}
+                  accessibilityState={{ disabled: shopDisabled }}
+                  className={`${categoryLabelIsLong ? "shrink-0" : "min-w-0 flex-1"} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2 ${
+                    shopDisabled ? "opacity-45" : "active:opacity-60"
+                  }`}
+                  style={{ backgroundColor: withAlpha(colors.accent, 0.12) }}
+                >
+                  <MaterialCommunityIcons
+                    name="cart"
+                    size={16}
+                    color={colors.accent}
+                  />
+                  <AppText
+                    numberOfLines={1}
+                    className="shrink text-sm font-semibold"
+                    style={{ color: colors.accent }}
+                  >
+                    {t("shopWithCount", { count: visibleItems.length })}
+                  </AppText>
+                </Pressable>
+              </View>
+            }
           />
-          <View className="mb-4 flex-row items-center gap-2">
-            <View ref={categoryButtonRef} collapsable={false} className="min-w-0 flex-1">
-            <Pressable
-              onPress={() => {
-                const node = categoryButtonRef.current;
-                if (!node) {
-                  setIsChoosingCategory(true);
-                  return;
-                }
-                node.measureInWindow((x, y, width, height) => {
-                  setCategoryAnchor({ x, y, width, height });
-                  setIsChoosingCategory(true);
-                });
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={quickCategoryLabel}
-              className="w-full flex-row items-center justify-center gap-1 rounded-xl px-3 py-1.5 active:opacity-80"
-              style={{
-                backgroundColor: colors.paper,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: colors.line,
-              }}
-            >
-              <AppText
-                numberOfLines={1}
-                className="min-w-0 shrink text-sm font-semibold"
-                style={{ color: colors.ink }}
-              >
-                {quickCategoryLabel}
-              </AppText>
-              <Ionicons name="chevron-down" size={14} color={colors.muted} />
-            </Pressable>
-            </View>
-            <Pressable
-              onPress={() => router.push("/pins")}
-              accessibilityRole="button"
-              accessibilityLabel={t("pin")}
-              className="flex-row items-center gap-1 rounded-xl px-3 py-1.5 active:opacity-80"
-              style={{
-                backgroundColor: colors.paper,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: colors.line,
-              }}
-            >
-              <MaterialCommunityIcons name="pin" size={16} color={colors.ink} />
-              <AppText
-                className="text-sm font-semibold"
-                style={{ color: colors.ink }}
-              >
-                {t("pin")}
-              </AppText>
-            </Pressable>
-            <Pressable
-              disabled={shopDisabled}
-              onPress={openShop}
-              accessibilityRole="button"
-              accessibilityLabel={t("shopTheseItems")}
-              accessibilityState={{ disabled: shopDisabled }}
-              className={`flex-row items-center gap-1 rounded-xl px-3 py-1.5 ${
-                shopDisabled ? "opacity-45" : "active:opacity-80"
-              }`}
-              style={{
-                backgroundColor: colors.accent,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: withAlpha(colors.onAccent, 0.28),
-              }}
-            >
-              <MaterialCommunityIcons
-                name="cart"
-                size={16}
-                color={colors.onAccent}
-              />
-              <AppText
-                className="text-sm font-semibold"
-                style={{ color: colors.onAccent }}
-              >
-                {t("shopTheseItems")}
-              </AppText>
-            </Pressable>
-          </View>
           <CategoryFilter
             layout="none"
             manage={false}
@@ -1075,7 +1080,21 @@ export default function ItemsScreen() {
             onDragChange={setIsDragging}
             onItemLongPress={longPressRow}
             onReorder={(ids) => void reorderNeeded(ids)}
-            renderRow={(purchase, handle, index) => (
+            renderRow={(purchase, handle, index, preview) =>
+              preview ? (
+                <PurchaseRow
+                  purchase={purchase}
+                  showCategory={false}
+                  leading={handle}
+                  selected={selectedIds.has(purchase.id)}
+                  quantityBusy={false}
+                  onChangeQuantity={
+                    isSelecting
+                      ? undefined
+                      : (quantity) => changeRowQuantity(purchase.id, quantity)
+                  }
+                />
+              ) : (
               <ShoppingRow
                 purchase={purchase}
                 index={index}
@@ -1093,7 +1112,8 @@ export default function ItemsScreen() {
                 onLongPress={longPressRow}
                 onChangeQuantity={changeRowQuantity}
               />
-            )}
+              )
+            }
           />
           </Animated.View>
         )}

@@ -24,6 +24,7 @@ type HomeCardProps = {
   onSwitch: () => void;
   onRemoveMember: (member: HouseholdMember) => void;
   onLeave: () => void;
+  onDelete: () => void;
 };
 
 export function HomeCard({
@@ -38,6 +39,7 @@ export function HomeCard({
   onSwitch,
   onRemoveMember,
   onLeave,
+  onDelete,
 }: HomeCardProps) {
   const { t } = useI18n();
   const { colors } = useTheme();
@@ -166,6 +168,9 @@ export function HomeCard({
               disabled={switching}
               onPress={onSwitch}
             />
+          ) : null}
+          {isHost ? (
+            <AppButton label={t("deleteHome")} variant="danger" onPress={onDelete} />
           ) : null}
         </View>
       ) : null}

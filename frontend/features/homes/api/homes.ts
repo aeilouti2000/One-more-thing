@@ -128,6 +128,23 @@ export async function leaveHome(homeId: string) {
   }
 }
 
+export async function deleteHome(homeId: string) {
+  try {
+    const result = await api.delete<{ home: Household | null }>(`/homes/${homeId}`);
+    return {
+      home: result?.home ? withCostDefaults(result.home) : null,
+      error: null,
+      code: null,
+    };
+  } catch (error) {
+    return {
+      home: null,
+      error: formatAppError(error),
+      code: error instanceof ApiError ? (error.code ?? null) : null,
+    };
+  }
+}
+
 export async function removeHomeMember(homeId: string, userId: string) {
   try {
     await api.delete(`/homes/${homeId}/members/${userId}`);

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -33,6 +33,7 @@ type QuickAddBarProps = {
   onOpenDetails: () => void;
   busy?: boolean;
   inputStyle?: StyleProp<TextStyle>;
+  footer?: ReactNode;
 };
 
 const TYPE_MS = 55;
@@ -47,6 +48,7 @@ export function QuickAddBar({
   onOpenDetails,
   busy = false,
   inputStyle,
+  footer,
 }: QuickAddBarProps) {
   const { colors, scheme } = useTheme();
   const { t, isRTL } = useI18n();
@@ -112,7 +114,9 @@ export function QuickAddBar({
   }));
 
   return (
-    <View className="mb-3 overflow-hidden rounded-3xl border border-cove-line">
+    <View
+      className={`${footer ? "mb-4" : "mb-3"} overflow-hidden rounded-3xl border border-cove-line`}
+    >
       <FrostedFill />
       <View className="flex-row items-center gap-2 px-4 py-2">
         <View className="relative h-11 min-w-0 flex-1 justify-center">
@@ -163,7 +167,7 @@ export function QuickAddBar({
         >
           <DetailsAddIcon color={colors.accent} plusColor={colors.onAccent} />
         </Pressable>
-        <Animated.View style={pulseStyle}>
+        <Animated.View collapsable={false} style={pulseStyle}>
           <Pressable
             disabled={!addEnabled}
             onPress={onSubmit}
@@ -187,6 +191,7 @@ export function QuickAddBar({
           </Pressable>
         </Animated.View>
       </View>
+      {footer ? <View>{footer}</View> : null}
     </View>
   );
 }
