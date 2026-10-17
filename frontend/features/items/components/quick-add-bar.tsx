@@ -19,7 +19,6 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { FrostedFill } from "@/components/ui/BlurBackdrop";
 import { scaleFontSize } from "@/constants/font";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -115,9 +114,20 @@ export function QuickAddBar({
 
   return (
     <View
-      className={`${footer ? "mb-4" : "mb-3"} overflow-hidden rounded-3xl border border-cove-line`}
+      className={`${footer ? "mb-4" : "mb-3"} rounded-3xl`}
+      style={{
+        backgroundColor: colors.paper,
+        shadowColor: scheme === "dark" ? "#000000" : colors.ink,
+        shadowOpacity: scheme === "dark" ? 0.22 : 0.045,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 1,
+      }}
     >
-      <FrostedFill />
+      <View
+        className="overflow-hidden rounded-3xl"
+        style={{ backgroundColor: colors.paper }}
+      >
       <View className="flex-row items-center gap-2 px-4 py-2">
         <View className="relative h-11 min-w-0 flex-1 justify-center">
           {showHint ? (
@@ -169,7 +179,7 @@ export function QuickAddBar({
           accessibilityRole="button"
           accessibilityLabel={t("addItemDetails")}
           className="h-9 w-9 items-center justify-center rounded-full active:opacity-80"
-          style={{ backgroundColor: scheme === "dark" ? colors.paper : colors.mist }}
+          style={{ backgroundColor: colors.mist }}
         >
           <DetailsAddIcon color={colors.accent} plusColor={colors.onAccent} />
         </Pressable>
@@ -198,6 +208,7 @@ export function QuickAddBar({
         </Animated.View>
       </View>
       {footer ? <View>{footer}</View> : null}
+      </View>
     </View>
   );
 }

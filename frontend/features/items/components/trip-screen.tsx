@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AppState, Alert, BackHandler, Platform, Pressable, View, type LayoutChangeEvent } from "react-native";
+import { AppState, BackHandler, Platform, Pressable, View, type LayoutChangeEvent } from "react-native";
 import Animated, {
   Easing,
   Extrapolation,
@@ -16,6 +16,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { RequireSession } from "@/features/auth/components/require-session";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
+import { ReceiptSourceModal } from "@/features/items/components/receipt-source-modal";
 import { AppText } from "@/components/ui/AppText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -30,7 +31,7 @@ import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { listLabel } from "@/features/items/api/lists";
 import { canUndoBought, formatNeededShare, shareNeededText } from "@/features/items/utils/share-list";
-import { readReceiptPhoto, type ReceiptScan } from "@/features/items/utils/scan-receipt";
+import { pickReceiptPhoto, interpretReceiptPhoto, type ReceiptScan } from "@/features/items/utils/scan-receipt";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/features/items/types/purchase";
@@ -72,8 +73,9 @@ function TripBody() {
   const [tripCostOpen, setTripCostOpen] = useState(false);
   const [singleCostItem, setSingleCostItem] = useState<Purchase | null>(null);
   const [isSavingCosts, setIsSavingCosts] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
+  const [scanPhase, setScanPhase] = useState<"picking" | "reading" | null>(null);
   const [receiptCover, setReceiptCover] = useState(false);
+  const [receiptSourceOpen, setReceiptSourceOpen] = useState(false);
   const [receiptScan, setReceiptScan] = useState<ReceiptScan | null>(null);
   const [frozenTripCostItems, setFrozenTripCostItems] = useState<
     { id: string; name: string; quantity?: number; initialCost?: number | null }[] | null
@@ -82,8 +84,8 @@ function TripBody() {
   const singleCostResolver = useRef<((value: number | null | undefined) => void) | null>(null);
   const inflightChecks = useRef(0);
   const undoing = useRef(false);
-  const scanStarting = useRef(false);
   const allowLeaveRef = useRef(false);
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tripCostOpenRef = useRef(false);
   const askTripCostsRef = useRef(false);
 
@@ -241,8 +243,10 @@ function TripBody() {
     }
   }
 
+  const scanning = scanPhase !== null;
+
   function leaveTrip() {
-    if (isSavingCosts || isScanning || receiptCover) return;
+    if (isSavingCosts || scanning || receiptCover) return;
     if (singleCostResolver.current) {
       resolveSingleCost(undefined);
       return;
@@ -267,6 +271,12 @@ function TripBody() {
   useLayoutEffect(() => {
     leaveTripRef.current = leaveTrip;
   });
+
+  useEffect(() => {
+    return () => {
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -320,63 +330,54 @@ function TripBody() {
   }
 
   function chooseReceiptPhoto() {
-    if (isSavingCosts || isScanning || receiptCover) return;
+    if (isSavingCosts || scanning || receiptCover) return;
     setReceiptCover(true);
-    setTimeout(() => {
-      Alert.alert(
-        t("scanReceipt"),
-        t("scanReceiptChoose"),
-        [
-          {
-            text: t("scanReceiptCamera"),
-            onPress: () => {
-              scanStarting.current = true;
-              void runReceiptScan("camera");
-            },
-          },
-          {
-            text: t("scanReceiptLibrary"),
-            onPress: () => {
-              scanStarting.current = true;
-              void runReceiptScan("library");
-            },
-          },
-          {
-            text: t("cancel"),
-            style: "cancel",
-            onPress: () => {
-              scanStarting.current = false;
-              setReceiptCover(false);
-            },
-          },
-        ],
-        {
-          cancelable: true,
-          onDismiss: () => {
-            if (!scanStarting.current) setReceiptCover(false);
-          },
-        },
-      );
-    }, 320);
+    scanTimerRef.current = setTimeout(() => setReceiptSourceOpen(true), 320);
+  }
+
+  function closeReceiptSource() {
+    setReceiptSourceOpen(false);
+    setReceiptCover(false);
+  }
+
+  function startReceiptScan(source: "camera" | "library") {
+    setReceiptSourceOpen(false);
+    setScanPhase("picking");
+    scanTimerRef.current = setTimeout(() => {
+      void runReceiptScan(source);
+    }, 450);
   }
 
   async function runReceiptScan(source: "camera" | "library") {
-    setIsScanning(true);
     setActionError(null);
-    const outcome = await readReceiptPhoto({
-      source,
-      preferArabic: locale === "ar",
-      items: tripCostItems,
-    });
-    setIsScanning(false);
-    setReceiptCover(false);
-    scanStarting.current = false;
-    if (!outcome.ok) {
-      if (outcome.error) setActionError(t(outcome.error));
-      return;
+    setScanPhase("picking");
+    try {
+      const picked = await pickReceiptPhoto(source);
+      if (!picked.ok) {
+        setScanPhase(null);
+        setReceiptCover(false);
+        if (picked.error) setActionError(t(picked.error));
+        return;
+      }
+      setScanPhase("reading");
+      const outcome = await interpretReceiptPhoto({
+        uri: picked.uri,
+        preferArabic: locale === "ar",
+        items: tripCostItems,
+      });
+      setScanPhase(null);
+      setReceiptCover(false);
+      if (!outcome.ok) {
+        setActionError(t(outcome.error));
+        return;
+      }
+      setReceiptScan(outcome.scan);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      setScanPhase(null);
+      setReceiptCover(false);
+      setActionError(t("scanReceiptFailed"));
     }
-    setReceiptScan(outcome.scan);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   if (isLoading && tripItems.length === 0 && bought.length === 0 && !error) {
@@ -459,8 +460,8 @@ function TripBody() {
         currency={household?.currency ?? "JOD"}
         items={tripCostItems}
         loading={isSavingCosts}
-        scanning={isScanning}
-        covered={receiptCover}
+        scanning={scanning}
+        covered={receiptCover || scanning}
         onScan={Platform.OS === "web" ? undefined : chooseReceiptPhoto}
         receipt={receiptScan}
         errorMessage={actionError}
@@ -473,12 +474,20 @@ function TripBody() {
           exitTrip();
         }}
         onClose={() => {
-          if (isSavingCosts || isScanning) return;
+          if (isSavingCosts || scanning) return;
           setTripCostOpen(false);
           setFrozenTripCostItems(null);
           setReceiptScan(null);
           exitTrip();
         }}
+      />
+
+      <ReceiptSourceModal
+        visible={receiptSourceOpen || scanPhase === "reading"}
+        reading={scanPhase === "reading"}
+        onCamera={() => startReceiptScan("camera")}
+        onLibrary={() => startReceiptScan("library")}
+        onClose={closeReceiptSource}
       />
     </Screen>
   );
