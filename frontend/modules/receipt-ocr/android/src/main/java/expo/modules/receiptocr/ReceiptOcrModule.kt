@@ -42,18 +42,35 @@ class ReceiptOcrModule : Module() {
 
   private fun decodeBitmap(uri: String): Bitmap {
     val context = appContext.reactContext ?: throw Exceptions.ReactContextLost()
+    val (file, temporary) = materialize(context, uri)
+    try {
+      val decoded = decodeSampled(file.absolutePath)
+        ?: throw IllegalArgumentException("Could not read the photo")
+      return upright(decoded, file.absolutePath)
+    } finally {
+      if (temporary) file.delete()
+    }
+  }
+
+  private fun materialize(context: android.content.Context, uri: String): Pair<File, Boolean> {
     val parsed = Uri.parse(uri)
-    val decoded = when (parsed.scheme) {
-      "content" -> context.contentResolver.openInputStream(parsed)?.use { input ->
-        BitmapFactory.decodeStream(input)
-      }
-      else -> {
-        val path = parsed.path ?: uri.removePrefix("file://")
-        decodeSampled(path)
-      }
-    } ?: throw IllegalArgumentException("Could not read the photo")
-    val path = if (parsed.scheme == "content") null else parsed.path
-    return upright(decoded, path)
+    val scheme = parsed.scheme
+    if (scheme == null || scheme == "file") {
+      val path = if (scheme == null) uri else parsed.path ?: uri.removePrefix("file://")
+      val file = File(path)
+      if (file.exists() && file.length() > 0L) return file to false
+    }
+    val out = File(context.cacheDir, "receipt-ocr-${System.currentTimeMillis()}.img")
+    val stream = context.contentResolver.openInputStream(parsed)
+      ?: throw IllegalArgumentException("Could not read the photo")
+    stream.use { input ->
+      FileOutputStream(out).use { output -> input.copyTo(output) }
+    }
+    if (!out.exists() || out.length() == 0L) {
+      out.delete()
+      throw IllegalArgumentException("Could not read the photo")
+    }
+    return out to true
   }
 
   private fun decodeSampled(path: String): Bitmap? {

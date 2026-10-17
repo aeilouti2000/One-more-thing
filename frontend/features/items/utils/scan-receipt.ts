@@ -34,11 +34,11 @@ export async function pickReceiptPhoto(
     source === "camera"
       ? await ImagePicker.launchCameraAsync({
           mediaTypes: ["images"],
-          quality: 0.92,
+          quality: 1,
         })
       : await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ["images"],
-          quality: 0.92,
+          quality: 1,
         });
   if (result.canceled || !result.assets[0]?.uri) {
     return { ok: false, error: null };
