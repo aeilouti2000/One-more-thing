@@ -70,10 +70,17 @@ function readQty(name: string): number | null {
   return qty;
 }
 
-function cleanName(line: string, token: string) {
+const LETTER = /[A-Za-z\u0600-\u06FF]/;
+const CURRENCY = /^(?:jd|jod|sar|aed|usd|eur|ils|egp|gbp)$/i;
+
+function nameAroundAmount(line: string, token: string) {
   const index = line.lastIndexOf(token);
-  const head = (index >= 0 ? line.slice(0, index) : line).replace(/[\s.:*\-]+$/g, "").trim();
-  return head.replace(/^(?:\d{1,2}\s*[x×]|[x×]\s*\d{1,2})\s+/i, "").trim();
+  const before = line.slice(0, index).replace(/[\s.:*\-–—]+$/g, "").trim();
+  const after = line.slice(index + token.length).replace(/^[\s.:*\-–—]+/g, "").trim();
+  const chosen = LETTER.test(before) ? before : LETTER.test(after) ? after : "";
+  const stripped = chosen.replace(/^(?:\d{1,2}\s*[x×]|[x×]\s*\d{1,2})\s+/i, "").trim();
+  if (!stripped || CURRENCY.test(stripped)) return "";
+  return stripped;
 }
 
 export function parseReceiptText(text: string): { lines: ReceiptLine[]; total: number | null } {
@@ -89,16 +96,30 @@ export function parseReceiptText(text: string): { lines: ReceiptLine[]; total: n
     kind: "item" | "total" | "subtotal" | "skip";
   };
   const drafts: Draft[] = [];
+  let pendingName = "";
 
   for (const line of rawLines) {
     const found = lastAmount(line);
-    if (!found) continue;
-    const name = cleanName(line, found.token);
+    if (!found) {
+      if (
+        LETTER.test(line) &&
+        line.length <= 80 &&
+        !TOTAL.test(line) &&
+        !SUBTOTAL.test(line) &&
+        !SKIP.test(line)
+      ) {
+        pendingName = line.trim();
+      }
+      continue;
+    }
+    let name = nameAroundAmount(line, found.token);
+    if (!name && pendingName) name = pendingName;
+    pendingName = "";
     const blob = `${name} ${line}`;
     let kind: Draft["kind"] = "item";
     if (SUBTOTAL.test(blob)) kind = "subtotal";
     else if (TOTAL.test(blob)) kind = "total";
-    else if (SKIP.test(blob) || name.length === 0) kind = "skip";
+    else if (SKIP.test(blob)) kind = "skip";
     drafts.push({ name, amount: found.amount, qty: readQty(line), kind });
   }
 

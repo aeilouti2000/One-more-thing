@@ -39,6 +39,27 @@ test("matches arabic list names after letter folding", () => {
   assert.equal(matches[0]?.itemId, "rice");
 });
 
+test("reads a price written before the item name", () => {
+  const parsed = parseReceiptText("1.250 حليب\n0.800 خبز\nالإجمالي 2.050");
+  assert.deepEqual(
+    parsed.lines.map((line) => line.name),
+    ["حليب", "خبز"],
+  );
+  assert.equal(parsed.total, 2.05);
+});
+
+test("joins a name with the price on the following line", () => {
+  const parsed = parseReceiptText("Milk\n1.250\nBread\n0.800\nTotal\n2.050");
+  assert.deepEqual(
+    parsed.lines.map((line) => [line.name, line.amount]),
+    [
+      ["Milk", 1.25],
+      ["Bread", 0.8],
+    ],
+  );
+  assert.equal(parsed.total, 2.05);
+});
+
 test("formats money for the cost field", () => {
   assert.equal(formatCostInput(1.25, "JOD"), "1.25");
   assert.equal(formatCostInput(10, "USD"), "10");
