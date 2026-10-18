@@ -43,6 +43,9 @@ fcm-service-account.json
 
 app-example
 
-# generated native folders
-ios/
-android/
+# generated prebuild folders only. The receipt reader lives under modules/receipt-ocr.
+frontend/ios/
+frontend/android/
+
+# local module compile output
+frontend/modules/receipt-ocr/android/build/
