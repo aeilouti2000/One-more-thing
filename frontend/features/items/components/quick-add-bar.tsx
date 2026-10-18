@@ -22,7 +22,7 @@ import Animated, {
 import { scaleFontSize } from "@/constants/font";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
-import { withAlpha } from "@/constants/theme";
+import { tabBar, withAlpha } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
 type QuickAddBarProps = {
@@ -112,22 +112,23 @@ export function QuickAddBar({
     opacity: caret.value,
   }));
 
+  const dark = scheme === "dark";
+
   return (
     <View
-      className={`${footer ? "mb-4" : "mb-3"} rounded-3xl`}
+      className={`${footer ? "mb-4" : "mb-3"} overflow-hidden rounded-3xl`}
       style={{
-        backgroundColor: colors.paper,
+        backgroundColor: dark ? colors.deep : colors.mist,
+        borderWidth: tabBar.borderWidth,
+        borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
         shadowColor: scheme === "dark" ? "#000000" : colors.ink,
-        shadowOpacity: scheme === "dark" ? 0.22 : 0.045,
-        shadowRadius: 8,
+        shadowOpacity: dark ? 0.42 : 0.16,
+        shadowRadius: 24,
         shadowOffset: { width: 0, height: 3 },
         elevation: 1,
       }}
     >
-      <View
-        className="overflow-hidden rounded-3xl"
-        style={{ backgroundColor: colors.paper }}
-      >
+      <View className="overflow-hidden rounded-3xl">
       <View className="flex-row items-center gap-2 px-4 py-2">
         <View className="relative h-11 min-w-0 flex-1 justify-center">
           {showHint ? (
