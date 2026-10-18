@@ -85,7 +85,7 @@ export function SegmentedToggle<T extends string>({
             top: TRACK_PAD,
             bottom: TRACK_PAD,
             left: 0,
-            borderRadius: radius.md - TRACK_PAD,
+            borderRadius: 80,
             backgroundColor: colors.accent,
             shadowColor: colors.accent,
             shadowOpacity: 0.28,

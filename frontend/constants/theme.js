@@ -258,7 +258,7 @@ const logo = {
 const tabBar = {
   height: 68,
   inset: 20,
-  radius: 28,
+  radius: 34,
   borderWidth: 1,
   labelSize: 12,
   itemPaddingTop: 4,

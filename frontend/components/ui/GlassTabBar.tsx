@@ -16,7 +16,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 type Slot = { x: number; width: number; content: number };
 
 const CONTENT_PAD = 16;
-const EDGE_GAP = 1;
+const EDGE_GAP = 4;
 const MOVE_MS = 250;
 
 function pillFrame(slot: Slot | undefined, rowWidth: number, content: number) {
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     bottom: EDGE_GAP,
     left: 0,
     borderRadius: tabBar.radius - EDGE_GAP,
-    borderWidth: 0.2,
+    borderWidth: 0.5,
     overflow: "hidden",
   },
 });
