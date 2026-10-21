@@ -1,4 +1,10 @@
-import { ActivityIndicator, Pressable } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -9,6 +15,8 @@ type AppButtonProps = {
   disabled?: boolean;
   loading?: boolean;
   compact?: boolean;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
 };
 
 const variants = {
@@ -32,6 +40,8 @@ export function AppButton({
   disabled = false,
   loading = false,
   compact = false,
+  style,
+  labelStyle,
 }: AppButtonProps) {
   const { colors } = useTheme();
   const isDisabled = disabled || loading;
@@ -47,6 +57,7 @@ export function AppButton({
       className={`items-center rounded-2xl px-5 ${compact ? "py-2.5" : "py-4"} ${variants[variant]} ${
         isDisabled ? "opacity-50" : "active:opacity-80"
       }`}
+      style={style}
     >
       {loading ? (
         <ActivityIndicator
@@ -63,7 +74,11 @@ export function AppButton({
           className={`font-semibold ${compact ? "text-sm" : "text-base"} ${
             variant === "danger" ? "" : labelVariants[variant]
           }`}
-          style={variant === "danger" ? { color: danger } : undefined}
+          style={
+            variant === "danger"
+              ? [{ color: danger }, labelStyle]
+              : labelStyle
+          }
         >
           {label}
         </AppText>

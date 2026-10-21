@@ -8,6 +8,7 @@ import { PinsController } from "./controllers/pins.controller";
 import { CustomCategory } from "./entities/custom-category.entity";
 import { HiddenCategory } from "./entities/hidden-category.entity";
 import { Item } from "./entities/item.entity";
+import { ListShopLock } from "./entities/list-shop-lock.entity";
 import { Pin } from "./entities/pin.entity";
 import { ShoppingList } from "./entities/shopping-list.entity";
 import { CATEGORIES_REPOSITORY } from "./repo/categories-repo/categories.repository";
@@ -22,10 +23,19 @@ import { CategoriesService } from "./services/categories.service";
 import { ItemsService } from "./services/items.service";
 import { PinsScheduler } from "./services/pins.scheduler";
 import { PinsService } from "./services/pins.service";
+import { ShopLocksService } from "./services/shop-locks.service";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Item, ShoppingList, Pin, User, CustomCategory, HiddenCategory]),
+    TypeOrmModule.forFeature([
+      Item,
+      ShoppingList,
+      ListShopLock,
+      Pin,
+      User,
+      CustomCategory,
+      HiddenCategory,
+    ]),
     HomesModule,
     NotificationsModule,
   ],
@@ -35,6 +45,7 @@ import { PinsService } from "./services/pins.service";
     PinsService,
     PinsScheduler,
     CategoriesService,
+    ShopLocksService,
     { provide: ITEMS_REPOSITORY, useClass: TypeormItemsRepository },
     { provide: LISTS_REPOSITORY, useClass: TypeormListsRepository },
     { provide: PINS_REPOSITORY, useClass: TypeormPinsRepository },

@@ -7,6 +7,7 @@ import {
   ReadexPro_700Bold,
   useFonts,
 } from "@expo-google-fonts/readex-pro";
+import { Platform } from "react-native";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
@@ -45,8 +46,15 @@ function ThemedNavigation() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="item" />
         <Stack.Screen name="trip" />
-        <Stack.Screen name="pins" />
-        <Stack.Screen name="categories" />
+        <Stack.Screen name="pins" options={{ animation: "fade" }} />
+        <Stack.Screen
+          name="categories"
+          options={{
+            animation:
+              Platform.OS === "android" ? "ios_from_right" : "slide_from_right",
+            fullScreenGestureShadowEnabled: false,
+          }}
+        />
         <Stack.Screen name="legal" />
       </Stack>
     </>

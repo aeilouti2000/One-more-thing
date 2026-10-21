@@ -118,7 +118,7 @@ export function QuickAddBar({
     <View
       className={`${footer ? "mb-4" : "mb-3"} overflow-hidden rounded-3xl`}
       style={{
-        backgroundColor: dark ? colors.deep : colors.mist,
+        backgroundColor: dark ? colors.paper : colors.mist,
         borderWidth: tabBar.borderWidth,
         borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
         shadowColor: scheme === "dark" ? "#000000" : colors.ink,
@@ -136,7 +136,9 @@ export function QuickAddBar({
               pointerEvents="none"
               style={[
                 styles.hintRow,
-                isRTL ? { flexDirection: "row-reverse" } : null,
+                // Root layout already sets direction for Arabic; do not
+                // row-reverse or the hint starts on the left again.
+                { justifyContent: "flex-start" },
               ]}
             >
               <TypewriterText
@@ -335,6 +337,7 @@ function TypewriterText({
         fontSize,
         fontFamily: "ReadexPro_400Regular",
         textAlign: isRTL ? "right" : "left",
+        writingDirection: isRTL ? "rtl" : "ltr",
         includeFontPadding: false,
       }}
     >

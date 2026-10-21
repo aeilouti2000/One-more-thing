@@ -35,7 +35,7 @@ export function EditButton({
       style={{ backgroundColor }}
     >
       <Ionicons
-        name="create-outline"
+        name="pencil"
         size={compact ? 15 : iconSize.sm}
         color={onPaper ? colors.accent : colors.ink}
       />

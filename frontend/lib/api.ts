@@ -164,7 +164,12 @@ async function request<T>(path: string, init: RequestInit = {}, auth = true, all
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, { ...init, headers });
+    response = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers,
+      // Avoid serving a stale household after cost-settings PATCH (web HTTP cache).
+      cache: "no-store",
+    });
   } catch (error) {
     throw new ApiError(error instanceof Error ? error.message : "Network request failed", "NETWORK");
   }

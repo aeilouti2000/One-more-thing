@@ -23,9 +23,6 @@ import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
-/** Unfinished ring on the app mark. Stays orange when the accent changes. */
-const MARK = "#F5A623";
-
 type AuthFieldProps = {
   label: string;
   value: string;
@@ -108,25 +105,27 @@ export function AuthFrame({ children }: { children: ReactNode }) {
   );
 }
 
-export function AuthBrand() {
+export function AuthBrand({ showName = true }: { showName?: boolean } = {}) {
   const { colors } = useTheme();
   const { t } = useI18n();
 
   return (
     <View style={styles.brand}>
-      <AppText
-        numberOfLines={1}
-        style={{
-          color: colors.accent,
-          fontWeight: "600",
-          fontSize: 11,
-          letterSpacing: 2.4,
-          textTransform: "uppercase",
-          textAlign: "center",
-        }}
-      >
-        {t("appName")}
-      </AppText>
+      {showName ? (
+        <AppText
+          numberOfLines={1}
+          style={{
+            color: colors.accent,
+            fontWeight: "600",
+            fontSize: 11,
+            letterSpacing: 2.4,
+            textTransform: "uppercase",
+            textAlign: "center",
+          }}
+        >
+          {t("appName")}
+        </AppText>
+      ) : null}
       <View style={styles.logoWrap}>
         <View
           pointerEvents="none"
@@ -290,14 +289,6 @@ export function AuthButton({ label, onPress, disabled = false, loading = false }
             {label}
           </AppText>
         )}
-        <View
-          pointerEvents="none"
-          style={[
-            styles.mark,
-            { backgroundColor: MARK },
-            isRTL ? { left: 16 } : { right: 16 },
-          ]}
-        />
       </LinearGradient>
     </Pressable>
   );
@@ -455,13 +446,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 36,
-  },
-  mark: {
-    position: "absolute",
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    top: 21,
   },
   link: {
     alignItems: "center",

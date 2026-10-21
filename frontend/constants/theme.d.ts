@@ -1,5 +1,7 @@
 export type ThemeScheme = "light" | "dark";
 
+export type SurfaceDepth = "soft" | "default" | "deep" | "true";
+
 export type ThemeColors = {
   ice: string;
   paper: string;
@@ -17,14 +19,23 @@ export type ThemeColors = {
 };
 
 export const DEFAULT_ACCENT: string;
+export const DEFAULT_SURFACE_DEPTH: SurfaceDepth;
+export const SURFACE_DEPTH_LEVELS: readonly SurfaceDepth[];
 
 export const colors: ThemeColors;
 export const lightColors: ThemeColors;
 export const darkColors: ThemeColors;
 
-export function getColors(scheme: ThemeScheme, accentHex?: string): ThemeColors;
+export function getColors(
+  scheme: ThemeScheme,
+  accentHex?: string,
+  surfaceDepth?: SurfaceDepth,
+): ThemeColors;
 export function getCssVars(palette: ThemeColors): Record<string, string>;
 export function normalizeHex(value: string | null | undefined): string | null;
+export function normalizeSurfaceDepth(
+  value: string | null | undefined,
+): SurfaceDepth;
 export function hexToHsl(hex: string): { h: number; s: number; l: number };
 export function hslToHex(h: number, s: number, l: number): string;
 export function withAlpha(hex: string, alpha: number): string;

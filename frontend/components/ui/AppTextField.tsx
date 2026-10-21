@@ -8,7 +8,7 @@ import { useFontScale } from "@/providers/FontScaleProvider";
 import { preserveSpaces } from "@/constants/text";
 
 type AppTextFieldProps = {
-  label: string;
+  label?: string;
   value: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
@@ -56,19 +56,23 @@ export function AppTextField({
 
   return (
     <View className={compact ? "gap-1.5" : "gap-2"}>
-      <View className={compact ? "gap-0.5" : "gap-1"}>
-        <AppText className={`font-medium text-cove-muted ${compact ? "text-xs" : "text-sm"}`}>
-          {label}
-        </AppText>
-        {hint ? (
-          <AppText
-            className={`leading-4 ${compact ? "text-[11px]" : "text-xs"}`}
-            style={{ color: colors.muted, opacity: 0.62 }}
-          >
-            {hint}
-          </AppText>
-        ) : null}
-      </View>
+      {label || hint ? (
+        <View className={compact ? "gap-0.5" : "gap-1"}>
+          {label ? (
+            <AppText className={`font-medium text-cove-muted ${compact ? "text-xs" : "text-sm"}`}>
+              {label}
+            </AppText>
+          ) : null}
+          {hint ? (
+            <AppText
+              className={`leading-4 ${compact ? "text-[11px]" : "text-xs"}`}
+              style={{ color: colors.muted, opacity: 0.62 }}
+            >
+              {hint}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
       <TextInput
         value={value}
         onChangeText={onChangeText}

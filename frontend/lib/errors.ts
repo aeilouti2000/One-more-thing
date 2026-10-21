@@ -96,6 +96,9 @@ export function formatAppError(
   if (code === "LAST_LIST") {
     return translate("errorKeepOneList");
   }
+  if (code === "LIST_SHOPPING_LOCKED" || code === "SHOP_LOCK_GONE") {
+    return message || fallback;
+  }
   if (code === "CATEGORY_NAME_REQUIRED") {
     return translate("errorCategoryName");
   }

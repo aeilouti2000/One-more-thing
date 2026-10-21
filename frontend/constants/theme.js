@@ -1,7 +1,28 @@
 const DEFAULT_ACCENT = "#2196F3";
+const DEFAULT_SURFACE_DEPTH = "default";
+const SURFACE_DEPTH_LEVELS = ["soft", "default", "deep", "true"];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function normalizeSurfaceDepth(value) {
+  if (SURFACE_DEPTH_LEVELS.includes(value)) return value;
+  return DEFAULT_SURFACE_DEPTH;
+}
+
+/** 0 = soft (lifted), 1 = true dark. */
+function surfaceDepthAmount(depth) {
+  switch (normalizeSurfaceDepth(depth)) {
+    case "soft":
+      return 0;
+    case "deep":
+      return 0.7;
+    case "true":
+      return 1;
+    default:
+      return 0.35;
+  }
 }
 
 function normalizeHex(value) {
@@ -125,24 +146,32 @@ function withOnAccent(palette) {
   };
 }
 
-function buildColors(scheme, accentHex) {
+function darkSurface(tint, softHex, deepHex, tintSoft, tintDeep, depth) {
+  const base = mixHex(softHex, deepHex, depth);
+  const tintAmount = tintSoft + (tintDeep - tintSoft) * depth;
+  return mixHex(base, tint, tintAmount);
+}
+
+function buildColors(scheme, accentHex, surfaceDepth = DEFAULT_SURFACE_DEPTH) {
   const accent = normalizeHex(accentHex) ?? DEFAULT_ACCENT;
-  const { h, s } = hexToHsl(accent);
+  const { h, s, l } = hexToHsl(accent);
   const neutral = s < 12;
+  const depth = surfaceDepthAmount(surfaceDepth);
 
   if (neutral) {
     if (scheme === "dark") {
       return withOnAccent({
-        ice: "#0E0E0E",
-        paper: "#1A1A1A",
-        mist: "#2A2A2A",
-        line: "#3A3A3A",
-        muted: "#B0B0B0",
+        ice: mixHex("#121212", "#050505", depth),
+        paper: mixHex("#1E1E1E", "#0A0A0A", depth),
+        mist: mixHex("#2E2E2E", "#141414", depth),
+        line: mixHex("#404040", "#1E1E1E", depth),
+        muted: mixHex("#B0B0B0", "#9A9A9A", depth),
         ink: "#F2F2F2",
-        accent: "#E0E0E0",
-        accentDeep: "#BDBDBD",
-        soft: "#161616",
-        deep: "#121212",
+        // Respect a dark grey pick for buttons; keep a readability floor.
+        accent: hslToHex(0, 0, clamp(l, 22, 88)),
+        accentDeep: hslToHex(0, 0, clamp(l + 14, 36, 92)),
+        soft: mixHex("#181818", "#080808", depth),
+        deep: mixHex("#101010", "#030303", depth),
         white: "#FFFFFF",
         transparent: "transparent",
       });
@@ -167,24 +196,28 @@ function buildColors(scheme, accentHex) {
   const sat = clamp(s, 42, 88);
 
   if (scheme === "dark") {
-    // Keep surfaces near-neutral charcoal; accent carries the color.
+    // Surfaces stay near-neutral charcoal; depth darkens them.
+    // Accent follows the user's pick (including darker blues) with a contrast floor.
     const tint = hslToHex(h, clamp(sat * 0.4, 14, 32), 28);
+    const accentL = clamp(l, 24, 64);
     return withOnAccent({
-      ice: mixHex("#0B0D10", tint, 0.1),
-      paper: mixHex("#14171C", tint, 0.14),
-      mist: mixHex("#1C2128", tint, 0.16),
-      line: mixHex("#2A313A", tint, 0.18),
-      muted: hslToHex(h, clamp(sat * 0.28, 10, 24), 68),
+      ice: darkSurface(tint, "#0B0D10", "#030405", 0.1, 0.05, depth),
+      paper: darkSurface(tint, "#14171C", "#07090C", 0.14, 0.07, depth),
+      mist: darkSurface(tint, "#1C2128", "#0C1014", 0.16, 0.09, depth),
+      line: darkSurface(tint, "#2A313A", "#141A22", 0.18, 0.1, depth),
+      muted: hslToHex(h, clamp(sat * 0.28, 10, 24), mixHexLightness(68, 62, depth)),
       ink: hslToHex(h, clamp(sat * 0.1, 4, 14), 93),
-      accent: hslToHex(h, sat, 58),
-      accentDeep: hslToHex(h, clamp(sat * 0.7, 28, 56), 70),
-      soft: mixHex("#101318", tint, 0.12),
-      deep: mixHex("#090B0E", tint, 0.08),
+      accent: hslToHex(h, sat, accentL),
+      accentDeep: hslToHex(h, clamp(sat * 0.7, 28, 56), clamp(accentL + 12, 36, 78)),
+      soft: darkSurface(tint, "#101318", "#06080A", 0.12, 0.06, depth),
+      deep: darkSurface(tint, "#090B0E", "#020304", 0.08, 0.04, depth),
       white: "#FFFFFF",
       transparent: "transparent",
     });
   }
 
+  // Light scheme: keep surfaces derived from hue; accent respects pick within a usable band.
+  const accentL = clamp(l, 38, 58);
   return withOnAccent({
     ice: hslToHex(h, clamp(sat, 40, 72), 94),
     paper: "#FFFFFF",
@@ -192,13 +225,17 @@ function buildColors(scheme, accentHex) {
     line: hslToHex(h, clamp(sat, 40, 72), 78),
     muted: hslToHex(h, clamp(sat + 8, 48, 86), 38),
     ink: hslToHex(h, clamp(sat + 12, 52, 90), 28),
-    accent: hslToHex(h, sat, 54),
+    accent: hslToHex(h, sat, accentL),
     accentDeep: hslToHex(h, clamp(sat + 12, 52, 90), 28),
     soft: hslToHex(h, clamp(sat, 40, 72), 94),
     deep: hslToHex(h, clamp(sat + 12, 52, 90), 28),
     white: "#FFFFFF",
     transparent: "transparent",
   });
+}
+
+function mixHexLightness(from, to, amount) {
+  return from + (to - from) * clamp(amount, 0, 1);
 }
 
 const lightColors = buildColors("light", DEFAULT_ACCENT);
@@ -272,8 +309,12 @@ const shadow = {
   elevation: 12,
 };
 
-function getColors(scheme, accentHex = DEFAULT_ACCENT) {
-  return buildColors(scheme, accentHex);
+function getColors(
+  scheme,
+  accentHex = DEFAULT_ACCENT,
+  surfaceDepth = DEFAULT_SURFACE_DEPTH,
+) {
+  return buildColors(scheme, accentHex, surfaceDepth);
 }
 
 function glassFieldStyle(scheme, palette = getColors(scheme)) {
@@ -373,12 +414,15 @@ const theme = {
 
 module.exports = {
   DEFAULT_ACCENT,
+  DEFAULT_SURFACE_DEPTH,
+  SURFACE_DEPTH_LEVELS,
   colors,
   lightColors,
   darkColors,
   getColors,
   getCssVars,
   normalizeHex,
+  normalizeSurfaceDepth,
   hexToHsl,
   hslToHex,
   withAlpha,

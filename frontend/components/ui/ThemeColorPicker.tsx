@@ -10,11 +10,14 @@ import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { FormSheetModal } from "@/components/ui/FormSheetModal";
+import { SegmentedToggle } from "@/components/ui/SegmentedToggle";
 import {
   DEFAULT_ACCENT,
+  DEFAULT_SURFACE_DEPTH,
   floatedCardStyle,
   getColors,
   hexToHsl,
+  type SurfaceDepth,
   withAlpha,
 } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -81,7 +84,7 @@ const THUMB = 22;
 
 export function ThemeColorPicker() {
   const { t } = useI18n();
-  const { accent, colors, scheme, setAccent } = useTheme();
+  const { accent, colors, scheme, setAccent, surfaceDepth, setSurfaceDepth } = useTheme();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Hsv>(() => hexToHsv(accent));
   const [draftAccent, setDraftAccent] = useState(accent);
@@ -96,9 +99,23 @@ export function ThemeColorPicker() {
   }
 
   const draftHex = useMemo(() => hsvToHex(draft), [draft]);
-  const draftPalette = useMemo(() => getColors(scheme, draftHex), [scheme, draftHex]);
+  const draftPalette = useMemo(
+    () => getColors(scheme, draftHex, surfaceDepth),
+    [scheme, draftHex, surfaceDepth],
+  );
   const pureHue = useMemo(() => hsvToHex({ h: draft.h, s: 1, v: 1 }), [draft.h]);
   const dirty = draftHex.toUpperCase() !== accent.toUpperCase();
+  const depthDirty = surfaceDepth !== DEFAULT_SURFACE_DEPTH;
+  const depthOptions = useMemo(
+    () =>
+      [
+        { id: "soft" as const, label: t("surfaceDepthSoft") },
+        { id: "default" as const, label: t("surfaceDepthDefault") },
+        { id: "deep" as const, label: t("surfaceDepthDeep") },
+        { id: "true" as const, label: t("surfaceDepthTrue") },
+      ] satisfies { id: SurfaceDepth; label: string }[],
+    [t],
+  );
 
   function openPicker() {
     setDraft(hexToHsv(accent));
@@ -122,6 +139,7 @@ export function ThemeColorPicker() {
     setDraft(hexToHsv(DEFAULT_ACCENT));
     setDraftAccent(DEFAULT_ACCENT);
     setAccent(DEFAULT_ACCENT);
+    setSurfaceDepth(DEFAULT_SURFACE_DEPTH);
     setOpen(false);
   }
 
@@ -224,16 +242,31 @@ export function ThemeColorPicker() {
         </View>
       </View>
 
-      {accent.toUpperCase() !== DEFAULT_ACCENT.toUpperCase() ? (
+      {accent.toUpperCase() !== DEFAULT_ACCENT.toUpperCase() || depthDirty ? (
         <Pressable onPress={resetColor} className="mt-3 self-start active:opacity-80">
           <AppText className="text-sm font-semibold text-cove-accent">{t("themeColorReset")}</AppText>
         </Pressable>
       ) : null}
 
+      {scheme === "dark" ? (
+        <View className="mt-5">
+          <AppText className="text-sm font-medium text-cove-muted">{t("surfaceDepth")}</AppText>
+          <AppText className="mt-1 text-sm text-cove-muted">{t("surfaceDepthBody")}</AppText>
+          <View className="mt-3">
+            <SegmentedToggle
+              value={surfaceDepth}
+              options={depthOptions}
+              onChange={setSurfaceDepth}
+              accessibilityLabel={t("surfaceDepth")}
+            />
+          </View>
+        </View>
+      ) : null}
+
       <FormSheetModal visible={open} onClose={closePicker}>
         <View
           className="overflow-hidden rounded-3xl px-4 py-4"
-          style={floatedCardStyle(scheme, colors)}
+          style={floatedCardStyle(scheme, draftPalette)}
         >
           <GlassFill soft neutral />
           <View className="mb-4 flex-row items-center gap-3">
@@ -242,9 +275,9 @@ export function ThemeColorPicker() {
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                backgroundColor: draftHex,
+                backgroundColor: draftPalette.accent,
                 borderWidth: 2,
-                borderColor: withAlpha(colors.ink, 0.18),
+                borderColor: withAlpha(draftPalette.ink, 0.18),
               }}
             />
             <View className="min-w-0 flex-1">
@@ -357,18 +390,34 @@ export function ThemeColorPicker() {
             </View>
           </View>
 
+          {scheme === "dark" ? (
+            <View className="mt-4">
+              <AppText className="mb-2 text-sm font-medium text-cove-muted">
+                {t("surfaceDepth")}
+              </AppText>
+              <SegmentedToggle
+                value={surfaceDepth}
+                options={depthOptions}
+                onChange={setSurfaceDepth}
+                accessibilityLabel={t("surfaceDepth")}
+              />
+            </View>
+          ) : null}
+
           <View className="mt-4 gap-2">
             <AppButton
               label={t("themeColorApply")}
               disabled={!dirty}
               onPress={applyColor}
+              style={{ backgroundColor: draftPalette.accent }}
+              labelStyle={{ color: draftPalette.onAccent }}
             />
             <AppButton
               label={t("themeColorClose")}
               variant="ghost"
               onPress={closePicker}
             />
-            {accent.toUpperCase() !== DEFAULT_ACCENT.toUpperCase() || dirty ? (
+            {accent.toUpperCase() !== DEFAULT_ACCENT.toUpperCase() || dirty || depthDirty ? (
               <Pressable onPress={resetColor} className="items-center py-2 active:opacity-80">
                 <AppText className="text-sm font-semibold text-cove-accent">
                   {t("themeColorReset")}

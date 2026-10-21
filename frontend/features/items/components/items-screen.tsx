@@ -42,7 +42,10 @@ import { ItemDetailCard } from "@/features/items/components/item-detail-card";
 import { PurchaseRow } from "@/features/items/components/purchase-row";
 import { QuickAddBar } from "@/features/items/components/quick-add-bar";
 import { ReorderableList } from "@/features/items/components/reorderable-list";
+import { ShopButton } from "@/features/items/components/shop-button";
 import { SwipeableItem } from "@/features/items/components/swipeable-item";
+import { firstName } from "@/features/items/api/shop-locks";
+import { useShopLock } from "@/features/items/hooks/use-shop-lock";
 import {
   readSwipeActions,
   subscribeSwipeActions,
@@ -174,6 +177,16 @@ export default function ItemsScreen() {
   const [isAddingDetails, setIsAddingDetails] = useState(false);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [bulkCostIds, setBulkCostIds] = useState<string[] | null>(null);
+  const multiMemberHome = (household?.members.length ?? 0) > 1;
+  const {
+    lock: shopLock,
+    blockedByOther: shopBlocked,
+    refresh: refreshShopLock,
+  } = useShopLock({
+    homeId: household?.id,
+    listId: selectedListId,
+    enabled: multiMemberHome,
+  });
 
   const openItem = openItemId
     ? (purchases.find((item) => item.id === openItemId) ?? null)
@@ -587,6 +600,13 @@ export default function ItemsScreen() {
     }, [isSelecting]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!multiMemberHome) return;
+      void refreshShopLock();
+    }, [multiMemberHome, refreshShopLock]),
+  );
+
   const rowHandlers = useRef({
     askDelete,
     markBoughtIds,
@@ -793,6 +813,15 @@ export default function ItemsScreen() {
 
   function openShop() {
     if (!selectedListId || visibleItems.length === 0) return;
+    if (shopBlocked) {
+      setFloatTone("error");
+      setFloatMessage(
+        t("shopLockedToast", {
+          name: firstName(shopLock?.shopperName) || t("partner"),
+        }),
+      );
+      return;
+    }
     router.push({
       pathname: "/trip",
       params: {
@@ -1009,32 +1038,13 @@ export default function ItemsScreen() {
                     {t("pin")}
                   </AppText>
                 </Pressable>
-                <Pressable
+                <ShopButton
+                  count={visibleItems.length}
                   disabled={shopDisabled}
+                  lockedByName={shopBlocked ? shopLock?.shopperName : null}
+                  className={categoryLabelIsLong ? "shrink-0" : "min-w-0 flex-1"}
                   onPress={openShop}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("shopWithCount", {
-                    count: visibleItems.length,
-                  })}
-                  accessibilityState={{ disabled: shopDisabled }}
-                  className={`${categoryLabelIsLong ? "shrink-0" : "min-w-0 flex-1"} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2 ${
-                    shopDisabled ? "opacity-45" : "active:opacity-60"
-                  }`}
-                  style={{ backgroundColor: withAlpha(colors.accent, 0.12) }}
-                >
-                  <MaterialCommunityIcons
-                    name="cart"
-                    size={16}
-                    color={colors.accent}
-                  />
-                  <AppText
-                    numberOfLines={1}
-                    className="shrink text-sm font-semibold"
-                    style={{ color: colors.accent }}
-                  >
-                    {t("shopWithCount", { count: visibleItems.length })}
-                  </AppText>
-                </Pressable>
+                />
               </View>
             }
           />

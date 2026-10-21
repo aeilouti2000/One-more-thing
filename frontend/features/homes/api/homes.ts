@@ -25,9 +25,9 @@ function withCostDefaults(home: Household): Household {
 
 export async function fetchMyHousehold(): Promise<Household | null> {
   try {
-    const home = withCostDefaults(await api.get<Household>("/homes/mine"));
-    writeCachedHousehold(home);
-    return home;
+    // Caller (refresh / adoptHome) writes the profile cache after it commits the
+    // result, so an in-flight GET cannot overwrite a newer adoptHome write.
+    return withCostDefaults(await api.get<Household>("/homes/mine"));
   } catch (error) {
     if (error instanceof ApiError && error.code === "NO_HOME") {
       writeCachedHousehold(null);
@@ -90,6 +90,7 @@ export async function updateCostSettings(homeId: string, settings: Partial<CostS
     const home = withCostDefaults(
       await api.patch<Household>(`/homes/${homeId}/cost-settings`, settings),
     );
+    writeCachedHousehold(home);
     return { home, error: null };
   } catch (error) {
     return { home: null, error: formatAppError(error) };

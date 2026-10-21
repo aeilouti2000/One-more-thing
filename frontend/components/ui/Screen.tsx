@@ -50,6 +50,8 @@ type ScreenProps = {
   scroll?: boolean;
   scrollEnabled?: boolean;
   tabBarInset?: boolean;
+  /** Keep content below the status bar. Off by default so ScreenHeader can cover it. */
+  safeTop?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
   floating?: ReactNode;
@@ -90,6 +92,7 @@ export function Screen({
   scroll = true,
   scrollEnabled = true,
   tabBarInset = false,
+  safeTop = false,
   refreshing = false,
   onRefresh,
   floating,
@@ -109,7 +112,6 @@ export function Screen({
   const isAnimating = useSharedValue(false);
   const canNext = useSharedValue(1);
   const canPrev = useSharedValue(1);
-  const headerSurface = scheme === "dark" ? colors.deep : colors.accent;
   const padding = tabBarInset
     ? top
       ? "px-4 pb-32 pt-4"
@@ -117,7 +119,6 @@ export function Screen({
     : top
       ? "px-4 pb-10 pt-4"
       : "px-4 pb-10 pt-2";
-
   useEffect(() => {
     swipeRef.current = onSwipe;
   }, [onSwipe]);
@@ -326,24 +327,9 @@ export function Screen({
     <SafeAreaView
       className="flex-1 bg-cove-ice"
       style={{ backgroundColor: colors.ice }}
-      edges={top ? [] : ["top"]}
+      edges={safeTop && !top ? ["top"] : []}
     >
-      {top ? (
-        <View style={{ zIndex: 2, paddingTop: insets.top }}>
-          <View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              height: insets.top,
-              backgroundColor: headerSurface,
-            }}
-          />
-          {top}
-        </View>
-      ) : null}
+      {top ? <View style={{ zIndex: 2 }}>{top}</View> : null}
       {scroll ? (
         onSwipe ? (
           swipeBody

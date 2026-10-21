@@ -16,6 +16,7 @@ import {
 } from "../dto/items.dto";
 import { CategoriesService } from "../services/categories.service";
 import { ItemsService } from "../services/items.service";
+import { ShopLocksService } from "../services/shop-locks.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
@@ -23,6 +24,7 @@ export class ItemsController {
   constructor(
     private readonly items: ItemsService,
     private readonly categories: CategoriesService,
+    private readonly shopLocks: ShopLocksService,
   ) {}
 
   @Get("homes/:homeId/lists")
@@ -61,6 +63,42 @@ export class ItemsController {
     @Param("listId", ParseUUIDPipe) listId: string,
   ) {
     return this.items.deleteList(user.id, homeId, listId);
+  }
+
+  @Get("homes/:homeId/lists/:listId/shop-lock")
+  shopLockStatus(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Param("listId", ParseUUIDPipe) listId: string,
+  ) {
+    return this.shopLocks.status(user.id, homeId, listId);
+  }
+
+  @Post("homes/:homeId/lists/:listId/shop-lock")
+  claimShopLock(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Param("listId", ParseUUIDPipe) listId: string,
+  ) {
+    return this.shopLocks.claim(user.id, homeId, listId);
+  }
+
+  @Post("homes/:homeId/lists/:listId/shop-lock/heartbeat")
+  heartbeatShopLock(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Param("listId", ParseUUIDPipe) listId: string,
+  ) {
+    return this.shopLocks.heartbeat(user.id, homeId, listId);
+  }
+
+  @Delete("homes/:homeId/lists/:listId/shop-lock")
+  releaseShopLock(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Param("listId", ParseUUIDPipe) listId: string,
+  ) {
+    return this.shopLocks.release(user.id, homeId, listId);
   }
 
   @Get("homes/:homeId/categories")

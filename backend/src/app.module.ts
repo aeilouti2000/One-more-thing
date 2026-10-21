@@ -10,6 +10,7 @@ import { ItemSortOrder1740000000006 } from "./database/migrations/1740000000006-
 import { CustomCategories1740000000008 } from "./database/migrations/1740000000008-CustomCategories";
 import { ItemCosts1740000000009 } from "./database/migrations/1740000000009-ItemCosts";
 import { SoftDeleteLists1740000000010 } from "./database/migrations/1740000000010-SoftDeleteLists";
+import { ListShopLocks1740000000011 } from "./database/migrations/1740000000011-ListShopLocks";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
 import { ShoppingTrip1740000000004 } from "./database/migrations/1740000000004-ShoppingTrip";
@@ -25,6 +26,7 @@ import { HomesModule } from "./modules/homes/homes.module";
 import { CustomCategory } from "./modules/items/entities/custom-category.entity";
 import { HiddenCategory } from "./modules/items/entities/hidden-category.entity";
 import { Item } from "./modules/items/entities/item.entity";
+import { ListShopLock } from "./modules/items/entities/list-shop-lock.entity";
 import { Pin } from "./modules/items/entities/pin.entity";
 import { ShoppingList } from "./modules/items/entities/shopping-list.entity";
 import { ItemsModule } from "./modules/items/items.module";
@@ -56,6 +58,7 @@ import { User } from "./users/user.entity";
             HomeMember,
             Item,
             ShoppingList,
+            ListShopLock,
             Pin,
             PushToken,
             CustomCategory,
@@ -73,6 +76,7 @@ import { User } from "./users/user.entity";
             CustomCategories1740000000008,
             ItemCosts1740000000009,
             SoftDeleteLists1740000000010,
+            ListShopLocks1740000000011,
           ],
           migrationsRun: true,
         };

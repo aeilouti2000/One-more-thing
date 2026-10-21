@@ -26,10 +26,17 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { getCategoryLabel } from "@/constants/categories";
 import { useCategories } from "@/features/items/providers/categories-provider";
-import { iconSize } from "@/constants/theme";
+import { headerActionStyle, iconSize } from "@/constants/theme";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { listLabel } from "@/features/items/api/lists";
+import {
+  claimShopLock,
+  firstName,
+  heartbeatShopLock,
+  releaseShopLock,
+  SHOP_LOCK_HEARTBEAT_MS,
+} from "@/features/items/api/shop-locks";
 import { canUndoBought, formatNeededShare, shareNeededText } from "@/features/items/utils/share-list";
 import { pickReceiptPhoto, interpretReceiptPhoto, type ReceiptScan } from "@/features/items/utils/scan-receipt";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -56,7 +63,8 @@ function TripBody() {
   const { household } = useHousehold();
   const { t, locale } = useI18n();
   const { categories } = useCategories();
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
+  const headerAction = headerActionStyle(scheme, colors);
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ listId?: string; listName?: string; category?: string }>();
   const listId = typeof params.listId === "string" && params.listId.length > 0 ? params.listId : null;
@@ -160,10 +168,80 @@ function TripBody() {
     return () => clearInterval(timer);
   }, [undoId]);
 
+  const multiMemberHome = (household?.members.length ?? 0) > 1;
+  const homeId = household?.id ?? null;
+  const lockHeldRef = useRef(false);
+
   function exitTrip() {
     allowLeaveRef.current = true;
+    if (lockHeldRef.current && homeId && listId) {
+      lockHeldRef.current = false;
+      void releaseShopLock(homeId, listId);
+    }
     router.back();
   }
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!multiMemberHome || !homeId || !listId) return;
+
+      let cancelled = false;
+      lockHeldRef.current = false;
+
+      void (async () => {
+        const claimed = await claimShopLock(homeId, listId);
+        if (cancelled) {
+          if (claimed.lock?.isMine) void releaseShopLock(homeId, listId);
+          return;
+        }
+        if (claimed.lock?.active && !claimed.lock.isMine) {
+          setActionError(
+            t("shopLockedToast", {
+              name: firstName(claimed.lock.shopperName) || t("partner"),
+            }),
+          );
+          allowLeaveRef.current = true;
+          router.back();
+          return;
+        }
+        if (claimed.lock?.isMine) {
+          lockHeldRef.current = true;
+          return;
+        }
+        // Network hiccup: keep shopping and retry on the next heartbeat tick.
+        lockHeldRef.current = true;
+      })();
+
+      const timer = setInterval(() => {
+        if (AppState.currentState !== "active") return;
+        if (!lockHeldRef.current) return;
+        void heartbeatShopLock(homeId, listId).then(async (result) => {
+          if (result.lock?.isMine) return;
+          const retry = await claimShopLock(homeId, listId);
+          if (retry.lock?.isMine) return;
+          if (retry.lock?.active && !retry.lock.isMine) {
+            lockHeldRef.current = false;
+            setActionError(
+              t("shopLockedToast", {
+                name: firstName(retry.lock.shopperName) || t("partner"),
+              }),
+            );
+            allowLeaveRef.current = true;
+            router.back();
+          }
+        });
+      }, SHOP_LOCK_HEARTBEAT_MS);
+
+      return () => {
+        cancelled = true;
+        clearInterval(timer);
+        if (lockHeldRef.current) {
+          lockHeldRef.current = false;
+          void releaseShopLock(homeId, listId);
+        }
+      };
+    }, [homeId, listId, multiMemberHome, t]),
+  );
 
   async function askCostForItem(item: Purchase): Promise<number | null | undefined> {
     if (!askCostOnCheck) return null;
@@ -397,9 +475,10 @@ function TripBody() {
             disabled={tripItems.length === 0}
             accessibilityRole="button"
             accessibilityLabel={t("shareList")}
-            className="h-11 w-11 items-center justify-center rounded-full bg-white active:opacity-80"
+            className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
+            style={{ backgroundColor: headerAction.backgroundColor }}
           >
-            <Ionicons name="share-outline" size={iconSize.sm} color={colors.accent} />
+            <Ionicons name="share-outline" size={iconSize.sm} color={headerAction.color} />
           </Pressable>
         }
       />

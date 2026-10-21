@@ -62,10 +62,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    const initiatingUserId = user?.id ?? null;
+    const initiatingUserId = userId;
     const requestSequence = ++requestSequenceRef.current;
 
-    if (!user) {
+    if (!userId) {
       setHousehold(null);
       setHomes([]);
       setError(null);
@@ -84,11 +84,16 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       setHousehold(next);
       if (!next) {
         setHomes([]);
+        writeCachedHousehold(null);
       } else if (!listed.error) {
         setHomes(listed.homes);
+        writeCachedHousehold(next, listed.homes);
       } else if (isOfflineMessage(listed.error)) {
         const cachedHomes = readCachedHousehold()?.homes ?? [];
         if (cachedHomes.length > 0) setHomes(cachedHomes);
+        writeCachedHousehold(next, cachedHomes.length > 0 ? cachedHomes : undefined);
+      } else {
+        writeCachedHousehold(next);
       }
       setError(listed.error && isOfflineMessage(listed.error) ? null : listed.error);
       setIsLoading(false);
@@ -112,7 +117,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       return null;
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     currentUserIdRef.current = user?.id ?? null;

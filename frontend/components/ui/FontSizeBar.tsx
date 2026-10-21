@@ -1,5 +1,13 @@
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { appFont, type FontScaleLevel } from "@/constants/font";
+import { radius } from "@/constants/theme";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -11,10 +19,17 @@ const LEVELS: { id: FontScaleLevel; sample: number }[] = [
   { id: "xl", sample: 26 },
 ];
 
+const TRACK_PAD = 4;
+
 export function FontSizeBar() {
   const { level, setLevel } = useFontScale();
   const { t } = useI18n();
   const { colors } = useTheme();
+  const selectedIndex = Math.max(0, LEVELS.findIndex((option) => option.id === level));
+  const progress = useSharedValue(selectedIndex);
+  const trackWidth = useSharedValue(0);
+  const count = LEVELS.length;
+
   const labels = {
     small: t("textSizeSmall"),
     medium: t("textSizeMedium"),
@@ -22,13 +37,62 @@ export function FontSizeBar() {
     xl: t("textSizeXl"),
   } as const;
 
+  useEffect(() => {
+    progress.value = withTiming(selectedIndex, { duration: 240 });
+  }, [progress, selectedIndex]);
+
+  const thumbStyle = useAnimatedStyle(() => {
+    const inner = Math.max(0, trackWidth.value - TRACK_PAD * 2);
+    const cell = inner / count;
+    return {
+      width: cell,
+      left: TRACK_PAD + progress.value * cell,
+    };
+  });
+
+  function select(id: FontScaleLevel) {
+    if (id === level) return;
+    void Haptics.selectionAsync();
+    setLevel(id);
+  }
+
   return (
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={t("textSize")}
-      className="w-full flex-row items-end gap-2"
-      style={{ direction: "ltr" }}
+      onLayout={(event) => {
+        trackWidth.value = event.nativeEvent.layout.width;
+      }}
+      style={{
+        direction: "ltr",
+        flexDirection: "row",
+        alignItems: "stretch",
+        height: 78,
+        padding: TRACK_PAD,
+        borderRadius: radius.md,
+        backgroundColor: colors.mist,
+        alignSelf: "stretch",
+      }}
     >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: "absolute",
+            top: TRACK_PAD,
+            bottom: TRACK_PAD,
+            left: 0,
+            borderRadius: radius.md,
+            backgroundColor: colors.accent,
+            shadowColor: colors.accent,
+            shadowOpacity: 0.28,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 3 },
+            elevation: 3,
+          },
+          thumbStyle,
+        ]}
+      />
       {LEVELS.map((option) => {
         const selected = level === option.id;
         return (
@@ -37,17 +101,16 @@ export function FontSizeBar() {
             accessibilityRole="radio"
             accessibilityLabel={labels[option.id]}
             accessibilityState={{ selected }}
-            onPress={() => setLevel(option.id)}
-            className={`min-w-0 flex-1 items-center justify-end rounded-2xl px-1 py-2.5 active:opacity-80 ${
-              selected ? "bg-cove-accent" : "bg-cove-paper"
-            }`}
+            onPress={() => select(option.id)}
+            className="z-[1] min-w-0 flex-1 items-center justify-center active:opacity-90"
+            style={{ paddingHorizontal: 4 }}
           >
             <Text
               allowFontScaling={false}
               style={{
                 fontFamily: appFont.semibold,
                 fontSize: option.sample,
-                lineHeight: option.sample + 6,
+                lineHeight: option.sample + 4,
                 color: selected ? colors.onAccent : colors.ink,
               }}
             >

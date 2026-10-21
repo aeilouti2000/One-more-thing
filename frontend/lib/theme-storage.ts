@@ -1,8 +1,16 @@
 import "@/features/auth/utils/session-storage";
-import { DEFAULT_ACCENT, normalizeHex, type ThemeScheme } from "@/constants/theme";
+import {
+  DEFAULT_ACCENT,
+  DEFAULT_SURFACE_DEPTH,
+  normalizeHex,
+  normalizeSurfaceDepth,
+  type SurfaceDepth,
+  type ThemeScheme,
+} from "@/constants/theme";
 
 const THEME_STORAGE_KEY = "one-more-thing.theme";
 const THEME_ACCENT_STORAGE_KEY = "one-more-thing.theme-accent";
+const THEME_SURFACE_DEPTH_STORAGE_KEY = "one-more-thing.theme-surface-depth";
 
 function storage() {
   try {
@@ -49,5 +57,22 @@ export function writeStoredAccent(accent: string) {
     storage()?.setItem(THEME_ACCENT_STORAGE_KEY, next);
   } catch {
     // Keep the active in-memory accent when persistence is unavailable.
+  }
+}
+
+export function readStoredSurfaceDepth(): SurfaceDepth {
+  try {
+    const value = storage()?.getItem(THEME_SURFACE_DEPTH_STORAGE_KEY);
+    return normalizeSurfaceDepth(value);
+  } catch {
+    return DEFAULT_SURFACE_DEPTH;
+  }
+}
+
+export function writeStoredSurfaceDepth(depth: SurfaceDepth) {
+  try {
+    storage()?.setItem(THEME_SURFACE_DEPTH_STORAGE_KEY, normalizeSurfaceDepth(depth));
+  } catch {
+    // Keep the active in-memory depth when persistence is unavailable.
   }
 }

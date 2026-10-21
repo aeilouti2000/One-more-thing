@@ -85,7 +85,7 @@ export function SegmentedToggle<T extends string>({
             top: TRACK_PAD,
             bottom: TRACK_PAD,
             left: 0,
-            borderRadius: 80,
+            borderRadius: radius.md,
             backgroundColor: colors.accent,
             shadowColor: colors.accent,
             shadowOpacity: 0.28,
@@ -110,12 +110,15 @@ export function SegmentedToggle<T extends string>({
           >
             <AppText
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
               allowFontScaling={false}
               className="font-semibold"
               style={{
                 color: selected ? colors.onAccent : colors.ink,
                 fontSize: compact ? 13 : 15,
                 lineHeight: compact ? 18 : 20,
+                textAlign: "center",
               }}
             >
               {option.label}

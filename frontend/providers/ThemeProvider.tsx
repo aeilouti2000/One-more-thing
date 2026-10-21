@@ -12,27 +12,34 @@ import * as SystemUI from "expo-system-ui";
 import { vars, useColorScheme } from "nativewind";
 import {
   DEFAULT_ACCENT,
+  DEFAULT_SURFACE_DEPTH,
   getColors,
   getCssVars,
   normalizeHex,
+  normalizeSurfaceDepth,
   shadow as baseShadow,
+  type SurfaceDepth,
   type ThemeColors,
   type ThemeScheme,
 } from "@/constants/theme";
 import {
   readStoredAccent,
+  readStoredSurfaceDepth,
   readStoredTheme,
   writeStoredAccent,
+  writeStoredSurfaceDepth,
   writeStoredTheme,
 } from "@/lib/theme-storage";
 
 type ThemeContextValue = {
   scheme: ThemeScheme;
   accent: string;
+  surfaceDepth: SurfaceDepth;
   colors: ThemeColors;
   shadow: typeof baseShadow;
   setScheme: (scheme: ThemeScheme) => void;
   setAccent: (accent: string) => void;
+  setSurfaceDepth: (depth: SurfaceDepth) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -41,8 +48,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const { setColorScheme } = useColorScheme();
   const [scheme, setSchemeState] = useState<ThemeScheme>(readStoredTheme);
   const [accent, setAccentState] = useState(readStoredAccent);
+  const [surfaceDepth, setSurfaceDepthState] = useState<SurfaceDepth>(readStoredSurfaceDepth);
 
-  const colors = useMemo(() => getColors(scheme, accent), [scheme, accent]);
+  const colors = useMemo(
+    () => getColors(scheme, accent, surfaceDepth),
+    [scheme, accent, surfaceDepth],
+  );
   const themeVars = useMemo(() => vars(getCssVars(colors)), [colors]);
   const shadow = useMemo(
     () => ({
@@ -69,10 +80,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     writeStoredTheme(scheme);
     writeStoredAccent(accent);
+    writeStoredSurfaceDepth(surfaceDepth);
     void SystemUI.setBackgroundColorAsync(colors.ice).catch(() => {
       // Web and some devices do not support a system background color.
     });
-  }, [scheme, accent, colors.ice, setColorScheme]);
+  }, [scheme, accent, surfaceDepth, colors.ice, setColorScheme]);
 
   const setScheme = useCallback((next: ThemeScheme) => {
     setSchemeState(next);
@@ -82,16 +94,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setAccentState(normalizeHex(next) ?? DEFAULT_ACCENT);
   }, []);
 
+  const setSurfaceDepth = useCallback((next: SurfaceDepth) => {
+    setSurfaceDepthState(normalizeSurfaceDepth(next) ?? DEFAULT_SURFACE_DEPTH);
+  }, []);
+
   const value = useMemo(
     () => ({
       scheme,
       accent,
+      surfaceDepth,
       colors,
       shadow,
       setScheme,
       setAccent,
+      setSurfaceDepth,
     }),
-    [scheme, accent, colors, shadow, setScheme, setAccent],
+    [scheme, accent, surfaceDepth, colors, shadow, setScheme, setAccent, setSurfaceDepth],
   );
 
   return (

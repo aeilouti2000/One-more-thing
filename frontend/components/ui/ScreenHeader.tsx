@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/AppText";
-import { iconSize, spacing } from "@/constants/theme";
+import { headerActionStyle, iconSize, spacing } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -34,19 +36,25 @@ export function ScreenHeader({
 }: ScreenHeaderProps) {
   const { colors, scheme } = useTheme();
   const { isRTL, t } = useI18n();
+  const insets = useSafeAreaInsets();
   const headerFg = scheme === "dark" ? colors.ink : colors.onAccent;
+  const backAction = headerActionStyle(scheme, colors);
+  const padTop = (compact ? spacing.lg : spacing.xl) + insets.top;
 
   return (
     <View
       className={`overflow-hidden rounded-b-3xl px-4 ${
-        compact ? "pb-4 pt-4" : "mb-6 pb-7 pt-5"
+        compact ? "pb-4" : "mb-6 pb-7"
       } ${scheme === "dark" ? "bg-cove-deep" : "bg-cove-accent"}`}
-      style={
-        flush
+      style={{
+        paddingTop: padTop,
+        ...(flush
           ? { marginHorizontal: -spacing.screen, marginTop: -spacing.sm }
-          : undefined
-      }
+          : null),
+      }}
     >
+      {/* Header sits on accent/deep — keep status icons light. */}
+      <StatusBar style="light" />
       <View
         pointerEvents="none"
         className="absolute -right-10 -top-16 h-40 w-5 rounded-full"
@@ -75,12 +83,13 @@ export function ScreenHeader({
               onPress={() => (onBack ? onBack() : router.back())}
               accessibilityRole="button"
               accessibilityLabel={t("back")}
-              className="h-10 w-10 items-center justify-center rounded-full bg-white"
+              className="h-10 w-10 items-center justify-center rounded-full active:opacity-80"
+              style={{ backgroundColor: backAction.backgroundColor }}
             >
               <Ionicons
                 name={isRTL ? "chevron-forward" : "chevron-back"}
                 size={iconSize.sm}
-                color={colors.accent}
+                color={backAction.color}
               />
             </Pressable>
           ) : null}

@@ -97,6 +97,7 @@ export function HomeCard({
         </Pressable>
         {isHost ? (
           <EditButton
+            compact
             variant="paper"
             accessibilityLabel={t("editHomeName")}
             onPress={startEditing}
