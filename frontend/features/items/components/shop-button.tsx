@@ -12,7 +12,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { firstName } from "@/features/items/api/shop-locks";
-import { withAlpha } from "@/constants/theme";
+import { tabBar, withAlpha } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -26,10 +26,11 @@ type Props = {
 
 export function ShopButton({ count, disabled, lockedByName, className, onPress }: Props) {
   const { t } = useI18n();
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const locked = Boolean(lockedByName);
   const inactive = disabled || locked;
   const shopper = firstName(lockedByName);
+  const dark = scheme === "dark";
 
   const cartX = useSharedValue(0);
   const cartBob = useSharedValue(0);
@@ -91,13 +92,15 @@ export function ShopButton({ count, disabled, lockedByName, className, onPress }
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive }}
-      className={`${className ?? ""} flex-row items-center justify-center gap-1 overflow-hidden rounded-xl px-3 py-2 ${
+      className={`${className ?? ""} flex-row items-center justify-center gap-1 overflow-hidden rounded-xl px-3 py-2.5 ${
         inactive && !locked ? "opacity-45" : locked ? "" : "active:opacity-60"
       }`}
       style={{
         backgroundColor: locked
           ? withAlpha(colors.accent, 0.18)
-          : withAlpha(colors.accent, 0.12),
+          : colors.paper,
+        borderWidth: tabBar.borderWidth,
+        borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
       }}
     >
       {locked ? (

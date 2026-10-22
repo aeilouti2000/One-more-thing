@@ -3,7 +3,7 @@ import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { appFont, scaleFontSize, singleLineInput } from "@/constants/font";
-import { glassFieldStyle, withAlpha } from "@/constants/theme";
+import { floatedControlRadius, glassFieldStyle, withAlpha } from "@/constants/theme";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { preserveSpaces } from "@/constants/text";
 
@@ -94,6 +94,7 @@ export function AppTextField({
         allowFontScaling={false}
         style={[
           preserveSpaces,
+          { borderRadius: floatedControlRadius },
           multiline
             ? {
                 fontFamily: appFont.regular,
@@ -106,7 +107,7 @@ export function AppTextField({
           glass ? glassFieldStyle(scheme, colors) : null,
           error ? { borderColor: colors.ink } : null,
         ]}
-        className={`rounded-2xl border text-cove-ink ${
+        className={`border text-cove-ink ${
           glass ? "" : "bg-cove-paper"
         } ${compact ? "px-3" : "px-4"} ${
           error ? "border-cove-ink" : glass ? "" : "border-cove-line"

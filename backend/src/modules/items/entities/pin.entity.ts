@@ -10,7 +10,8 @@ import { User } from "../../../users/user.entity";
 import { Home } from "../../homes/entities/home.entity";
 import type { ItemCategory } from "./item.entity";
 
-export const PIN_INTERVALS = [1, 7, 14, 30] as const;
+/** 0 = once (manual only; never auto-returns to the list). */
+export const PIN_INTERVALS = [0, 1, 7, 14, 30] as const;
 export type PinInterval = (typeof PIN_INTERVALS)[number];
 export const PIN_LIMIT = 12;
 

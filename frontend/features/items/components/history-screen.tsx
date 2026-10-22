@@ -698,7 +698,7 @@ function OptionMenu({
             top: frame.top,
             left: frame.left,
             width: frame.width,
-            borderRadius: 24,
+            borderRadius: 16,
             shadowColor: shadow.color,
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.16,
@@ -707,7 +707,7 @@ function OptionMenu({
           }}
         >
           <View
-            className="overflow-hidden rounded-3xl"
+            className="overflow-hidden rounded-2xl"
             style={[floatedCardStyle(scheme, colors), { maxHeight: frame.maxHeight }]}
           >
             <GlassFill soft neutral />

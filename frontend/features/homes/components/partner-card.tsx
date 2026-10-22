@@ -26,7 +26,7 @@ export function PartnerCard({
   const initial = member.name.charAt(0).toUpperCase();
 
   return (
-    <View className={plain ? "flex-row items-center gap-3" : "flex-row items-center gap-3 rounded-3xl bg-cove-paper px-4 py-4"}>
+    <View className={plain ? "flex-row items-center gap-3" : "flex-row items-center gap-3 rounded-2xl bg-cove-paper px-4 py-4"}>
       <View className={`h-12 w-12 items-center justify-center rounded-full ${plain ? "bg-cove-paper" : "bg-cove-mist"}`}>
         <AppText className="text-lg font-semibold text-cove-ink">{initial}</AppText>
       </View>

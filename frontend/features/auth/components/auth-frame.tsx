@@ -9,7 +9,6 @@ import {
   TextInput,
   View,
   type TextInputProps,
-  type ViewStyle,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -43,63 +42,60 @@ type AuthButtonProps = {
 };
 
 type AuthLinkProps = {
-  label: string;
+  prompt: string;
+  action: string;
   onPress: () => void;
 };
 
-export function AuthFrame({ children }: { children: ReactNode }) {
+export function AuthFrame({
+  children,
+  scroll = true,
+}: {
+  children: ReactNode;
+  /** When false, the auth card fills the viewport without scrolling. */
+  scroll?: boolean;
+}) {
   const { colors, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const dark = scheme === "dark";
+  const framePad = {
+    paddingTop: Math.max(insets.top, 18),
+    paddingBottom: Math.max(insets.bottom, 18),
+  };
+  const cardStyle = [
+    styles.card,
+    dark
+      ? {
+          backgroundColor: colors.paper,
+          borderColor: withAlpha(colors.white, 0.1),
+        }
+      : {
+          backgroundColor: colors.paper,
+          borderColor: withAlpha("#12141A", 0.08),
+        },
+  ];
 
   return (
     <View style={[styles.root, { backgroundColor: dark ? colors.deep : colors.ice }]}>
       <StatusBar style={dark ? "light" : "dark"} />
-      <SoftOrb
-        color={colors.accent}
-        size={340}
-        style={{ top: 24, left: -150, opacity: dark ? 0.38 : 0.85 }}
-      />
-      <SoftOrb
-        color={colors.accent}
-        size={200}
-        style={{ right: -80, bottom: 36, opacity: dark ? 0.22 : 0.4 }}
-      />
 
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.scroll,
-            {
-              paddingTop: Math.max(insets.top, 18),
-              paddingBottom: Math.max(insets.bottom, 18),
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.card,
-              dark
-                ? {
-                    backgroundColor: withAlpha(colors.paper, 0.9),
-                    borderColor: withAlpha(colors.white, 0.12),
-                    boxShadow: "0 24px 60px rgba(0, 0, 0, 0.35)",
-                  }
-                : {
-                    backgroundColor: withAlpha(colors.paper, 0.9),
-                    borderColor: withAlpha(colors.white, 0.96),
-                    boxShadow: "0 24px 60px rgba(80, 120, 160, 0.16)",
-                  },
-            ]}
+        {scroll ? (
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[styles.scroll, framePad]}
           >
-            {children}
+            <View style={cardStyle}>{children}</View>
+          </ScrollView>
+        ) : (
+          <View style={[styles.scroll, styles.flex, framePad]}>
+            <View style={[cardStyle, styles.cardFill]}>{children}</View>
           </View>
-        </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -127,22 +123,7 @@ export function AuthBrand({ showName = true }: { showName?: boolean } = {}) {
         </AppText>
       ) : null}
       <View style={styles.logoWrap}>
-        <View
-          pointerEvents="none"
-          style={[
-            styles.logoHalo,
-            { backgroundColor: withAlpha(colors.accent, 0.16) },
-            Platform.OS === "web" ? ({ filter: "blur(10px)" } as ViewStyle) : null,
-          ]}
-        />
-        <View
-          style={[
-            styles.logoDisc,
-            { backgroundColor: withAlpha(colors.accent, 0.1) },
-          ]}
-        >
-          <AppLogo size={86} />
-        </View>
+        <AppLogo size={86} />
       </View>
     </View>
   );
@@ -294,11 +275,16 @@ export function AuthButton({ label, onPress, disabled = false, loading = false }
   );
 }
 
-export function AuthLink({ label, onPress }: AuthLinkProps) {
+export function AuthLink({ prompt, action, onPress }: AuthLinkProps) {
   const { colors } = useTheme();
 
   return (
-    <Pressable onPress={onPress} accessibilityRole="link" style={styles.link}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="link"
+      accessibilityLabel={`${prompt} ${action}`}
+      style={styles.link}
+    >
       <AppText
         style={{
           color: withAlpha(colors.ink, 0.78),
@@ -307,7 +293,17 @@ export function AuthLink({ label, onPress }: AuthLinkProps) {
           textAlign: "center",
         }}
       >
-        {label}
+        {prompt}{" "}
+        <AppText
+          style={{
+            color: colors.accent,
+            fontWeight: "600",
+            fontSize: 13,
+            lineHeight: 18,
+          }}
+        >
+          {action}
+        </AppText>
       </AppText>
     </Pressable>
   );
@@ -331,41 +327,25 @@ export function AuthLegal({
 
   return (
     <View style={styles.legal}>
-      <Pressable onPress={onPrivacy} accessibilityRole="link">
+      <Pressable
+        onPress={onPrivacy}
+        accessibilityRole="link"
+        accessibilityLabel={t("privacyPolicy")}
+        hitSlop={8}
+        style={styles.legalLink}
+      >
         <AppText style={legal}>{t("privacyPolicy")}</AppText>
       </Pressable>
-      <AppText style={legal}>{t("and")}</AppText>
-      <Pressable onPress={onTerms} accessibilityRole="link">
+      <Pressable
+        onPress={onTerms}
+        accessibilityRole="link"
+        accessibilityLabel={t("terms")}
+        hitSlop={8}
+        style={styles.legalLink}
+      >
         <AppText style={legal}>{t("terms")}</AppText>
       </Pressable>
     </View>
-  );
-}
-
-function SoftOrb({
-  color,
-  size,
-  style,
-}: {
-  color: string;
-  size: number;
-  style?: ViewStyle;
-}) {
-  return (
-    <View
-      pointerEvents="none"
-      style={[
-        {
-          position: "absolute",
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: withAlpha(color, 0.42),
-        },
-        Platform.OS === "web" ? ({ filter: "blur(46px)" } as ViewStyle) : null,
-        style,
-      ]}
-    />
   );
 }
 
@@ -392,33 +372,16 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 28,
     overflow: "hidden",
-    boxShadow: "0 24px 60px rgba(120, 160, 200, 0.18)",
-    ...(Platform.OS === "web"
-      ? ({
-          backdropFilter: "blur(18px)",
-        } as ViewStyle)
-      : null),
+  },
+  cardFill: {
+    flex: 1,
+    minHeight: 0,
   },
   brand: {
     alignItems: "center",
-    gap: 18,
+    gap: 14,
   },
   logoWrap: {
-    width: 118,
-    height: 118,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoHalo: {
-    position: "absolute",
-    width: 118,
-    height: 118,
-    borderRadius: 59,
-  },
-  logoDisc: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -458,6 +421,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "center",
     alignItems: "center",
-    columnGap: 4,
+    gap: 22,
+  },
+  legalLink: {
+    paddingVertical: 2,
+    paddingHorizontal: 2,
   },
 });

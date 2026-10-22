@@ -72,7 +72,8 @@ export function SegmentedToggle<T extends string>({
         height: compact ? 42 : 58,
         padding: TRACK_PAD,
         borderRadius: radius.md,
-        backgroundColor: colors.mist,
+        // Transparent track so unselected options sit on the parent card.
+        backgroundColor: "transparent",
         alignSelf: compact ? "center" : "stretch",
         minWidth: compact ? 196 : undefined,
       }}
@@ -115,7 +116,7 @@ export function SegmentedToggle<T extends string>({
               allowFontScaling={false}
               className="font-semibold"
               style={{
-                color: selected ? colors.onAccent : colors.ink,
+                color: selected ? colors.onAccent : colors.muted,
                 fontSize: compact ? 13 : 15,
                 lineHeight: compact ? 18 : 20,
                 textAlign: "center",

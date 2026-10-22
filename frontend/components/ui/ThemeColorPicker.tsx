@@ -10,14 +10,13 @@ import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { FormSheetModal } from "@/components/ui/FormSheetModal";
-import { SegmentedToggle } from "@/components/ui/SegmentedToggle";
+import { SurfaceDepthBar } from "@/components/ui/SurfaceDepthBar";
 import {
   DEFAULT_ACCENT,
   DEFAULT_SURFACE_DEPTH,
   floatedCardStyle,
   getColors,
   hexToHsl,
-  type SurfaceDepth,
   withAlpha,
 } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -106,16 +105,6 @@ export function ThemeColorPicker() {
   const pureHue = useMemo(() => hsvToHex({ h: draft.h, s: 1, v: 1 }), [draft.h]);
   const dirty = draftHex.toUpperCase() !== accent.toUpperCase();
   const depthDirty = surfaceDepth !== DEFAULT_SURFACE_DEPTH;
-  const depthOptions = useMemo(
-    () =>
-      [
-        { id: "soft" as const, label: t("surfaceDepthSoft") },
-        { id: "default" as const, label: t("surfaceDepthDefault") },
-        { id: "deep" as const, label: t("surfaceDepthDeep") },
-        { id: "true" as const, label: t("surfaceDepthTrue") },
-      ] satisfies { id: SurfaceDepth; label: string }[],
-    [t],
-  );
 
   function openPicker() {
     setDraft(hexToHsv(accent));
@@ -253,19 +242,14 @@ export function ThemeColorPicker() {
           <AppText className="text-sm font-medium text-cove-muted">{t("surfaceDepth")}</AppText>
           <AppText className="mt-1 text-sm text-cove-muted">{t("surfaceDepthBody")}</AppText>
           <View className="mt-3">
-            <SegmentedToggle
-              value={surfaceDepth}
-              options={depthOptions}
-              onChange={setSurfaceDepth}
-              accessibilityLabel={t("surfaceDepth")}
-            />
+            <SurfaceDepthBar value={surfaceDepth} onChange={setSurfaceDepth} />
           </View>
         </View>
       ) : null}
 
       <FormSheetModal visible={open} onClose={closePicker}>
         <View
-          className="overflow-hidden rounded-3xl px-4 py-4"
+          className="overflow-hidden px-4 py-4"
           style={floatedCardStyle(scheme, draftPalette)}
         >
           <GlassFill soft neutral />
@@ -395,11 +379,10 @@ export function ThemeColorPicker() {
               <AppText className="mb-2 text-sm font-medium text-cove-muted">
                 {t("surfaceDepth")}
               </AppText>
-              <SegmentedToggle
+              <SurfaceDepthBar
                 value={surfaceDepth}
-                options={depthOptions}
                 onChange={setSurfaceDepth}
-                accessibilityLabel={t("surfaceDepth")}
+                accentHex={draftHex}
               />
             </View>
           ) : null}

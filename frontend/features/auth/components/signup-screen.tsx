@@ -125,7 +125,11 @@ export default function SignupScreen() {
             loading={isSubmitting}
             onPress={() => void onSubmit()}
           />
-          <AuthLink label={t("alreadyHaveAccount")} onPress={() => router.push("/login")} />
+          <AuthLink
+            prompt={t("alreadyHaveAccountPrompt")}
+            action={t("alreadyHaveAccountAction")}
+            onPress={() => router.push("/login")}
+          />
           <AuthLegal
             onPrivacy={() => router.push("/legal/privacy" as Href)}
             onTerms={() => router.push("/legal/terms" as Href)}

@@ -3,7 +3,8 @@ import { formatAppError, isOfflineError } from "@/lib/errors";
 import { readCachedPins, writeCachedPins } from "@/features/offline/profile-cache";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
 
-export const PIN_INTERVALS = [1, 7, 14, 30] as const;
+/** 0 = once (manual only; never auto-returns to the list). */
+export const PIN_INTERVALS = [0, 1, 7, 14, 30] as const;
 export type PinInterval = (typeof PIN_INTERVALS)[number];
 
 export type Pin = {

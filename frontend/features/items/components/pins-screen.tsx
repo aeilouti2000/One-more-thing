@@ -41,6 +41,7 @@ import type { TranslationKey } from "@/constants/i18n";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
 
 const intervalKeys: Record<PinInterval, TranslationKey> = {
+  0: "intervalOnce",
   1: "intervalDay",
   7: "intervalWeek",
   14: "intervalTwoWeeks",
@@ -353,10 +354,13 @@ function PinsBody() {
       ) : (
         <View className="mb-6 gap-3">
           {visiblePins.map((pin) => {
-            const due = new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
-              month: "short",
-              day: "numeric",
-            }).format(new Date(pin.nextDueAt));
+            const once = pin.intervalDays === 0;
+            const due = once
+              ? null
+              : new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+                  month: "short",
+                  day: "numeric",
+                }).format(new Date(pin.nextDueAt));
             const isAddingThis = addingId === pin.id;
             const isRemovingThis = removingId === pin.id;
             const busy = isAddingThis || isRemovingThis;
@@ -384,7 +388,7 @@ function PinsBody() {
                     <View className="flex-row flex-wrap items-center gap-1.5">
                       <MetaChip label={categoryName(pin.category)} />
                       <MetaChip label={t(intervalKeys[pin.intervalDays])} />
-                      <MetaChip label={due} />
+                      {due ? <MetaChip label={due} /> : null}
                       {listPresence[pin.id] ? (
                         <MetaChip
                           label={t("pinnedOnList", {
@@ -453,7 +457,7 @@ function PinsBody() {
         <View className="flex-1 items-center justify-center px-5">
           <BlurBackdrop onPress={closeForm} disabled={isSaving} />
           <View
-            className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
+            className="w-full max-w-md overflow-hidden px-7 pb-5 pt-8"
             style={floatedCardStyle(scheme, colors)}
           >
             <GlassFill soft neutral />
@@ -496,20 +500,22 @@ function PinsBody() {
               )}
               <FormMessage message={error} />
             </View>
-            <View className="mt-8 gap-3">
+            <View className="mt-8 flex-row flex-wrap items-center justify-center gap-3">
               <AppButton
                 compact
-                label={editingPin ? t("saveChanges") : t("addPin")}
-                disabled={!name.trim()}
-                loading={isSaving}
-                onPress={() => void onSave()}
-              />
-              <AppButton
-                compact
+                fit
                 label={t("cancel")}
                 variant="ghost"
                 disabled={isSaving}
                 onPress={closeForm}
+              />
+              <AppButton
+                compact
+                fit
+                label={editingPin ? t("saveChanges") : t("addPin")}
+                disabled={!name.trim()}
+                loading={isSaving}
+                onPress={() => void onSave()}
               />
             </View>
           </View>
@@ -574,7 +580,7 @@ function IntervalField({
           <Pressable
             onPress={openMenu}
             accessibilityRole="button"
-            className="h-10 flex-row items-center justify-between rounded-2xl border px-3 active:opacity-80"
+            className="h-10 flex-row items-center justify-between border px-3 active:opacity-80"
             style={glassFieldStyle(scheme, colors)}
           >
             <AppText className="text-sm font-medium text-cove-ink">
@@ -599,7 +605,7 @@ function IntervalField({
               top: frame.top,
               left: frame.left,
               width: frame.width,
-              borderRadius: 24,
+              borderRadius: 16,
               shadowColor: shadow.color,
               shadowOffset: { width: 0, height: 8 },
               shadowOpacity: 0.16,
@@ -608,7 +614,7 @@ function IntervalField({
             }}
           >
             <View
-              className="overflow-hidden rounded-3xl"
+              className="overflow-hidden rounded-2xl"
               style={floatedCardStyle(scheme, colors)}
             >
               <GlassFill soft neutral />

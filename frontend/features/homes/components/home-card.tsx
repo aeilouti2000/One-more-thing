@@ -103,6 +103,17 @@ export function HomeCard({
             onPress={startEditing}
           />
         ) : null}
+        {isHost && expanded ? (
+          <Pressable
+            onPress={onDelete}
+            accessibilityRole="button"
+            accessibilityLabel={t("deleteHome")}
+            className="h-8 w-8 items-center justify-center rounded-full active:opacity-80"
+            style={{ backgroundColor: "rgba(248, 113, 113, 0.18)" }}
+          >
+            <Ionicons name="trash-outline" size={15} color="#F87171" />
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={onToggle}
           accessibilityRole="button"
@@ -169,9 +180,6 @@ export function HomeCard({
               disabled={switching}
               onPress={onSwitch}
             />
-          ) : null}
-          {isHost ? (
-            <AppButton label={t("deleteHome")} variant="danger" onPress={onDelete} />
           ) : null}
         </View>
       ) : null}

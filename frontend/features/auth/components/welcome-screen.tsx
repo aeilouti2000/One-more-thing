@@ -13,10 +13,14 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { AuthBrand } from "@/features/auth/components/auth-frame";
+import {
+  AuthBrand,
+  AuthFrame,
+  AuthLegal,
+  AuthLink,
+} from "@/features/auth/components/auth-frame";
 import { GuestOnly } from "@/features/auth/components/guest-only";
 import { AppText } from "@/components/ui/AppText";
-import { Screen } from "@/components/ui/Screen";
 import type { TranslationKey } from "@/constants/i18n";
 import { withAlpha } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -35,48 +39,20 @@ const HOW_IT_WORKS_STEPS: {
 const STEP_HOLD_MS = 2800;
 const STEP_FADE_MS = 280;
 
-const MARK = "#F5A623";
-
-/**
- * Android draws RTL script on the opposite edge from textAlign.
- * "left" is the visual right for Arabic on Android. Web and iOS use "right".
- */
-function rtlAlign() {
-  return Platform.OS === "android" ? "left" : "right";
-}
+/** Static colors from the app icon — do not follow theme. */
+const ICON_NAVY = "#071633";
+const ICON_MARK = "#FFB020";
 
 export default function WelcomeScreen() {
   const { t, locale, setLocale, isRTL } = useI18n();
   const { colors, scheme, setScheme } = useTheme();
   const dark = scheme === "dark";
-  // Web mirrors flex from the document direction. Native mirrors only when
-  // the phone language is RTL, so compensate when the app language differs.
-  const row =
-    Platform.OS === "web" || isRTL === I18nManager.isRTL
-      ? "row"
-      : "row-reverse";
-  const start = isRTL ? rtlAlign() : "left";
 
   return (
     <GuestOnly>
-      <Screen safeTop>
-        <View style={[styles.header, { flexDirection: row }]}>
-          <View style={styles.brandName}>
-            <AppText
-              numberOfLines={1}
-              style={{
-                color: colors.ink,
-                fontWeight: "600",
-                fontSize: 24,
-                lineHeight: 32,
-                textAlign: isRTL && Platform.OS === "android" ? "right" : start,
-                writingDirection: Platform.OS === "android" ? "ltr" : isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {t("appName")}
-            </AppText>
-          </View>
-          <View style={[styles.headerActions, { flexDirection: row }]}>
+      <AuthFrame scroll={false}>
+        <View style={styles.page}>
+          <View style={styles.toolbar}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("appearance")}
@@ -86,7 +62,7 @@ export default function WelcomeScreen() {
             >
               <Ionicons
                 name={dark ? "sunny-outline" : "moon-outline"}
-                size={22}
+                size={20}
                 color={colors.ink}
               />
             </Pressable>
@@ -97,105 +73,95 @@ export default function WelcomeScreen() {
               hitSlop={8}
               style={styles.iconButton}
             >
-              <Ionicons name="language-outline" size={22} color={colors.ink} />
+              <Ionicons name="language-outline" size={20} color={colors.ink} />
             </Pressable>
           </View>
-        </View>
 
-        <AuthBrand showName={false} />
+          <View style={styles.main}>
+            <View style={styles.hero}>
+              <AuthBrand showName={false} />
 
-        <View style={styles.slips}>
-          <Animated.View entering={FadeInDown.delay(60).duration(260)}>
-            <PreviewSlip
-              label={t("previewMilk")}
-              done
-              style={{ transform: [{ rotate: "-7deg" }, { translateX: isRTL ? 14 : -14 }] }}
-            />
-          </Animated.View>
-          <Animated.View entering={FadeInDown.delay(150).duration(260)}>
-            <PreviewSlip
-              label={t("previewBread")}
-              done
-              style={{ transform: [{ rotate: "6deg" }, { translateX: isRTL ? -16 : 16 }] }}
-            />
-          </Animated.View>
-          <Animated.View entering={FadeInDown.delay(240).duration(260)}>
-            <PreviewSlip
-              label={t("previewOpen")}
-              style={{ transform: [{ rotate: "-2deg" }], width: "74%", maxWidth: 250 }}
-            />
-          </Animated.View>
-        </View>
-
-        <Animated.View entering={FadeIn.delay(360).duration(280)} style={styles.copy}>
-          <HowItWorksCopy key={locale} />
-        </Animated.View>
-
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("logIn")}
-            onPress={() => router.push("/login")}
-            style={styles.buttonPress}
-          >
-            <View style={[styles.button, { backgroundColor: colors.accent }]}>
               <AppText
+                numberOfLines={2}
                 style={{
-                  color: colors.onAccent,
-                  fontWeight: "600",
-                  fontSize: 16,
-                  lineHeight: 20,
-                  textAlign: "center",
-                }}
-              >
-                {t("logIn")}
-              </AppText>
-            </View>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("createAccount")}
-            onPress={() => router.push("/signup")}
-            style={styles.buttonPress}
-          >
-            <View
-              style={[
-                styles.button,
-                {
-                  backgroundColor: dark ? withAlpha(colors.white, 0.04) : colors.paper,
-                  borderWidth: 1,
-                  borderColor: dark ? withAlpha(colors.white, 0.16) : colors.line,
-                },
-              ]}
-            >
-              <AppText
-                style={{
+                  marginTop: 12,
                   color: colors.ink,
                   fontWeight: "600",
-                  fontSize: 16,
-                  lineHeight: 20,
+                  fontSize: 24,
+                  lineHeight: 30,
+                  letterSpacing: locale === "ar" ? 0 : 0.3,
                   textAlign: "center",
+                  writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
-                {t("createAccount")}
+                {t("appName")}
               </AppText>
-            </View>
-          </Pressable>
-        </View>
 
-        <View style={[styles.legal, { flexDirection: row }]}>
-          <Pressable onPress={() => router.push("/legal/privacy" as Href)} accessibilityRole="link">
-            <AppText style={{ color: colors.muted, fontSize: 13, lineHeight: 18 }}>
-              {t("privacyPolicy")}
-            </AppText>
-          </Pressable>
-          <Pressable onPress={() => router.push("/legal/terms" as Href)} accessibilityRole="link">
-            <AppText style={{ color: colors.muted, fontSize: 13, lineHeight: 18 }}>
-              {t("terms")}
-            </AppText>
-          </Pressable>
+              <View style={styles.slips}>
+                <Animated.View entering={FadeInDown.delay(60).duration(260)}>
+                  <PreviewSlip
+                    label={t("previewMilk")}
+                    done
+                    style={{ transform: [{ rotate: "-7deg" }, { translateX: isRTL ? 12 : -12 }] }}
+                  />
+                </Animated.View>
+                <Animated.View entering={FadeInDown.delay(150).duration(260)}>
+                  <PreviewSlip
+                    label={t("previewBread")}
+                    done
+                    style={{ transform: [{ rotate: "6deg" }, { translateX: isRTL ? -14 : 14 }] }}
+                  />
+                </Animated.View>
+                <Animated.View entering={FadeInDown.delay(240).duration(260)}>
+                  <PreviewSlip
+                    label={t("previewOpen")}
+                    style={{ transform: [{ rotate: "-2deg" }], width: "74%", maxWidth: 240 }}
+                  />
+                </Animated.View>
+              </View>
+            </View>
+
+            <Animated.View entering={FadeIn.delay(320).duration(260)} style={styles.copy}>
+              <HowItWorksCopy key={locale} />
+            </Animated.View>
+
+            <View style={styles.actions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("logIn")}
+                onPress={() => router.push("/login")}
+                style={styles.buttonPress}
+              >
+                <View style={[styles.button, { backgroundColor: colors.accent }]}>
+                  <AppText
+                    style={{
+                      color: colors.onAccent,
+                      fontWeight: "600",
+                      fontSize: 16,
+                      lineHeight: 20,
+                      textAlign: "center",
+                    }}
+                  >
+                    {t("logIn")}
+                  </AppText>
+                </View>
+              </Pressable>
+              <AuthLink
+                prompt={t("newHerePrompt")}
+                action={t("newHereAction")}
+                onPress={() => router.push("/signup")}
+              />
+            </View>
+
+            <View style={styles.mainSpacer} />
+          </View>
+
+          <AuthLegal
+            onPrivacy={() => router.push("/legal/privacy" as Href)}
+            onTerms={() => router.push("/legal/terms" as Href)}
+          />
         </View>
-      </Screen>
+      </AuthFrame>
     </GuestOnly>
   );
 }
@@ -240,7 +206,7 @@ function HowItWorksCopy() {
 
   const stageStyle = useAnimatedStyle(() => ({
     opacity: reveal.value,
-    transform: [{ translateY: interpolate(reveal.value, [0, 1], [6, 0]) }],
+    transform: [{ translateY: interpolate(reveal.value, [0, 1], [4, 0]) }],
   }));
 
   return (
@@ -254,8 +220,8 @@ function HowItWorksCopy() {
         style={{
           color: colors.accent,
           fontWeight: "600",
-          fontSize: 14,
-          letterSpacing: 2.2,
+          fontSize: 12,
+          letterSpacing: 2,
           textTransform: "uppercase",
           textAlign: "center",
         }}
@@ -264,17 +230,15 @@ function HowItWorksCopy() {
       </AppText>
 
       <Animated.View style={[styles.stepStage, stageStyle]}>
-        <Ionicons name={current.icon} size={22} color={colors.accent} />
+        <Ionicons name={current.icon} size={18} color={colors.accent} />
         <AppText
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.8}
+          numberOfLines={2}
           style={{
             flexShrink: 1,
             color: colors.ink,
             fontWeight: "600",
-            fontSize: 18,
-            lineHeight: 24,
+            fontSize: 16,
+            lineHeight: 20,
             textAlign: "center",
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
@@ -306,30 +270,33 @@ function PreviewSlip({
         {
           flexDirection:
             Platform.OS === "web" || isRTL === I18nManager.isRTL ? "row" : "row-reverse",
-          backgroundColor: done ? (dark ? colors.paper : colors.white) : MARK,
-          boxShadow: dark
-            ? "0 12px 28px rgba(0, 0, 0, 0.35)"
-            : "0 12px 28px rgba(70, 100, 140, 0.14)",
+          backgroundColor: done ? (dark ? colors.mist : colors.white) : ICON_NAVY,
+          borderWidth: done ? 1 : 0,
+          borderColor: done
+            ? dark
+              ? withAlpha(colors.white, 0.08)
+              : withAlpha("#12141A", 0.06)
+            : "transparent",
         },
         style,
       ]}
     >
       {done ? (
         <View style={[styles.check, { backgroundColor: colors.accent }]}>
-          <Ionicons name="checkmark" size={14} color={colors.onAccent} />
+          <Ionicons name="checkmark" size={12} color={colors.onAccent} />
         </View>
       ) : (
-        <View style={[styles.ring, { borderColor: colors.white }]} />
+        <View style={[styles.ring, { borderColor: ICON_MARK }]} />
       )}
       <View style={styles.slipLabel}>
         <AppText
           numberOfLines={1}
           style={{
             width: "100%",
-            color: done ? colors.ink : colors.white,
+            color: done ? colors.ink : "#FFFFFF",
             fontWeight: "600",
-            fontSize: 14,
-            lineHeight: 20,
+            fontSize: 13,
+            lineHeight: 18,
             textAlign: isRTL && Platform.OS === "android" ? "right" : "left",
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
@@ -342,18 +309,16 @@ function PreviewSlip({
 }
 
 const styles = StyleSheet.create({
-  header: {
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 12,
+  page: {
+    flex: 1,
+    minHeight: 0,
   },
-  brandName: {
-    flexGrow: 0,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  headerActions: {
+  toolbar: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    zIndex: 2,
+    flexDirection: "row",
     alignItems: "center",
     gap: 2,
   },
@@ -363,20 +328,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  slips: {
-    marginTop: 28,
+  main: {
+    flex: 1,
+    minHeight: 0,
+    marginTop: 50,
+  },
+  hero: {
+    flexShrink: 0,
     alignItems: "center",
-    gap: 10,
+    paddingTop: 20,
+  },
+  slips: {
+    marginTop: 18,
+    alignItems: "center",
+    gap: 8,
   },
   slip: {
     justifyContent: "flex-start",
     width: "64%",
-    maxWidth: 230,
-    height: 46,
-    borderRadius: 14,
+    maxWidth: 220,
+    height: 42,
+    borderRadius: 12,
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
   },
   slipLabel: {
     flex: 1,
@@ -384,47 +359,51 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   check: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
   },
   ring: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     borderWidth: 2,
   },
   copy: {
-    marginTop: 50,
+    marginTop: 60,
+    marginBottom: 20,
     alignItems: "center",
     width: "100%",
+    flexShrink: 0,
   },
   howItWorks: {
     width: "100%",
     alignItems: "center",
-    gap: 10,
+    gap: 6,
   },
   stepStage: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    minHeight: 24,
+    gap: 6,
+    minHeight: 40,
     maxWidth: "92%",
     paddingHorizontal: 8,
   },
   actions: {
-    marginTop: 60,
-    marginBottom: 46,
     alignItems: "center",
-    gap: 12,
+    gap: 4,
+    flexShrink: 0,
+  },
+  mainSpacer: {
+    flex: 1,
+    minHeight: 12,
   },
   buttonPress: {
-    width: "72%",
-    maxWidth: 260,
-    minWidth: 200,
+    width: "100%",
+    maxWidth: 280,
   },
   button: {
     width: "100%",
@@ -434,11 +413,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 16,
     overflow: "hidden",
-  },
-  legal: {
-    marginTop: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 22,
   },
 });

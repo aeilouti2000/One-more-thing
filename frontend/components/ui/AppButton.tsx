@@ -6,6 +6,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { floatedControlRadius } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
 
 type AppButtonProps = {
@@ -15,6 +16,8 @@ type AppButtonProps = {
   disabled?: boolean;
   loading?: boolean;
   compact?: boolean;
+  /** Size to the label instead of stretching to the parent width. */
+  fit?: boolean;
   style?: StyleProp<ViewStyle>;
   labelStyle?: StyleProp<TextStyle>;
 };
@@ -40,6 +43,7 @@ export function AppButton({
   disabled = false,
   loading = false,
   compact = false,
+  fit = false,
   style,
   labelStyle,
 }: AppButtonProps) {
@@ -54,10 +58,14 @@ export function AppButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
-      className={`items-center rounded-2xl px-5 ${compact ? "py-2.5" : "py-4"} ${variants[variant]} ${
+      className={`items-center px-5 ${compact ? "py-2.5" : "py-4"} ${variants[variant]} ${
         isDisabled ? "opacity-50" : "active:opacity-80"
       }`}
-      style={style}
+      style={[
+        { borderRadius: floatedControlRadius },
+        fit ? { alignSelf: "center" } : null,
+        style,
+      ]}
     >
       {loading ? (
         <ActivityIndicator

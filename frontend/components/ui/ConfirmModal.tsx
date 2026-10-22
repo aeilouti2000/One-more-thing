@@ -1,10 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Modal, Pressable, View } from "react-native";
-import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
+import {
+  FloatedCard,
+  FloatedCardActions,
+  FloatedCardHeader,
+} from "@/components/ui/FloatedCard";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { floatedCardStyle, iconSize, withAlpha } from "@/constants/theme";
+import { floatedControlRadius, withAlpha } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -40,7 +45,6 @@ export function ConfirmModal({
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
   const danger = scheme === "dark" ? "#F07178" : "#C2414A";
-  const dangerSoft = scheme === "dark" ? "rgba(240, 113, 120, 0.16)" : "rgba(194, 65, 74, 0.1)";
 
   return (
     <Modal
@@ -55,29 +59,21 @@ export function ConfirmModal({
       <View className="flex-1 items-center justify-center px-6">
         <BlurBackdrop onPress={onCancel} disabled={loading} />
 
-        <View
-          className="w-full max-w-md gap-4 overflow-hidden rounded-3xl p-5"
-          style={floatedCardStyle(scheme, colors)}
-        >
-          <GlassFill soft neutral />
-          <View className="flex-row items-center gap-3">
-            <View
-              className="h-12 w-12 items-center justify-center rounded-full"
-              style={{ backgroundColor: dangerSoft }}
-            >
-              <Ionicons name={icon} size={iconSize.md} color={danger} />
-            </View>
-            <AppText
-              className="min-w-0 flex-1 text-xl font-semibold"
-              style={{ color: colors.ink }}
-            >
-              {title}
-            </AppText>
-          </View>
+        <FloatedCard>
+          <FloatedCardHeader
+            title={title}
+            icon={icon}
+            iconTone="danger"
+            accent={false}
+            className="mb-3"
+          />
 
           <AppText
-            className="text-sm leading-5"
-            style={{ color: colors.muted }}
+            className="mb-1 text-sm leading-5"
+            style={{
+              color: colors.muted,
+              textAlign: isRTL ? "right" : "left",
+            }}
           >
             {message}
           </AppText>
@@ -89,51 +85,55 @@ export function ConfirmModal({
           {alert ? (
             <Pressable
               onPress={onCancel}
-              className="items-center rounded-2xl px-3 py-3 active:opacity-80"
-              style={{ backgroundColor: colors.accent }}
+              className="mt-4 items-center px-3 py-3 active:opacity-80"
+              style={{
+                backgroundColor: colors.accent,
+                borderRadius: floatedControlRadius,
+              }}
             >
               <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
                 {cancelLabel}
               </AppText>
             </Pressable>
           ) : (
-          <View
-            className="gap-3"
-            style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-          >
-            <Pressable
-              disabled={loading}
-              onPress={onCancel}
-              className="flex-1 items-center rounded-2xl px-3 py-3 active:opacity-80"
-              style={{
-                backgroundColor:
-                  scheme === "dark" ? withAlpha(colors.white, 0.08) : "#F4F5F7",
-              }}
-            >
-              <AppText
-                className="text-sm font-semibold"
-                style={{ color: colors.ink }}
+            <FloatedCardActions className="mt-4">
+              <Pressable
+                disabled={loading}
+                onPress={onCancel}
+                className="flex-1 items-center px-3 py-3 active:opacity-80"
+                style={{
+                  backgroundColor:
+                    scheme === "dark" ? withAlpha(colors.white, 0.08) : "#F4F5F7",
+                  borderRadius: floatedControlRadius,
+                }}
               >
-                {cancelLabel}
-              </AppText>
-            </Pressable>
-            <Pressable
-              disabled={loading}
-              onPress={onConfirm}
-              className="flex-1 items-center rounded-2xl px-3 py-3 active:opacity-80"
-              style={{ backgroundColor: danger }}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <AppText className="text-sm font-semibold text-white">
-                  {confirmLabel}
+                <AppText
+                  className="text-sm font-semibold"
+                  style={{ color: colors.ink }}
+                >
+                  {cancelLabel}
                 </AppText>
-              )}
-            </Pressable>
-          </View>
+              </Pressable>
+              <Pressable
+                disabled={loading}
+                onPress={onConfirm}
+                className="flex-1 items-center px-3 py-3 active:opacity-80"
+                style={{
+                  backgroundColor: danger,
+                  borderRadius: floatedControlRadius,
+                }}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <AppText className="text-sm font-semibold text-white">
+                    {confirmLabel}
+                  </AppText>
+                )}
+              </Pressable>
+            </FloatedCardActions>
           )}
-        </View>
+        </FloatedCard>
       </View>
     </Modal>
   );

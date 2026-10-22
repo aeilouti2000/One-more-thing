@@ -203,8 +203,26 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         };
       }
 
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const optimistic: Purchase = {
+        id: tempId,
+        name: values.name.trim(),
+        quantity: values.quantity,
+        unit: values.unit?.trim() || undefined,
+        category: values.category,
+        notes: values.notes?.trim() || undefined,
+        status: "needed",
+        urgent: values.urgent === true,
+        cost: null,
+        listId: values.listId,
+        addedByName: user.name,
+        createdAt: new Date().toISOString(),
+      };
+
       const endLocalChange = noteLocalChange();
-      let result: { error: string | null };
+      setPurchases((current) => placeNeededLocally(current, optimistic));
+
+      let result: { item: Purchase | null; error: string | null };
       try {
         result = await insertItem({
           ...values,
@@ -215,11 +233,28 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
 
-      if (result.error) await refresh();
-      else emitListChanged();
-      return result;
+      if (result.error) {
+        setPurchases((current) => current.filter((item) => item.id !== tempId));
+        await refresh();
+        return { error: result.error };
+      }
+
+      if (result.item) {
+        const created = result.item;
+        setPurchases((current) =>
+          current.map((item) => (item.id === tempId ? created : item)),
+        );
+        rememberItems(
+          purchasesRef.current.map((item) =>
+            item.id === tempId ? created : item,
+          ),
+        );
+      } else {
+        emitListChanged();
+      }
+      return { error: null };
     },
-    [household, noteLocalChange, refresh, user],
+    [household, noteLocalChange, refresh, rememberItems, user],
   );
 
   const markBought = useCallback(
@@ -611,4 +646,17 @@ export function filterPurchasesByStatus(
   status: PurchaseStatus,
 ) {
   return purchases.filter((item) => item.status === status);
+}
+
+/** Mirror backend placeNeeded: urgent at top, else after the urgent block. */
+function placeNeededLocally(purchases: Purchase[], item: Purchase): Purchase[] {
+  const needed = purchases.filter((row) => row.status === "needed");
+  const bought = purchases.filter((row) => row.status === "bought");
+  if (item.urgent) return [item, ...needed, ...bought];
+  const index = needed.findIndex((row) => !row.urgent);
+  const nextNeeded =
+    index === -1
+      ? [...needed, item]
+      : [...needed.slice(0, index), item, ...needed.slice(index)];
+  return [...nextNeeded, ...bought];
 }

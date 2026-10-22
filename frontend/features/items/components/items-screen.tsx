@@ -695,6 +695,7 @@ export default function ItemsScreen() {
     if (!name || isQuickAdding || !selectedListId) return;
     setIsQuickAdding(true);
     setActionError(null);
+    setQuickName("");
     const result = await addItem({
       name,
       quantity: 1,
@@ -703,11 +704,7 @@ export default function ItemsScreen() {
       listId: selectedListId ?? undefined,
     });
     setIsQuickAdding(false);
-    if (result.error) {
-      setActionError(result.error);
-      return;
-    }
-    setQuickName("");
+    if (result.error) setActionError(result.error);
   }
 
   function closeListForm() {
@@ -984,7 +981,7 @@ export default function ItemsScreen() {
             inputStyle={quickInputStyle}
             footer={
               <View
-                className="flex-row items-center gap-2 px-3 pb-3 pt-1"
+                className="flex-row items-center gap-2"
                 style={{ direction: isRTL ? "rtl" : "ltr" }}
               >
                 <View
@@ -1006,9 +1003,14 @@ export default function ItemsScreen() {
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={quickCategoryLabel}
-                    className={`${categoryLabelIsLong ? "w-full" : ""} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2 active:opacity-60`}
+                    className={`${categoryLabelIsLong ? "w-full" : ""} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2.5 active:opacity-60`}
                     style={{
-                      backgroundColor: withAlpha(colors.accent, 0.12),
+                      backgroundColor: colors.paper,
+                      borderWidth: tabBar.borderWidth,
+                      borderColor: withAlpha(
+                        scheme === "dark" ? colors.muted : colors.accent,
+                        0.34,
+                      ),
                       minWidth: 100,
                     }}
                   >
@@ -1026,8 +1028,15 @@ export default function ItemsScreen() {
                   onPress={() => router.push("/pins")}
                   accessibilityRole="button"
                   accessibilityLabel={t("pin")}
-                  className={`${categoryLabelIsLong ? "shrink-0" : "min-w-0 flex-1"} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2 active:opacity-60`}
-                  style={{ backgroundColor: withAlpha(colors.accent, 0.12) }}
+                  className={`${categoryLabelIsLong ? "shrink-0" : "min-w-0 flex-1"} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2.5 active:opacity-60`}
+                  style={{
+                    backgroundColor: colors.paper,
+                    borderWidth: tabBar.borderWidth,
+                    borderColor: withAlpha(
+                      scheme === "dark" ? colors.muted : colors.accent,
+                      0.34,
+                    ),
+                  }}
                 >
                   <MaterialCommunityIcons name="pin" size={16} color={colors.ink} />
                   <AppText
@@ -1223,7 +1232,7 @@ export default function ItemsScreen() {
             disabled={busyAction === "move"}
           />
           <View
-            className="w-full max-w-md gap-3 overflow-hidden rounded-3xl p-5"
+            className="w-full max-w-md gap-3 overflow-hidden p-5"
             style={floatedCardStyle(scheme, colors)}
           >
             <GlassFill soft neutral />
@@ -1290,7 +1299,7 @@ export default function ItemsScreen() {
         <View className="flex-1 items-center justify-center px-6">
           <BlurBackdrop onPress={closeListForm} disabled={isSavingList} />
           <View
-            className="w-full max-w-md gap-4 overflow-hidden rounded-3xl p-5"
+            className="w-full max-w-md gap-4 overflow-hidden p-5"
             style={floatedCardStyle(scheme, colors)}
           >
             <GlassFill soft neutral />

@@ -85,7 +85,7 @@ export async function fetchHomeItems(homeId: string) {
 
 export async function addItem(input: NewItemInput) {
   try {
-    await api.post(`/homes/${input.homeId}/items`, {
+    const created = await api.post<ItemResponse>(`/homes/${input.homeId}/items`, {
       name: input.name.trim(),
       quantity: input.quantity,
       category: input.category,
@@ -94,9 +94,9 @@ export async function addItem(input: NewItemInput) {
       urgent: input.urgent === true,
       listId: input.listId,
     });
-    return { error: null };
+    return { item: toPurchase(created), error: null };
   } catch (error) {
-    return { error: formatAppError(error) };
+    return { item: null as Purchase | null, error: formatAppError(error) };
   }
 }
 

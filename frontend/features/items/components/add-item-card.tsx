@@ -3,16 +3,18 @@ import { View } from "react-native";
 import { CategoryField } from "@/features/items/components/category-field";
 import { UrgentToggle } from "@/features/items/components/urgent-toggle";
 import { AppButton } from "@/components/ui/AppButton";
-import { GlassFill } from "@/components/ui/BlurBackdrop";
-import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
+import {
+  FloatedCard,
+  FloatedCardActions,
+  FloatedCardHeader,
+  FloatedCardSection,
+} from "@/components/ui/FloatedCard";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { FormSheetModal, useFormSheet } from "@/components/ui/FormSheetModal";
-import { floatedCardStyle } from "@/constants/theme";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
-import { useTheme } from "@/providers/ThemeProvider";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
 
 type AddItemCardProps = {
@@ -159,69 +161,80 @@ function AddItemForm({
   onCancel: () => void;
 }) {
   const { t } = useI18n();
-  const { colors, scheme } = useTheme();
   const formSheet = useFormSheet();
 
   return (
-    <View
-      className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
-      style={floatedCardStyle(scheme, colors)}
-    >
-      <GlassFill soft neutral />
-      <AppText className="mb-6 text-lg font-semibold text-cove-ink">{t("addItem")}</AppText>
+    <FloatedCard>
+      <FloatedCardHeader title={t("addItem")} subtitle={t("addItemSubtitle")} />
+
       <View className="gap-4">
-        <View className="flex-row items-stretch gap-3">
-          <View className="min-w-0 flex-1">
-            <AppTextField
-              compact
-              glass
-              label={t("itemNameLabel")}
-              value={name}
-              onChangeText={onChangeName}
-              placeholder={t("itemNamePlaceholder")}
-              userText
-              onFocus={() => formSheet?.scrollToStart()}
-            />
+        <FloatedCardSection title={t("formEssentials")}>
+          <View className="flex-row items-stretch gap-3">
+            <View className="min-w-0 flex-1">
+              <AppTextField
+                compact
+                glass
+                label={t("itemNameLabel")}
+                value={name}
+                onChangeText={onChangeName}
+                placeholder={t("itemNamePlaceholder")}
+                userText
+                onFocus={() => formSheet?.scrollToStart()}
+              />
+            </View>
+            <View className="w-20">
+              <AppTextField
+                compact
+                glass
+                label={t("quantity")}
+                value={quantity}
+                onChangeText={onChangeQuantity}
+                placeholder="1"
+                keyboardType="decimal-pad"
+                error={quantityError}
+                onFocus={() => formSheet?.scrollToStart()}
+              />
+            </View>
           </View>
-          <View className="w-20">
-            <AppTextField
-              compact
-              glass
-              label={t("quantity")}
-              value={quantity}
-              onChangeText={onChangeQuantity}
-              placeholder="1"
-              keyboardType="decimal-pad"
-              error={quantityError}
-              onFocus={() => formSheet?.scrollToStart()}
-            />
-          </View>
-        </View>
-        <CategoryField glass value={category} onChange={onChangeCategory} />
-        <UrgentToggle compact value={urgent} onValueChange={onChangeUrgent} />
-        <AppTextField
-          compact
-          glass
-          label={t("notes")}
-          value={notes}
-          onChangeText={onChangeNotes}
-          placeholder={t("notesPlaceholder")}
-          multiline
-          userText
-          onFocus={() => formSheet?.scrollToEnd()}
-        />
+          <CategoryField glass value={category} onChange={onChangeCategory} />
+        </FloatedCardSection>
+
+        <FloatedCardSection title={t("formExtra")} divided>
+          <UrgentToggle compact value={urgent} onValueChange={onChangeUrgent} />
+          <AppTextField
+            compact
+            glass
+            label={t("notes")}
+            value={notes}
+            onChangeText={onChangeNotes}
+            placeholder={t("notesPlaceholder")}
+            multiline
+            userText
+            onFocus={() => formSheet?.scrollToEnd()}
+          />
+        </FloatedCardSection>
+
         <FormMessage message={error} />
       </View>
-      <View className="mt-8 gap-3">
+
+      <FloatedCardActions>
+        <AppButton
+          compact
+          label={t("cancel")}
+          variant="ghost"
+          disabled={isSubmitting}
+          onPress={onCancel}
+          style={{ flex: 1 }}
+        />
         <AppButton
           compact
           label={t("saveItem")}
           disabled={!name.trim() || !listId}
           loading={isSubmitting}
           onPress={onSubmit}
+          style={{ flex: 1 }}
         />
-        <AppButton compact label={t("cancel")} variant="ghost" disabled={isSubmitting} onPress={onCancel} />
-      </View>
-    </View>
+      </FloatedCardActions>
+    </FloatedCard>
   );
 }

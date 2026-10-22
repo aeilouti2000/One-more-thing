@@ -103,7 +103,11 @@ export default function LoginScreen() {
             loading={isSubmitting}
             onPress={() => void onSubmit()}
           />
-          <AuthLink label={t("newHere")} onPress={() => router.push("/signup")} />
+          <AuthLink
+            prompt={t("newHerePrompt")}
+            action={t("newHereAction")}
+            onPress={() => router.push("/signup")}
+          />
         </View>
       </AuthFrame>
     </GuestOnly>

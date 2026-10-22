@@ -6,7 +6,11 @@ import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
 import { useCategories, useCategoryLabel } from "@/features/items/providers/categories-provider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { floatedCardStyle, glassFieldStyle } from "@/constants/theme";
+import {
+  floatedCardStyle,
+  floatedControlRadius,
+  glassFieldStyle,
+} from "@/constants/theme";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
 
 type Anchor = { x: number; y: number; width: number; height: number };
@@ -47,10 +51,14 @@ export function CategoryField({ value, onChange, glass = false }: CategoryFieldP
           <Pressable
             onPress={openMenu}
             accessibilityRole="button"
-            className={`h-10 flex-row items-center justify-between rounded-2xl border px-3 active:opacity-80 ${
+            className={`h-10 flex-row items-center justify-between border px-3 active:opacity-80 ${
               glass ? "" : "border-cove-line bg-cove-paper"
             }`}
-            style={glass ? glassFieldStyle(scheme, colors) : undefined}
+            style={
+              glass
+                ? glassFieldStyle(scheme, colors)
+                : { borderRadius: floatedControlRadius }
+            }
           >
             <AppText className="text-sm font-medium text-cove-ink">
               {selectedLabel}
@@ -74,7 +82,7 @@ export function CategoryField({ value, onChange, glass = false }: CategoryFieldP
               top: frame.top,
               left: frame.left,
               width: frame.width,
-              borderRadius: 24,
+              borderRadius: 16,
               shadowColor: shadow.color,
               shadowOffset: { width: 0, height: 8 },
               shadowOpacity: 0.16,
@@ -83,7 +91,7 @@ export function CategoryField({ value, onChange, glass = false }: CategoryFieldP
             }}
           >
             <View
-              className="overflow-hidden rounded-3xl"
+              className="overflow-hidden"
               style={[floatedCardStyle(scheme, colors), { maxHeight: frame.maxHeight }]}
             >
               <GlassFill soft neutral />

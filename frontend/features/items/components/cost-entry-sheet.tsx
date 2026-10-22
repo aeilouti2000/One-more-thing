@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
+import {
+  FloatedCard,
+  FloatedCardHeader,
+} from "@/components/ui/FloatedCard";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { FormSheetModal, useFormSheet } from "@/components/ui/FormSheetModal";
 import { appFont, scaleFontSize, singleLineInput } from "@/constants/font";
-import { floatedCardStyle, iconSize, withAlpha } from "@/constants/theme";
+import {
+  floatedControlRadius,
+  iconSize,
+  withAlpha,
+} from "@/constants/theme";
 import {
   currencySymbol,
   formatCostInput,
@@ -244,9 +251,10 @@ function CostField({
 
   return (
     <View
-      className={`flex-row items-center rounded-2xl border ${large ? "h-14 px-3.5" : "h-11 px-3"}`}
+      className={`flex-row items-center border ${large ? "h-14 px-3.5" : "h-11 px-3"}`}
       style={[
         {
+          borderRadius: floatedControlRadius,
           flexDirection: isRTL ? "row-reverse" : "row",
           backgroundColor:
             scheme === "dark" ? withAlpha(colors.white, 0.06) : "#F4F5F7",
@@ -458,7 +466,6 @@ function CostSheetBody({
   const { colors, scheme } = useTheme();
   const sheet = useFormSheet();
   const single = items.length === 1;
-  const accentSoft = withAlpha(colors.accent, scheme === "dark" ? 0.16 : 0.12);
 
   useEffect(() => {
     if (!single) return;
@@ -467,44 +474,13 @@ function CostSheetBody({
   }, [sheet, single]);
 
   return (
-    <View
-      className="w-full max-w-sm overflow-hidden rounded-3xl p-5"
-      style={floatedCardStyle(scheme, colors)}
-    >
-      <GlassFill soft neutral />
-
-      <View
-        className="mb-5 items-center gap-3"
-        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-      >
-        <View
-          className="h-11 w-11 items-center justify-center rounded-2xl"
-          style={{ backgroundColor: accentSoft }}
-        >
-          <Ionicons
-            name="cash-outline"
-            size={iconSize.sm}
-            color={colors.accent}
-          />
-        </View>
-        <View className="min-w-0 flex-1 gap-0.5">
-          <AppText
-            className="text-lg font-semibold text-cove-ink"
-            style={{ textAlign: isRTL ? "right" : "left" }}
-          >
-            {title}
-          </AppText>
-          {subtitle || (single && items[0]?.name) ? (
-            <AppText
-              className="text-xs leading-4 text-cove-muted"
-              numberOfLines={2}
-              style={{ textAlign: isRTL ? "right" : "left" }}
-            >
-              {subtitle ?? items[0]?.name}
-            </AppText>
-          ) : null}
-        </View>
-      </View>
+    <FloatedCard size="sm">
+      <FloatedCardHeader
+        title={title}
+        subtitle={subtitle || (single ? items[0]?.name : undefined)}
+        icon="cash-outline"
+        iconTone="accent"
+      />
 
       {onScan ? (
         <Pressable
@@ -641,17 +617,40 @@ function CostSheetBody({
         <FormMessage message={error} />
       </View>
 
-      <View className="mt-5 gap-2">
+      <View className="mt-5 flex-row flex-wrap items-center justify-center gap-2">
+        <Pressable
+          disabled={loading || scanning}
+          onPress={onSkip}
+          accessibilityRole="button"
+          accessibilityLabel={skipLabel}
+          accessibilityState={{ disabled: loading }}
+          className={`items-center px-3 py-2.5 ${
+            loading ? "opacity-45" : "active:opacity-80"
+          }`}
+          style={{
+            alignSelf: "center",
+            borderRadius: floatedControlRadius,
+            backgroundColor: scheme === "dark" ? colors.mist : "#F4F5F7",
+          }}
+        >
+          <AppText className="text-xs font-semibold text-cove-ink">
+            {skipLabel}
+          </AppText>
+        </Pressable>
         <Pressable
           disabled={loading || scanning}
           onPress={onConfirm}
           accessibilityRole="button"
           accessibilityLabel={confirmLabel}
           accessibilityState={{ disabled: loading, busy: loading }}
-          className={`items-center rounded-2xl px-4 py-3 ${
+          className={`items-center px-4 py-3 ${
             loading ? "opacity-50" : "active:opacity-80"
           }`}
-          style={{ backgroundColor: colors.accent }}
+          style={{
+            alignSelf: "center",
+            backgroundColor: colors.accent,
+            borderRadius: floatedControlRadius,
+          }}
         >
           {loading ? (
             <ActivityIndicator color={colors.onAccent} />
@@ -664,24 +663,7 @@ function CostSheetBody({
             </AppText>
           )}
         </Pressable>
-        <Pressable
-          disabled={loading || scanning}
-          onPress={onSkip}
-          accessibilityRole="button"
-          accessibilityLabel={skipLabel}
-          accessibilityState={{ disabled: loading }}
-          className={`items-center rounded-2xl px-3 py-2.5 ${
-            loading ? "opacity-45" : "active:opacity-80"
-          }`}
-          style={{
-            backgroundColor: scheme === "dark" ? colors.mist : "#F4F5F7",
-          }}
-        >
-          <AppText className="text-xs font-semibold text-cove-ink">
-            {skipLabel}
-          </AppText>
-        </Pressable>
       </View>
-    </View>
+    </FloatedCard>
   );
 }

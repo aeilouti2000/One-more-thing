@@ -317,31 +317,54 @@ function getColors(
   return buildColors(scheme, accentHex, surfaceDepth);
 }
 
+/** Outer floated sheet corner radius. */
+const floatedRadius = 20;
+/**
+ * Fields / buttons / badges inside floated sheets.
+ * Shorter than the sheet so the same number reads as a pill — keep this
+ * closer to a soft rectangle to match the container.
+ */
+const floatedControlRadius = 12;
+
 function glassFieldStyle(scheme, palette = getColors(scheme)) {
   if (scheme === "dark") {
     return {
-      backgroundColor: withAlpha(palette.white, 0.06),
-      borderColor: withAlpha(palette.white, 0.12),
+      borderRadius: floatedControlRadius,
+      backgroundColor: withAlpha(palette.white, 0.05),
+      borderColor: withAlpha(palette.white, 0.1),
     };
   }
 
   return {
+    borderRadius: floatedControlRadius,
     backgroundColor: "#F4F5F7",
-    borderColor: withAlpha("#12141A", 0.1),
+    borderColor: withAlpha("#12141A", 0.08),
   };
 }
 
 function floatedCardStyle(scheme, palette = getColors(scheme)) {
   const dark = scheme === "dark";
   return {
+    borderRadius: floatedRadius,
     borderWidth: 1,
     borderColor: dark ? withAlpha(palette.white, 0.1) : withAlpha("#12141A", 0.08),
     backgroundColor: dark ? palette.paper : palette.white,
     shadowColor: "#12141A",
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: dark ? 0.42 : 0.12,
-    shadowRadius: 28,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: dark ? 0.48 : 0.14,
+    shadowRadius: 32,
+    elevation: 14,
+  };
+}
+
+/** Soft grouped block inside a floated card (Option B sections). */
+function floatedSectionStyle(scheme, palette = getColors(scheme)) {
+  const dark = scheme === "dark";
+  return {
+    borderRadius: floatedControlRadius + 2,
+    borderWidth: 1,
+    borderColor: dark ? withAlpha(palette.white, 0.08) : withAlpha("#12141A", 0.06),
+    backgroundColor: dark ? withAlpha(palette.white, 0.035) : "#F6F7F9",
   };
 }
 
@@ -428,6 +451,9 @@ module.exports = {
   withAlpha,
   glassFieldStyle,
   floatedCardStyle,
+  floatedSectionStyle,
+  floatedRadius,
+  floatedControlRadius,
   headerIconFrameStyle,
   headerActionStyle,
   spacing,

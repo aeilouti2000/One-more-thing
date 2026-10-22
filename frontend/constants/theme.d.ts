@@ -44,6 +44,7 @@ export function glassFieldStyle(
   scheme: ThemeScheme,
   palette?: ThemeColors,
 ): {
+  borderRadius: number;
   backgroundColor: string;
   borderColor: string;
 };
@@ -52,6 +53,7 @@ export function floatedCardStyle(
   scheme: ThemeScheme,
   palette?: ThemeColors,
 ): {
+  borderRadius: number;
   borderWidth: number;
   borderColor: string;
   backgroundColor: string;
@@ -61,6 +63,21 @@ export function floatedCardStyle(
   shadowRadius: number;
   elevation: number;
 };
+
+export function floatedSectionStyle(
+  scheme: ThemeScheme,
+  palette?: ThemeColors,
+): {
+  borderRadius: number;
+  borderWidth: number;
+  borderColor: string;
+  backgroundColor: string;
+};
+
+/** Outer floated sheet corner radius. */
+export const floatedRadius: number;
+/** Fields / buttons / badges inside floated sheets. */
+export const floatedControlRadius: number;
 
 export function headerIconFrameStyle(
   scheme: ThemeScheme,

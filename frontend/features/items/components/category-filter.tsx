@@ -208,7 +208,7 @@ export function CategoryFilter({
                 left: frame.left,
                 width: frame.width,
                 maxHeight: frame.maxHeight,
-                borderRadius: 20,
+                borderRadius: 16,
                 padding: 6,
               },
             ]}

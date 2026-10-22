@@ -70,7 +70,8 @@ export function FontSizeBar() {
         height: 78,
         padding: TRACK_PAD,
         borderRadius: radius.md,
-        backgroundColor: colors.mist,
+        // Transparent track so unselected options sit on the parent card.
+        backgroundColor: "transparent",
         alignSelf: "stretch",
       }}
     >
@@ -111,7 +112,7 @@ export function FontSizeBar() {
                 fontFamily: appFont.semibold,
                 fontSize: option.sample,
                 lineHeight: option.sample + 4,
-                color: selected ? colors.onAccent : colors.ink,
+                color: selected ? colors.onAccent : colors.muted,
               }}
             >
               A

@@ -36,7 +36,7 @@ export function InviteCodeCard({ code, homeName, onCopied }: InviteCodeCardProps
 
   return (
     <View
-      className="overflow-hidden rounded-[28px] px-5 py-5"
+      className="overflow-hidden px-5 py-5"
       style={floatedCardStyle(scheme, colors)}
     >
       <View

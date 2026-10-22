@@ -16,6 +16,7 @@ import { useI18n } from "@/providers/LanguageProvider";
 import { SWIPE_ACTION_TONE, type SwipeAction } from "@/features/items/utils/swipe-actions";
 
 const REVEAL_RATIO = 0.36;
+const COMMIT_RATIO = 0.5;
 
 type SwipeableItemProps = {
   enabled: boolean;
@@ -59,19 +60,27 @@ export function SwipeableItem({
     callbacks.current.onReveal(side !== null);
   }
 
-  function trigger() {
-    const side = resting.value < 0 ? "left" : resting.value > 0 ? "right" : null;
-    if (!side) return;
-    const action = side === "left" ? callbacks.current.leftAction : callbacks.current.rightAction;
-    resting.value = 0;
-    travel.value = withTiming(0, { duration: 180 });
+  function fireAction(direction: number) {
+    if (direction === 0) return;
+    const action =
+      direction < 0 ? callbacks.current.leftAction : callbacks.current.rightAction;
     setSettled(null);
     callbacks.current.onReveal(false);
     callbacks.current.onAction(action);
   }
 
+  function trigger() {
+    const side = resting.value < 0 ? "left" : resting.value > 0 ? "right" : null;
+    if (!side) return;
+    const direction = side === "left" ? -1 : 1;
+    resting.value = 0;
+    travel.value = withTiming(0, { duration: 180 });
+    fireAction(direction);
+  }
+
   const gesture = useMemo(() => {
     const report = (direction: number) => settle(direction);
+    const commit = (direction: number) => fireAction(direction);
     const pan = Gesture.Pan()
       .enabled(enabled)
       .activeOffsetX([-18, 18])
@@ -92,6 +101,14 @@ export function SwipeableItem({
         const width = Math.max(widthSV.value, 1);
         const projected = resting.value * width + event.translationX;
         const ratio = projected / width;
+        if (ratio <= -COMMIT_RATIO || ratio >= COMMIT_RATIO) {
+          const direction = ratio < 0 ? -1 : 1;
+          resting.value = 0;
+          travel.value = withTiming(0, { duration: 180 }, () => {
+            runOnJS(commit)(direction);
+          });
+          return;
+        }
         const direction = ratio <= -REVEAL_RATIO ? -1 : ratio >= REVEAL_RATIO ? 1 : 0;
         resting.value = direction;
         travel.value = withTiming(direction * width, { duration: 180 }, () => {

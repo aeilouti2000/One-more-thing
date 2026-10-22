@@ -108,7 +108,7 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
           />
           <View
             onStartShouldSetResponder={() => true}
-            className="absolute overflow-hidden rounded-3xl px-3 py-3"
+            className="absolute overflow-hidden rounded-2xl px-3 py-3"
             style={[
               floatedCardStyle(scheme, colors),
               {

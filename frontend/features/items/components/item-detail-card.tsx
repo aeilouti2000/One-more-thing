@@ -7,12 +7,18 @@ import { StatusBadge } from "@/features/items/components/status-badge";
 import { UrgentToggle } from "@/features/items/components/urgent-toggle";
 import { AppButton } from "@/components/ui/AppButton";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
+import {
+  FloatedCard,
+  FloatedCardActions,
+  FloatedCardHeader,
+  FloatedCardMeta,
+  FloatedCardSection,
+} from "@/components/ui/FloatedCard";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { FormSheetModal, useFormSheet } from "@/components/ui/FormSheetModal";
-import { floatedCardStyle, withAlpha } from "@/constants/theme";
+import { floatedControlRadius, withAlpha } from "@/constants/theme";
 import { useCategoryLabel } from "@/features/items/providers/categories-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
@@ -366,7 +372,7 @@ function EditItemForm({
   onMarkBought: () => void;
 }) {
   const { t, locale } = useI18n();
-  const { colors, scheme } = useTheme();
+  const { colors } = useTheme();
   const formSheet = useFormSheet();
   const categoryLabel = useCategoryLabel(category);
   const quantityLabel = purchase?.unit
@@ -391,45 +397,41 @@ function EditItemForm({
     }
   }, [editingOpen, formSheet]);
 
+  const dateLabel = purchase
+    ? new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }).format(new Date(purchase.createdAt))
+    : null;
+
   return (
-    <View
-      className="w-full max-w-md overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
-      style={floatedCardStyle(scheme, colors)}
-    >
-      <GlassFill soft neutral />
-      <View className="mb-5 flex-row items-start justify-between gap-4">
-        <View className="min-w-0 flex-1">
-          <AppText className="text-lg font-semibold text-cove-ink" numberOfLines={2}>
-            {name.trim() || purchase?.name || t("item")}
-          </AppText>
-          {purchase?.urgent && purchase.status !== "bought" ? (
-            <AppText className="mt-1 text-xs font-semibold" style={{ color: "#F87171" }}>
-              {t("urgent")}
+    <FloatedCard>
+      <View className="mb-5 gap-3">
+        <View className="flex-row items-start gap-3">
+          <View className="min-w-0 flex-1 gap-1">
+            <AppText className="text-lg font-semibold text-cove-ink" numberOfLines={2}>
+              {name.trim() || purchase?.name || t("item")}
             </AppText>
+            {purchase?.urgent && purchase.status !== "bought" ? (
+              <AppText className="text-xs font-semibold" style={{ color: "#F87171" }}>
+                {t("urgent")}
+              </AppText>
+            ) : null}
+          </View>
+          {purchase ? (
+            <FloatedCardMeta
+              lines={[
+                t("addedByName", { name: purchase.addedByName }),
+                ...(dateLabel ? [dateLabel] : []),
+              ]}
+            />
           ) : null}
         </View>
-        {purchase ? (
-          <View className="shrink-0 items-end">
-            <AppText
-              numberOfLines={1}
-              className="text-xs"
-              style={{ color: scheme === "dark" ? "#FFFFFF" : colors.ink }}
-            >
-              {t("addedByName", { name: purchase.addedByName })}
-            </AppText>
-            <AppText
-              numberOfLines={1}
-              className="text-xs"
-              style={{ color: scheme === "dark" ? "#FFFFFF" : colors.ink }}
-            >
-              {new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              }).format(new Date(purchase.createdAt))}
-            </AppText>
-          </View>
-        ) : null}
+        <View
+          className="h-0.5 w-10 rounded-full"
+          style={{ backgroundColor: colors.accent }}
+        />
       </View>
 
       {purchase ? (
@@ -449,34 +451,23 @@ function EditItemForm({
             </View>
           ) : null}
 
-          <View
-            className="overflow-hidden rounded-2xl"
-            style={{
-              backgroundColor:
-                scheme === "dark" ? withAlpha(colors.white, 0.04) : "#F4F5F7",
-              borderWidth: 1,
-              borderColor:
-                scheme === "dark"
-                  ? withAlpha(colors.white, 0.1)
-                  : withAlpha("#12141A", 0.08),
-            }}
+          <Pressable
+            onPress={onToggleEditing}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: editingOpen }}
+            className="flex-row items-center justify-between py-1 active:opacity-80"
           >
-            <Pressable
-              onPress={onToggleEditing}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: editingOpen }}
-              className="flex-row items-center justify-between px-4 py-3 active:opacity-80"
-            >
-              <AppText className="text-sm font-semibold text-cove-ink">{t("editItem")}</AppText>
-              <Ionicons
-                name={editingOpen ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={colors.muted}
-              />
-            </Pressable>
+            <AppText className="text-sm font-semibold text-cove-ink">{t("editItem")}</AppText>
+            <Ionicons
+              name={editingOpen ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={colors.muted}
+            />
+          </Pressable>
 
-            {editingOpen ? (
-              <View className="gap-4 px-4 pb-4 pt-1">
+          {editingOpen ? (
+            <View className="gap-4">
+              <FloatedCardSection title={t("formEssentials")}>
                 <View className="flex-row items-stretch gap-3">
                   <View className="min-w-0 flex-1">
                     <AppTextField
@@ -505,6 +496,9 @@ function EditItemForm({
                   </View>
                 </View>
                 <CategoryField glass value={category} onChange={onChangeCategory} />
+              </FloatedCardSection>
+
+              <FloatedCardSection title={t("formExtra")} divided>
                 <View className="flex-row flex-wrap gap-4">
                   <UrgentToggle compact value={urgent} onValueChange={onChangeUrgent} />
                   <UrgentToggle
@@ -525,38 +519,43 @@ function EditItemForm({
                   userText
                   onFocus={() => formSheet?.scrollToEnd()}
                 />
-              </View>
-            ) : null}
-          </View>
+              </FloatedCardSection>
+            </View>
+          ) : null}
 
           <FormMessage message={error} />
 
-          <Pressable
-            disabled={isSubmitting || (hasChanges && !name.trim())}
-            onPress={hasChanges ? onSubmit : onMarkBought}
-            accessibilityRole="button"
-            className={`mt-2 h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-cove-accent px-3 ${
-              isSubmitting || (hasChanges && !name.trim()) ? "opacity-50" : "active:opacity-80"
-            }`}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color={colors.onAccent} />
-            ) : hasChanges ? (
-              <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
-                {t("saveChanges")}
-              </AppText>
-            ) : (
-              <>
-                <MaterialCommunityIcons name="cart-check" size={18} color={colors.onAccent} />
+          <FloatedCardActions className="mt-2">
+            <Pressable
+              disabled={isSubmitting || (hasChanges && !name.trim())}
+              onPress={hasChanges ? onSubmit : onMarkBought}
+              accessibilityRole="button"
+              className={`h-12 flex-1 flex-row items-center justify-center gap-2 bg-cove-accent px-4 ${
+                isSubmitting || (hasChanges && !name.trim())
+                  ? "opacity-50"
+                  : "active:opacity-80"
+              }`}
+              style={{ borderRadius: floatedControlRadius }}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color={colors.onAccent} />
+              ) : hasChanges ? (
                 <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
-                  {t("markBought")}
+                  {t("saveChanges")}
                 </AppText>
-              </>
-            )}
-          </Pressable>
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="cart-check" size={18} color={colors.onAccent} />
+                  <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
+                    {t("markBought")}
+                  </AppText>
+                </>
+              )}
+            </Pressable>
+          </FloatedCardActions>
         </View>
       ) : null}
-    </View>
+    </FloatedCard>
   );
 }
 
@@ -565,8 +564,11 @@ function SummaryChip({ label }: { label: string }) {
 
   return (
     <View
-      className="rounded-full px-3 py-1"
-      style={{ backgroundColor: scheme === "dark" ? colors.mist : colors.soft }}
+      className="px-3 py-1"
+      style={{
+        borderRadius: floatedControlRadius,
+        backgroundColor: scheme === "dark" ? colors.mist : colors.soft,
+      }}
     >
       <AppText className="text-xs font-medium text-cove-ink">{label}</AppText>
     </View>
@@ -622,89 +624,96 @@ function HistoryItemCard({
   ].filter((fact): fact is { label: string; value: string } => fact !== null);
 
   return (
-    <View
-      className="w-full max-w-md gap-6 overflow-hidden rounded-[28px] px-7 pb-5 pt-8"
-      style={floatedCardStyle(scheme, colors)}
-    >
-      <GlassFill soft neutral />
-      <View className="-mx-7 flex-row items-center gap-3 border-b border-cove-line px-7 pb-5">
-        <AppText
-          className="min-w-0 flex-1 text-xl font-semibold tracking-tight text-cove-ink"
-          numberOfLines={2}
-        >
-          {purchase.name}
-        </AppText>
-        {onAskDelete ? (
-          <Pressable
-            onPress={onAskDelete}
-            accessibilityRole="button"
-            accessibilityLabel={t("delete")}
-            hitSlop={8}
-            className="h-10 w-10 items-center justify-center rounded-full active:opacity-80"
-            style={{
-              backgroundColor:
-                scheme === "dark" ? "rgba(240, 113, 120, 0.16)" : "rgba(194, 65, 74, 0.1)",
-            }}
-          >
-            <Ionicons
-              name="trash-outline"
-              size={18}
-              color={scheme === "dark" ? "#F07178" : "#C2414A"}
-            />
-          </Pressable>
-        ) : null}
-        <StatusBadge status={purchase.status} />
-      </View>
-
-      <View
-        className="overflow-hidden rounded-2xl px-4"
-        style={{
-          backgroundColor: scheme === "dark" ? withAlpha(colors.white, 0.04) : "#F4F5F7",
-        }}
-      >
-        {facts.map((fact, index) => (
-          <View
-            key={fact.label}
-            className="flex-row items-center justify-between gap-4 py-3"
-            style={
-              index < facts.length - 1
-                ? {
-                    borderBottomWidth: 1,
-                    borderBottomColor:
-                      scheme === "dark"
-                        ? withAlpha(colors.white, 0.08)
-                        : withAlpha("#12141A", 0.08),
-                  }
-                : undefined
-            }
-          >
-            <AppText className="text-sm text-cove-muted">{fact.label}</AppText>
-            <AppText
-              className="min-w-0 flex-1 text-base font-semibold text-cove-ink"
-              style={{ textAlign: isRTL ? "left" : "right" }}
-              numberOfLines={2}
-            >
-              {fact.value}
-            </AppText>
+    <FloatedCard>
+      <FloatedCardHeader
+        title={purchase.name}
+        trailing={
+          <View className="flex-row items-center gap-2">
+            {onAskDelete ? (
+              <Pressable
+                onPress={onAskDelete}
+                accessibilityRole="button"
+                accessibilityLabel={t("delete")}
+                hitSlop={8}
+                className="h-9 w-9 items-center justify-center rounded-full active:opacity-80"
+                style={{
+                  backgroundColor:
+                    scheme === "dark"
+                      ? "rgba(240, 113, 120, 0.16)"
+                      : "rgba(194, 65, 74, 0.1)",
+                }}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={16}
+                  color={scheme === "dark" ? "#F07178" : "#C2414A"}
+                />
+              </Pressable>
+            ) : null}
+            <StatusBadge status={purchase.status} />
           </View>
-        ))}
-      </View>
+        }
+      />
 
-      {purchase.notes ? (
-        <View className="gap-1">
-          <AppText className="text-sm text-cove-muted">{t("notes")}</AppText>
-          <AppText className="text-base font-medium text-cove-ink">{purchase.notes}</AppText>
-        </View>
-      ) : null}
+      <View className="gap-3">
+        <FloatedCardSection title={t("formEssentials")}>
+          {facts.map((fact, index) => (
+            <View
+              key={`${fact.label}-${fact.value}`}
+              className="flex-row items-center justify-between gap-4 py-1"
+              style={
+                index < facts.length - 1
+                  ? {
+                      borderBottomWidth: 1,
+                      borderBottomColor:
+                        scheme === "dark"
+                          ? withAlpha(colors.white, 0.08)
+                          : withAlpha("#12141A", 0.08),
+                      paddingBottom: 10,
+                      marginBottom: 2,
+                    }
+                  : undefined
+              }
+            >
+              <AppText className="text-sm text-cove-muted">{fact.label}</AppText>
+              <AppText
+                className="min-w-0 flex-1 text-base font-semibold text-cove-ink"
+                style={{ textAlign: isRTL ? "left" : "right" }}
+                numberOfLines={2}
+              >
+                {fact.value}
+              </AppText>
+            </View>
+          ))}
+        </FloatedCardSection>
 
-      <FormMessage message={error} />
-
-      <View className="mt-2 gap-2">
-        {costsEnabled ? (
-          <AppButton label={t("editCost")} variant="secondary" onPress={onEditCost} />
+        {purchase.notes ? (
+          <FloatedCardSection title={t("notes")} divided>
+            <AppText className="text-base font-medium text-cove-ink">{purchase.notes}</AppText>
+          </FloatedCardSection>
         ) : null}
-        <AppButton label={t("close")} variant="secondary" onPress={onClose} />
+
+        <FormMessage message={error} />
       </View>
-    </View>
+
+      <FloatedCardActions>
+        {costsEnabled ? (
+          <AppButton
+            compact
+            label={t("editCost")}
+            variant="secondary"
+            onPress={onEditCost}
+            style={{ flex: 1 }}
+          />
+        ) : null}
+        <AppButton
+          compact
+          label={t("close")}
+          variant={costsEnabled ? "primary" : "secondary"}
+          onPress={onClose}
+          style={{ flex: 1 }}
+        />
+      </FloatedCardActions>
+    </FloatedCard>
   );
 }

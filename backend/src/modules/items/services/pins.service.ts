@@ -152,6 +152,9 @@ export class PinsService {
     const arrived: string[] = [];
 
     for (const pin of due) {
+      // Once-pins are templates only; they must not auto-return.
+      if (pin.intervalDays <= 0) continue;
+
       const claimed = await this.pins.claimDue(
         pin.id,
         advanceDue(pin.nextDueAt, pin.intervalDays, now),
