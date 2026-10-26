@@ -21,3 +21,7 @@ services:
         value: "90"
       - key: CORS_ORIGINS
         value: ""
+      - key: APP_MIN_VERSION
+        value: "2.2.2"
+      - key: APP_DOWNLOAD_URL
+        value: "https://expo.dev/artifacts/eas/RtaP4Eov_znHtCGLcR4Qkea3lz9k-80iWbVw4eHIFew.apk"
