@@ -19,6 +19,8 @@ type HomeCardProps = {
   members: HouseholdMember[];
   switching: boolean;
   currentUserId?: string;
+  /** Fold detail pane: always show body, hide accordion chevron. */
+  variant?: "accordion" | "detail";
   onToggle: () => void;
   onRename: (name: string) => Promise<string | null>;
   onSwitch: () => void;
@@ -34,6 +36,7 @@ export function HomeCard({
   members,
   switching,
   currentUserId,
+  variant = "accordion",
   onToggle,
   onRename,
   onSwitch,
@@ -49,6 +52,8 @@ export function HomeCard({
   const [isSaving, setIsSaving] = useState(false);
   const [trackedName, setTrackedName] = useState({ name: home.name, editing: false });
   const isHost = home.role === "owner";
+  const showBody = variant === "detail" || expanded;
+  const detail = variant === "detail";
 
   if (home.name !== trackedName.name || isEditing !== trackedName.editing) {
     setTrackedName({ name: home.name, editing: isEditing });
@@ -84,9 +89,10 @@ export function HomeCard({
     <View className="rounded-2xl bg-cove-mist px-3.5 py-3.5">
       <View className="flex-row items-center gap-3">
         <Pressable
-          onPress={onToggle}
+          onPress={detail ? undefined : onToggle}
+          disabled={detail}
           accessibilityRole="button"
-          accessibilityState={{ expanded }}
+          accessibilityState={{ expanded: showBody }}
           className="min-w-0 flex-1 active:opacity-80"
         >
           <AppText className="text-base font-semibold text-cove-ink">{home.name}</AppText>
@@ -103,7 +109,7 @@ export function HomeCard({
             onPress={startEditing}
           />
         ) : null}
-        {isHost && expanded ? (
+        {isHost && showBody ? (
           <Pressable
             onPress={onDelete}
             accessibilityRole="button"
@@ -114,19 +120,21 @@ export function HomeCard({
             <Ionicons name="trash-outline" size={15} color="#F87171" />
           </Pressable>
         ) : null}
-        <Pressable
-          onPress={onToggle}
-          accessibilityRole="button"
-          accessibilityLabel={home.name}
-          accessibilityState={{ expanded }}
-          className="h-11 w-11 items-center justify-center active:opacity-80"
-        >
-          <Ionicons
-            name={expanded ? "chevron-up" : "chevron-down"}
-            size={iconSize.sm}
-            color={colors.muted}
-          />
-        </Pressable>
+        {detail ? null : (
+          <Pressable
+            onPress={onToggle}
+            accessibilityRole="button"
+            accessibilityLabel={home.name}
+            accessibilityState={{ expanded }}
+            className="h-11 w-11 items-center justify-center active:opacity-80"
+          >
+            <Ionicons
+              name={expanded ? "chevron-up" : "chevron-down"}
+              size={iconSize.sm}
+              color={colors.muted}
+            />
+          </Pressable>
+        )}
       </View>
 
       {isHost && isEditing ? (
@@ -160,7 +168,7 @@ export function HomeCard({
         </View>
       ) : null}
 
-      {expanded ? (
+      {showBody ? (
         <View className="mt-4 gap-2.5">
           {members.map((member) => (
             <PartnerCard

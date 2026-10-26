@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Dimensions, Modal, Pressable, ScrollView, View } from "react-native";
+import { FoldPaneEmpty, FoldSplit } from "@/components/ui/FoldSplit";
 import { HistoryDateField } from "@/features/items/components/history-date-field";
 import { ItemDetailCard } from "@/features/items/components/item-detail-card";
 import { PurchaseRow } from "@/features/items/components/purchase-row";
@@ -20,9 +21,16 @@ import { groupPurchasesIntoTrips } from "@/features/items/utils/trips";
 import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeList } from "@/features/items/api/lists";
 import { readCachedHistoryLists, readCachedLists } from "@/features/offline/profile-cache";
 import { canUndoBought } from "@/features/items/utils/share-list";
+import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { floatedCardStyle, headerActionStyle, headerIconFrameStyle, iconSize } from "@/constants/theme";
+import {
+  floatedCardStyle,
+  headerActionStyle,
+  headerIconFrameStyle,
+  iconSize,
+  withAlpha,
+} from "@/constants/theme";
 import type { Purchase } from "@/features/items/types/purchase";
 
 type HistoryRange = "all" | "today" | "week" | "month";
@@ -36,6 +44,7 @@ export default function HistoryScreen() {
   const { household } = useHousehold();
   const { t, locale, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
+  const wide = useWideLayout();
   const invoiceAction = headerActionStyle(scheme, colors);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
@@ -246,7 +255,7 @@ export default function HistoryScreen() {
     return <LoadingScreen />;
   }
 
-  return (
+  const listScreen = (
     <Screen
       tabBarInset
       refreshing={isRefreshing}
@@ -363,7 +372,7 @@ export default function HistoryScreen() {
                 : t("historyFilterEmptyBody")
             }
           />
-        ) : mode === "invoice" && openTrip ? (
+        ) : mode === "invoice" && openTrip && !wide ? (
           <View className="gap-3">
             <Pressable
               onPress={() => setOpenTripId(null)}
@@ -399,8 +408,10 @@ export default function HistoryScreen() {
             currency={currency}
             locale={locale}
             isRTL={isRTL}
+            selectedId={wide ? openTripId : null}
             onOpen={(id) => {
               setOpenTripId(id);
+              setOpenItemId(null);
               void Haptics.selectionAsync();
             }}
           />
@@ -410,6 +421,7 @@ export default function HistoryScreen() {
               <PurchaseRow
                 key={purchase.id}
                 purchase={purchase}
+                selected={wide && openItemId === purchase.id}
                 onPress={() => setOpenItemId(purchase.id)}
                 onUndo={
                   canUndoBought(purchase.boughtAt, now) && undoId !== purchase.id
@@ -424,12 +436,14 @@ export default function HistoryScreen() {
         )}
       </SwipeSlideContent>
 
-      <ItemDetailCard
-        purchase={openItem}
-        visible={openItem !== null}
-        onClose={() => setOpenItemId(null)}
-        onDelete={openItem ? () => deleteMany([openItem.id]) : undefined}
-      />
+      {wide ? null : (
+        <ItemDetailCard
+          purchase={openItem}
+          visible={openItem !== null}
+          onClose={() => setOpenItemId(null)}
+          onDelete={openItem ? () => deleteMany([openItem.id]) : undefined}
+        />
+      )}
 
       <OptionMenu
         visible={isChoosingList}
@@ -460,6 +474,101 @@ export default function HistoryScreen() {
       />
     </Screen>
   );
+
+  if (!wide) return listScreen;
+
+  const tripDetail =
+    mode === "invoice" && openTrip ? (
+      <View className="gap-3 px-4 pb-10 pt-2">
+        <Pressable
+          onPress={() => {
+            setOpenTripId(null);
+            setOpenItemId(null);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t("invoiceAllTrips")}
+          className="flex-row items-center gap-1 self-start active:opacity-80"
+          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+        >
+          <Ionicons
+            name={isRTL ? "chevron-forward" : "chevron-back"}
+            size={iconSize.sm}
+            color={colors.accent}
+          />
+          <AppText className="text-sm font-semibold text-cove-accent">
+            {t("invoiceAllTrips")}
+          </AppText>
+        </Pressable>
+        <InvoiceView
+          items={openTrip.items}
+          currency={currency}
+          periodTitle={formatTripWhen(openTrip.startedAt, locale)}
+          listTitle={listLabel(openTrip.listName, t("defaultList"))}
+          locale={locale}
+          total={openTrip.total}
+          priced={openTrip.priced}
+          count={openTrip.count}
+          onPressItem={(purchase) => setOpenItemId(purchase.id)}
+        />
+      </View>
+    ) : null;
+
+  return (
+    <FoldSplit
+      master={listScreen}
+      detail={
+        <Screen scroll={false} tabBarInset>
+          {openItem ? (
+            <View className="flex-1">
+              {mode === "invoice" && openTrip ? (
+                <Pressable
+                  onPress={() => setOpenItemId(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("back")}
+                  className="mb-1 flex-row items-center gap-1 self-start px-4 pt-2 active:opacity-80"
+                  style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                >
+                  <Ionicons
+                    name={isRTL ? "chevron-forward" : "chevron-back"}
+                    size={iconSize.sm}
+                    color={colors.accent}
+                  />
+                  <AppText className="text-sm font-semibold text-cove-accent">
+                    {t("back")}
+                  </AppText>
+                </Pressable>
+              ) : null}
+              <ItemDetailCard
+                presentation="pane"
+                purchase={openItem}
+                visible
+                onClose={() => setOpenItemId(null)}
+                onDelete={() => deleteMany([openItem.id])}
+              />
+            </View>
+          ) : tripDetail ? (
+            <ScrollView
+              className="flex-1"
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {tripDetail}
+            </ScrollView>
+          ) : (
+            <FoldPaneEmpty
+              icon={mode === "invoice" ? "receipt-outline" : "time-outline"}
+              title={
+                mode === "invoice" ? t("tripPickTitle") : t("historyPickTitle")
+              }
+              body={
+                mode === "invoice" ? t("tripPickBody") : t("historyPickBody")
+              }
+            />
+          )}
+        </Screen>
+      }
+    />
+  );
 }
 
 function TripInvoiceList({
@@ -467,12 +576,14 @@ function TripInvoiceList({
   currency,
   locale,
   isRTL,
+  selectedId = null,
   onOpen,
 }: {
   trips: ReturnType<typeof groupPurchasesIntoTrips>;
   currency: string;
   locale: string;
   isRTL: boolean;
+  selectedId?: string | null;
   onOpen: (id: string) => void;
 }) {
   const { t } = useI18n();
@@ -489,7 +600,14 @@ function TripInvoiceList({
           key={trip.id}
           onPress={() => onOpen(trip.id)}
           accessibilityRole="button"
-          className="rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
+          accessibilityState={{ selected: selectedId === trip.id }}
+          className="rounded-3xl px-4 py-4 active:opacity-80"
+          style={{
+            backgroundColor:
+              selectedId === trip.id
+                ? withAlpha(colors.accent, 0.12)
+                : colors.paper,
+          }}
         >
           <View
             className="items-center justify-between gap-3"

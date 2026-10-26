@@ -2,12 +2,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/AppText";
 import { headerActionStyle, iconSize, spacing } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+
+/** Matches the settings icon frame so split panes share one header height. */
+const SPLIT_HEADER_BODY = 56;
+/** Cover pane hairline + antialias gap between fold headers. */
+const SPLIT_COVER = StyleSheet.hairlineWidth + 1;
 
 type ScreenHeaderProps = {
   title?: string;
@@ -20,6 +25,11 @@ type ScreenHeaderProps = {
   children?: ReactNode;
   flush?: boolean;
   compact?: boolean;
+  /**
+   * Fold master–detail: which horizontal edge meets the other pane.
+   * Locks height and paints over the divider so headers read as one band.
+   */
+  splitJoin?: "start" | "end";
 };
 
 export function ScreenHeader({
@@ -33,6 +43,7 @@ export function ScreenHeader({
   children,
   flush = true,
   compact = false,
+  splitJoin,
 }: ScreenHeaderProps) {
   const { colors, scheme } = useTheme();
   const { isRTL, t } = useI18n();
@@ -40,42 +51,45 @@ export function ScreenHeader({
   const headerFg = scheme === "dark" ? colors.ink : colors.onAccent;
   const backAction = headerActionStyle(scheme, colors);
   const padTop = (compact ? spacing.lg : spacing.xl) + insets.top;
+  const padBottom = compact ? spacing.lg : 28;
+  const split = Boolean(splitJoin);
 
   return (
     <View
-      className={`overflow-hidden rounded-b-3xl px-4 ${
+      className={`overflow-hidden px-4 ${
         compact ? "pb-4" : "mb-6 pb-7"
       } ${scheme === "dark" ? "bg-cove-deep" : "bg-cove-accent"}`}
       style={{
         paddingTop: padTop,
-        ...(flush
-          ? { marginHorizontal: -spacing.screen, marginTop: -spacing.sm }
+        ...(flush ? { marginTop: -spacing.sm } : null),
+        ...(flush || split
+          ? {
+              marginLeft: -(
+                (flush ? spacing.screen : 0) +
+                (splitJoin === "start" ? SPLIT_COVER : 0)
+              ),
+              marginRight: -(
+                (flush ? spacing.screen : 0) +
+                (splitJoin === "end" ? SPLIT_COVER : 0)
+              ),
+            }
+          : null),
+        ...(split
+          ? {
+              minHeight: padTop + SPLIT_HEADER_BODY + padBottom,
+              zIndex: 2,
+            }
           : null),
       }}
     >
       {/* Header sits on accent/deep — keep status icons light. */}
       <StatusBar style="light" />
-      <View
-        pointerEvents="none"
-        className="absolute -right-10 -top-16 h-40 w-5 rounded-full"
-        style={{
-          backgroundColor: "rgba(255,255,255,0.18)",
-          transform: [{ rotate: "32deg" }],
-        }}
-      />
-      <View
-        pointerEvents="none"
-        className="absolute right-5 -top-12 h-36 w-2 rounded-full"
-        style={{
-          backgroundColor: "rgba(255,255,255,0.1)",
-          transform: [{ rotate: "32deg" }],
-        }}
-      />
 
       <View
-        className={`relative z-10 flex-row justify-between gap-3 ${
-          children || icon ? "items-center" : "items-start"
+        className={`flex-row justify-between gap-3 ${
+          children || icon || split ? "items-center" : "items-start"
         }`}
+        style={split ? { minHeight: SPLIT_HEADER_BODY } : undefined}
       >
         <View className="min-w-0 flex-1 flex-row items-center gap-3">
           {showBack ? (
@@ -123,7 +137,7 @@ export function ScreenHeader({
         </View>
         {right}
       </View>
-      {footer ? <View className="relative z-10 mt-4">{footer}</View> : null}
+      {footer ? <View className="mt-4">{footer}</View> : null}
     </View>
   );
 }

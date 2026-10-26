@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
+import { FoldPaneEmpty, FoldSplit } from "@/components/ui/FoldSplit";
 import { HomeCard } from "@/features/homes/components/home-card";
 import { InviteCodeCard } from "@/features/homes/components/invite-code-card";
 import { AppButton } from "@/components/ui/AppButton";
@@ -13,7 +14,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
-import { headerIconFrameStyle, iconSize } from "@/constants/theme";
+import { headerIconFrameStyle, iconSize, withAlpha } from "@/constants/theme";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import {
   createHome,
@@ -25,6 +26,7 @@ import {
   updateHomeName,
 } from "@/features/homes/api/homes";
 import { useAuth } from "@/features/auth/providers/auth-provider";
+import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { HomeSummary, HouseholdMember } from "@/features/homes/types/household";
@@ -32,11 +34,13 @@ import type { HomeSummary, HouseholdMember } from "@/features/homes/types/househ
 export default function HomeScreen() {
   const { user } = useAuth();
   const { household, homes, isLoading, error, refresh, adoptHome } = useHousehold();
-  const { t } = useI18n();
+  const { t, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
+  const wide = useWideLayout();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [homesOpen, setHomesOpen] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
+  const [widePane, setWidePane] = useState<"home" | "add">("home");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [memberToRemove, setMemberToRemove] = useState<HouseholdMember | null>(null);
   const [memberHomeId, setMemberHomeId] = useState<string | null>(null);
@@ -89,6 +93,11 @@ export default function HomeScreen() {
   }
 
   function toggleHome(homeId: string) {
+    if (wide) {
+      setExpandedId(homeId);
+      setWidePane("home");
+      return;
+    }
     setExpandedId((current) => (current === homeId ? null : homeId));
   }
 
@@ -251,179 +260,146 @@ export default function HomeScreen() {
 
   const leavingHome = homeCards.find((home) => home.id === leaveHomeId);
   const deletingHome = homeCards.find((home) => home.id === deleteHomeId);
+  const selectedHome =
+    homeCards.find((home) => home.id === expandedId) ?? null;
 
   if (isLoading && !household && !error) {
     return <LoadingScreen />;
   }
 
-  return (
-    <Screen
-      tabBarInset
-      refreshing={isRefreshing}
-      onRefresh={() => void onRefresh()}
-      floating={floatMessage ? <FloatMessage message={floatMessage} tone={floatTone} /> : null}
-    >
-      <ScreenHeader
-        title={t("homeTitle")}
-        subtitle={t("homeSubtitle")}
-        icon={
-          <View
-            className="items-center justify-center"
-            style={headerIconFrameStyle(scheme, colors)}
-          >
+  function homeCardProps(home: HomeSummary, expanded: boolean) {
+    return {
+      home,
+      selected: home.id === household?.id,
+      expanded,
+      members:
+        (home.id === household?.id ? household?.members : home.members) ?? [],
+      switching: switchingId === home.id,
+      currentUserId: user?.id,
+      onToggle: () => toggleHome(home.id),
+      onRename: (name: string) => renameHome(home.id, name),
+      onSwitch: () => void openHome(home.id),
+      onRemoveMember: (member: HouseholdMember) => {
+        setMemberHomeId(home.id);
+        setMemberToRemove(member);
+        setMemberError(null);
+      },
+      onLeave: () => {
+        setLeaveError(null);
+        setLeaveHomeId(home.id);
+      },
+      onDelete: () => askDeleteHome(home.id),
+    };
+  }
+
+  const addHomeForms = (
+    <View className="gap-3">
+      <View className="rounded-2xl bg-cove-mist px-3.5 py-3.5">
+        <Pressable
+          onPress={() => setIsCreateOpen((open) => !open)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isCreateOpen }}
+          className="min-h-11 flex-row items-center justify-between gap-3 active:opacity-80"
+        >
+          <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+            {t("createAnotherHome")}
+          </AppText>
+          <View className="h-11 w-11 items-center justify-center">
             <Ionicons
-              name="home-outline"
-              size={34}
-              color={scheme === "dark" ? colors.ink : colors.onAccent}
+              name={isCreateOpen ? "chevron-up" : "chevron-down"}
+              size={iconSize.sm}
+              color={colors.ink}
             />
           </View>
-        }
-      />
-
-      <FormMessage message={error} />
-
-      {household ? (
-        <View className="gap-6">
-          <InviteCodeCard
-            code={household.inviteCode}
-            homeName={household.name}
-            onCopied={() => {
-              setFloatTone("success");
-              setFloatMessage(t("inviteCopied"));
-            }}
-          />
-
-          <View className="gap-3">
-            <SectionCard
-              icon="home-outline"
-              title={t("yourHomes")}
-              summary={household.name}
-              open={homesOpen}
-              onToggle={() => setHomesOpen((open) => !open)}
-              colors={colors}
-            >
-              {homeCards.map((home) => (
-                <HomeCard
-                  key={home.id}
-                  home={home}
-                  selected={home.id === household.id}
-                  expanded={expandedId === home.id}
-                  members={(home.id === household.id ? household.members : home.members) ?? []}
-                  switching={switchingId === home.id}
-                  currentUserId={user?.id}
-                  onToggle={() => toggleHome(home.id)}
-                  onRename={(name) => renameHome(home.id, name)}
-                  onSwitch={() => void openHome(home.id)}
-                  onRemoveMember={(member) => {
-                    setMemberHomeId(home.id);
-                    setMemberToRemove(member);
-                    setMemberError(null);
-                  }}
-                  onLeave={() => {
-                    setLeaveError(null);
-                    setLeaveHomeId(home.id);
-                  }}
-                  onDelete={() => askDeleteHome(home.id)}
-                />
-              ))}
-            </SectionCard>
-
-            <SectionCard
-              icon="add-outline"
-              title={t("addAHome")}
-              summary={t("addAHomeSummary")}
-              open={addOpen}
-              onToggle={() => setAddOpen((open) => !open)}
-              colors={colors}
-            >
-              <View className="rounded-2xl bg-cove-mist px-3.5 py-3.5">
-                <Pressable
-                  onPress={() => setIsCreateOpen((open) => !open)}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: isCreateOpen }}
-                  className="min-h-11 flex-row items-center justify-between gap-3 active:opacity-80"
-                >
-                  <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
-                    {t("createAnotherHome")}
-                  </AppText>
-                  <View className="h-11 w-11 items-center justify-center">
-                    <Ionicons
-                      name={isCreateOpen ? "chevron-up" : "chevron-down"}
-                      size={iconSize.sm}
-                      color={colors.ink}
-                    />
-                  </View>
-                </Pressable>
-                {isCreateOpen ? (
-                  <View className="mt-4 gap-4">
-                    <AppText className="text-sm text-cove-muted">{t("createAnotherHomeHint")}</AppText>
-                    <AppTextField
-                      label={t("homeName")}
-                      value={newHomeName}
-                      onChangeText={setNewHomeName}
-                      placeholder={t("homeNamePlaceholder")}
-                      userText
-                    />
-                    <FormMessage message={createError} />
-                    <AppButton
-                      label={t("createAnotherHome")}
-                      disabled={!newHomeName.trim()}
-                      loading={isCreating}
-                      onPress={() => void createAnotherHome()}
-                    />
-                  </View>
-                ) : null}
-              </View>
-
-              <View className="rounded-2xl bg-cove-mist px-3.5 py-3.5">
-                <Pressable
-                  onPress={() => setIsJoinOpen((open) => !open)}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: isJoinOpen }}
-                  className="min-h-11 flex-row items-center justify-between gap-3 active:opacity-80"
-                >
-                  <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
-                    {t("joinAnotherHome")}
-                  </AppText>
-                  <View className="h-11 w-11 items-center justify-center">
-                    <Ionicons
-                      name={isJoinOpen ? "chevron-up" : "chevron-down"}
-                      size={iconSize.sm}
-                      color={colors.ink}
-                    />
-                  </View>
-                </Pressable>
-                {isJoinOpen ? (
-                  <View className="mt-4 gap-4">
-                    <AppText className="text-sm text-cove-muted">{t("joinAnotherHomeHint")}</AppText>
-                    <AppTextField
-                      label={t("inviteCode")}
-                      value={inviteCode}
-                      onChangeText={(value) => setInviteCode(value.toUpperCase())}
-                      placeholder={t("inviteCodePlaceholder")}
-                      autoCapitalize="characters"
-                      autoCorrect={false}
-                    />
-                    <FormMessage message={joinError} />
-                    <AppButton
-                      label={t("joinThisHome")}
-                      disabled={!inviteCode.trim()}
-                      loading={isJoining}
-                      onPress={() => void joinAnotherHome()}
-                    />
-                  </View>
-                ) : null}
-              </View>
-            </SectionCard>
+        </Pressable>
+        {isCreateOpen ? (
+          <View className="mt-4 gap-4">
+            <AppText className="text-sm text-cove-muted">
+              {t("createAnotherHomeHint")}
+            </AppText>
+            <AppTextField
+              label={t("homeName")}
+              value={newHomeName}
+              onChangeText={setNewHomeName}
+              placeholder={t("homeNamePlaceholder")}
+              userText
+            />
+            <FormMessage message={createError} />
+            <AppButton
+              label={t("createAnotherHome")}
+              disabled={!newHomeName.trim()}
+              loading={isCreating}
+              onPress={() => void createAnotherHome()}
+            />
           </View>
-        </View>
-      ) : (
-        <EmptyState
-          title={t("noHomeYet")}
-          message={t("noHomeYetBody")}
-        />
-      )}
+        ) : null}
+      </View>
 
+      <View className="rounded-2xl bg-cove-mist px-3.5 py-3.5">
+        <Pressable
+          onPress={() => setIsJoinOpen((open) => !open)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isJoinOpen }}
+          className="min-h-11 flex-row items-center justify-between gap-3 active:opacity-80"
+        >
+          <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+            {t("joinAnotherHome")}
+          </AppText>
+          <View className="h-11 w-11 items-center justify-center">
+            <Ionicons
+              name={isJoinOpen ? "chevron-up" : "chevron-down"}
+              size={iconSize.sm}
+              color={colors.ink}
+            />
+          </View>
+        </Pressable>
+        {isJoinOpen ? (
+          <View className="mt-4 gap-4">
+            <AppText className="text-sm text-cove-muted">
+              {t("joinAnotherHomeHint")}
+            </AppText>
+            <AppTextField
+              label={t("inviteCode")}
+              value={inviteCode}
+              onChangeText={(value) => setInviteCode(value.toUpperCase())}
+              placeholder={t("inviteCodePlaceholder")}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <FormMessage message={joinError} />
+            <AppButton
+              label={t("joinThisHome")}
+              disabled={!inviteCode.trim()}
+              loading={isJoining}
+              onPress={() => void joinAnotherHome()}
+            />
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+
+  const header = (
+    <ScreenHeader
+      title={t("homeTitle")}
+      subtitle={t("homeSubtitle")}
+      icon={
+        <View
+          className="items-center justify-center"
+          style={headerIconFrameStyle(scheme, colors)}
+        >
+          <Ionicons
+            name="home-outline"
+            size={34}
+            color={scheme === "dark" ? colors.ink : colors.onAccent}
+          />
+        </View>
+      }
+    />
+  );
+
+  const modals = (
+    <>
       <ConfirmModal
         visible={memberToRemove !== null}
         title={t("removeMemberTitle", {
@@ -444,7 +420,9 @@ export default function HomeScreen() {
       />
       <ConfirmModal
         visible={leaveHomeId !== null}
-        title={t("leaveHomeTitle", { name: leavingHome?.name ?? household?.name ?? "" })}
+        title={t("leaveHomeTitle", {
+          name: leavingHome?.name ?? household?.name ?? "",
+        })}
         message={t("leaveHomeMessage")}
         confirmLabel={t("leaveHome")}
         cancelLabel={t("cancel")}
@@ -459,7 +437,9 @@ export default function HomeScreen() {
       />
       <ConfirmModal
         visible={deleteHomeId !== null}
-        title={t("deleteHomeTitle", { name: deletingHome?.name ?? household?.name ?? "" })}
+        title={t("deleteHomeTitle", {
+          name: deletingHome?.name ?? household?.name ?? "",
+        })}
         message={t("deleteHomeMessage")}
         confirmLabel={t("deleteHome")}
         cancelLabel={t("cancel")}
@@ -484,7 +464,199 @@ export default function HomeScreen() {
         onConfirm={() => setLastHomeAlert(false)}
         onCancel={() => setLastHomeAlert(false)}
       />
-    </Screen>
+    </>
+  );
+
+  if (!wide) {
+    return (
+      <Screen
+        tabBarInset
+        refreshing={isRefreshing}
+        onRefresh={() => void onRefresh()}
+        floating={
+          floatMessage ? (
+            <FloatMessage message={floatMessage} tone={floatTone} />
+          ) : null
+        }
+      >
+        {header}
+        <FormMessage message={error} />
+        {household ? (
+          <View className="gap-6">
+            <InviteCodeCard
+              code={household.inviteCode}
+              homeName={household.name}
+              onCopied={() => {
+                setFloatTone("success");
+                setFloatMessage(t("inviteCopied"));
+              }}
+            />
+            <View className="gap-3">
+              <SectionCard
+                icon="home-outline"
+                title={t("yourHomes")}
+                summary={household.name}
+                open={homesOpen}
+                onToggle={() => setHomesOpen((open) => !open)}
+                colors={colors}
+              >
+                {homeCards.map((home) => (
+                  <HomeCard
+                    key={home.id}
+                    {...homeCardProps(home, expandedId === home.id)}
+                  />
+                ))}
+              </SectionCard>
+              <SectionCard
+                icon="add-outline"
+                title={t("addAHome")}
+                summary={t("addAHomeSummary")}
+                open={addOpen}
+                onToggle={() => setAddOpen((open) => !open)}
+                colors={colors}
+              >
+                {addHomeForms}
+              </SectionCard>
+            </View>
+          </View>
+        ) : (
+          <EmptyState title={t("noHomeYet")} message={t("noHomeYetBody")} />
+        )}
+        {modals}
+      </Screen>
+    );
+  }
+
+  return (
+    <FoldSplit
+      master={
+        <Screen
+          tabBarInset
+          refreshing={isRefreshing}
+          onRefresh={() => void onRefresh()}
+          floating={
+            floatMessage ? (
+              <FloatMessage message={floatMessage} tone={floatTone} />
+            ) : null
+          }
+        >
+          {header}
+          <FormMessage message={error} />
+          {household ? (
+            <View className="gap-6">
+              <InviteCodeCard
+                code={household.inviteCode}
+                homeName={household.name}
+                onCopied={() => {
+                  setFloatTone("success");
+                  setFloatMessage(t("inviteCopied"));
+                }}
+              />
+              <View className="gap-3">
+                <AppText className="px-1 text-sm font-semibold text-cove-muted">
+                  {t("yourHomes")}
+                </AppText>
+                {homeCards.map((home) => {
+                  const active =
+                    widePane === "home" && expandedId === home.id;
+                  return (
+                    <View
+                      key={home.id}
+                      className="overflow-hidden rounded-3xl"
+                      style={{
+                        backgroundColor: active
+                          ? withAlpha(colors.accent, 0.12)
+                          : colors.paper,
+                      }}
+                    >
+                      <HomeCard
+                        {...homeCardProps(home, false)}
+                        variant="accordion"
+                      />
+                    </View>
+                  );
+                })}
+                <Pressable
+                  onPress={() => {
+                    setWidePane("add");
+                    setIsCreateOpen(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: widePane === "add" }}
+                  className="flex-row items-center gap-3 overflow-hidden rounded-3xl px-4 py-4 active:opacity-80"
+                  style={{
+                    backgroundColor:
+                      widePane === "add"
+                        ? withAlpha(colors.accent, 0.12)
+                        : colors.paper,
+                  }}
+                >
+                  <View
+                    className="h-11 w-11 items-center justify-center rounded-2xl"
+                    style={{ backgroundColor: colors.mist }}
+                  >
+                    <Ionicons
+                      name="add-outline"
+                      size={22}
+                      color={colors.accent}
+                    />
+                  </View>
+                  <View className="min-w-0 flex-1">
+                    <AppText className="text-base font-semibold text-cove-ink">
+                      {t("addAHome")}
+                    </AppText>
+                    <AppText
+                      className="mt-1 text-sm text-cove-muted"
+                      numberOfLines={1}
+                    >
+                      {t("addAHomeSummary")}
+                    </AppText>
+                  </View>
+                  <Ionicons
+                    name={isRTL ? "chevron-back" : "chevron-forward"}
+                    size={iconSize.sm}
+                    color={
+                      widePane === "add" ? colors.accent : colors.ink
+                    }
+                  />
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <EmptyState title={t("noHomeYet")} message={t("noHomeYetBody")} />
+          )}
+          {modals}
+        </Screen>
+      }
+      detail={
+        <Screen scroll={false} tabBarInset>
+          {widePane === "add" ? (
+            <View className="gap-3 px-0 pt-2">
+              <AppText className="text-xl font-semibold text-cove-ink">
+                {t("addAHome")}
+              </AppText>
+              <AppText className="mb-1 text-sm text-cove-muted">
+                {t("addAHomeSummary")}
+              </AppText>
+              {addHomeForms}
+            </View>
+          ) : selectedHome && household ? (
+            <View className="pt-2">
+              <HomeCard
+                {...homeCardProps(selectedHome, true)}
+                variant="detail"
+              />
+            </View>
+          ) : (
+            <FoldPaneEmpty
+              icon="home-outline"
+              title={t("homePickTitle")}
+              body={t("homePickBody")}
+            />
+          )}
+        </Screen>
+      }
+    />
   );
 }
 

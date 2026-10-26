@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -6,7 +7,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
   type StyleProp,
   type TextStyle,
@@ -53,8 +53,7 @@ export function QuickAddBar({
   const { colors, scheme } = useTheme();
   const { t, isRTL } = useI18n();
   const { scale } = useFontScale();
-  const { width } = useWindowDimensions();
-  const showDetailsLabel = width >= 390;
+  const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
   const showHint = !value && !focused && !busy;
 
@@ -71,6 +70,7 @@ export function QuickAddBar({
 
   const addEnabled = Boolean(value.trim()) && !busy;
   const caret = useSharedValue(1);
+  const shakeX = useSharedValue(0);
 
   useEffect(() => {
     if (!showHint) {
@@ -93,20 +93,48 @@ export function QuickAddBar({
     opacity: caret.value,
   }));
 
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakeX.value }],
+  }));
+
   const dark = scheme === "dark";
   const chipBorder = withAlpha(dark ? colors.muted : colors.accent, 0.34);
   const cardRadius = radius.md;
 
+  function promptForName() {
+    inputRef.current?.focus();
+    shakeX.value = withSequence(
+      withTiming(-6, { duration: 40 }),
+      withTiming(6, { duration: 50 }),
+      withTiming(-5, { duration: 45 }),
+      withTiming(4, { duration: 45 }),
+      withTiming(0, { duration: 40 }),
+    );
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }
+
+  function handleAdd() {
+    if (busy) return;
+    if (!value.trim()) {
+      promptForName();
+      return;
+    }
+    onSubmit();
+  }
+
   return (
     <View className="mb-3">
-      <View
+      <Animated.View
         className="overflow-hidden"
-        style={{
-          backgroundColor: colors.paper,
-          borderWidth: tabBar.borderWidth,
-          borderColor: chipBorder,
-          borderRadius: cardRadius,
-        }}
+        style={[
+          {
+            backgroundColor: colors.paper,
+            borderWidth: tabBar.borderWidth,
+            borderColor: chipBorder,
+            borderRadius: cardRadius,
+          },
+          shakeStyle,
+        ]}
       >
         <View className="flex-row items-center gap-2 px-3 py-2.5">
           <View className="relative h-12 min-w-0 flex-1 justify-center px-1">
@@ -140,11 +168,12 @@ export function QuickAddBar({
               </View>
             ) : null}
             <TextInput
+              ref={inputRef}
               value={value}
               onChangeText={onChangeText}
               placeholder={showHint ? "" : t("quickAddPlaceholder")}
               placeholderTextColor={colors.muted}
-              onSubmitEditing={onSubmit}
+              onSubmitEditing={handleAdd}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               returnKeyType="done"
@@ -161,48 +190,33 @@ export function QuickAddBar({
             onPress={onOpenDetails}
             accessibilityRole="button"
             accessibilityLabel={t("addItemDetails")}
-            className={`h-12 flex-row items-center justify-center gap-1.5 active:opacity-80 ${
-              showDetailsLabel ? "px-3" : "w-12"
-            }`}
-            style={{
-              backgroundColor: withAlpha(colors.accent, dark ? 0.16 : 0.1),
-              borderWidth: tabBar.borderWidth,
-              borderColor: chipBorder,
-              borderRadius: cardRadius,
-            }}
+            className="h-12 w-12 items-center justify-center active:opacity-70"
           >
             <View style={styles.detailsGlyph}>
-              <Ionicons name="list" size={15} color={colors.accent} />
+              <Ionicons name="list" size={18} color={colors.accent} />
               <View
                 style={[
                   styles.detailsBadge,
                   { backgroundColor: colors.accent },
                 ]}
               >
-                <Ionicons name="add" size={9} color={colors.onAccent} />
+                <Ionicons name="add" size={10} color={colors.onAccent} />
               </View>
             </View>
-            {showDetailsLabel ? (
-              <AppText
-                numberOfLines={1}
-                className="text-sm font-semibold"
-                style={{ color: colors.accent }}
-              >
-                {t("addItemDetailsShort")}
-              </AppText>
-            ) : null}
           </Pressable>
 
           <Pressable
-            disabled={!addEnabled}
-            onPress={onSubmit}
+            disabled={busy}
+            onPress={handleAdd}
             accessibilityRole="button"
             accessibilityLabel={t("addItem")}
             className={`h-12 flex-row items-center justify-center gap-0.5 ${
-              addEnabled ? "active:opacity-80" : ""
+              busy ? "" : "active:opacity-80"
             }`}
             style={{
-              backgroundColor: colors.accent,
+              backgroundColor: addEnabled
+                ? colors.accent
+                : withAlpha(colors.accent, dark ? 0.38 : 0.42),
               borderRadius: cardRadius,
               // Icon glyph has extra empty space on the start side; bias
               // padding so left/right edges look even.
@@ -217,13 +231,21 @@ export function QuickAddBar({
                 <Ionicons
                   name="add"
                   size={22}
-                  color={colors.onAccent}
+                  color={
+                    addEnabled
+                      ? colors.onAccent
+                      : withAlpha(colors.onAccent, 0.72)
+                  }
                   style={{ marginStart: -2 }}
                 />
                 <AppText
                   numberOfLines={1}
                   className="text-[15px] font-bold"
-                  style={{ color: colors.onAccent }}
+                  style={{
+                    color: addEnabled
+                      ? colors.onAccent
+                      : withAlpha(colors.onAccent, 0.72),
+                  }}
                 >
                   {t("quickAddAction")}
                 </AppText>
@@ -231,7 +253,7 @@ export function QuickAddBar({
             )}
           </Pressable>
         </View>
-      </View>
+      </Animated.View>
 
       {footer ? <View className="mt-2.5">{footer}</View> : null}
     </View>
@@ -371,17 +393,17 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   detailsGlyph: {
-    width: 18,
-    height: 18,
+    width: 22,
+    height: 22,
     alignItems: "center",
     justifyContent: "center",
   },
   detailsBadge: {
     position: "absolute",
-    right: -4,
-    bottom: -3,
-    width: 11,
-    height: 11,
+    right: -5,
+    bottom: -4,
+    width: 12,
+    height: 12,
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",

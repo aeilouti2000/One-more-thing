@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { View } from "react-native";
+import { useEffect, useState } from "react";
+import { ScrollView, View } from "react-native";
 import { CategoryField } from "@/features/items/components/category-field";
 import { UrgentToggle } from "@/features/items/components/urgent-toggle";
 import { AppButton } from "@/components/ui/AppButton";
@@ -24,6 +24,7 @@ type AddItemCardProps = {
   initialName?: string;
   onClose: () => void;
   onSaved?: () => void;
+  presentation?: "sheet" | "pane";
 };
 
 export function AddItemCard({
@@ -33,6 +34,7 @@ export function AddItemCard({
   initialName = "",
   onClose,
   onSaved,
+  presentation = "sheet",
 }: AddItemCardProps) {
   const { addItem } = usePurchases();
   const { t } = useI18n();
@@ -94,33 +96,57 @@ export function AddItemCard({
     onClose();
   }
 
+  useEffect(() => {
+    if (presentation !== "pane" || !visible) return;
+    reset(initialCategory, initialName.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open sync
+  }, [presentation, visible, initialCategory, initialName]);
+
+  const form = (
+    <AddItemForm
+      name={name}
+      quantity={quantity}
+      notes={notes}
+      category={category}
+      urgent={urgent}
+      quantityError={quantityError}
+      error={error}
+      isSubmitting={isSubmitting}
+      listId={listId}
+      onChangeName={setName}
+      onChangeQuantity={(value) => {
+        setQuantity(value);
+        setQuantityError(undefined);
+      }}
+      onChangeNotes={setNotes}
+      onChangeCategory={setCategory}
+      onChangeUrgent={setUrgent}
+      onSubmit={() => void onSubmit()}
+      onCancel={close}
+    />
+  );
+
+  if (presentation === "pane") {
+    if (!visible) return null;
+    return (
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="px-4 pb-10 pt-2"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {form}
+      </ScrollView>
+    );
+  }
+
   return (
     <FormSheetModal
       visible={visible}
       onClose={close}
       onShow={() => reset(initialCategory, initialName.trim())}
     >
-      <AddItemForm
-        name={name}
-        quantity={quantity}
-        notes={notes}
-        category={category}
-        urgent={urgent}
-        quantityError={quantityError}
-        error={error}
-        isSubmitting={isSubmitting}
-        listId={listId}
-        onChangeName={setName}
-        onChangeQuantity={(value) => {
-          setQuantity(value);
-          setQuantityError(undefined);
-        }}
-        onChangeNotes={setNotes}
-        onChangeCategory={setCategory}
-        onChangeUrgent={setUrgent}
-        onSubmit={() => void onSubmit()}
-        onCancel={close}
-      />
+      {form}
     </FormSheetModal>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { CategoryField } from "@/features/items/components/category-field";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
 import { StatusBadge } from "@/features/items/components/status-badge";
@@ -34,12 +34,21 @@ type ItemDetailCardProps = {
   visible: boolean;
   onClose: () => void;
   onDelete?: () => Promise<{ error: string | null }>;
+  /** Fold detail pane vs phone bottom sheet. */
+  presentation?: "sheet" | "pane";
 };
 
-export function ItemDetailCard({ purchase, visible, onClose, onDelete }: ItemDetailCardProps) {
+export function ItemDetailCard({
+  purchase,
+  visible,
+  onClose,
+  onDelete,
+  presentation = "sheet",
+}: ItemDetailCardProps) {
   const { updateItem, updateCost, markBought } = usePurchases();
   const { household } = useHousehold();
-  const { t } = useI18n();
+  const { t, isRTL } = useI18n();
+  const { colors } = useTheme();
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
@@ -199,67 +208,72 @@ export function ItemDetailCard({ purchase, visible, onClose, onDelete }: ItemDet
       return;
     }
     setEditCostOpen(false);
-    onClose();
+    // Sheet: dismiss entirely. Pane: stay on the item after saving cost.
+    if (presentation === "sheet") onClose();
   }
 
-  return (
-    <>
-      <FormSheetModal
-        visible={visible && purchase !== null && !costPromptOpen && !editCostOpen && !deleteOpen}
-        onClose={close}
-        onShow={() => {
-          if (!purchase) return;
-          fill(purchase);
-          setError(null);
-          setCostPromptOpen(false);
-          setEditCostOpen(false);
-          setDeleteOpen(false);
-          setDeleteError(null);
-          void loadPin(purchase);
-        }}
-      >
-        {purchase && !editable ? (
-          <HistoryItemCard
-            purchase={purchase}
-            currency={household?.currency ?? "JOD"}
-            costsEnabled={household?.costsEnabled === true}
-            error={error}
-            onEditCost={() => setEditCostOpen(true)}
-            onAskDelete={onDelete ? () => setDeleteOpen(true) : undefined}
-            onClose={close}
-          />
-        ) : (
-          <EditItemForm
-            purchase={purchase}
-            name={name}
-            quantity={quantity}
-            notes={notes}
-            category={category}
-            urgent={urgent}
-            pinned={pinned}
-            pinBaseline={pinBaseline}
-            quantityError={quantityError}
-            error={error}
-            isSubmitting={isSubmitting}
-            editingOpen={editingOpen}
-            onToggleEditing={() => setEditingOpen((open) => !open)}
-            onChangeName={setName}
-            onChangeQuantity={(value) => {
-              setQuantity(value);
-              setQuantityError(undefined);
-            }}
-            onChangeNotes={setNotes}
-            onChangeCategory={setCategory}
-            onChangeUrgent={setUrgent}
-            onChangePinned={setPinned}
-            onSubmit={() => void onSubmit()}
-            onMarkBought={() => onMarkBought()}
-          />
-        )}
-      </FormSheetModal>
+  function syncFromPurchase(item: Purchase) {
+    fill(item);
+    setError(null);
+    setCostPromptOpen(false);
+    setEditCostOpen(false);
+    setDeleteOpen(false);
+    setDeleteError(null);
+    void loadPin(item);
+  }
 
+  useEffect(() => {
+    if (presentation !== "pane" || !visible || !purchase) return;
+    syncFromPurchase(purchase);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when the open item changes
+  }, [presentation, visible, purchase?.id]);
+
+  const detailBody =
+    purchase && !editable ? (
+      <HistoryItemCard
+        purchase={purchase}
+        currency={household?.currency ?? "JOD"}
+        costsEnabled={household?.costsEnabled === true}
+        error={error}
+        showClose={presentation === "sheet"}
+        onEditCost={() => setEditCostOpen(true)}
+        onAskDelete={onDelete ? () => setDeleteOpen(true) : undefined}
+        onClose={close}
+      />
+    ) : (
+      <EditItemForm
+        purchase={purchase}
+        name={name}
+        quantity={quantity}
+        notes={notes}
+        category={category}
+        urgent={urgent}
+        pinned={pinned}
+        pinBaseline={pinBaseline}
+        quantityError={quantityError}
+        error={error}
+        isSubmitting={isSubmitting}
+        editingOpen={editingOpen}
+        onToggleEditing={() => setEditingOpen((open) => !open)}
+        onChangeName={setName}
+        onChangeQuantity={(value) => {
+          setQuantity(value);
+          setQuantityError(undefined);
+        }}
+        onChangeNotes={setNotes}
+        onChangeCategory={setCategory}
+        onChangeUrgent={setUrgent}
+        onChangePinned={setPinned}
+        onSubmit={() => void onSubmit()}
+        onMarkBought={() => onMarkBought()}
+      />
+    );
+
+  const costSheets = (
+    <>
       {purchase ? (
         <CostEntrySheet
+          presentation={presentation}
           visible={costPromptOpen}
           title={t("enterCost")}
           subtitle={purchase.name}
@@ -281,6 +295,7 @@ export function ItemDetailCard({ purchase, visible, onClose, onDelete }: ItemDet
 
       {purchase && household?.costsEnabled ? (
         <CostEntrySheet
+          presentation={presentation}
           visible={editCostOpen}
           title={t("editCost")}
           subtitle={purchase.name}
@@ -305,23 +320,86 @@ export function ItemDetailCard({ purchase, visible, onClose, onDelete }: ItemDet
           }}
         />
       ) : null}
+    </>
+  );
 
-      <ConfirmModal
-        visible={deleteOpen && purchase !== null}
-        title={t("deleteHistoryTitle")}
-        message={t("deleteHistoryMessage")}
-        confirmLabel={t("delete")}
-        cancelLabel={t("cancel")}
-        icon="trash-outline"
-        error={deleteError}
-        loading={deleteBusy}
-        onConfirm={() => void confirmDelete()}
-        onCancel={() => {
-          if (deleteBusy) return;
-          setDeleteOpen(false);
-          setDeleteError(null);
+  const deleteConfirm = (
+    <ConfirmModal
+      visible={deleteOpen && purchase !== null}
+      title={t("deleteHistoryTitle")}
+      message={t("deleteHistoryMessage")}
+      confirmLabel={t("delete")}
+      cancelLabel={t("cancel")}
+      icon="trash-outline"
+      error={deleteError}
+      loading={deleteBusy}
+      onConfirm={() => void confirmDelete()}
+      onCancel={() => {
+        if (deleteBusy) return;
+        setDeleteOpen(false);
+        setDeleteError(null);
+      }}
+    />
+  );
+
+  if (presentation === "pane") {
+    if (!visible || !purchase) return null;
+    const costOpen = costPromptOpen || editCostOpen;
+    return (
+      <>
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="px-4 pb-10 pt-2"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {costOpen ? (
+            <View className="gap-3">
+              <Pressable
+                onPress={() => {
+                  if (isSubmitting) return;
+                  setCostPromptOpen(false);
+                  setEditCostOpen(false);
+                  setError(null);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t("back")}
+                className="flex-row items-center gap-1 self-start active:opacity-80"
+              >
+                <Ionicons
+                  name={isRTL ? "chevron-forward" : "chevron-back"}
+                  size={18}
+                  color={colors.accent}
+                />
+                <AppText className="text-sm font-semibold text-cove-accent">
+                  {t("back")}
+                </AppText>
+              </Pressable>
+              {costSheets}
+            </View>
+          ) : (
+            detailBody
+          )}
+        </ScrollView>
+        {deleteConfirm}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <FormSheetModal
+        visible={visible && purchase !== null && !costPromptOpen && !editCostOpen && !deleteOpen}
+        onClose={close}
+        onShow={() => {
+          if (!purchase) return;
+          syncFromPurchase(purchase);
         }}
-      />
+      >
+        {detailBody}
+      </FormSheetModal>
+      {costSheets}
+      {deleteConfirm}
     </>
   );
 }
@@ -580,6 +658,7 @@ function HistoryItemCard({
   currency,
   costsEnabled,
   error,
+  showClose = true,
   onEditCost,
   onAskDelete,
   onClose,
@@ -588,6 +667,7 @@ function HistoryItemCard({
   currency: string;
   costsEnabled: boolean;
   error: string | null;
+  showClose?: boolean;
   onEditCost: () => void;
   onAskDelete?: () => void;
   onClose: () => void;
@@ -696,24 +776,28 @@ function HistoryItemCard({
         <FormMessage message={error} />
       </View>
 
-      <FloatedCardActions>
-        {costsEnabled ? (
-          <AppButton
-            compact
-            label={t("editCost")}
-            variant="secondary"
-            onPress={onEditCost}
-            style={{ flex: 1 }}
-          />
-        ) : null}
-        <AppButton
-          compact
-          label={t("close")}
-          variant={costsEnabled ? "primary" : "secondary"}
-          onPress={onClose}
-          style={{ flex: 1 }}
-        />
-      </FloatedCardActions>
+      {costsEnabled || showClose || onAskDelete ? (
+        <FloatedCardActions>
+          {costsEnabled ? (
+            <AppButton
+              compact
+              label={t("editCost")}
+              variant="secondary"
+              onPress={onEditCost}
+              style={{ flex: 1 }}
+            />
+          ) : null}
+          {showClose ? (
+            <AppButton
+              compact
+              label={t("close")}
+              variant={costsEnabled ? "primary" : "secondary"}
+              onPress={onClose}
+              style={{ flex: 1 }}
+            />
+          ) : null}
+        </FloatedCardActions>
+      ) : null}
     </FloatedCard>
   );
 }

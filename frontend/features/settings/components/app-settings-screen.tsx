@@ -20,6 +20,11 @@ import {
   SettingsLinkCard,
   SettingsSection,
 } from "@/features/settings/components/settings-ui";
+import {
+  useSettingsShowBack,
+  useSettingsSplitJoin,
+  useSettingsTabBarInset,
+} from "@/features/settings/hooks/use-settings-chrome";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -27,6 +32,9 @@ export default function AppSettingsScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { t, locale } = useI18n();
+  const showBack = useSettingsShowBack();
+  const tabBarInset = useSettingsTabBarInset();
+  const splitJoin = useSettingsSplitJoin("detail");
   const [pushStatus, setPushStatus] = useState<PushStatus>(
     canUsePush() ? (readPushEnabled() ? "on" : "off") : "unsupported",
   );
@@ -51,11 +59,12 @@ export default function AppSettingsScreen() {
   }
 
   return (
-    <Screen>
+    <Screen tabBarInset={tabBarInset}>
       <ScreenHeader
         title={t("appSettings")}
         subtitle={`${t("categories")} · ${t("pinsTitle")} · ${t("listAlerts")}`}
-        showBack
+        showBack={showBack}
+        splitJoin={splitJoin}
       />
 
       <SettingsSection>

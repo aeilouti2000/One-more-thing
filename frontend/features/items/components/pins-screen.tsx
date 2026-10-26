@@ -18,7 +18,7 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { getCategoryLabel } from "@/constants/categories";
-import { floatedCardStyle, glassFieldStyle, withAlpha } from "@/constants/theme";
+import { floatedCardStyle, glassFieldStyle, tabBar, withAlpha } from "@/constants/theme";
 import { useCategories } from "@/features/items/providers/categories-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
@@ -35,6 +35,11 @@ import {
   type Pin,
   type PinInterval,
 } from "@/features/items/api/pins";
+import {
+  useSettingsShowBack,
+  useSettingsSplitJoin,
+  useSettingsTabBarInset,
+} from "@/features/settings/hooks/use-settings-chrome";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { TranslationKey } from "@/constants/i18n";
@@ -64,6 +69,9 @@ function PinsBody() {
   const { t, locale, isRTL } = useI18n();
   const { categories } = useCategories();
   const { colors, scheme, shadow } = useTheme();
+  const showBack = useSettingsShowBack({ nested: true });
+  const tabBarInset = useSettingsTabBarInset();
+  const splitJoin = useSettingsSplitJoin("detail");
   const dark = scheme === "dark";
 
   function categoryName(id: string) {
@@ -290,11 +298,15 @@ function PinsBody() {
 
   return (
     <Screen
+      tabBarInset={tabBarInset}
+      dockBeside={tabBarInset}
       floating={floatMessage ? <FloatMessage message={floatMessage} tone="success" /> : null}
       dock={
         <View
           style={{
-            borderRadius: 28,
+            flex: tabBarInset ? 1 : undefined,
+            height: tabBarInset ? "100%" : undefined,
+            borderRadius: tabBarInset ? tabBar.radius : 28,
             borderWidth: 1,
             overflow: "hidden",
             borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
@@ -311,24 +323,79 @@ function PinsBody() {
             onPress={openForm}
             accessibilityRole="button"
             accessibilityLabel={t("addPin")}
-            className="flex-row items-center gap-3 px-4 py-3.5 active:opacity-80"
+            className="active:opacity-80"
+            style={
+              tabBarInset
+                ? {
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    paddingHorizontal: 12,
+                  }
+                : {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                  }
+            }
           >
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-cove-accent">
-              <MaterialCommunityIcons name="pin" size={20} color={colors.onAccent} />
+            <View
+              className="bg-cove-accent"
+              style={{
+                width: tabBarInset ? 36 : 44,
+                height: tabBarInset ? 36 : 44,
+                borderRadius: tabBarInset ? 18 : 16,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <MaterialCommunityIcons
+                name="pin"
+                size={tabBarInset ? 18 : 20}
+                color={colors.onAccent}
+                style={{ textAlign: "center" }}
+              />
             </View>
-            <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+            <AppText
+              className="min-w-0 flex-1 font-semibold text-cove-ink"
+              numberOfLines={1}
+              style={{
+                fontSize: tabBarInset ? tabBar.labelSize + 2 : 16,
+                textAlignVertical: "center",
+                includeFontPadding: false,
+              }}
+            >
               {t("addPin")}
             </AppText>
-            <Ionicons
-              name={isRTL ? "chevron-back" : "chevron-forward"}
-              size={18}
-              color={colors.muted}
-            />
+            <View
+              style={{
+                width: 22,
+                height: 22,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons
+                name={isRTL ? "chevron-back" : "chevron-forward"}
+                size={18}
+                color={colors.muted}
+                style={{ textAlign: "center" }}
+              />
+            </View>
           </Pressable>
         </View>
       }
     >
-      <ScreenHeader title={t("pinsTitle")} subtitle={t("pinsSubtitle")} showBack />
+      <ScreenHeader
+        title={t("pinsTitle")}
+        subtitle={t("pinsSubtitle")}
+        showBack={showBack}
+        splitJoin={splitJoin}
+      />
       {isAdding ? null : <FormMessage message={error} />}
 
       {pins.length > 0 ? (

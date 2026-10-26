@@ -296,9 +296,11 @@ const tabBar = {
   height: 68,
   inset: 20,
   radius: 34,
-  borderWidth: 1,
+  borderWidth: 0.3,
   labelSize: 12,
   itemPaddingTop: 4,
+  /** On wide/fold layouts the bar is centered and capped to this width. */
+  maxWidth: 440,
 };
 
 const shadow = {

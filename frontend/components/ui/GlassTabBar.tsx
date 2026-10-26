@@ -1,7 +1,14 @@
 import type { BottomTabBarProps } from "expo-router/js-tabs";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
-import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
+import {
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -11,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/AppText";
 import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { spacing, tabBar, withAlpha } from "@/constants/theme";
+import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useTheme } from "@/providers/ThemeProvider";
 
 type Slot = { x: number; width: number; content: number };
@@ -36,6 +44,8 @@ export function GlassTabBar({
   hidden: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const wide = useWideLayout();
   const { colors, scheme, shadow } = useTheme();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const pillLeft = useSharedValue(0);
@@ -130,11 +140,17 @@ export function GlassTabBar({
     ? ([withAlpha(colors.white, 0.2), withAlpha(colors.white, 0)] as const)
     : ([withAlpha(colors.white, 0.65), withAlpha(colors.white, 0.05)] as const);
 
+  const sideInset = spacing.xl;
+  const shellWidth = wide
+    ? Math.min(tabBar.maxWidth, Math.max(0, windowWidth - sideInset * 2))
+    : undefined;
+
   return (
     <View
       pointerEvents="box-none"
       style={[
         styles.position,
+        wide ? styles.positionWide : styles.positionPhone,
         {
           bottom: Math.max(insets.bottom, spacing.md) + spacing.sm,
           shadowColor: shadow.color,
@@ -148,6 +164,7 @@ export function GlassTabBar({
       <View
         style={[
           styles.shell,
+          shellWidth != null ? { width: shellWidth } : null,
           {
             borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
             backgroundColor: withAlpha(
@@ -263,9 +280,16 @@ export function GlassTabBar({
 const styles = StyleSheet.create({
   position: {
     position: "absolute",
+    zIndex: 20,
+  },
+  positionPhone: {
     left: spacing.xl,
     right: spacing.xl,
-    zIndex: 20,
+  },
+  positionWide: {
+    left: 0,
+    right: 0,
+    alignItems: "center",
   },
   shell: {
     height: tabBar.height,

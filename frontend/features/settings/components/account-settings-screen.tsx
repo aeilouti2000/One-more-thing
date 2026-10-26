@@ -18,6 +18,11 @@ import {
   SettingsCardIcon,
   SettingsSection,
 } from "@/features/settings/components/settings-ui";
+import {
+  useSettingsShowBack,
+  useSettingsSplitJoin,
+  useSettingsTabBarInset,
+} from "@/features/settings/hooks/use-settings-chrome";
 import { isValidPassword, isValidUsername } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -27,6 +32,9 @@ export default function AccountSettingsScreen() {
   const { refresh: refreshHome } = useHousehold();
   const { colors, scheme } = useTheme();
   const { t, isRTL } = useI18n();
+  const showBack = useSettingsShowBack();
+  const tabBarInset = useSettingsTabBarInset();
+  const splitJoin = useSettingsSplitJoin("detail");
   const logOutBg = scheme === "dark" ? "#3F1D1D" : "#FEE2E2";
   const logOutFg = scheme === "dark" ? "#F07178" : "#C2414A";
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
@@ -175,11 +183,12 @@ export default function AccountSettingsScreen() {
   }
 
   return (
-    <Screen>
+    <Screen tabBarInset={tabBarInset}>
       <ScreenHeader
         title={t("account")}
         subtitle={displayName}
-        showBack
+        showBack={showBack}
+        splitJoin={splitJoin}
         right={
           <Pressable
             onPress={() => {

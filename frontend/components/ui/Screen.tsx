@@ -7,7 +7,14 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { Dimensions, Platform, RefreshControl, ScrollView, View } from "react-native";
+import {
+  Dimensions,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import {
   Gesture,
   GestureDetector,
@@ -25,7 +32,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { TabBlurSurface } from "@/components/ui/TabBlurTarget";
-import { spacing } from "@/constants/theme";
+import { spacing, tabBar } from "@/constants/theme";
+import { SETTINGS_MASTER_WIDTH } from "@/lib/layout";
+import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 const SWIPE_DISTANCE = 48;
@@ -57,6 +66,8 @@ type ScreenProps = {
   floating?: ReactNode;
   top?: ReactNode;
   dock?: ReactNode;
+  /** Place the dock in the gap beside the centered fold tab bar. */
+  dockBeside?: boolean;
   onSwipe?: (direction: SwipeDirection) => void;
   canSwipe?: (direction: SwipeDirection) => boolean;
 };
@@ -98,12 +109,17 @@ export function Screen({
   floating,
   top,
   dock,
+  dockBeside = false,
   onSwipe,
   canSwipe,
 }: ScreenProps) {
   const { colors, scheme } = useTheme();
+  const { isRTL } = useI18n();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  // Same bottom as GlassTabBar. On fold settings the dock sits beside the bar.
   const dockBottom = Math.max(insets.bottom, spacing.md) + spacing.sm;
+  const dockBesideTabBar = Boolean(dockBeside && dock);
   const swipeRef = useRef(onSwipe);
   const canSwipeRef = useRef(canSwipe);
   const commitSwipeRef = useRef<(direction: SwipeDirection) => void>(() => {});
@@ -112,13 +128,39 @@ export function Screen({
   const isAnimating = useSharedValue(false);
   const canNext = useSharedValue(1);
   const canPrev = useSharedValue(1);
-  const padding = tabBarInset
-    ? top
-      ? "px-4 pb-32 pt-4"
-      : "px-4 pb-32 pt-2"
-    : top
-      ? "px-4 pb-10 pt-4"
-      : "px-4 pb-10 pt-2";
+  const bottomPad = tabBarInset ? "pb-32" : "pb-10";
+  const padding = top
+    ? `px-4 ${bottomPad} pt-4`
+    : `px-4 ${bottomPad} pt-2`;
+
+  const sideInset = spacing.xl;
+  const tabShellWidth = Math.min(
+    tabBar.maxWidth,
+    Math.max(0, windowWidth - sideInset * 2),
+  );
+  const tabBarLeft = (windowWidth - tabShellWidth) / 2;
+  const tabBarRight = tabBarLeft + tabShellWidth;
+  const dockGap = spacing.sm;
+  // Screen is the settings detail pane on fold — convert window coords to local.
+  const dockBesideStyle = dockBesideTabBar
+    ? isRTL
+      ? {
+          left: sideInset,
+          right: Math.max(
+            spacing.screen,
+            windowWidth -
+              SETTINGS_MASTER_WIDTH -
+              (tabBarLeft - dockGap),
+          ),
+        }
+      : {
+          left: Math.max(
+            spacing.screen,
+            tabBarRight + dockGap - SETTINGS_MASTER_WIDTH,
+          ),
+          right: sideInset,
+        }
+    : null;
   useEffect(() => {
     swipeRef.current = onSwipe;
   }, [onSwipe]);
@@ -376,8 +418,12 @@ export function Screen({
       {dock ? (
         <View
           pointerEvents="box-none"
-          className="absolute inset-x-4"
-          style={{ bottom: dockBottom, zIndex: 30 }}
+          className={dockBesideTabBar ? "absolute" : "absolute inset-x-4"}
+          style={[
+            { bottom: dockBottom, zIndex: 30 },
+            dockBesideStyle,
+            dockBesideTabBar ? { height: tabBar.height } : null,
+          ]}
         >
           {dock}
         </View>

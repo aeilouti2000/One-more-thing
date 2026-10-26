@@ -12,6 +12,11 @@ import { useHousehold } from "@/features/homes/hooks/use-household";
 import { HOME_CURRENCIES, type CostSettings, type HomeCurrency } from "@/features/homes/types/household";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 import { CardBlock, CostAskToggle, SettingsSection } from "@/features/settings/components/settings-ui";
+import {
+  useSettingsShowBack,
+  useSettingsSplitJoin,
+  useSettingsTabBarInset,
+} from "@/features/settings/hooks/use-settings-chrome";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -20,6 +25,9 @@ export default function CostsSettingsScreen() {
   const { household, adoptHome } = useHousehold();
   const { colors } = useTheme();
   const { t } = useI18n();
+  const showBack = useSettingsShowBack();
+  const tabBarInset = useSettingsTabBarInset();
+  const splitJoin = useSettingsSplitJoin("detail");
   const [costError, setCostError] = useState<string | null>(null);
   const [isSavingCosts, setIsSavingCosts] = useState(false);
   const [isChoosingCurrency, setIsChoosingCurrency] = useState(false);
@@ -51,11 +59,12 @@ export default function CostsSettingsScreen() {
   }
 
   return (
-    <Screen>
+    <Screen tabBarInset={tabBarInset}>
       <ScreenHeader
         title={t("costsSection")}
         subtitle={household.costsEnabled ? t("trackCosts") : t("costsSectionBody")}
-        showBack
+        showBack={showBack}
+        splitJoin={splitJoin}
       />
 
       <SettingsSection>

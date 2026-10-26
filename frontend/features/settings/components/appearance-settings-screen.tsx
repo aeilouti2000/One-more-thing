@@ -10,19 +10,28 @@ import {
   SettingsCardIcon,
   SettingsSection,
 } from "@/features/settings/components/settings-ui";
+import {
+  useSettingsShowBack,
+  useSettingsSplitJoin,
+  useSettingsTabBarInset,
+} from "@/features/settings/hooks/use-settings-chrome";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export default function AppearanceSettingsScreen() {
   const { t } = useI18n();
   const { colors, scheme, setScheme } = useTheme();
+  const showBack = useSettingsShowBack();
+  const tabBarInset = useSettingsTabBarInset();
+  const splitJoin = useSettingsSplitJoin("detail");
 
   return (
-    <Screen>
+    <Screen tabBarInset={tabBarInset}>
       <ScreenHeader
         title={t("appearance")}
         subtitle={`${scheme === "dark" ? t("dark") : t("light")} · ${t("textSize")}`}
-        showBack
+        showBack={showBack}
+        splitJoin={splitJoin}
       />
 
       <SettingsSection>

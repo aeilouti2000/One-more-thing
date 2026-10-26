@@ -156,6 +156,7 @@ export const tabBar: {
   borderWidth: number;
   labelSize: number;
   itemPaddingTop: number;
+  maxWidth: number;
 };
 
 export const shadow: {

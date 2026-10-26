@@ -3,6 +3,7 @@ import { Tabs, usePathname } from "expo-router";
 import { RequireSession } from "@/features/auth/components/require-session";
 import { GlassTabBar } from "@/components/ui/GlassTabBar";
 import { TabBarVisibility, useTabBarVisibility } from "@/components/ui/TabBarVisibility";
+import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useI18n } from "@/providers/LanguageProvider";
 
 export default function TabsLayout() {
@@ -13,9 +14,11 @@ export default function TabsLayout() {
   );
 }
 
-/** Hide the tab bar on settings subpages (account, app, …), not the hub itself. */
+/** Hide the tab bar on settings subpages on phone only; fold keeps the bar. */
 function useSettingsSectionOpen() {
   const pathname = usePathname();
+  const wide = useWideLayout();
+  if (wide) return false;
   return pathname.startsWith("/settings/");
 }
 

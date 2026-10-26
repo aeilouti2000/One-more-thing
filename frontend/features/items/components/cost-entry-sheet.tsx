@@ -43,6 +43,8 @@ type CostEntrySheetProps = {
   errorMessage?: string | null;
   scanning?: boolean;
   covered?: boolean;
+  /** Fold detail pane: render inline instead of a centered modal. */
+  presentation?: "sheet" | "pane";
   onScan?: () => void;
   receipt?: ReceiptScan | null;
   onConfirm: (entries: { id: string; cost: number | null }[]) => void;
@@ -79,6 +81,7 @@ export function CostEntrySheet({
   errorMessage = null,
   scanning = false,
   covered = false,
+  presentation = "sheet",
   onScan,
   receipt = null,
   onConfirm,
@@ -188,43 +191,56 @@ export function CostEntrySheet({
     onConfirm(entries);
   }
 
+  const body = (
+    <CostSheetBody
+      title={title}
+      subtitle={subtitle}
+      symbol={symbol}
+      items={items}
+      values={values}
+      error={error ?? (hideExternalError ? null : errorMessage)}
+      loading={loading}
+      scanning={scanning}
+      onScan={onScan}
+      receipt={receipt}
+      lineByItem={lineByItem}
+      pendingLineId={pendingLineId}
+      currency={currency}
+      confirmLabel={
+        confirmLabel ?? (items.length > 1 ? t("saveCosts") : t("saveCost"))
+      }
+      skipLabel={skipLabel ?? t("skipCostsForNow")}
+      onChange={(id, text) => {
+        setValues((current) => ({ ...current, [id]: text }));
+        setLineByItem((current) => {
+          if (!current[id]) return current;
+          const next = { ...current };
+          delete next[id];
+          return next;
+        });
+        setError(null);
+        setHideExternalError(true);
+      }}
+      onAssign={assignLine}
+      onClearLine={clearLine}
+      onPickLine={setPendingLineId}
+      onConfirm={submit}
+      onSkip={onSkip}
+    />
+  );
+
+  if (presentation === "pane") {
+    if (!visible) return null;
+    return body;
+  }
+
   return (
-    <FormSheetModal visible={visible} covered={covered || scanning} onClose={onClose}>
-      <CostSheetBody
-        title={title}
-        subtitle={subtitle}
-        symbol={symbol}
-        items={items}
-        values={values}
-        error={error ?? (hideExternalError ? null : errorMessage)}
-        loading={loading}
-        scanning={scanning}
-        onScan={onScan}
-        receipt={receipt}
-        lineByItem={lineByItem}
-        pendingLineId={pendingLineId}
-        currency={currency}
-        confirmLabel={
-          confirmLabel ?? (items.length > 1 ? t("saveCosts") : t("saveCost"))
-        }
-        skipLabel={skipLabel ?? t("skipCostsForNow")}
-        onChange={(id, text) => {
-          setValues((current) => ({ ...current, [id]: text }));
-          setLineByItem((current) => {
-            if (!current[id]) return current;
-            const next = { ...current };
-            delete next[id];
-            return next;
-          });
-          setError(null);
-          setHideExternalError(true);
-        }}
-        onAssign={assignLine}
-        onClearLine={clearLine}
-        onPickLine={setPendingLineId}
-        onConfirm={submit}
-        onSkip={onSkip}
-      />
+    <FormSheetModal
+      visible={visible}
+      covered={covered || scanning}
+      onClose={onClose}
+    >
+      {body}
     </FormSheetModal>
   );
 }

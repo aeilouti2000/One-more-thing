@@ -14,6 +14,11 @@ import { appFont, scaleFontSize, singleLineInput } from "@/constants/font";
 import { tabBar, withAlpha } from "@/constants/theme";
 import { RequireSession } from "@/features/auth/components/require-session";
 import { useCategories, useCategoryLabel } from "@/features/items/providers/categories-provider";
+import {
+  useSettingsShowBack,
+  useSettingsSplitJoin,
+  useSettingsTabBarInset,
+} from "@/features/settings/hooks/use-settings-chrome";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -31,6 +36,9 @@ function CategoriesBody() {
   const { t, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
   const { scale } = useFontScale();
+  const showBack = useSettingsShowBack({ nested: true });
+  const tabBarInset = useSettingsTabBarInset();
+  const splitJoin = useSettingsSplitJoin("detail");
   const { categories, addCategory, removeCategory } = useCategories();
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
@@ -65,8 +73,13 @@ function CategoriesBody() {
   }
 
   return (
-    <Screen>
-      <ScreenHeader title={t("categories")} subtitle={t("categoriesSettingsBody")} showBack />
+    <Screen tabBarInset={tabBarInset}>
+      <ScreenHeader
+        title={t("categories")}
+        subtitle={t("categoriesSettingsBody")}
+        showBack={showBack}
+        splitJoin={splitJoin}
+      />
       <FormMessage message={error} />
 
       <View

@@ -36,6 +36,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { FoldPaneEmpty, FoldSplit } from "@/components/ui/FoldSplit";
 import { AddItemCard } from "@/features/items/components/add-item-card";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
 import { ItemDetailCard } from "@/features/items/components/item-detail-card";
@@ -44,6 +45,7 @@ import { QuickAddBar } from "@/features/items/components/quick-add-bar";
 import { ReorderableList } from "@/features/items/components/reorderable-list";
 import { ShopButton } from "@/features/items/components/shop-button";
 import { SwipeableItem } from "@/features/items/components/swipeable-item";
+import { useWideLayout } from "@/hooks/use-wide-layout";
 import { firstName } from "@/features/items/api/shop-locks";
 import { useShopLock } from "@/features/items/hooks/use-shop-lock";
 import {
@@ -86,6 +88,7 @@ import { useFontScale } from "@/providers/FontScaleProvider";
 import {
   iconSize,
   floatedCardStyle,
+  spacing,
   tabBar,
   withAlpha,
 } from "@/constants/theme";
@@ -116,8 +119,9 @@ export default function ItemsScreen() {
   const { colors, scheme } = useTheme();
   const { setHidden: setTabBarHidden } = useTabBarVisibility();
   const { t, isRTL } = useI18n();
+  const wide = useWideLayout();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const { scale } = useFontScale();
   const quickInputStyle = {
     ...singleLineInput,
@@ -936,7 +940,21 @@ export default function ItemsScreen() {
     </ScreenHeader>
   );
 
-  return (
+  const selectionDock = isSelecting ? (
+    <SelectionBar
+      busyAction={busyAction}
+      disabled={isApplyingAction}
+      clearUrgent={allSelectedUrgent}
+      canMove={lists.filter((list) => list.id !== selectedListId).length > 0}
+      onBought={() => void markBoughtIds([...selectedIds])}
+      onPin={() => void pinIds([...selectedIds])}
+      onUrgent={() => void markUrgentIds([...selectedIds])}
+      onMove={() => askMove([...selectedIds])}
+      onDelete={() => askDelete([...selectedIds])}
+    />
+  ) : null;
+
+  const listScreen = (
     <Screen
       tabBarInset
       scrollEnabled={!isDragging}
@@ -950,23 +968,7 @@ export default function ItemsScreen() {
         ) : null
       }
       top={isSelecting ? header : null}
-      dock={
-        isSelecting ? (
-          <SelectionBar
-            busyAction={busyAction}
-            disabled={isApplyingAction}
-            clearUrgent={allSelectedUrgent}
-            canMove={
-              lists.filter((list) => list.id !== selectedListId).length > 0
-            }
-            onBought={() => void markBoughtIds([...selectedIds])}
-            onPin={() => void pinIds([...selectedIds])}
-            onUrgent={() => void markUrgentIds([...selectedIds])}
-            onMove={() => askMove([...selectedIds])}
-            onDelete={() => askDelete([...selectedIds])}
-          />
-        ) : null
-      }
+      dock={wide ? null : selectionDock}
     >
       {isSelecting ? null : header}
 
@@ -976,7 +978,10 @@ export default function ItemsScreen() {
             value={quickName}
             onChangeText={setQuickName}
             onSubmit={() => void quickAdd()}
-            onOpenDetails={() => setIsAddingDetails(true)}
+            onOpenDetails={() => {
+              setOpenItemId(null);
+              setIsAddingDetails(true);
+            }}
             busy={isQuickAdding}
             inputStyle={quickInputStyle}
             footer={
@@ -1103,7 +1108,10 @@ export default function ItemsScreen() {
                   purchase={purchase}
                   showCategory={false}
                   leading={handle}
-                  selected={selectedIds.has(purchase.id)}
+                  selected={
+                    selectedIds.has(purchase.id) ||
+                    (wide && !isSelecting && openItemId === purchase.id)
+                  }
                   quantityBusy={false}
                   onChangeQuantity={
                     isSelecting
@@ -1120,7 +1128,10 @@ export default function ItemsScreen() {
                 revealed={openSwipeId === purchase.id}
                 leftAction={swipeActions.left}
                 rightAction={swipeActions.right}
-                selected={selectedIds.has(purchase.id)}
+                selected={
+                  selectedIds.has(purchase.id) ||
+                  (wide && !isSelecting && openItemId === purchase.id)
+                }
                 selecting={isSelecting}
                 quantityBusy={false}
                 onReveal={revealRow}
@@ -1156,39 +1167,45 @@ export default function ItemsScreen() {
         }}
       />
 
-      <AddItemCard
-        visible={isAddingDetails}
-        listId={selectedListId}
-        initialCategory={addCategory}
-        initialName={quickName}
-        onClose={() => setIsAddingDetails(false)}
-        onSaved={() => setQuickName("")}
-      />
-      <ItemDetailCard
-        purchase={openItem}
-        visible={openItem !== null}
-        onClose={() => setOpenItemId(null)}
-      />
+      {wide ? null : (
+        <AddItemCard
+          visible={isAddingDetails}
+          listId={selectedListId}
+          initialCategory={addCategory}
+          initialName={quickName}
+          onClose={() => setIsAddingDetails(false)}
+          onSaved={() => setQuickName("")}
+        />
+      )}
+      {wide ? null : (
+        <ItemDetailCard
+          purchase={openItem}
+          visible={openItem !== null}
+          onClose={() => setOpenItemId(null)}
+        />
+      )}
 
-      <CostEntrySheet
-        visible={bulkCostIds !== null}
-        title={t("enterCosts")}
-        currency={household?.currency ?? "JOD"}
-        items={bulkCostItems}
-        loading={busyAction === "bought"}
-        errorMessage={actionError}
-        onConfirm={(entries) => void completeBulkBought(entries)}
-        onSkip={() =>
-          void completeBulkBought(
-            (bulkCostIds ?? []).map((id) => ({ id, cost: null })),
-          )
-        }
-        onClose={() => {
-          if (busyAction === "bought") return;
-          setBulkCostIds(null);
-          setActionError(null);
-        }}
-      />
+      {wide ? null : (
+        <CostEntrySheet
+          visible={bulkCostIds !== null}
+          title={t("enterCosts")}
+          currency={household?.currency ?? "JOD"}
+          items={bulkCostItems}
+          loading={busyAction === "bought"}
+          errorMessage={actionError}
+          onConfirm={(entries) => void completeBulkBought(entries)}
+          onSkip={() =>
+            void completeBulkBought(
+              (bulkCostIds ?? []).map((id) => ({ id, cost: null })),
+            )
+          }
+          onClose={() => {
+            if (busyAction === "bought") return;
+            setBulkCostIds(null);
+            setActionError(null);
+          }}
+        />
+      )}
 
       <ConfirmModal
         visible={listPendingDelete !== null}
@@ -1499,6 +1516,92 @@ export default function ItemsScreen() {
         </View>
       </Modal>
     </Screen>
+  );
+
+  if (!wide) return listScreen;
+
+  const foldBarWidth = Math.min(
+    tabBar.maxWidth,
+    Math.max(0, windowWidth - spacing.xl * 2),
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+    <FoldSplit
+      master={listScreen}
+      detail={
+        <Screen scroll={false} tabBarInset>
+          {isAddingDetails ? (
+            <AddItemCard
+              presentation="pane"
+              visible
+              listId={selectedListId}
+              initialCategory={addCategory}
+              initialName={quickName}
+              onClose={() => setIsAddingDetails(false)}
+              onSaved={() => setQuickName("")}
+            />
+          ) : bulkCostIds !== null ? (
+            <ScrollView
+              className="flex-1"
+              contentContainerClassName="px-4 pb-10 pt-2"
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <CostEntrySheet
+                presentation="pane"
+                visible
+                title={t("enterCosts")}
+                currency={household?.currency ?? "JOD"}
+                items={bulkCostItems}
+                loading={busyAction === "bought"}
+                errorMessage={actionError}
+                onConfirm={(entries) => void completeBulkBought(entries)}
+                onSkip={() =>
+                  void completeBulkBought(
+                    (bulkCostIds ?? []).map((id) => ({ id, cost: null })),
+                  )
+                }
+                onClose={() => {
+                  if (busyAction === "bought") return;
+                  setBulkCostIds(null);
+                  setActionError(null);
+                }}
+              />
+            </ScrollView>
+          ) : openItem ? (
+            <ItemDetailCard
+              presentation="pane"
+              purchase={openItem}
+              visible
+              onClose={() => setOpenItemId(null)}
+            />
+          ) : (
+            <FoldPaneEmpty
+              icon="list-outline"
+              title={t("itemPickTitle")}
+              body={t("itemPickBody")}
+            />
+          )}
+        </Screen>
+      }
+    />
+    {selectionDock ? (
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: Math.max(insets.bottom, spacing.md) + spacing.sm,
+          alignItems: "center",
+          zIndex: 40,
+        }}
+      >
+        <View style={{ width: foldBarWidth }}>{selectionDock}</View>
+      </View>
+    ) : null}
+    </View>
   );
 }
 
