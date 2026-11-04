@@ -38,7 +38,8 @@ function pillFrame(slot: Slot | undefined, rowWidth: number, content: number) {
 export function GlassTabBar({
   state,
   descriptors,
-  navigation,
+  emitter,
+  navigateToTab,
   hidden,
 }: BottomTabBarProps & {
   hidden: boolean;
@@ -225,17 +226,17 @@ export function GlassTabBar({
                   typeof label === "string" ? label : route.name
                 }
                 onPress={() => {
-                  const event = navigation.emit({
+                  const event = emitter.emit({
                     type: "tabPress",
                     target: route.key,
                     canPreventDefault: true,
                   });
                   if (!focused && !event.defaultPrevented) {
-                    navigation.navigate(route.name, route.params);
+                    navigateToTab(route.key);
                   }
                 }}
                 onLongPress={() => {
-                  navigation.emit({ type: "tabLongPress", target: route.key });
+                  emitter.emit({ type: "tabLongPress", target: route.key });
                 }}
                 onLayout={(event) => {
                   const { x, width } = event.nativeEvent.layout;

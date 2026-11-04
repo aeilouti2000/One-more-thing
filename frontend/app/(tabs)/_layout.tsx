@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs, usePathname } from "expo-router";
+import { usePathname } from "expo-router";
+import { Tabs } from "expo-router/js-tabs";
 import { RequireSession } from "@/features/auth/components/require-session";
 import { GlassTabBar } from "@/components/ui/GlassTabBar";
 import { TabBarVisibility, useTabBarVisibility } from "@/components/ui/TabBarVisibility";

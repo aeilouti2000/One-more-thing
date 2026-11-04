@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -78,49 +78,47 @@ export function SwipeableItem({
     fireAction(direction);
   }
 
-  const gesture = useMemo(() => {
-    const report = (direction: number) => settle(direction);
-    const commit = (direction: number) => fireAction(direction);
-    const pan = Gesture.Pan()
-      .enabled(enabled)
-      .activeOffsetX([-18, 18])
-      .failOffsetY([-14, 14])
-      .onStart(() => {
-        "worklet";
-        dragging.value = true;
-      })
-      .onUpdate((event) => {
-        "worklet";
-        const width = Math.max(widthSV.value, 1);
-        const next = resting.value * width + event.translationX;
-        travel.value = Math.max(-width, Math.min(width, next));
-      })
-      .onFinalize((event) => {
-        "worklet";
-        dragging.value = false;
-        const width = Math.max(widthSV.value, 1);
-        const projected = resting.value * width + event.translationX;
-        const ratio = projected / width;
-        if (ratio <= -COMMIT_RATIO || ratio >= COMMIT_RATIO) {
-          const direction = ratio < 0 ? -1 : 1;
-          resting.value = 0;
-          travel.value = withTiming(0, { duration: 180 }, () => {
-            runOnJS(commit)(direction);
-          });
-          return;
-        }
-        const direction = ratio <= -REVEAL_RATIO ? -1 : ratio >= REVEAL_RATIO ? 1 : 0;
-        resting.value = direction;
-        travel.value = withTiming(direction * width, { duration: 180 }, () => {
-          runOnJS(report)(direction);
-        });
-      });
+  const report = (direction: number) => settle(direction);
+  const commit = (direction: number) => fireAction(direction);
+  const gesture = usePanGesture({
+    enabled,
+    activeOffsetX: [-18, 18],
+    failOffsetY: [-14, 14],
     // A swipe on the card belongs to the item action, not the list pager.
-    if (enabled && screenSwipe) pan.blocksExternalGesture(screenSwipe);
-    return pan;
-    // Shared values are stable. Callbacks are read through the ref.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging, enabled, resting, screenSwipe, travel, widthSV]);
+    block: enabled ? (screenSwipe ?? undefined) : undefined,
+    onActivate: () => {
+      dragging.value = true;
+    },
+    onUpdate: (event) => {
+      const width = Math.max(widthSV.value, 1);
+      const next = resting.value * width + event.translationX;
+      travel.value = Math.max(-width, Math.min(width, next));
+    },
+    onDeactivate: (event) => {
+      dragging.value = false;
+      if (event.canceled) {
+        const width = Math.max(widthSV.value, 1);
+        travel.value = withTiming(resting.value * width, { duration: 180 });
+        return;
+      }
+      const width = Math.max(widthSV.value, 1);
+      const projected = resting.value * width + event.translationX;
+      const ratio = projected / width;
+      if (ratio <= -COMMIT_RATIO || ratio >= COMMIT_RATIO) {
+        const direction = ratio < 0 ? -1 : 1;
+        resting.value = 0;
+        travel.value = withTiming(0, { duration: 180 }, () => {
+          runOnJS(commit)(direction);
+        });
+        return;
+      }
+      const direction = ratio <= -REVEAL_RATIO ? -1 : ratio >= REVEAL_RATIO ? 1 : 0;
+      resting.value = direction;
+      travel.value = withTiming(direction * width, { duration: 180 }, () => {
+        runOnJS(report)(direction);
+      });
+    },
+  });
 
   const leftBg = SWIPE_ACTION_TONE[leftAction].bg;
   const rightBg = SWIPE_ACTION_TONE[rightAction].bg;

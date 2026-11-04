@@ -16,11 +16,11 @@ import {
   View,
 } from "react-native";
 import {
-  Gesture,
   GestureDetector,
   RefreshControl as GestureRefreshControl,
   ScrollView as GestureScrollView,
-  type GestureType,
+  usePanGesture,
+  type PanGesture,
 } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -52,7 +52,7 @@ type ScreenSwipeContextValue = {
 };
 
 const ScreenSwipeContext = createContext<ScreenSwipeContextValue | null>(null);
-const ScreenSwipeGestureContext = createContext<GestureType | null>(null);
+const ScreenSwipeGestureContext = createContext<PanGesture | null>(null);
 
 type ScreenProps = {
   children: ReactNode;
@@ -226,87 +226,74 @@ export function Screen({
     rejectSwipeRef.current();
   }
 
-  /* eslint-disable react-hooks/refs -- gesture callback reads latest handlers via refs */
-  const listPan = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetX([-SWIPE_ACTIVE_X, SWIPE_ACTIVE_X])
-        .failOffsetY([-SWIPE_FAIL_Y, SWIPE_FAIL_Y])
-        .onUpdate((event) => {
-          "worklet";
-          if (isAnimating.value) return;
-          const goingNext = event.translationX < 0;
-          const allowed = goingNext ? canNext.value === 1 : canPrev.value === 1;
-          translateX.set(allowed ? event.translationX : 0);
-        })
-        .onEnd((event) => {
-            "worklet";
-            if (isAnimating.value) return;
+  /* eslint-disable react-hooks/refs -- gesture callbacks read latest handlers via refs */
+  const listPan = usePanGesture({
+    enabled: Boolean(onSwipe),
+    activeOffsetX: [-SWIPE_ACTIVE_X, SWIPE_ACTIVE_X],
+    failOffsetY: [-SWIPE_FAIL_Y, SWIPE_FAIL_Y],
+    onUpdate: (event) => {
+      if (isAnimating.value) return;
+      const goingNext = event.translationX < 0;
+      const allowed = goingNext ? canNext.value === 1 : canPrev.value === 1;
+      translateX.set(allowed ? event.translationX : 0);
+    },
+    onDeactivate: (event) => {
+      if (isAnimating.value || event.canceled) return;
 
-            const distance = Math.abs(event.translationX);
-            const velocity = Math.abs(event.velocityX);
-            const passed =
-              distance >= SWIPE_DISTANCE || velocity >= SWIPE_VELOCITY;
+      const distance = Math.abs(event.translationX);
+      const velocity = Math.abs(event.velocityX);
+      const passed =
+        distance >= SWIPE_DISTANCE || velocity >= SWIPE_VELOCITY;
 
-            if (!passed) {
-              translateX.set(
-                withTiming(0, {
-                  duration: 180,
-                  easing: Easing.out(Easing.cubic),
-                }),
-              );
-              return;
-            }
-
-            const direction: SwipeDirection =
-              event.translationX < 0 ? "next" : "previous";
-            const allowed =
-              direction === "next" ? canNext.value : canPrev.value;
-
-            if (!allowed) {
-              runOnJS(callRejectSwipe)();
-              return;
-            }
-
-            isAnimating.set(true);
-            const exitX = direction === "next" ? -screenWidth : screenWidth;
-            // Finish exit on the UI thread — only hop to JS to swap content.
-            translateX.set(
-              withTiming(
-                exitX,
-                {
-                  duration: SLIDE_OUT_MS,
-                  easing: Easing.in(Easing.cubic),
-                },
-                (finished) => {
-                  if (!finished) {
-                    isAnimating.set(false);
-                    return;
-                  }
-                  runOnJS(callCommitSwipe)(direction);
-                },
-              ),
-            );
-          })
-          .onFinalize((_, success) => {
-            "worklet";
-            if (!success && !isAnimating.value) {
-              translateX.set(
-                withTiming(0, {
-                  duration: 180,
-                  easing: Easing.out(Easing.cubic),
-                }),
-              );
-            }
+      if (!passed) {
+        translateX.set(
+          withTiming(0, {
+            duration: 180,
+            easing: Easing.out(Easing.cubic),
           }),
-    // Shared values + refs stay valid for the gesture lifetime.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-  const swipe = useMemo(
-    () => Gesture.Simultaneous(listPan, Gesture.Native()),
-    [listPan],
-  );
+        );
+        return;
+      }
+
+      const direction: SwipeDirection =
+        event.translationX < 0 ? "next" : "previous";
+      const allowed = direction === "next" ? canNext.value : canPrev.value;
+
+      if (!allowed) {
+        runOnJS(callRejectSwipe)();
+        return;
+      }
+
+      isAnimating.set(true);
+      const exitX = direction === "next" ? -screenWidth : screenWidth;
+      translateX.set(
+        withTiming(
+          exitX,
+          {
+            duration: SLIDE_OUT_MS,
+            easing: Easing.in(Easing.cubic),
+          },
+          (finished) => {
+            if (!finished) {
+              isAnimating.set(false);
+              return;
+            }
+            runOnJS(callCommitSwipe)(direction);
+          },
+        ),
+      );
+    },
+    onFinalize: (event) => {
+      if (event.canceled && !isAnimating.value) {
+        translateX.set(
+          withTiming(0, {
+            duration: 180,
+            easing: Easing.out(Easing.cubic),
+          }),
+        );
+      }
+    },
+  });
   /* eslint-enable react-hooks/refs */
 
   // Stable context identity — avoid re-renders from inline onSwipe props.
@@ -343,8 +330,9 @@ export function Screen({
 
   const swipeBody = (
     <View style={{ flex: 1, width: "100%" }}>
-      <GestureDetector gesture={swipe}>
+      <GestureDetector gesture={listPan}>
         <GestureScrollView
+          simultaneousWith={listPan}
           style={{ flex: 1, width: "100%" }}
           scrollEnabled={scrollEnabled}
           removeClippedSubviews={false}
