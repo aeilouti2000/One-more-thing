@@ -4,11 +4,12 @@ import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle }
 import { useTabBlurTarget } from "@/components/ui/TabBlurTarget";
 import { withAlpha } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
+import type { ViewHandle } from "@/lib/native-refs";
 
-const BlurTargetContext = createContext<RefObject<View | null> | null>(null);
+const BlurTargetContext = createContext<RefObject<ViewHandle | null> | null>(null);
 
 export function BlurScreen({ children }: { children: ReactNode }) {
-  const target = useRef<View>(null);
+  const target = useRef<ViewHandle>(null);
 
   if (Platform.OS === "android") {
     return <View style={styles.fill}>{children}</View>;

@@ -66,6 +66,8 @@ type ScreenProps = {
   floating?: ReactNode;
   top?: ReactNode;
   dock?: ReactNode;
+  /** Full-screen overlay layer for a floating action button (positions itself). */
+  fab?: ReactNode;
   /** Place the dock in the gap beside the centered fold tab bar. */
   dockBeside?: boolean;
   onSwipe?: (direction: SwipeDirection) => void;
@@ -109,6 +111,7 @@ export function Screen({
   floating,
   top,
   dock,
+  fab,
   dockBeside = false,
   onSwipe,
   canSwipe,
@@ -128,7 +131,7 @@ export function Screen({
   const isAnimating = useSharedValue(false);
   const canNext = useSharedValue(1);
   const canPrev = useSharedValue(1);
-  const bottomPad = tabBarInset ? "pb-32" : "pb-10";
+  const bottomPad = tabBarInset ? (fab ? "pb-40" : "pb-32") : "pb-10";
   const padding = top
     ? `px-4 ${bottomPad} pt-4`
     : `px-4 ${bottomPad} pt-2`;
@@ -226,7 +229,6 @@ export function Screen({
     rejectSwipeRef.current();
   }
 
-  /* eslint-disable react-hooks/refs -- gesture callbacks read latest handlers via refs */
   const listPan = usePanGesture({
     enabled: Boolean(onSwipe),
     activeOffsetX: [-SWIPE_ACTIVE_X, SWIPE_ACTIVE_X],
@@ -294,7 +296,6 @@ export function Screen({
       }
     },
   });
-  /* eslint-enable react-hooks/refs */
 
   // Stable context identity — avoid re-renders from inline onSwipe props.
   const swipeContext = useMemo(
@@ -340,7 +341,7 @@ export function Screen({
             width: "100%",
             paddingHorizontal: spacing.screen,
             paddingTop: top ? spacing.lg : spacing.sm,
-            paddingBottom: tabBarInset ? 128 : 40,
+            paddingBottom: tabBarInset ? (fab ? 160 : 128) : 40,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -398,11 +399,12 @@ export function Screen({
       {floating ? (
         <View
           pointerEvents="box-none"
-          className="absolute inset-x-0 bottom-28 items-center px-4"
+          className={`absolute inset-x-0 ${fab ? "bottom-40" : "bottom-28"} items-center px-4`}
         >
           {floating}
         </View>
       ) : null}
+      {fab}
       {dock ? (
         <View
           pointerEvents="box-none"

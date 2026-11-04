@@ -10,11 +10,12 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Platform, View } from "react-native";
+import { Platform } from "react-native";
+import type { ViewHandle } from "@/lib/native-refs";
 
 type TabBlurContextValue = {
-  target: RefObject<View | null> | null;
-  setTarget: (target: RefObject<View | null>) => void;
+  target: RefObject<ViewHandle | null> | null;
+  setTarget: (target: RefObject<ViewHandle | null>) => void;
 };
 
 const TabBlurContext = createContext<TabBlurContextValue>({
@@ -23,7 +24,7 @@ const TabBlurContext = createContext<TabBlurContextValue>({
 });
 
 export function TabBlurProvider({ children }: { children: ReactNode }) {
-  const [target, setTarget] = useState<RefObject<View | null> | null>(null);
+  const [target, setTarget] = useState<RefObject<ViewHandle | null> | null>(null);
   const value = useMemo(() => ({ target, setTarget }), [target]);
   return <TabBlurContext.Provider value={value}>{children}</TabBlurContext.Provider>;
 }
@@ -33,7 +34,7 @@ export function useTabBlurTarget() {
 }
 
 export function TabBlurSurface({ children }: { children: ReactNode }) {
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewHandle>(null);
   const focused = useIsFocused();
   const setTarget = useContext(TabBlurContext).setTarget;
 

@@ -1,9 +1,12 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { In, type Repository } from "typeorm";
 import { DomainError } from "../../../common/domain.error";
 import { HomesService } from "../../homes/services/homes.service";
 import { NotificationsService } from "../../notifications/services/notifications.service";
 import type { ItemCategory } from "../entities/item.entity";
 import { Item } from "../entities/item.entity";
+import { TripReceipt } from "../entities/trip-receipt.entity";
 import { ITEMS_REPOSITORY, type IItemsRepository } from "../repo/items-repo/items.repository";
 import { LISTS_REPOSITORY, type IListsRepository } from "../repo/lists-repo/lists.repository";
 import { undoDeadline } from "../utils/shopping";
@@ -23,6 +26,9 @@ export type ItemView = {
   status: "needed" | "bought";
   urgent: boolean;
   cost: number | null;
+  /** Trip receipt this item was priced under (trip-total mode). */
+  receiptId: string | null;
+  receiptTotal: number | null;
   addedBy: string;
   boughtBy: string | null;
   addedByName: string;
@@ -40,6 +46,8 @@ export class ItemsService {
     private readonly notifications: NotificationsService,
     private readonly pins: PinsService,
     private readonly categories: CategoriesService,
+    @InjectRepository(TripReceipt) private readonly receipts: Repository<TripReceipt>,
+    @InjectRepository(Item) private readonly itemRows: Repository<Item>,
   ) {}
 
   async list(userId: string, homeId: string) {
@@ -89,7 +97,14 @@ export class ItemsService {
   async updateDetails(
     userId: string,
     itemId: string,
-    input: { name: string; quantity: number; category: ItemCategory; urgent: boolean; notes?: string },
+    input: {
+      name: string;
+      quantity: number;
+      category: ItemCategory;
+      urgent: boolean;
+      notes?: string;
+      unit?: string;
+    },
   ) {
     const item = await this.requireItem(userId, itemId);
     await this.categories.assertUsable(item.homeId, input.category);
@@ -100,6 +115,9 @@ export class ItemsService {
     item.urgent = input.urgent;
     if (input.notes !== undefined) {
       item.notes = blankToNull(input.notes);
+    }
+    if (input.unit !== undefined) {
+      item.unit = blankToNull(input.unit);
     }
     const saved = await this.items.save(item);
     if (becameUrgent) {
@@ -154,6 +172,7 @@ export class ItemsService {
     item.boughtBy = null;
     item.boughtAt = null;
     item.cost = null;
+    item.receiptId = null;
     const saved = await this.items.save(item);
     await this.items.placeNeeded(
       saved.homeId,
@@ -178,6 +197,63 @@ export class ItemsService {
     const saved = await this.items.save(item);
     const [view] = await this.withNames([saved]);
     return view;
+  }
+
+  /**
+   * Record one total for a finished trip. Links the given bought items to it so
+   * history can show the trip as a single invoice.
+   */
+  async createReceipt(
+    userId: string,
+    homeId: string,
+    input: { total: number; itemIds: string[]; listId?: string | null },
+  ) {
+    await this.homes.requireMembership(userId, homeId);
+    const total = normalizeCost(input.total);
+    if (total === null) {
+      throw new DomainError("INVALID_COST", "Enter a valid cost.", HttpStatus.BAD_REQUEST);
+    }
+    const ids = [...new Set(input.itemIds)];
+    const rows = ids.length
+      ? await this.itemRows.find({ where: { id: In(ids), homeId, status: "bought" } })
+      : [];
+    if (rows.length === 0) {
+      throw new DomainError("ITEM_NOT_FOUND", "No bought items for this trip.", HttpStatus.BAD_REQUEST);
+    }
+    // The list comes from the items themselves (never trust a client list id).
+    const listId = rows[0]?.listId ?? null;
+    const itemIds = rows.map((row) => row.id);
+    const previousReceiptIds = [
+      ...new Set(rows.map((row) => row.receiptId).filter((id): id is string => Boolean(id))),
+    ];
+    // One transaction: never leave a receipt without items or items half-moved.
+    const receipt = await this.receipts.manager.transaction(async (manager) => {
+      const saved = await manager.save(
+        manager.create(TripReceipt, { homeId, listId, total, createdBy: userId }),
+      );
+      await manager.update(Item, { id: In(itemIds) }, { receiptId: saved.id });
+      // Re-entering a trip's total replaces its old receipt: drop receipts that
+      // no longer have any items.
+      if (previousReceiptIds.length > 0) {
+        await manager.query(
+          `delete from trip_receipts r
+            where r.id = any($1::uuid[])
+              and not exists (select 1 from items i where i.receipt_id = r.id)`,
+          [previousReceiptIds],
+        );
+      }
+      return saved;
+    });
+    const updated = await this.itemRows.find({ where: { id: In(rows.map((row) => row.id)) } });
+    return {
+      receipt: {
+        id: receipt.id,
+        listId: receipt.listId,
+        total: receipt.total,
+        createdAt: receipt.createdAt,
+      },
+      items: await this.withNames(updated),
+    };
   }
 
   async reorder(userId: string, ids: string[]) {
@@ -374,6 +450,11 @@ export class ItemsService {
     const listIds = [...new Set(rows.map((row) => row.listId).filter(Boolean))];
     const lists = listIds.length ? await this.shoppingLists.findByIds(listIds) : [];
     const listNames = new Map(lists.map((list) => [list.id, list.name]));
+    const receiptIds = [...new Set(rows.map((row) => row.receiptId).filter((id): id is string => Boolean(id)))];
+    const receiptRows = receiptIds.length
+      ? await this.receipts.find({ where: { id: In(receiptIds) } })
+      : [];
+    const receiptTotals = new Map(receiptRows.map((receipt) => [receipt.id, Number(receipt.total)]));
 
     return rows.map((row) => ({
       id: row.id,
@@ -388,6 +469,8 @@ export class ItemsService {
       status: row.status,
       urgent: row.urgent,
       cost: row.cost === null || row.cost === undefined ? null : Number(row.cost),
+      receiptId: row.receiptId ?? null,
+      receiptTotal: row.receiptId ? (receiptTotals.get(row.receiptId) ?? null) : null,
       addedBy: row.addedBy,
       boughtBy: row.boughtBy,
       addedByName: names.get(row.addedBy) ?? "Member",

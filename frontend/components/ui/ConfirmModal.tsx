@@ -1,17 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
-import { ActivityIndicator, Modal, Pressable, View } from "react-native";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { ActivityIndicator, Pressable, View } from "react-native";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { AppText } from "@/components/ui/AppText";
 import {
   FloatedCard,
-  FloatedCardActions,
   FloatedCardHeader,
 } from "@/components/ui/FloatedCard";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { floatedControlRadius, withAlpha } from "@/constants/theme";
+import { withAlpha } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+
+const SHEET_BUTTON_RADIUS = 16;
 
 type ConfirmModalProps = {
   visible: boolean;
@@ -47,18 +48,7 @@ export function ConfirmModal({
   const danger = scheme === "dark" ? "#F07178" : "#C2414A";
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={() => {
-        if (!loading) onCancel();
-      }}
-    >
-      <View className="flex-1 items-center justify-center px-6">
-        <BlurBackdrop onPress={onCancel} disabled={loading} />
-
+    <BottomSheet visible={visible} onClose={onCancel} locked={loading}>
         <FloatedCard>
           <FloatedCardHeader
             title={title}
@@ -85,10 +75,10 @@ export function ConfirmModal({
           {alert ? (
             <Pressable
               onPress={onCancel}
-              className="mt-4 items-center px-3 py-3 active:opacity-80"
+              className="mt-5 h-[52px] items-center justify-center px-4 active:opacity-80"
               style={{
                 backgroundColor: colors.accent,
-                borderRadius: floatedControlRadius,
+                borderRadius: SHEET_BUTTON_RADIUS,
               }}
             >
               <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
@@ -96,45 +86,39 @@ export function ConfirmModal({
               </AppText>
             </Pressable>
           ) : (
-            <FloatedCardActions className="mt-4">
-              <Pressable
-                disabled={loading}
-                onPress={onCancel}
-                className="flex-1 items-center px-3 py-3 active:opacity-80"
-                style={{
-                  backgroundColor:
-                    scheme === "dark" ? withAlpha(colors.white, 0.08) : "#F4F5F7",
-                  borderRadius: floatedControlRadius,
-                }}
-              >
-                <AppText
-                  className="text-sm font-semibold"
-                  style={{ color: colors.ink }}
-                >
-                  {cancelLabel}
-                </AppText>
-              </Pressable>
+            <View className="mt-5 gap-3">
               <Pressable
                 disabled={loading}
                 onPress={onConfirm}
-                className="flex-1 items-center px-3 py-3 active:opacity-80"
-                style={{
-                  backgroundColor: danger,
-                  borderRadius: floatedControlRadius,
-                }}
+                className="h-[52px] items-center justify-center px-4 active:opacity-80"
+                style={{ backgroundColor: danger, borderRadius: SHEET_BUTTON_RADIUS }}
               >
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <AppText className="text-sm font-semibold text-white">
+                  <AppText className="text-[15px] font-semibold text-white">
                     {confirmLabel}
                   </AppText>
                 )}
               </Pressable>
-            </FloatedCardActions>
+              <Pressable
+                disabled={loading}
+                onPress={onCancel}
+                className="h-[52px] items-center justify-center px-4 active:opacity-70"
+                style={{
+                  borderRadius: SHEET_BUTTON_RADIUS,
+                  borderWidth: 1.5,
+                  borderColor:
+                    scheme === "dark" ? withAlpha(colors.white, 0.22) : withAlpha("#12141A", 0.18),
+                }}
+              >
+                <AppText className="text-[15px] font-semibold" style={{ color: colors.ink }}>
+                  {cancelLabel}
+                </AppText>
+              </Pressable>
+            </View>
           )}
         </FloatedCard>
-      </View>
-    </Modal>
+    </BottomSheet>
   );
 }

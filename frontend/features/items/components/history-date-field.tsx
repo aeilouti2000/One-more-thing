@@ -6,6 +6,7 @@ import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { floatedCardStyle } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import type { ViewHandle } from "@/lib/native-refs";
 
 type HistoryDateFieldProps = {
   value: Date | null;
@@ -18,7 +19,7 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
   const { colors, scheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [anchorTop, setAnchorTop] = useState(0);
-  const rowRef = useRef<View>(null);
+  const rowRef = useRef<ViewHandle>(null);
   const [cursor, setCursor] = useState(() => startOfMonth(value ?? new Date()));
   const language = locale === "ar" ? "ar" : "en";
   const selected = value !== null;

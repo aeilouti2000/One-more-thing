@@ -76,6 +76,12 @@ export class UpdateItemDto {
   @IsString()
   @MaxLength(500)
   notes?: string;
+
+  /** Omit to keep the current unit; "" clears it. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  unit?: string;
 }
 
 export class MarkBoughtDto {
@@ -115,6 +121,22 @@ export class UpdateItemCostDto {
   cost: number | null;
 }
 
+export class CreateTripReceiptDto {
+  @IsNumber()
+  @Min(0)
+  @Max(999999.999)
+  total: number;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID("all", { each: true })
+  itemIds: string[];
+
+  @IsOptional()
+  @IsUUID()
+  listId?: string;
+}
+
 export class CreatePinDto extends CreateItemDto {
   @IsIn(PIN_INTERVALS)
   intervalDays: PinInterval;
@@ -140,6 +162,18 @@ export class UpdatePinDto {
 
   @IsIn(PIN_INTERVALS)
   intervalDays: PinInterval;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(9999)
+  quantity?: number;
+
+  /** Omit to keep the current unit; "" clears it. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  unit?: string;
 }
 
 export class ItemIdsDto {

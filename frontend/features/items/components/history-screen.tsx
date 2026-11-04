@@ -1,11 +1,12 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type ReactNode } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Dimensions, Modal, Pressable, ScrollView, View } from "react-native";
 import { FoldPaneEmpty, FoldSplit } from "@/components/ui/FoldSplit";
 import { HistoryDateField } from "@/features/items/components/history-date-field";
 import { ItemDetailCard } from "@/features/items/components/item-detail-card";
+import { TripInvoiceCosts } from "@/features/items/components/trip-invoice-costs";
 import { PurchaseRow } from "@/features/items/components/purchase-row";
 import { AppText } from "@/components/ui/AppText";
 import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
@@ -16,7 +17,7 @@ import { Screen, SwipeSlideContent } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { useHousehold } from "@/features/homes/hooks/use-household";
-import { formatMoney, sumKnownCosts } from "@/features/items/utils/currency";
+import { formatMoney, summarizeSpend } from "@/features/items/utils/currency";
 import { groupPurchasesIntoTrips } from "@/features/items/utils/trips";
 import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeList } from "@/features/items/api/lists";
 import { readCachedHistoryLists, readCachedLists } from "@/features/offline/profile-cache";
@@ -32,6 +33,7 @@ import {
   withAlpha,
 } from "@/constants/theme";
 import type { Purchase } from "@/features/items/types/purchase";
+import type { ViewHandle } from "@/lib/native-refs";
 
 type HistoryRange = "all" | "today" | "week" | "month";
 type HistoryMode = "list" | "invoice";
@@ -61,8 +63,8 @@ export default function HistoryScreen() {
   const [isChoosingRange, setIsChoosingRange] = useState(false);
   const [listAnchor, setListAnchor] = useState<Anchor | null>(null);
   const [rangeAnchor, setRangeAnchor] = useState<Anchor | null>(null);
-  const listButtonRef = useRef<View>(null);
-  const rangeButtonRef = useRef<View>(null);
+  const listButtonRef = useRef<ViewHandle>(null);
+  const rangeButtonRef = useRef<ViewHandle>(null);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [openTripId, setOpenTripId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -103,7 +105,7 @@ export default function HistoryScreen() {
 
   const openItem = openItemId ? (bought.find((item) => item.id === openItemId) ?? null) : null;
   const spend = useMemo(
-    () => sumKnownCosts(visible.map((item) => item.cost)),
+    () => summarizeSpend(visible),
     [visible],
   );
   const trips = useMemo(() => groupPurchasesIntoTrips(visible), [visible]);
@@ -215,7 +217,7 @@ export default function HistoryScreen() {
   }
 
   function openAnchored(
-    ref: RefObject<View | null>,
+    ref: RefObject<ViewHandle | null>,
     setAnchor: (anchor: Anchor) => void,
     setOpen: (open: boolean) => void,
   ) {
@@ -400,6 +402,7 @@ export default function HistoryScreen() {
               priced={openTrip.priced}
               count={openTrip.count}
               onPressItem={(purchase) => setOpenItemId(purchase.id)}
+              actions={<TripInvoiceCosts items={openTrip.items} currency={currency} />}
             />
           </View>
         ) : mode === "invoice" ? (
@@ -509,6 +512,7 @@ export default function HistoryScreen() {
           priced={openTrip.priced}
           count={openTrip.count}
           onPressItem={(purchase) => setOpenItemId(purchase.id)}
+          actions={<TripInvoiceCosts items={openTrip.items} currency={currency} />}
         />
       </View>
     ) : null;
@@ -667,6 +671,7 @@ function InvoiceView({
   priced,
   count,
   onPressItem,
+  actions,
 }: {
   items: Purchase[];
   currency: string;
@@ -677,6 +682,8 @@ function InvoiceView({
   priced: number;
   count: number;
   onPressItem: (item: Purchase) => void;
+  /** Cost actions for an opened trip (scan / item prices / trip total). */
+  actions?: ReactNode;
 }) {
   const { t } = useI18n();
   const { colors, scheme } = useTheme();
@@ -707,6 +714,7 @@ function InvoiceView({
           total: formatMoney(total, currency),
         })}
       </AppText>
+      {actions}
 
       <View className="mt-4 gap-0">
         {items.map((item, index) => {
@@ -733,9 +741,18 @@ function InvoiceView({
                   {when ? ` · ${when}` : ""}
                 </AppText>
               </View>
-              <AppText className="text-base font-semibold text-cove-ink">
-                {formatMoney(item.cost, currency, t("noPrice"))}
-              </AppText>
+              {item.receiptId ? (
+                // Counted in the trip total; show its own price if one was typed.
+                <AppText className="text-xs font-medium text-cove-muted">
+                  {item.cost !== null && item.cost !== undefined
+                    ? formatMoney(item.cost, currency)
+                    : t("inTripTotal")}
+                </AppText>
+              ) : (
+                <AppText className="text-base font-semibold text-cove-ink">
+                  {formatMoney(item.cost, currency, t("noPrice"))}
+                </AppText>
+              )}
             </Pressable>
           );
         })}

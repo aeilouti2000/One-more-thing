@@ -163,12 +163,34 @@ export default function CostsSettingsScreen() {
               onChange={(value) => void saveCostSettings({ askCostOnBulkBuy: value })}
               colors={colors}
             />
+            {/* Two independent end-of-trip prompts; only one can run, so turning
+                one on turns the other off. */}
             <CostAskToggle
               title={t("askCostTrip")}
               body={t("askCostTripBody")}
-              value={household.askCostOnTripEnd}
+              value={household.askCostOnTripEnd && household.tripCostMode !== "total"}
               disabled={!isHost || isSavingCosts}
-              onChange={(value) => void saveCostSettings({ askCostOnTripEnd: value })}
+              onChange={(value) =>
+                void saveCostSettings(
+                  value
+                    ? { askCostOnTripEnd: true, tripCostMode: "items" }
+                    : { askCostOnTripEnd: false },
+                )
+              }
+              colors={colors}
+            />
+            <CostAskToggle
+              title={t("askCostTripTotal")}
+              body={t("askCostTripTotalBody")}
+              value={household.tripCostMode === "total"}
+              disabled={!isHost || isSavingCosts}
+              onChange={(value) =>
+                void saveCostSettings(
+                  value
+                    ? { tripCostMode: "total" }
+                    : { tripCostMode: "items", askCostOnTripEnd: false },
+                )
+              }
               colors={colors}
             />
           </>

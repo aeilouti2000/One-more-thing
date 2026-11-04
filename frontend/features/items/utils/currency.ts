@@ -49,7 +49,7 @@ export function parseCostInput(raw: string): number | null {
   return Math.round(value * 1000) / 1000;
 }
 
-export function sumKnownCosts(costs: Array<number | null | undefined>) {
+export function sumKnownCosts(costs: (number | null | undefined)[]) {
   let total = 0;
   let priced = 0;
   for (const cost of costs) {
@@ -58,4 +58,32 @@ export function sumKnownCosts(costs: Array<number | null | undefined>) {
     priced += 1;
   }
   return { total, priced, count: costs.length };
+}
+
+/**
+ * Spend for bought items, counting trip receipts: an item priced under a
+ * trip total adds nothing on its own; each receipt's total is added once.
+ */
+export function summarizeSpend(
+  items: { cost?: number | null; receiptId?: string | null; receiptTotal?: number | null }[],
+) {
+  let total = 0;
+  let priced = 0;
+  const receipts = new Set<string>();
+  for (const item of items) {
+    if (item.receiptId) {
+      priced += 1;
+      if (!receipts.has(item.receiptId)) {
+        receipts.add(item.receiptId);
+        const amount = item.receiptTotal;
+        if (amount !== null && amount !== undefined && Number.isFinite(amount)) total += amount;
+      }
+      continue;
+    }
+    const cost = item.cost;
+    if (cost === null || cost === undefined || !Number.isFinite(cost)) continue;
+    total += cost;
+    priced += 1;
+  }
+  return { total, priced, count: items.length };
 }

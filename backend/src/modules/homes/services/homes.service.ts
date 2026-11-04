@@ -1,6 +1,6 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { DomainError } from "../../../common/domain.error";
-import type { Home } from "../entities/home.entity";
+import type { Home, TripCostMode } from "../entities/home.entity";
 import {
   HOMES_REPOSITORY,
   type HomeSummary,
@@ -68,6 +68,7 @@ export class HomesService {
       askCostOnSingleBuy?: boolean;
       askCostOnBulkBuy?: boolean;
       askCostOnTripEnd?: boolean;
+      tripCostMode?: TripCostMode;
     },
   ) {
     const membership = await this.requireMembership(userId, homeId);
@@ -85,6 +86,9 @@ export class HomesService {
     if (typeof input.askCostOnSingleBuy === "boolean") patch.askCostOnSingleBuy = input.askCostOnSingleBuy;
     if (typeof input.askCostOnBulkBuy === "boolean") patch.askCostOnBulkBuy = input.askCostOnBulkBuy;
     if (typeof input.askCostOnTripEnd === "boolean") patch.askCostOnTripEnd = input.askCostOnTripEnd;
+    if (input.tripCostMode === "items" || input.tripCostMode === "total") {
+      patch.tripCostMode = input.tripCostMode;
+    }
 
     if (Object.keys(patch).length > 0) {
       await this.homes.updateHome(homeId, patch);

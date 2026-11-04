@@ -286,6 +286,7 @@ export class TypeormHomesRepository implements IHomesRepository {
       askCostOnSingleBuy: home.askCostOnSingleBuy,
       askCostOnBulkBuy: home.askCostOnBulkBuy,
       askCostOnTripEnd: home.askCostOnTripEnd,
+      tripCostMode: home.tripCostMode === "total" ? "total" : "items",
       members: rows.map((row) => ({
         id: row.id,
         role: row.role,

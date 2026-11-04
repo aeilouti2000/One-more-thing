@@ -1,4 +1,5 @@
 import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import { TRIP_COST_MODES, type TripCostMode } from "../entities/home.entity";
 
 export const HOME_CURRENCIES = ["JOD", "USD", "EUR", "ILS", "SAR", "AED", "EGP", "GBP"] as const;
 export type HomeCurrency = (typeof HOME_CURRENCIES)[number];
@@ -50,4 +51,8 @@ export class UpdateCostSettingsDto {
   @IsOptional()
   @IsBoolean()
   askCostOnTripEnd?: boolean;
+
+  @IsOptional()
+  @IsIn(TRIP_COST_MODES)
+  tripCostMode?: TripCostMode;
 }

@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { RequireSession } from "@/features/auth/components/require-session";
-import { CategoryField } from "@/features/items/components/category-field";
 import { CategoryFilter } from "@/features/items/components/category-filter";
-import { UrgentToggle } from "@/features/items/components/urgent-toggle";
-import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
-import { AppTextField } from "@/components/ui/AppTextField";
-import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import {
+  ItemSheetForm,
+  ItemSheetToggle,
+  PIN_INTERVAL_KEYS,
+} from "@/features/items/components/item-sheet-form";
+import { parseQuantity } from "@/lib/validation";
+import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
@@ -18,7 +21,7 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { getCategoryLabel } from "@/constants/categories";
-import { floatedCardStyle, glassFieldStyle, tabBar, withAlpha } from "@/constants/theme";
+import { tabBar, withAlpha } from "@/constants/theme";
 import { useCategories } from "@/features/items/providers/categories-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
@@ -30,7 +33,6 @@ import {
   createPin,
   deletePin,
   fetchPins,
-  PIN_INTERVALS,
   updatePin,
   type Pin,
   type PinInterval,
@@ -87,6 +89,8 @@ function PinsBody() {
   const [category, setCategory] = useState<PurchaseCategory>("supermarket");
   const [urgent, setUrgent] = useState(false);
   const [intervalDays, setIntervalDays] = useState<PinInterval>(7);
+  const [quantity, setQuantity] = useState("1");
+  const [unit, setUnit] = useState("");
   const [addNow, setAddNow] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -136,6 +140,12 @@ function PinsBody() {
       return;
     }
 
+    const parsedQuantity = parseQuantity(quantity);
+    if (parsedQuantity === null) {
+      setError(t("errorQuantityMin"));
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
     if (editingPin) {
@@ -144,6 +154,8 @@ function PinsBody() {
         category,
         urgent,
         intervalDays,
+        quantity: parsedQuantity,
+        unit,
       });
       setIsSaving(false);
       if (result.error) {
@@ -169,7 +181,8 @@ function PinsBody() {
     }
     const result = await createPin(household.id, {
       name: name.trim(),
-      quantity: 1,
+      quantity: parsedQuantity,
+      unit: unit || undefined,
       category,
       urgent,
       intervalDays,
@@ -206,6 +219,8 @@ function PinsBody() {
     setCategory("supermarket");
     setUrgent(false);
     setIntervalDays(7);
+    setQuantity("1");
+    setUnit("");
     setAddNow(true);
     setError(null);
     setIsAdding(true);
@@ -217,6 +232,8 @@ function PinsBody() {
     setCategory(pin.category);
     setUrgent(pin.urgent);
     setIntervalDays(pin.intervalDays);
+    setQuantity(String(pin.quantity || 1));
+    setUnit(pin.unit ?? "");
     setAddNow(false);
     setError(null);
     setIsAdding(true);
@@ -512,82 +529,51 @@ function PinsBody() {
 
       <View className="h-24" />
 
-      <Modal
-        visible={isAdding}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => {
-          if (!isSaving) closeForm();
-        }}
-      >
-        <View className="flex-1 items-center justify-center px-5">
-          <BlurBackdrop onPress={closeForm} disabled={isSaving} />
-          <View
-            className="w-full max-w-md overflow-hidden px-7 pb-5 pt-8"
-            style={floatedCardStyle(scheme, colors)}
-          >
-            <GlassFill soft neutral />
-            <AppText className="mb-6 text-lg font-semibold text-cove-ink">
-              {editingPin ? t("editPin") : t("addPin")}
-            </AppText>
-            <View className="gap-4">
-              <AppTextField
-                compact
-                glass
-                label={t("itemNameLabel")}
-                value={name}
-                onChangeText={setName}
-                placeholder={t("itemNamePlaceholder")}
-                userText
+      <BottomSheet visible={isAdding} onClose={closeForm} locked={isSaving}>
+        <ItemSheetForm
+          title={editingPin ? t("editPin") : t("addPin")}
+          titleIcon="pin"
+          onClose={closeForm}
+          name={name}
+          onChangeName={(value) => {
+            setName(value);
+            setError(null);
+          }}
+          autoFocusName={!editingPin}
+          repeat={{ value: intervalDays, onChange: setIntervalDays }}
+          quantity={quantity}
+          onChangeQuantity={setQuantity}
+          unit={unit}
+          onChangeUnit={setUnit}
+          urgent={urgent}
+          onChangeUrgent={setUrgent}
+          category={category}
+          onChangeCategory={setCategory}
+          extra={
+            editingPin ? null : (
+              <ItemSheetToggle
+                label={t("addToListNow")}
+                icon="playlist-plus"
+                value={addNow}
+                onChange={setAddNow}
               />
-              <CategoryField glass value={category} onChange={setCategory} />
-              <IntervalField value={intervalDays} onChange={setIntervalDays} />
-              <UrgentToggle compact value={urgent} onValueChange={setUrgent} />
-              {editingPin ? null : (
-                <Pressable
-                  onPress={() => setAddNow((value) => !value)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: addNow }}
-                  className="flex-row items-center gap-3"
-                >
-                  <View
-                    className={`h-6 w-6 items-center justify-center rounded-md ${
-                      addNow ? "bg-cove-accent" : "bg-cove-line"
-                    }`}
-                  >
-                    {addNow ? (
-                      <AppText className="text-xs font-semibold" style={{ color: colors.onAccent }}>
-                        ✓
-                      </AppText>
-                    ) : null}
-                  </View>
-                  <AppText className="text-base text-cove-ink">{t("addToListNow")}</AppText>
-                </Pressable>
-              )}
-              <FormMessage message={error} />
-            </View>
-            <View className="mt-8 flex-row flex-wrap items-center justify-center gap-3">
-              <AppButton
-                compact
-                fit
-                label={t("cancel")}
-                variant="ghost"
-                disabled={isSaving}
-                onPress={closeForm}
-              />
-              <AppButton
-                compact
-                fit
-                label={editingPin ? t("saveChanges") : t("addPin")}
-                disabled={!name.trim()}
-                loading={isSaving}
-                onPress={() => void onSave()}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
+            )
+          }
+          error={error}
+          submitLabel={
+            editingPin
+              ? t("saveChanges")
+              : t("pinNameInterval", {
+                  name: name.trim(),
+                  interval: t(PIN_INTERVAL_KEYS[intervalDays]).toLowerCase(),
+                })
+          }
+          disabledLabel={t("typeNameToAdd")}
+          canSubmit={Boolean(name.trim())}
+          submitting={isSaving}
+          onSubmit={() => void onSave()}
+        />
+      </BottomSheet>
 
       <ConfirmModal
         visible={pinPendingDelete !== null}
@@ -609,140 +595,6 @@ function PinsBody() {
       />
     </Screen>
   );
-}
-
-function IntervalField({
-  value,
-  onChange,
-}: {
-  value: PinInterval;
-  onChange: (days: PinInterval) => void;
-}) {
-  const { t } = useI18n();
-  const { colors, scheme, shadow } = useTheme();
-  const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(
-    null,
-  );
-  const fieldRef = useRef<View>(null);
-  const frame = intervalMenuFrame(anchor);
-
-  function openMenu() {
-    const node = fieldRef.current;
-    if (!node) {
-      setOpen(true);
-      return;
-    }
-    node.measureInWindow((x, y, width, height) => {
-      setAnchor({ x, y, width, height });
-      setOpen(true);
-    });
-  }
-
-  return (
-    <>
-      <View className="gap-1.5">
-        <AppText className="text-xs font-medium text-cove-muted">{t("pinInterval")}</AppText>
-        <View ref={fieldRef} collapsable={false}>
-          <Pressable
-            onPress={openMenu}
-            accessibilityRole="button"
-            className="h-10 flex-row items-center justify-between border px-3 active:opacity-80"
-            style={glassFieldStyle(scheme, colors)}
-          >
-            <AppText className="text-sm font-medium text-cove-ink">
-              {t(intervalKeys[value])}
-            </AppText>
-            <Ionicons name="chevron-down" size={16} color={colors.muted} />
-          </Pressable>
-        </View>
-      </View>
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setOpen(false)}
-      >
-        <View className="flex-1">
-          <BlurBackdrop onPress={() => setOpen(false)} />
-          <View
-            className="absolute"
-            style={{
-              top: frame.top,
-              left: frame.left,
-              width: frame.width,
-              borderRadius: 16,
-              shadowColor: shadow.color,
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.16,
-              shadowRadius: 16,
-              elevation: 8,
-            }}
-          >
-            <View
-              className="overflow-hidden rounded-2xl"
-              style={floatedCardStyle(scheme, colors)}
-            >
-              <GlassFill soft neutral />
-              <ScrollView
-                bounces={false}
-                style={{ flexGrow: 0 }}
-                contentContainerStyle={{ gap: 4, padding: 8 }}
-              >
-                {PIN_INTERVALS.map((days) => {
-                  const selected = days === value;
-                  return (
-                    <Pressable
-                      key={days}
-                      onPress={() => {
-                        onChange(days);
-                        setOpen(false);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      className="flex-row items-center justify-between rounded-2xl px-3 py-3 active:opacity-80"
-                      style={{ backgroundColor: selected ? colors.accent : "transparent" }}
-                    >
-                      <AppText
-                        className="text-sm font-medium"
-                        style={{ color: selected ? colors.onAccent : colors.ink }}
-                      >
-                        {t(intervalKeys[days])}
-                      </AppText>
-                      {selected ? (
-                        <Ionicons name="checkmark" size={16} color={colors.onAccent} />
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </>
-  );
-}
-
-function intervalMenuFrame(anchor: { x: number; y: number; width: number; height: number } | null) {
-  const screen = Dimensions.get("window");
-  const gap = 8;
-  const estimated = PIN_INTERVALS.length * 48 + 16;
-  if (!anchor) {
-    const width = screen.width - 32;
-    return { top: 96, left: 16, width };
-  }
-
-  const width = Math.min(Math.max(anchor.width, 180), screen.width - 32);
-  const left = Math.max(16, Math.min(anchor.x, screen.width - width - 16));
-  const spaceBelow = screen.height - (anchor.y + anchor.height + gap) - 16;
-  const openUp = spaceBelow < estimated;
-  const top = openUp
-    ? Math.max(16, anchor.y - gap - estimated)
-    : anchor.y + anchor.height + gap;
-
-  return { top, left, width };
 }
 
 function MetaChip({ label, accent = false }: { label: string; accent?: boolean }) {

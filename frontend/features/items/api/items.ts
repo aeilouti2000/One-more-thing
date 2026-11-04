@@ -17,7 +17,7 @@ export type NewItemInput = {
 
 export type UpdateItemInput = Pick<
   NewItemInput,
-  "name" | "quantity" | "category" | "urgent" | "notes"
+  "name" | "quantity" | "category" | "urgent" | "notes" | "unit"
 >;
 
 export type BoughtCostEntry = {
@@ -35,6 +35,8 @@ type ItemResponse = {
   status: Purchase["status"];
   urgent: boolean;
   cost?: number | null;
+  receiptId?: string | null;
+  receiptTotal?: number | string | null;
   listId?: string;
   listName?: string;
   addedByName: string;
@@ -61,6 +63,13 @@ function toPurchase(item: ItemResponse): Purchase {
     status: item.status,
     urgent: Boolean(item.urgent),
     cost,
+    receiptId: item.receiptId ?? null,
+    receiptTotal:
+      item.receiptTotal === null || item.receiptTotal === undefined
+        ? null
+        : Number.isFinite(Number(item.receiptTotal))
+          ? Number(item.receiptTotal)
+          : null,
     listId: item.listId,
     listName: item.listName,
     addedByName: item.addedByName,
@@ -108,6 +117,7 @@ export async function updateItemDetails(itemId: string, input: UpdateItemInput) 
       category: PurchaseCategory;
       urgent: boolean;
       notes?: string;
+      unit?: string;
     } = {
       name: input.name.trim(),
       quantity: input.quantity,
@@ -118,6 +128,10 @@ export async function updateItemDetails(itemId: string, input: UpdateItemInput) 
     // updates do not wipe existing notes on the server.
     if (typeof input.notes === "string") {
       body.notes = input.notes.trim();
+    }
+    // Same for unit: omit keeps it, "" clears it.
+    if (typeof input.unit === "string") {
+      body.unit = input.unit.trim();
     }
     await api.patch(`/items/${itemId}`, body);
     return { error: null };
@@ -132,6 +146,26 @@ export async function updateItemCost(itemId: string, cost: number | null) {
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
+  }
+}
+
+/** Save one total for a finished trip and link its bought items to it. */
+export async function createTripReceipt(
+  homeId: string,
+  input: { total: number; itemIds: string[]; listId?: string | null },
+) {
+  try {
+    const result = await api.post<{ receipt: { id: string; total: number } }>(
+      `/homes/${homeId}/receipts`,
+      {
+        total: input.total,
+        itemIds: input.itemIds,
+        ...(input.listId ? { listId: input.listId } : {}),
+      },
+    );
+    return { receipt: result.receipt, error: null };
+  } catch (error) {
+    return { receipt: null, error: formatAppError(error) };
   }
 }
 

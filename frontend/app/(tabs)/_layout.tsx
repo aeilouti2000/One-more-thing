@@ -15,12 +15,12 @@ export default function TabsLayout() {
   );
 }
 
-/** Hide the tab bar on settings subpages on phone only; fold keeps the bar. */
+/** Hide the tab bar on settings / home subpages on phone only; fold keeps the bar. */
 function useSettingsSectionOpen() {
   const pathname = usePathname();
   const wide = useWideLayout();
   if (wide) return false;
-  return pathname.startsWith("/settings/");
+  return pathname.startsWith("/settings/") || pathname.startsWith("/home/");
 }
 
 function TabScreens() {
@@ -44,7 +44,7 @@ function TabScreens() {
               <Ionicons
                 name={focused ? "list" : "list-outline"}
                 size={size}
-                color={color}
+                color={color as string}
               />
             ),
           }}
@@ -57,7 +57,7 @@ function TabScreens() {
               <Ionicons
                 name={focused ? "time" : "time-outline"}
                 size={size}
-                color={color}
+                color={color as string}
               />
             ),
           }}
@@ -70,7 +70,7 @@ function TabScreens() {
               <Ionicons
                 name={focused ? "home" : "home-outline"}
                 size={size}
-                color={color}
+                color={color as string}
               />
             ),
           }}
@@ -83,7 +83,7 @@ function TabScreens() {
               <Ionicons
                 name={focused ? "settings" : "settings-outline"}
                 size={size}
-                color={color}
+                color={color as string}
               />
             ),
           }}

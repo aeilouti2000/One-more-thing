@@ -10,7 +10,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/features/items/types/purchase";
 import { StatusBadge } from "./status-badge";
 
-const CARD_RADIUS = 16;
+export const CARD_RADIUS = 22;
 const SELECTION_BORDER = 2;
 const URGENT_COLOR = "#F43F5E";
 const URGENT_FLAG = 48;

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { ViewHandle } from "@/lib/native-refs";
 import { View } from "react-native";
 import { useDragOverlay } from "@/components/ui/DragOverlay";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -93,7 +94,7 @@ export function ReorderableList({
   const onDragChangeRef = useRef(onDragChange);
   const onLongPressRef = useRef(onItemLongPress);
   const renderRowRef = useRef(renderRow);
-  const rowRefs = useRef(new Map<string, View>());
+  const rowRefs = useRef(new Map<string, ViewHandle>());
   const overlay = useDragOverlay();
   const dragY = overlay.y;
   const dragX = overlay.x;
@@ -123,8 +124,8 @@ export function ReorderableList({
       tops.push(y);
       y += rowHeight(measured, index) + GAP;
     }
-    heightsSV.value = measured;
-    topsSV.value = tops;
+    heightsSV.set(measured);
+    topsSV.set(tops);
   }
 
   // Sync before paint so list switches don't flash the previous rows for a frame.
@@ -147,11 +148,11 @@ export function ReorderableList({
     if (!pendingReset.current) return;
     pendingReset.current = false;
     overlay.dismiss();
-    activeIndex.value = -1;
-    targetIndex.value = -1;
-    dragX.value = 0;
-    dragY.value = 0;
-    settling.value = false;
+    activeIndex.set(-1);
+    targetIndex.set(-1);
+    dragX.set(0);
+    dragY.set(0);
+    settling.set(false);
     publishMetrics();
   });
 
@@ -269,7 +270,7 @@ function ReorderRow({
   activeIndex: SharedValue<number>;
   targetIndex: SharedValue<number>;
   heightsSV: SharedValue<number[]>;
-  rowRefs: { current: Map<string, View> };
+  rowRefs: { current: Map<string, ViewHandle> };
   onLayout: (height: number) => void;
   children: ReactNode;
 }) {
@@ -277,7 +278,7 @@ function ReorderRow({
   const shift = useSharedValue(0);
 
   useLayoutEffect(() => {
-    indexSV.value = index;
+    indexSV.set(index);
   }, [index, indexSV]);
 
   useAnimatedReaction(
@@ -293,13 +294,13 @@ function ReorderRow({
     },
     (next) => {
       if (activeIndex.value < 0) {
-        shift.value = 0;
+        shift.set(0);
         return;
       }
-      shift.value = withTiming(next, {
+      shift.set(withTiming(next, {
         duration: SHIFT_MS,
         easing: Easing.out(Easing.cubic),
-      });
+      }));
     },
   );
 
@@ -320,7 +321,7 @@ function ReorderRow({
 
   return (
     <Animated.View
-      ref={(node: View | null) => {
+      ref={(node: ViewHandle | null) => {
         if (node) rowRefs.current.set(id, node);
         else rowRefs.current.delete(id);
       }}
@@ -366,10 +367,11 @@ function DragHandle({
   const callbacks = useRef({ onHold, onBegin, onCommit, onLongPress });
 
   useLayoutEffect(() => {
-    indexSV.value = index;
+    indexSV.set(index);
     callbacks.current = { onHold, onBegin, onCommit, onLongPress };
   });
 
+  /* eslint-disable react-hooks/refs -- gesture callbacks read the latest handlers via a ref when they fire, not during render */
   const gesture = useMemo(() => {
     const hold = (active: boolean) => callbacks.current.onHold(active);
     const begin = () => callbacks.current.onBegin();
@@ -382,47 +384,47 @@ function DragHandle({
         .onStart(() => {
           "worklet";
           if (settling.value) return;
-          dragX.value = 0;
-          dragY.value = 0;
-          activeIndex.value = indexSV.value;
-          targetIndex.value = indexSV.value;
+          dragX.set(0);
+          dragY.set(0);
+          activeIndex.set(indexSV.value);
+          targetIndex.set(indexSV.value);
           runOnJS(begin)();
         })
         .onUpdate((event) => {
           "worklet";
           if (settling.value || activeIndex.value < 0) return;
-          dragX.value = event.translationX;
-          dragY.value = event.translationY;
+          dragX.set(event.translationX);
+          dragY.set(event.translationY);
           const next = computeTarget(
             activeIndex.value,
             event.translationY,
             topsSV.value,
             heightsSV.value,
           );
-          if (next !== targetIndex.value) targetIndex.value = next;
+          if (next !== targetIndex.value) targetIndex.set(next);
         })
         .onFinalize((event, success) => {
           "worklet";
           if (activeIndex.value < 0 || settling.value) return;
-          settling.value = true;
+          settling.set(true);
           const from = activeIndex.value;
           const to = success
             ? computeTarget(from, event.translationY, topsSV.value, heightsSV.value)
             : from;
-          targetIndex.value = to;
+          targetIndex.set(to);
           const dest = settleOffset(from, to, topsSV.value, heightsSV.value);
-          dragX.value = withTiming(0, {
+          dragX.set(withTiming(0, {
             duration: SETTLE_MS,
             easing: Easing.out(Easing.cubic),
-          });
-          dragY.value = withTiming(
+          }));
+          dragY.set(withTiming(
             dest,
             { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) },
             () => {
               "worklet";
               runOnJS(commitDrag)(from, to);
             },
-          );
+          ));
         }),
       Gesture.LongPress()
         .minDuration(350)
@@ -433,8 +435,8 @@ function DragHandle({
         }),
     );
     // Shared values are stable. JS callbacks are read through the ref at call time.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, dragX, dragY, heightsSV, indexSV, settling, targetIndex, topsSV]);
+  /* eslint-enable react-hooks/refs */
 
   return (
     <GestureDetector gesture={gesture}>

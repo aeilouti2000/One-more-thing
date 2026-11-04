@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="1060" viewBox="0 0 1640 1060">
+  <defs>
+    <linearGradient id="fab" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#4aa3ff"/><stop offset="1" stop-color="#1f77d0"/></linearGradient>
+    <radialGradient id="spot" cx="0.5" cy="0.5" r="0.5"><stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.72"/></radialGradient>
+    <filter id="sh" x="-60%" y="-60%" width="220%" height="220%"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000" flood-opacity=".55"/></filter>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="6"/></filter>
+    <path id="pin" d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"/>
+    <path id="cart" d="M17,18C15.89,18 15,18.89 15,20A2,2 0 0,0 17,22A2,2 0 0,0 19,20C19,18.89 18.1,18 17,18M1,2V4H3L6.6,11.59L5.24,14.04C5.09,14.32 5,14.65 5,15A2,2 0 0,0 7,17H19V15H7.42A0.25,0.25 0 0,1 7.17,14.75C7.17,14.7 7.18,14.66 7.2,14.63L8.1,13H15.55C16.3,13 16.96,12.58 17.3,11.97L20.88,5.5C20.95,5.34 21,5.17 21,5A1,1 0 0,0 20,4H5.21L4.27,2M7,18C5.89,18 5,18.89 5,20A2,2 0 0,0 7,22A2,2 0 0,0 9,20C9,18.89 8.1,18 7,18Z"/>
+    <style>
+      text{font-family:system-ui,"Segoe UI",sans-serif}
+      .H{font-size:34px;font-weight:700;fill:#f3f7fb}
+      .T{font-size:17px;fill:#93a6b8}
+      .L{font-size:20px;font-weight:700;fill:#e8eef4}
+      .N{font-size:14px;fill:#9fb1c2}
+      .tab{font-size:10px;font-weight:600;fill:#8a9bab}
+      .row{font-size:13px;font-weight:600;fill:#dfe7ee}
+      .tag{font-size:12px;font-weight:700}
+    </style>
+
+    <!-- phone bottom crop: 340 x 470 -->
+    <g id="base">
+      <rect width="340" height="470" rx="28" fill="#0a0f15" stroke="#2a333d" stroke-width="2"/>
+      <rect x="18" y="22" width="304" height="48" rx="20" fill="#111820" stroke="#1d2731"/>
+      <rect x="32" y="40" width="14" height="2" fill="#6f8397"/><rect x="32" y="45" width="14" height="2" fill="#6f8397"/><rect x="32" y="50" width="14" height="2" fill="#6f8397"/>
+      <text x="58" y="51" class="row">Milk</text>
+      <circle cx="270" cy="46" r="11" fill="none" stroke="#33414f"/><text x="287" y="50" class="row" font-size="11">1</text><circle cx="306" cy="46" r="11" fill="#2e8ae6"/><path d="M306 41v10M301 46h10" stroke="#fff" stroke-width="1.8"/>
+      <rect x="18" y="78" width="304" height="48" rx="20" fill="#111820" stroke="#1d2731"/>
+      <rect x="32" y="96" width="14" height="2" fill="#6f8397"/><rect x="32" y="101" width="14" height="2" fill="#6f8397"/><rect x="32" y="106" width="14" height="2" fill="#6f8397"/>
+      <text x="58" y="107" class="row">Eggs</text>
+      <circle cx="270" cy="102" r="11" fill="none" stroke="#33414f"/><text x="287" y="106" class="row" font-size="11">1</text><circle cx="306" cy="102" r="11" fill="#2e8ae6"/><path d="M306 97v10M301 102h10" stroke="#fff" stroke-width="1.8"/>
+      <rect x="18" y="134" width="304" height="48" rx="20" fill="#111820" stroke="#1d2731"/>
+      <rect x="32" y="152" width="14" height="2" fill="#6f8397"/><rect x="32" y="157" width="14" height="2" fill="#6f8397"/><rect x="32" y="162" width="14" height="2" fill="#6f8397"/>
+      <text x="58" y="163" class="row">Tomatoes</text>
+      <circle cx="270" cy="158" r="11" fill="none" stroke="#33414f"/><text x="287" y="162" class="row" font-size="11">1</text><circle cx="306" cy="158" r="11" fill="#2e8ae6"/><path d="M306 153v10M301 158h10" stroke="#fff" stroke-width="1.8"/>
+      <!-- tab bar with center gap -->
+      <rect x="16" y="392" width="308" height="62" rx="31" fill="#121b25" stroke="#2c3946"/>
+      <rect x="24" y="398" width="60" height="50" rx="25" fill="#163250" stroke="#25507a"/>
+      <path d="M46 413h16M46 418h16M46 423h16" stroke="#4aa3ff" stroke-width="1.8" stroke-linecap="round"/>
+      <text x="54" y="440" class="tab" fill="#4aa3ff" text-anchor="middle">Items</text>
+      <circle cx="113" cy="418" r="7" fill="none" stroke="#8a9bab" stroke-width="1.5"/><path d="M113 414v4l3 2" stroke="#8a9bab" stroke-width="1.4" fill="none"/>
+      <text x="113" y="440" class="tab" text-anchor="middle">History</text>
+      <path d="M220 422v-6l7-6 7 6v6z" fill="none" stroke="#8a9bab" stroke-width="1.5" stroke-linejoin="round"/>
+      <text x="227" y="440" class="tab" text-anchor="middle">Home</text>
+      <circle cx="288" cy="418" r="6.5" fill="none" stroke="#8a9bab" stroke-width="1.5" stroke-dasharray="3 1.6"/><circle cx="288" cy="418" r="2.2" fill="none" stroke="#8a9bab" stroke-width="1.3"/>
+      <text x="288" y="440" class="tab" text-anchor="middle">Settings</text>
+    </g>
+
+    <g id="fabBtn">
+      <g filter="url(#sh)"><circle cx="170" cy="400" r="28" fill="url(#fab)"/></g>
+      <path d="M170 389v22M159 400h22" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="arrow">
+      <polyline points="162,360 170,352 178,360" fill="none" stroke="#e8eef4" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </defs>
+
+  <rect width="1640" height="1060" fill="#070b10"/>
+  <text x="60" y="66" class="H">Hinting what’s under the arrow</text>
+  <text x="60" y="98" class="T">Four ways to tell people Pinned and Shop live there. They combine well: A always on, B when there’s something to shop, C once.</text>
+
+  <!-- ============ A: Peek stack ============ -->
+  <text x="60" y="160" class="L">A · Peek stack</text>
+  <text x="60" y="184" class="N">Two tiny ghost icons sit behind the arrow,</text>
+  <text x="60" y="203" class="N">like cards tucked behind the +. Always visible.</text>
+  <g transform="translate(60 225)">
+    <use href="#base"/>
+    <!-- ghost peeks fanned behind arrow -->
+    <g opacity="0.95">
+      <g transform="rotate(-14 170 360)">
+        <rect x="134" y="331" width="30" height="30" rx="15" fill="#162230" stroke="#3b5a78"/>
+        <use href="#pin" transform="translate(141 338) scale(.68)" fill="#7fb6ea"/>
+      </g>
+      <g transform="rotate(14 170 360)">
+        <rect x="176" y="331" width="30" height="30" rx="15" fill="#162230" stroke="#3b5a78"/>
+        <use href="#cart" transform="translate(183 338) scale(.68)" fill="#7fb6ea"/>
+      </g>
+    </g>
+    <use href="#arrow" transform="translate(0 4)"/>
+    <use href="#fabBtn"/>
+  </g>
+  <text x="60" y="728" class="N" fill="#cfe0ee">+ Zero extra steps, reads instantly</text>
+  <text x="60" y="748" class="N">− Adds a little visual weight</text>
+
+  <!-- ============ B: Smart badge ============ -->
+  <text x="450" y="160" class="L">B · Smart cart badge</text>
+  <text x="450" y="184" class="N">When the list has items, a small cart + count</text>
+  <text x="450" y="203" class="N">rides on the arrow with a soft pulse ring.</text>
+  <g transform="translate(450 225)">
+    <use href="#base"/>
+    <circle cx="170" cy="352" r="22" fill="#4aa3ff" opacity="0.18" filter="url(#glow)"/>
+    <circle cx="170" cy="352" r="19" fill="none" stroke="#4aa3ff" stroke-opacity="0.45" stroke-width="1.5"/>
+    <rect x="146" y="337" width="48" height="26" rx="13" fill="#132233" stroke="#3b74a8"/>
+    <use href="#cart" transform="translate(152 342) scale(.66)" fill="#8fc6f5"/>
+    <text x="175" y="355" class="tag" fill="#e8eef4">3</text>
+    <polyline points="185,353 189,349 193,353" fill="none" stroke="#e8eef4" stroke-width="1.8" stroke-linecap="round"/>
+    <use href="#fabBtn"/>
+  </g>
+  <text x="450" y="728" class="N" fill="#cfe0ee">+ Useful info, nudges a shopping trip</text>
+  <text x="450" y="748" class="N">− Only hints Shop, not Pinned</text>
+
+  <!-- ============ C: First-run coach mark ============ -->
+  <text x="840" y="160" class="L">C · First-time swipe hint</text>
+  <text x="840" y="184" class="N">Shown once: the screen dims, a hand shows the</text>
+  <text x="840" y="203" class="N">swipe, and ghost pills preview what appears.</text>
+  <g transform="translate(840 225)">
+    <use href="#base"/>
+    <rect width="340" height="470" rx="28" fill="#000" opacity="0.62"/>
+    <circle cx="170" cy="380" r="80" fill="url(#spot)" opacity="0"/>
+    <!-- ghost pills -->
+    <g opacity="0.55">
+      <rect x="118" y="232" width="104" height="34" rx="17" fill="#16212d" stroke="#3b5a78" stroke-dasharray="4 3"/>
+      <use href="#cart" transform="translate(132 241) scale(.66)" fill="#8fc6f5"/><text x="154" y="254" class="tag" fill="#dfe7ee">Shop</text>
+      <rect x="112" y="274" width="116" height="34" rx="17" fill="#16212d" stroke="#3b5a78" stroke-dasharray="4 3"/>
+      <use href="#pin" transform="translate(126 283) scale(.66)" fill="#8fc6f5"/><text x="148" y="296" class="tag" fill="#dfe7ee">Pinned</text>
+    </g>
+    <!-- swipe path -->
+    <path d="M200 392 C 205 370, 205 345, 200 322" fill="none" stroke="#4aa3ff" stroke-width="2" stroke-dasharray="3 5" stroke-linecap="round"/>
+    <polyline points="194,330 200,320 206,330" fill="none" stroke="#4aa3ff" stroke-width="2" stroke-linecap="round"/>
+    <use href="#arrow"/>
+    <use href="#fabBtn"/>
+    <!-- hand -->
+    <g transform="translate(196 388)">
+      <path d="M8 0c3 0 5 2 5 5v14l2-3c2-3 6-2 6 1l-5 12c-2 5-6 8-12 8h-2c-6 0-10-5-10-11v-9c0-2 2-4 4-4s4 2 4 4V5c0-3 2-5 5-5z" fill="#f3f7fb" stroke="#0a0f15" stroke-width="1.5"/>
+    </g>
+    <!-- caption bubble -->
+    <rect x="60" y="174" width="220" height="44" rx="14" fill="#1f4f7a"/>
+    <text x="170" y="201" class="tag" fill="#fff" text-anchor="middle">Swipe up for Pinned &amp; Shop</text>
+    <path d="M164 218l6 7 6-7z" fill="#1f4f7a"/>
+  </g>
+  <text x="840" y="728" class="N" fill="#cfe0ee">+ Teaches the swipe explicitly</text>
+  <text x="840" y="748" class="N">− One-time only; easy to tap past</text>
+
+  <!-- ============ D: Idle peek animation ============ -->
+  <text x="1230" y="160" class="L">D · Idle "breathe" peek</text>
+  <text x="1230" y="184" class="N">After ~4s idle on first visits, the pills peek up</text>
+  <text x="1230" y="203" class="N">a few pixels, then tuck back. Max 3 times.</text>
+  <g transform="translate(1230 225)">
+    <use href="#base"/>
+    <!-- three frames side by side inside phone, zoomed crops -->
+    <g transform="translate(0 0)">
+      <rect x="10" y="196" width="320" height="180" rx="16" fill="#0d141c" stroke="#1d2731"/>
+      <!-- frame 1 rest -->
+      <g transform="translate(20 210)">
+        <text x="40" y="12" class="tag" fill="#6f8397" text-anchor="middle">rest</text>
+        <polyline points="32,104 40,96 48,104" fill="none" stroke="#e8eef4" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="40" cy="134" r="20" fill="url(#fab)"/><path d="M40 126v16M32 134h16" stroke="#fff" stroke-width="2.4"/>
+      </g>
+      <!-- frame 2 peek -->
+      <g transform="translate(120 210)">
+        <text x="40" y="12" class="tag" fill="#4aa3ff" text-anchor="middle">peek</text>
+        <rect x="18" y="40" width="44" height="18" rx="9" fill="#16212d" stroke="#3b74a8" opacity=".75"/>
+        <use href="#cart" transform="translate(33 43) scale(.5)" fill="#8fc6f5" opacity=".9"/>
+        <rect x="14" y="62" width="52" height="18" rx="9" fill="#16212d" stroke="#3b74a8"/>
+        <use href="#pin" transform="translate(34 65) scale(.5)" fill="#8fc6f5"/>
+        <polyline points="32,98 40,90 48,98" fill="none" stroke="#4aa3ff" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="40" cy="134" r="20" fill="url(#fab)"/><path d="M40 126v16M32 134h16" stroke="#fff" stroke-width="2.4"/>
+      </g>
+      <!-- frame 3 tuck -->
+      <g transform="translate(220 210)">
+        <text x="40" y="12" class="tag" fill="#6f8397" text-anchor="middle">tuck back</text>
+        <rect x="22" y="84" width="36" height="10" rx="5" fill="#16212d" stroke="#3b5a78" opacity=".35"/>
+        <polyline points="32,104 40,96 48,104" fill="none" stroke="#e8eef4" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="40" cy="134" r="20" fill="url(#fab)"/><path d="M40 126v16M32 134h16" stroke="#fff" stroke-width="2.4"/>
+      </g>
+      <path d="M92 344h20M212 344h20" stroke="#3b5a78" stroke-width="1.5"/>
+      <polyline points="106,340 112,344 106,348" fill="none" stroke="#3b5a78" stroke-width="1.5"/>
+      <polyline points="226,340 232,344 226,348" fill="none" stroke="#3b5a78" stroke-width="1.5"/>
+    </g>
+    <use href="#arrow"/>
+    <use href="#fabBtn"/>
+  </g>
+  <text x="1230" y="728" class="N" fill="#cfe0ee">+ Shows the real content, feels alive</text>
+  <text x="1230" y="748" class="N">− Motion can distract if overused</text>
+
+  <!-- recommendation -->
+  <rect x="60" y="800" width="1520" height="200" rx="22" fill="#0e1620" stroke="#22303c"/>
+  <text x="92" y="846" class="L">Recommended: A + B + C together</text>
+  <text x="92" y="882" class="N" font-size="16">• A (peek stack) is the always-on signal: tiny pin + cart ghosts fanned behind the arrow say “two things live here”.</text>
+  <text x="92" y="910" class="N" font-size="16">• B swaps the cart ghost for a live “cart · 3” chip whenever the list has items, so the most useful action carries real information.</text>
+  <text x="92" y="938" class="N" font-size="16">• C runs once (first Items visit after the update): dim + hand + “Swipe up for Pinned &amp; Shop”, dismissed on any tap and saved so it never repeats.</text>
+  <text x="92" y="966" class="N" font-size="16">• D is a lighter alternative to C if a coach mark feels too heavy: a few gentle peeks on the first visits, then it stops.</text>
+</svg>

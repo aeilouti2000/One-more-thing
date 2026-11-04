@@ -6,12 +6,16 @@ export type HouseholdMember = {
 
 export type HomeCurrency = "JOD" | "USD" | "EUR" | "ILS" | "SAR" | "AED" | "EGP" | "GBP";
 
+/** End-of-trip prompt: price each item, or enter one total for the trip. */
+export type TripCostMode = "items" | "total";
+
 export type CostSettings = {
   costsEnabled: boolean;
   currency: HomeCurrency | string;
   askCostOnSingleBuy: boolean;
   askCostOnBulkBuy: boolean;
   askCostOnTripEnd: boolean;
+  tripCostMode: TripCostMode;
 };
 
 export type Household = {
@@ -24,6 +28,7 @@ export type Household = {
   askCostOnSingleBuy: boolean;
   askCostOnBulkBuy: boolean;
   askCostOnTripEnd: boolean;
+  tripCostMode: TripCostMode;
 };
 
 export type HomeSummary = {
@@ -51,5 +56,6 @@ export function defaultCostSettings(): CostSettings {
     askCostOnSingleBuy: true,
     askCostOnBulkBuy: true,
     askCostOnTripEnd: true,
+    tripCostMode: "items",
   };
 }

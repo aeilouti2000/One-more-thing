@@ -19,23 +19,23 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { AppText } from "@/components/ui/AppText";
 import { scaleFontSize } from "@/constants/font";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
-import { radius, tabBar, withAlpha } from "@/constants/theme";
+import { withAlpha } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
+import type { TextInputHandle } from "@/lib/native-refs";
 
 type QuickAddBarProps = {
   value: string;
   onChangeText: (value: string) => void;
   onSubmit: () => void;
-  onOpenDetails: () => void;
   busy?: boolean;
   inputStyle?: StyleProp<TextStyle>;
   footer?: ReactNode;
 };
 
+const BAR_RADIUS = 999;
 const TYPE_MS = 55;
 const HOLD_MS = 1600;
 const DELETE_MS = 28;
@@ -45,7 +45,6 @@ export function QuickAddBar({
   value,
   onChangeText,
   onSubmit,
-  onOpenDetails,
   busy = false,
   inputStyle,
   footer,
@@ -53,7 +52,7 @@ export function QuickAddBar({
   const { colors, scheme } = useTheme();
   const { t, isRTL } = useI18n();
   const { scale } = useFontScale();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputHandle>(null);
   const [focused, setFocused] = useState(false);
   const showHint = !value && !focused && !busy;
 
@@ -75,17 +74,17 @@ export function QuickAddBar({
   useEffect(() => {
     if (!showHint) {
       cancelAnimation(caret);
-      caret.value = 1;
+      caret.set(1);
       return;
     }
-    caret.value = withRepeat(
+    caret.set(withRepeat(
       withSequence(
         withTiming(0, { duration: 420 }),
         withTiming(1, { duration: 420 }),
       ),
       -1,
       false,
-    );
+    ));
     return () => cancelAnimation(caret);
   }, [showHint, caret]);
 
@@ -98,18 +97,16 @@ export function QuickAddBar({
   }));
 
   const dark = scheme === "dark";
-  const chipBorder = withAlpha(dark ? colors.muted : colors.accent, 0.34);
-  const cardRadius = radius.md;
 
   function promptForName() {
     inputRef.current?.focus();
-    shakeX.value = withSequence(
+    shakeX.set(withSequence(
       withTiming(-6, { duration: 40 }),
       withTiming(6, { duration: 50 }),
       withTiming(-5, { duration: 45 }),
       withTiming(4, { duration: 45 }),
       withTiming(0, { duration: 40 }),
-    );
+    ));
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   }
 
@@ -124,19 +121,28 @@ export function QuickAddBar({
 
   return (
     <View className="mb-3">
+      {/* Pill + accent tint so it reads as the input, not another item card. */}
       <Animated.View
         className="overflow-hidden"
         style={[
           {
             backgroundColor: colors.paper,
-            borderWidth: tabBar.borderWidth,
-            borderColor: chipBorder,
-            borderRadius: cardRadius,
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.accent, focused ? 0.9 : dark ? 0.45 : 0.35),
+            borderRadius: BAR_RADIUS,
           },
           shakeStyle,
         ]}
       >
-        <View className="flex-row items-center gap-2 px-3 py-2.5">
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: withAlpha(colors.accent, focused ? 0.16 : dark ? 0.1 : 0.07) },
+          ]}
+        />
+        <View className="flex-row items-center gap-2 py-2 pe-2 ps-4">
+          <Ionicons name="cart-outline" size={20} color={colors.accent} />
           <View className="relative h-12 min-w-0 flex-1 justify-center px-1">
             {showHint ? (
               <View
@@ -187,69 +193,31 @@ export function QuickAddBar({
           </View>
 
           <Pressable
-            onPress={onOpenDetails}
-            accessibilityRole="button"
-            accessibilityLabel={t("addItemDetails")}
-            className="h-12 w-12 items-center justify-center active:opacity-70"
-          >
-            <View style={styles.detailsGlyph}>
-              <Ionicons name="list" size={18} color={colors.accent} />
-              <View
-                style={[
-                  styles.detailsBadge,
-                  { backgroundColor: colors.accent },
-                ]}
-              >
-                <Ionicons name="add" size={10} color={colors.onAccent} />
-              </View>
-            </View>
-          </Pressable>
-
-          <Pressable
             disabled={busy}
             onPress={handleAdd}
             accessibilityRole="button"
             accessibilityLabel={t("addItem")}
-            className={`h-12 flex-row items-center justify-center gap-0.5 ${
+            className={`h-11 w-11 items-center justify-center rounded-full ${
               busy ? "" : "active:opacity-80"
             }`}
             style={{
               backgroundColor: addEnabled
                 ? colors.accent
                 : withAlpha(colors.accent, dark ? 0.38 : 0.42),
-              borderRadius: cardRadius,
-              // Icon glyph has extra empty space on the start side; bias
-              // padding so left/right edges look even.
-              paddingStart: 8,
-              paddingEnd: 12,
             }}
           >
             {busy ? (
               <ActivityIndicator color={colors.onAccent} size="small" />
             ) : (
-              <>
-                <Ionicons
-                  name="add"
-                  size={22}
-                  color={
-                    addEnabled
-                      ? colors.onAccent
-                      : withAlpha(colors.onAccent, 0.72)
-                  }
-                  style={{ marginStart: -2 }}
-                />
-                <AppText
-                  numberOfLines={1}
-                  className="text-[15px] font-bold"
-                  style={{
-                    color: addEnabled
-                      ? colors.onAccent
-                      : withAlpha(colors.onAccent, 0.72),
-                  }}
-                >
-                  {t("quickAddAction")}
-                </AppText>
-              </>
+              <Ionicons
+                name="add"
+                size={24}
+                color={
+                  addEnabled
+                    ? colors.onAccent
+                    : withAlpha(colors.onAccent, 0.72)
+                }
+              />
             )}
           </Pressable>
         </View>
@@ -391,21 +359,5 @@ const styles = StyleSheet.create({
   input: {
     zIndex: 2,
     backgroundColor: "transparent",
-  },
-  detailsGlyph: {
-    width: 22,
-    height: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  detailsBadge: {
-    position: "absolute",
-    right: -5,
-    bottom: -4,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

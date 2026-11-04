@@ -10,6 +10,8 @@ import {
   View,
 } from "react-native";
 import Animated, {
+  ZoomIn,
+  ZoomOut,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -19,21 +21,21 @@ import { AppText } from "@/components/ui/AppText";
 import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { spacing, tabBar, withAlpha } from "@/constants/theme";
 import { useWideLayout } from "@/hooks/use-wide-layout";
+import { useTabBarCenter } from "@/components/ui/TabBarVisibility";
 import { useTheme } from "@/providers/ThemeProvider";
-
-type Slot = { x: number; width: number; content: number };
 
 const CONTENT_PAD = 16;
 const EDGE_GAP = 4;
 const MOVE_MS = 250;
 
-function pillFrame(slot: Slot | undefined, rowWidth: number, content: number) {
-  if (!slot || slot.width <= 0 || content <= 0 || rowWidth <= 0) return null;
-  const center = slot.x + slot.width / 2;
-  const room = Math.min(center - EDGE_GAP, rowWidth - EDGE_GAP - center);
-  const width = Math.min(content + CONTENT_PAD * 2, Math.max(0, room * 2));
-  return { left: center - width / 2, width };
-}
+/** Gap between the middle tabs reserved for the center button. */
+export const TAB_BAR_CENTER_GAP = 72;
+/**
+ * Touch room above the bar for the raised center button and its menu.
+ * Android ignores touches outside a parent's bounds, so the bar grows upward
+ * (box-none, so empty space still passes touches to the screen).
+ */
+export const TAB_BAR_CENTER_RISE = 240;
 
 export function GlassTabBar({
   state,
@@ -48,62 +50,42 @@ export function GlassTabBar({
   const { width: windowWidth } = useWindowDimensions();
   const wide = useWideLayout();
   const { colors, scheme, shadow } = useTheme();
+  const center = useTabBarCenter();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const pillLeft = useSharedValue(0);
-  const pillWidth = useSharedValue(0);
-  const measured = useRef<Slot[]>([]);
-  const rowW = useRef(0);
-  const indexRef = useRef(state.index);
-  const placed = useRef(false);
-  const animating = useRef(false);
+  const count = state.routes.length;
+  const gapAfter = Math.ceil(count / 2) - 1;
+  // Pill geometry is computed from these on the UI thread every frame, so it
+  // stays glued to its tab while the center gap opens or closes.
+  const rowWidth = useSharedValue(0);
+  const content = useSharedValue(0);
+  const rtl = useSharedValue(0);
+  const pos = useSharedValue(state.index);
+  const gap = useSharedValue(center ? TAB_BAR_CENTER_GAP : 0);
+  const contentWidths = useRef<number[]>([]);
+  const tabX = useRef<number[]>([]);
 
-  function widestContent() {
-    let max = 0;
-    for (const slot of measured.current) {
-      if (slot && slot.content > max) max = slot.content;
-    }
-    return max;
+  function saveContent(index: number, width: number) {
+    contentWidths.current[index] = width;
+    content.set(Math.max(0, ...contentWidths.current.filter(Boolean)));
   }
 
-  function goTo(index: number, animated: boolean) {
-    const frame = pillFrame(measured.current[index], rowW.current, widestContent());
-    if (!frame) return;
-    if (!placed.current || !animated) {
-      if (animating.current && !animated) return;
-      pillLeft.value = frame.left;
-      pillWidth.value = frame.width;
-      placed.current = true;
-      return;
-    }
-    animating.current = true;
-    pillLeft.value = withTiming(frame.left, { duration: MOVE_MS });
-    pillWidth.value = withTiming(frame.width, { duration: MOVE_MS });
-    setTimeout(() => {
-      animating.current = false;
-      goTo(indexRef.current, false);
-    }, MOVE_MS + 16);
+  function saveTabX(index: number, x: number) {
+    tabX.current[index] = x;
+    const first = tabX.current[0];
+    const last = tabX.current[count - 1];
+    if (first != null && last != null) rtl.set(first > last ? 1 : 0);
   }
 
-  const goToRef = useRef(goTo);
+  const hasCenter = center != null;
   useEffect(() => {
-    goToRef.current = goTo;
-  });
+    gap.set(withTiming(hasCenter ? TAB_BAR_CENTER_GAP : 0, { duration: MOVE_MS }));
+  }, [gap, hasCenter]);
 
-  function saveSlot(index: number, patch: Partial<Slot>) {
-    const prev = measured.current[index] ?? { x: 0, width: 0, content: 0 };
-    const nextSlot = { ...prev, ...patch };
-    if (
-      Math.abs(prev.x - nextSlot.x) < 0.5 &&
-      Math.abs(prev.width - nextSlot.width) < 0.5 &&
-      Math.abs(prev.content - nextSlot.content) < 0.5
-    ) {
-      return;
-    }
-    const next = measured.current.slice();
-    next[index] = nextSlot;
-    measured.current = next;
-    if (placed.current || index === indexRef.current) goTo(indexRef.current, false);
-  }
+  useEffect(() => {
+    pos.set(withTiming(state.index, { duration: MOVE_MS }));
+  }, [pos, state.index]);
+
+  const gapStyle = useAnimatedStyle(() => ({ width: gap.value }));
 
   useEffect(() => {
     const showEvent =
@@ -118,16 +100,23 @@ export function GlassTabBar({
     };
   }, []);
 
-  useEffect(() => {
-    indexRef.current = state.index;
-    goToRef.current(state.index, placed.current);
-  }, [state.index]);
-
-  const indicator = useAnimatedStyle(() => ({
-    opacity: pillWidth.value > 0 ? 1 : 0,
-    width: pillWidth.value,
-    left: pillLeft.value,
-  }));
+  const indicator = useAnimatedStyle(() => {
+    const width = rowWidth.value;
+    if (width <= 0 || content.value <= 0) return { opacity: 0 };
+    const tab = (width - gap.value) / count;
+    const centerOf = (i: number) =>
+      tab * (i + 0.5) + (i > gapAfter ? gap.value : 0);
+    const from = Math.floor(pos.value);
+    const to = Math.min(count - 1, Math.ceil(pos.value));
+    let middle = centerOf(from) + (centerOf(to) - centerOf(from)) * (pos.value - from);
+    if (rtl.value === 1) middle = width - middle;
+    const room = Math.min(middle - EDGE_GAP, width - EDGE_GAP - middle);
+    const pill = Math.max(
+      0,
+      Math.min(content.value + CONTENT_PAD * 2, tab, room * 2),
+    );
+    return { opacity: 1, width: pill, left: middle - pill / 2 };
+  });
 
   if (hidden || keyboardOpen) return null;
 
@@ -152,6 +141,7 @@ export function GlassTabBar({
       style={[
         styles.position,
         wide ? styles.positionWide : styles.positionPhone,
+        { paddingTop: TAB_BAR_CENTER_RISE },
         {
           bottom: Math.max(insets.bottom, spacing.md) + spacing.sm,
           shadowColor: shadow.color,
@@ -202,9 +192,7 @@ export function GlassTabBar({
           collapsable={false}
           onLayout={(event) => {
             const width = event.nativeEvent.layout.width;
-            if (width <= 0) return;
-            rowW.current = width;
-            goTo(indexRef.current, false);
+            if (width > 0) rowWidth.set(width);
           }}
           style={[StyleSheet.absoluteFill, styles.row]}
         >
@@ -217,7 +205,7 @@ export function GlassTabBar({
                 ? options.tabBarLabel
                 : (options.title ?? route.name);
 
-            return (
+            const tab = (
               <Pressable
                 key={route.key}
                 accessibilityRole="tab"
@@ -240,18 +228,15 @@ export function GlassTabBar({
                 }}
                 onLayout={(event) => {
                   const { x, width } = event.nativeEvent.layout;
-                  if (width <= 0) return;
-                  saveSlot(index, { x, width });
+                  if (width > 0) saveTabX(index, x);
                 }}
                 style={styles.tab}
-                android_ripple={null}
               >
                 <View
                   style={styles.label}
                   onLayout={(event) => {
                     const { width } = event.nativeEvent.layout;
-                    if (width <= 0) return;
-                    saveSlot(index, { content: width });
+                    if (width > 0) saveContent(index, width);
                   }}
                 >
                   {options.tabBarIcon?.({ focused, color, size: 22 })}
@@ -271,8 +256,25 @@ export function GlassTabBar({
                 </View>
               </Pressable>
             );
+            // Middle gap for the raised center button; animates open/closed.
+            if (index === gapAfter) {
+              return [tab, <Animated.View key="center-gap" style={gapStyle} />];
+            }
+            return tab;
           })}
         </View>
+      </View>
+      {/* Always mounted so the button's exit animation can play. */}
+      <View pointerEvents="box-none" style={styles.center}>
+        {center ? (
+          <Animated.View
+            pointerEvents="box-none"
+            entering={ZoomIn.duration(MOVE_MS)}
+            exiting={ZoomOut.duration(180)}
+          >
+            {center}
+          </Animated.View>
+        ) : null}
       </View>
     </View>
   );
@@ -286,6 +288,15 @@ const styles = StyleSheet.create({
   positionPhone: {
     left: spacing.xl,
     right: spacing.xl,
+  },
+  center: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "flex-end",
   },
   positionWide: {
     left: 0,

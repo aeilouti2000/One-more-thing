@@ -1,25 +1,9 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { Keyboard, Modal, Platform, Pressable, ScrollView, View } from "react-native";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import type { ReactNode } from "react";
+import { BottomSheet, useSheetScroll } from "@/components/ui/BottomSheet";
 
-type FormSheetContextValue = {
-  scrollToEnd: () => void;
-  scrollToStart: () => void;
-};
-
-const FormSheetContext = createContext<FormSheetContextValue | null>(null);
-
+/** Scroll helpers for the form inside the sheet. */
 export function useFormSheet() {
-  return useContext(FormSheetContext);
+  return useSheetScroll();
 }
 
 type FormSheetModalProps = {
@@ -31,102 +15,7 @@ type FormSheetModalProps = {
   children: ReactNode;
 };
 
-export function FormSheetModal({
-  visible,
-  onClose,
-  onShow,
-  covered = false,
-  children,
-}: FormSheetModalProps) {
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [trackedVisible, setTrackedVisible] = useState(visible);
-  const scrollRef = useRef<ScrollView>(null);
-
-  if (visible !== trackedVisible) {
-    setTrackedVisible(visible);
-    if (!visible) setKeyboardHeight(0);
-  }
-
-  useEffect(() => {
-    if (!visible) return;
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const show = Keyboard.addListener(showEvent, (event) => {
-      setKeyboardHeight(event.endCoordinates.height);
-    });
-    const hide = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, [visible]);
-
-  const scrollToEnd = useCallback(() => {
-    const run = () => scrollRef.current?.scrollToEnd({ animated: true });
-    requestAnimationFrame(run);
-    setTimeout(run, 150);
-  }, []);
-
-  const scrollToStart = useCallback(() => {
-    const run = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
-    requestAnimationFrame(run);
-    setTimeout(run, 150);
-  }, []);
-
-  const sheet = useMemo(
-    () => ({ scrollToEnd, scrollToStart }),
-    [scrollToEnd, scrollToStart],
-  );
-
-  function dismissKeyboardOrClose() {
-    if (Keyboard.isVisible() || keyboardHeight > 0) {
-      Keyboard.dismiss();
-      return;
-    }
-    onClose();
-  }
-
-  function closeFromOutside() {
-    Keyboard.dismiss();
-    onClose();
-  }
-
-  return (
-    <Modal
-      visible={visible && !covered}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onShow={onShow}
-      onRequestClose={dismissKeyboardOrClose}
-    >
-      <View className="flex-1" style={{ paddingBottom: keyboardHeight }}>
-        <BlurBackdrop onPress={closeFromOutside} />
-        <FormSheetContext.Provider value={sheet}>
-          <ScrollView
-            ref={scrollRef}
-            style={{ flex: 1 }}
-            contentContainerStyle={{ flexGrow: 1 }}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
-          >
-            <Pressable
-              style={{
-                flexGrow: 1,
-                justifyContent: "center",
-                paddingHorizontal: 20,
-                paddingVertical: 24,
-              }}
-              onPress={closeFromOutside}
-            >
-              <Pressable onPress={() => undefined}>{children}</Pressable>
-            </Pressable>
-          </ScrollView>
-        </FormSheetContext.Provider>
-      </View>
-    </Modal>
-  );
+/** Form presented as a bottom sheet (attached to the bottom edge, drag to close). */
+export function FormSheetModal(props: FormSheetModalProps) {
+  return <BottomSheet {...props} />;
 }

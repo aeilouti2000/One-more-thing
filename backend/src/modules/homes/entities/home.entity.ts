@@ -7,6 +7,9 @@ import {
 } from "typeorm";
 import { HomeMember } from "./home-member.entity";
 
+export const TRIP_COST_MODES = ["items", "total"] as const;
+export type TripCostMode = (typeof TRIP_COST_MODES)[number];
+
 @Entity("homes")
 export class Home {
   @PrimaryGeneratedColumn("uuid")
@@ -32,6 +35,10 @@ export class Home {
 
   @Column({ name: "ask_cost_on_trip_end", type: "boolean", default: true })
   askCostOnTripEnd: boolean;
+
+  /** End-of-trip prompt: price each item, or enter one total for the trip. */
+  @Column({ name: "trip_cost_mode", type: "varchar", length: 8, default: "items" })
+  tripCostMode: TripCostMode;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;

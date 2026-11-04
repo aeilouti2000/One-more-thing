@@ -115,4 +115,8 @@ export class Item {
     transformer: nullableMoneyTransformer,
   })
   cost: number | null;
+
+  /** Set when this item's trip was priced as one total (see TripReceipt). */
+  @Column({ name: "receipt_id", type: "uuid", nullable: true })
+  receiptId: string | null;
 }

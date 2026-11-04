@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import type { NavigationProp, ParamListBase } from "@react-navigation/native";
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppState, BackHandler, Platform, Pressable, View, type LayoutChangeEvent } from "react-native";
@@ -49,6 +50,14 @@ const LEAVE_DELAY = 140;
 const LEAVE_MS = 380;
 const TRIP_REFRESH_MS = 5000;
 
+/**
+ * Pause after the last check before closing the trip / opening costs — long
+ * enough to tap Undo on the last item (undoing cancels the auto-finish).
+ */
+const AUTO_FINISH_DELAY_MS = 2500;
+/** Row id for the single "Total paid" field in trip-total mode. */
+const TRIP_TOTAL_ROW_ID = "trip-total";
+
 export default function TripScreen() {
   return (
     <RequireSession requireHome>
@@ -58,14 +67,24 @@ export default function TripScreen() {
 }
 
 function TripBody() {
-  const { needed, bought, isLoading, error, refresh, markBought, undoBought, updateCosts } =
+  const {
+    needed,
+    bought,
+    isLoading,
+    error,
+    refresh,
+    markBought,
+    undoBought,
+    updateCosts,
+    saveTripTotal,
+  } =
     usePurchases();
   const { household } = useHousehold();
   const { t, locale } = useI18n();
   const { categories } = useCategories();
   const { colors, scheme } = useTheme();
   const headerAction = headerActionStyle(scheme, colors);
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const params = useLocalSearchParams<{ listId?: string; listName?: string; category?: string }>();
   const listId = typeof params.listId === "string" && params.listId.length > 0 ? params.listId : null;
   const category =
@@ -149,10 +168,21 @@ function TripBody() {
 
   const tripCostItems = frozenTripCostItems ?? liveTripCostItems;
 
+  // "total" mode: one receipt total for the trip instead of per-item prices.
+  const tripTotalMode = household?.tripCostMode === "total";
+  const [frozenTotalIds, setFrozenTotalIds] = useState<string[] | null>(null);
+  const tripTotalItems = useMemo(
+    () => [{ id: TRIP_TOTAL_ROW_ID, name: t("tripTotalLabel") }],
+    [t],
+  );
+
+  // Two separate settings: "Trip total only" asks for one total on its own;
+  // "Ask prices at end of trip" asks per item.
   const askTripCosts =
     household?.costsEnabled === true &&
-    household.askCostOnTripEnd !== false &&
-    unpricedSessionIds.length > 0;
+    (tripTotalMode
+      ? sessionBoughtIds.length > 0
+      : household.askCostOnTripEnd !== false && unpricedSessionIds.length > 0);
 
   useEffect(() => {
     tripCostOpenRef.current = tripCostOpen;
@@ -339,6 +369,7 @@ function TripBody() {
     if (inflightChecks.current > 0) return;
     if (askTripCosts) {
       setFrozenTripCostItems(liveTripCostItems);
+      setFrozenTotalIds(sessionBoughtIds);
       setTripCostOpen(true);
       return;
     }
@@ -390,6 +421,30 @@ function TripBody() {
     return unsub;
   }, [navigation]);
 
+  // Last item checked: finish the trip automatically. leaveTrip() opens the
+  // trip-costs sheet when costs are enabled, otherwise goes back to Items.
+  // Only after this session checked something (opening an empty trip, or a
+  // partner clearing it before you shop, doesn't bounce you out).
+  const autoFinishedRef = useRef(false);
+  const tripCleared =
+    !isLoading && tripItems.length === 0 && sessionBoughtIds.length > 0;
+  useEffect(() => {
+    if (!tripCleared || autoFinishedRef.current) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const attempt = () => {
+      // Wait out a check still animating / saving, or a cost prompt.
+      if (inflightChecks.current > 0 || singleCostResolver.current) {
+        timer = setTimeout(attempt, 250);
+        return;
+      }
+      autoFinishedRef.current = true;
+      leaveTripRef.current();
+    };
+    // Short beat so the final check registers before the page changes.
+    timer = setTimeout(attempt, AUTO_FINISH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [tripCleared]);
+
   async function saveTripCosts(entries: { id: string; cost: number | null }[]) {
     setIsSavingCosts(true);
     setActionError(null);
@@ -403,6 +458,31 @@ function TripBody() {
     setIsSavingCosts(false);
     setTripCostOpen(false);
     setFrozenTripCostItems(null);
+    setReceiptScan(null);
+    exitTrip();
+  }
+
+  async function saveTripTotalAndExit(total: number | null) {
+    const itemIds = frozenTotalIds ?? sessionBoughtIds;
+    if (total === null || itemIds.length === 0) {
+      closeTripCosts();
+      return;
+    }
+    setIsSavingCosts(true);
+    setActionError(null);
+    const result = await saveTripTotal({ total, itemIds, listId: listId || null });
+    setIsSavingCosts(false);
+    if (result.error) {
+      setActionError(result.error);
+      return;
+    }
+    closeTripCosts();
+  }
+
+  function closeTripCosts() {
+    setTripCostOpen(false);
+    setFrozenTripCostItems(null);
+    setFrozenTotalIds(null);
     setReceiptScan(null);
     exitTrip();
   }
@@ -534,30 +614,33 @@ function TripBody() {
 
       <CostEntrySheet
         visible={tripCostOpen}
-        title={t("tripCostsTitle")}
-        subtitle={t("tripCostsSubtitle")}
+        title={tripTotalMode ? t("tripTotalTitle") : t("tripCostsTitle")}
+        subtitle={
+          tripTotalMode
+            ? `${t("tripTotalSubtitle")}\n${t("tripTotalItems", {
+                count: (frozenTotalIds ?? sessionBoughtIds).length,
+              })}`
+            : t("tripCostsSubtitle")
+        }
         currency={household?.currency ?? "JOD"}
-        items={tripCostItems}
+        items={tripTotalMode ? tripTotalItems : tripCostItems}
         loading={isSavingCosts}
         scanning={scanning}
         covered={receiptCover || scanning}
-        onScan={Platform.OS === "web" ? undefined : chooseReceiptPhoto}
-        receipt={receiptScan}
+        // Receipt scan matches lines to items — not useful for a single total.
+        onScan={Platform.OS === "web" || tripTotalMode ? undefined : chooseReceiptPhoto}
+        receipt={tripTotalMode ? null : receiptScan}
         errorMessage={actionError}
         skipLabel={t("skipCostsForNow")}
-        onConfirm={(entries) => void saveTripCosts(entries)}
-        onSkip={() => {
-          setTripCostOpen(false);
-          setFrozenTripCostItems(null);
-          setReceiptScan(null);
-          exitTrip();
-        }}
+        onConfirm={(entries) =>
+          void (tripTotalMode
+            ? saveTripTotalAndExit(entries[0]?.cost ?? null)
+            : saveTripCosts(entries))
+        }
+        onSkip={closeTripCosts}
         onClose={() => {
           if (isSavingCosts || scanning) return;
-          setTripCostOpen(false);
-          setFrozenTripCostItems(null);
-          setReceiptScan(null);
-          exitTrip();
+          closeTripCosts();
         }}
       />
 

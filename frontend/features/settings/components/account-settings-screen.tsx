@@ -30,13 +30,11 @@ import { useTheme } from "@/providers/ThemeProvider";
 export default function AccountSettingsScreen() {
   const { user, signOut, changePassword, updateProfile, deleteAccount } = useAuth();
   const { refresh: refreshHome } = useHousehold();
-  const { colors, scheme } = useTheme();
+  const { colors } = useTheme();
   const { t, isRTL } = useI18n();
   const showBack = useSettingsShowBack();
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
-  const logOutBg = scheme === "dark" ? "#3F1D1D" : "#FEE2E2";
-  const logOutFg = scheme === "dark" ? "#F07178" : "#C2414A";
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
@@ -189,26 +187,6 @@ export default function AccountSettingsScreen() {
         subtitle={displayName}
         showBack={showBack}
         splitJoin={splitJoin}
-        right={
-          <Pressable
-            onPress={() => {
-              setSignOutError(null);
-              setIsConfirmingSignOut(true);
-            }}
-            disabled={isSigningOut}
-            accessibilityRole="button"
-            accessibilityLabel={t("logOut")}
-            className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
-            style={{ backgroundColor: logOutBg, opacity: isSigningOut ? 0.5 : 1 }}
-          >
-            <Ionicons
-              name="log-out-outline"
-              size={iconSize.sm}
-              color={logOutFg}
-              style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
-            />
-          </Pressable>
-        }
       />
 
       <SettingsSection>
@@ -404,6 +382,42 @@ export default function AccountSettingsScreen() {
             </View>
           ) : null}
         </CardBlock>
+
+        {/* Log out: a normal, neutral action — kept apart from Delete account. */}
+        <Pressable
+          onPress={() => {
+            setSignOutError(null);
+            setIsConfirmingSignOut(true);
+          }}
+          disabled={isSigningOut}
+          accessibilityRole="button"
+          accessibilityLabel={t("logOut")}
+          className="flex-row items-center gap-3 overflow-hidden rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
+          style={{ opacity: isSigningOut ? 0.5 : 1 }}
+        >
+          <View
+            className="h-11 w-11 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: colors.mist }}
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={22}
+              color={colors.accent}
+              style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
+            />
+          </View>
+          <View className="min-w-0 flex-1">
+            <AppText className="text-base font-semibold text-cove-ink">{t("logOut")}</AppText>
+            <AppText className="mt-0.5 text-sm text-cove-muted" numberOfLines={1}>
+              {t("signedInAs", { name: user?.email ?? displayName })}
+            </AppText>
+          </View>
+          <Ionicons
+            name={isRTL ? "chevron-back" : "chevron-forward"}
+            size={iconSize.sm}
+            color={colors.ink}
+          />
+        </Pressable>
 
         <CardBlock>
           <AppButton

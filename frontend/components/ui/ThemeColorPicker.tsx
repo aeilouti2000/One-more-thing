@@ -8,19 +8,18 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
-import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { FormSheetModal } from "@/components/ui/FormSheetModal";
 import { SurfaceDepthBar } from "@/components/ui/SurfaceDepthBar";
 import {
   DEFAULT_ACCENT,
   DEFAULT_SURFACE_DEPTH,
-  floatedCardStyle,
   getColors,
   hexToHsl,
   withAlpha,
 } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import type { ViewHandle } from "@/lib/native-refs";
 
 type Hsv = { h: number; s: number; v: number };
 
@@ -87,8 +86,8 @@ export function ThemeColorPicker() {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Hsv>(() => hexToHsv(accent));
   const [draftAccent, setDraftAccent] = useState(accent);
-  const panelRef = useRef<View>(null);
-  const hueRef = useRef<View>(null);
+  const panelRef = useRef<ViewHandle>(null);
+  const hueRef = useRef<ViewHandle>(null);
   const panelSize = useRef({ width: 1, height: PANEL_HEIGHT, x: 0, y: 0 });
   const hueSize = useRef({ width: 1, x: 0 });
 
@@ -248,11 +247,7 @@ export function ThemeColorPicker() {
       ) : null}
 
       <FormSheetModal visible={open} onClose={closePicker}>
-        <View
-          className="overflow-hidden px-4 py-4"
-          style={floatedCardStyle(scheme, draftPalette)}
-        >
-          <GlassFill soft neutral />
+        <View className="py-1">
           <View className="mb-4 flex-row items-center gap-3">
             <View
               style={{

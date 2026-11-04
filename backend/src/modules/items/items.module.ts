@@ -11,6 +11,7 @@ import { Item } from "./entities/item.entity";
 import { ListShopLock } from "./entities/list-shop-lock.entity";
 import { Pin } from "./entities/pin.entity";
 import { ShoppingList } from "./entities/shopping-list.entity";
+import { TripReceipt } from "./entities/trip-receipt.entity";
 import { CATEGORIES_REPOSITORY } from "./repo/categories-repo/categories.repository";
 import { TypeormCategoriesRepository } from "./repo/categories-repo/typeorm-categories.repository";
 import { ITEMS_REPOSITORY } from "./repo/items-repo/items.repository";
@@ -35,6 +36,7 @@ import { ShopLocksService } from "./services/shop-locks.service";
       User,
       CustomCategory,
       HiddenCategory,
+      TripReceipt,
     ]),
     HomesModule,
     NotificationsModule,

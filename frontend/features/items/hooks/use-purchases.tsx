@@ -20,6 +20,7 @@ import {
   setItemsUrgent,
   undoItemBought,
   updateItemCost,
+  createTripReceipt,
   updateItemDetails,
   type BoughtCostEntry,
   type NewItemInput,
@@ -58,6 +59,12 @@ type UsePurchasesResult = {
   updateCosts: (
     entries: { id: string; cost: number | null }[],
   ) => Promise<{ error: string | null }>;
+  /** Trip-total mode: one amount for the trip's items (an "invoice"). */
+  saveTripTotal: (input: {
+    total: number;
+    itemIds: string[];
+    listId?: string | null;
+  }) => Promise<{ error: string | null }>;
   markBought: (
     id: string,
     cost?: number | null,
@@ -309,6 +316,10 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
                 category: values.category,
                 urgent: values.urgent === true,
                 notes: values.notes ?? item.notes,
+                unit:
+                  typeof values.unit === "string"
+                    ? values.unit.trim() || undefined
+                    : item.unit,
               }
             : item,
         ),
@@ -348,6 +359,35 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       return result;
     },
     [noteLocalChange, refresh, rememberItems, user],
+  );
+
+  const saveTripTotal = useCallback(
+    async (input: { total: number; itemIds: string[]; listId?: string | null }) => {
+      const currentHomeId = homeIdRef.current;
+      if (!user || !currentHomeId) return { error: translate("errorNeedLogin") };
+      const endLocalChange = noteLocalChange();
+      let result: Awaited<ReturnType<typeof createTripReceipt>>;
+      try {
+        result = await createTripReceipt(currentHomeId, input);
+      } finally {
+        endLocalChange();
+      }
+      if (result.error || !result.receipt) {
+        return { error: result.error ?? translate("errorGeneric") };
+      }
+      const receipt = result.receipt;
+      const ids = new Set(input.itemIds);
+      setPurchases((current) =>
+        current.map((item) =>
+          ids.has(item.id)
+            ? { ...item, receiptId: receipt.id, receiptTotal: Number(receipt.total) }
+            : item,
+        ),
+      );
+      rememberItems(purchasesRef.current);
+      return { error: null };
+    },
+    [noteLocalChange, rememberItems, user],
   );
 
   const updateCosts = useCallback(
@@ -584,6 +624,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       updateItem,
       updateCost,
       updateCosts,
+      saveTripTotal,
       markBought,
       undoBought,
       markManyBought,
@@ -605,6 +646,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       updateItem,
       updateCost,
       updateCosts,
+      saveTripTotal,
       markBought,
       undoBought,
       markManyBought,

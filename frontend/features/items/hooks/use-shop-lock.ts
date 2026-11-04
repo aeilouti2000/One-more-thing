@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import {
   fetchShopLock,
@@ -16,36 +16,36 @@ export function useShopLock(options: {
   enabled: boolean;
 }) {
   const { homeId, listId, enabled } = options;
-  const [lock, setLock] = useState<ShopLock | null>(null);
+  // Remember which list a lock belongs to, so switching lists never shows the
+  // previous list's lock while the new one loads.
+  const [stored, setStored] = useState<{ key: string; lock: ShopLock } | null>(null);
   const homeIdRef = useRef(homeId);
   const listIdRef = useRef(listId);
-  homeIdRef.current = homeId;
-  listIdRef.current = listId;
+  useLayoutEffect(() => {
+    homeIdRef.current = homeId;
+    listIdRef.current = listId;
+  });
+  const currentKey = enabled && homeId && listId ? `${homeId}:${listId}` : null;
+  const lock = currentKey && stored?.key === currentKey ? stored.lock : null;
 
   const refresh = useCallback(async () => {
     const home = homeIdRef.current;
     const list = listIdRef.current;
-    if (!home || !list) {
-      setLock(null);
-      return null;
-    }
+    if (!home || !list) return null;
     const result = await fetchShopLock(home, list);
     if (homeIdRef.current !== home || listIdRef.current !== list) return null;
-    if (result.lock) setLock(result.lock);
+    if (result.lock) setStored({ key: `${home}:${list}`, lock: result.lock });
     return result.lock;
   }, []);
 
   useEffect(() => {
-    if (!enabled || !homeId || !listId) {
-      setLock(null);
-      return;
-    }
+    if (!enabled || !homeId || !listId) return;
 
     let cancelled = false;
     void (async () => {
       const result = await fetchShopLock(homeId, listId);
       if (cancelled) return;
-      if (result.lock) setLock(result.lock);
+      if (result.lock) setStored({ key: `${homeId}:${listId}`, lock: result.lock });
     })();
 
     const timer = setInterval(() => {

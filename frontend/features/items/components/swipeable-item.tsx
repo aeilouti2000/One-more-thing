@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
@@ -14,6 +14,7 @@ import { AppText } from "@/components/ui/AppText";
 import { useScreenSwipeGesture } from "@/components/ui/Screen";
 import { useI18n } from "@/providers/LanguageProvider";
 import { SWIPE_ACTION_TONE, type SwipeAction } from "@/features/items/utils/swipe-actions";
+import { CARD_RADIUS } from "@/features/items/components/purchase-row";
 
 const REVEAL_RATIO = 0.36;
 const COMMIT_RATIO = 0.5;
@@ -45,12 +46,16 @@ export function SwipeableItem({
   const resting = useSharedValue(0);
   const dragging = useSharedValue(false);
   const callbacks = useRef({ onReveal, onAction, leftAction, rightAction });
-  callbacks.current = { onReveal, onAction, leftAction, rightAction };
+  useLayoutEffect(() => {
+    callbacks.current = { onReveal, onAction, leftAction, rightAction };
+  });
 
   useEffect(() => {
     if (revealed || dragging.value) return;
-    resting.value = 0;
-    travel.value = withTiming(0, { duration: 180 });
+    resting.set(0);
+    travel.set(withTiming(0, { duration: 180 }));
+    // Depends on a UI-thread value (dragging), so it can't be derived in render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSettled(null);
   }, [dragging, revealed, resting, travel]);
 
@@ -73,8 +78,8 @@ export function SwipeableItem({
     const side = resting.value < 0 ? "left" : resting.value > 0 ? "right" : null;
     if (!side) return;
     const direction = side === "left" ? -1 : 1;
-    resting.value = 0;
-    travel.value = withTiming(0, { duration: 180 });
+    resting.set(0);
+    travel.set(withTiming(0, { duration: 180 }));
     fireAction(direction);
   }
 
@@ -87,18 +92,18 @@ export function SwipeableItem({
     // A swipe on the card belongs to the item action, not the list pager.
     block: enabled ? (screenSwipe ?? undefined) : undefined,
     onActivate: () => {
-      dragging.value = true;
+      dragging.set(true);
     },
     onUpdate: (event) => {
       const width = Math.max(widthSV.value, 1);
       const next = resting.value * width + event.translationX;
-      travel.value = Math.max(-width, Math.min(width, next));
+      travel.set(Math.max(-width, Math.min(width, next)));
     },
     onDeactivate: (event) => {
-      dragging.value = false;
+      dragging.set(false);
       if (event.canceled) {
         const width = Math.max(widthSV.value, 1);
-        travel.value = withTiming(resting.value * width, { duration: 180 });
+        travel.set(withTiming(resting.value * width, { duration: 180 }));
         return;
       }
       const width = Math.max(widthSV.value, 1);
@@ -106,17 +111,17 @@ export function SwipeableItem({
       const ratio = projected / width;
       if (ratio <= -COMMIT_RATIO || ratio >= COMMIT_RATIO) {
         const direction = ratio < 0 ? -1 : 1;
-        resting.value = 0;
-        travel.value = withTiming(0, { duration: 180 }, () => {
+        resting.set(0);
+        travel.set(withTiming(0, { duration: 180 }, () => {
           runOnJS(commit)(direction);
-        });
+        }));
         return;
       }
       const direction = ratio <= -REVEAL_RATIO ? -1 : ratio >= REVEAL_RATIO ? 1 : 0;
-      resting.value = direction;
-      travel.value = withTiming(direction * width, { duration: 180 }, () => {
+      resting.set(direction);
+      travel.set(withTiming(direction * width, { duration: 180 }, () => {
         runOnJS(report)(direction);
-      });
+      }));
     },
   });
 
@@ -142,16 +147,16 @@ export function SwipeableItem({
     <GestureDetector gesture={gesture}>
       <Animated.View
         onLayout={(event) => {
-          widthSV.value = event.nativeEvent.layout.width;
+          widthSV.set(event.nativeEvent.layout.width);
         }}
-        style={{ borderRadius: 16 }}
+        style={{ borderRadius: CARD_RADIUS }}
       >
         <View pointerEvents={openAction ? "none" : "auto"}>{children}</View>
         <Animated.View
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: leftBg, borderRadius: 16, overflow: "hidden" },
+            { backgroundColor: leftBg, borderRadius: CARD_RADIUS, overflow: "hidden" },
             leftStyle,
           ]}
         >
@@ -161,7 +166,7 @@ export function SwipeableItem({
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: rightBg, borderRadius: 16, overflow: "hidden" },
+            { backgroundColor: rightBg, borderRadius: CARD_RADIUS, overflow: "hidden" },
             rightStyle,
           ]}
         >

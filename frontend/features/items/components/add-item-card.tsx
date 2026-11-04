@@ -1,21 +1,18 @@
-import { useEffect, useState } from "react";
-import { ScrollView, View } from "react-native";
-import { CategoryField } from "@/features/items/components/category-field";
-import { UrgentToggle } from "@/features/items/components/urgent-toggle";
-import { AppButton } from "@/components/ui/AppButton";
-import { AppTextField } from "@/components/ui/AppTextField";
+import { useMemo, useState } from "react";
+import { ScrollView } from "react-native";
+import { FloatedCard } from "@/components/ui/FloatedCard";
+import { FormSheetModal } from "@/components/ui/FormSheetModal";
 import {
-  FloatedCard,
-  FloatedCardActions,
-  FloatedCardHeader,
-  FloatedCardSection,
-} from "@/components/ui/FloatedCard";
-import { FormMessage } from "@/components/ui/FormMessage";
-import { FormSheetModal, useFormSheet } from "@/components/ui/FormSheetModal";
+  ItemSheetForm,
+  useAmountLabel,
+  type RecentPick,
+} from "@/features/items/components/item-sheet-form";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
+
+const RECENT_LIMIT = 6;
 
 type AddItemCardProps = {
   visible: boolean;
@@ -36,10 +33,12 @@ export function AddItemCard({
   onSaved,
   presentation = "sheet",
 }: AddItemCardProps) {
-  const { addItem } = usePurchases();
+  const { addItem, bought, needed } = usePurchases();
   const { t } = useI18n();
+  const amountLabel = useAmountLabel();
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
+  const [unit, setUnit] = useState("");
   const [notes, setNotes] = useState("");
   const [category, setCategory] = useState<PurchaseCategory>(initialCategory);
   const [urgent, setUrgent] = useState(false);
@@ -50,6 +49,7 @@ export function AddItemCard({
   function reset(nextCategory: PurchaseCategory, nextName = "") {
     setName(nextName);
     setQuantity("1");
+    setUnit("");
     setNotes("");
     setCategory(nextCategory);
     setUrgent(false);
@@ -83,6 +83,7 @@ export function AddItemCard({
       quantity: parsedQuantity,
       category,
       notes,
+      unit: unit || undefined,
       urgent,
       listId,
     });
@@ -96,34 +97,74 @@ export function AddItemCard({
     onClose();
   }
 
-  useEffect(() => {
-    if (presentation !== "pane" || !visible) return;
-    reset(initialCategory, initialName.trim());
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- open sync
-  }, [presentation, visible, initialCategory, initialName]);
+  // Fold pane: reset the form whenever it opens (or its prefill changes).
+  const paneKey =
+    presentation === "pane" && visible ? `${initialCategory}|${initialName.trim()}` : null;
+  const [syncedPaneKey, setSyncedPaneKey] = useState<string | null>(null);
+  if (paneKey !== syncedPaneKey) {
+    setSyncedPaneKey(paneKey);
+    if (paneKey !== null) reset(initialCategory, initialName.trim());
+  }
 
+  // Recent: newest bought first, unique names, not already on the list.
+  const recent = useMemo<RecentPick[]>(() => {
+    const onList = new Set(needed.map((item) => item.name.trim().toLowerCase()));
+    const seen = new Set<string>();
+    const picks: RecentPick[] = [];
+    const ordered = [...bought].sort((a, b) =>
+      (b.boughtAt ?? b.createdAt).localeCompare(a.boughtAt ?? a.createdAt),
+    );
+    for (const item of ordered) {
+      const key = item.name.trim().toLowerCase();
+      if (!key || seen.has(key) || onList.has(key)) continue;
+      seen.add(key);
+      picks.push({ name: item.name.trim(), category: item.category, unit: item.unit });
+      if (picks.length >= RECENT_LIMIT) break;
+    }
+    return picks;
+  }, [bought, needed]);
+
+  const trimmedName = name.trim();
   const form = (
-    <AddItemForm
-      name={name}
-      quantity={quantity}
-      notes={notes}
-      category={category}
-      urgent={urgent}
-      quantityError={quantityError}
-      error={error}
-      isSubmitting={isSubmitting}
-      listId={listId}
-      onChangeName={setName}
-      onChangeQuantity={(value) => {
-        setQuantity(value);
-        setQuantityError(undefined);
-      }}
-      onChangeNotes={setNotes}
-      onChangeCategory={setCategory}
-      onChangeUrgent={setUrgent}
-      onSubmit={() => void onSubmit()}
-      onCancel={close}
-    />
+    <FloatedCard>
+      <ItemSheetForm
+        title={t("addItem")}
+        onClose={close}
+        name={name}
+        onChangeName={(value) => {
+          setName(value);
+          setError(null);
+        }}
+        autoFocusName={presentation === "sheet"}
+        recent={recent}
+        onPickRecent={(pick) => {
+          setName(pick.name);
+          setCategory(pick.category);
+          setUnit(pick.unit ?? "");
+          setError(null);
+        }}
+        quantity={quantity}
+        onChangeQuantity={(value) => {
+          setQuantity(value);
+          setQuantityError(undefined);
+        }}
+        quantityError={quantityError}
+        unit={unit}
+        onChangeUnit={setUnit}
+        urgent={urgent}
+        onChangeUrgent={setUrgent}
+        category={category}
+        onChangeCategory={setCategory}
+        notes={notes}
+        onChangeNotes={setNotes}
+        error={error}
+        submitLabel={t("addAmountName", { amount: amountLabel(quantity, unit), name: trimmedName })}
+        disabledLabel={t("typeNameToAdd")}
+        canSubmit={Boolean(trimmedName) && Boolean(listId)}
+        submitting={isSubmitting}
+        onSubmit={() => void onSubmit()}
+      />
+    </FloatedCard>
   );
 
   if (presentation === "pane") {
@@ -148,119 +189,5 @@ export function AddItemCard({
     >
       {form}
     </FormSheetModal>
-  );
-}
-
-function AddItemForm({
-  name,
-  quantity,
-  notes,
-  category,
-  urgent,
-  quantityError,
-  error,
-  isSubmitting,
-  listId,
-  onChangeName,
-  onChangeQuantity,
-  onChangeNotes,
-  onChangeCategory,
-  onChangeUrgent,
-  onSubmit,
-  onCancel,
-}: {
-  name: string;
-  quantity: string;
-  notes: string;
-  category: PurchaseCategory;
-  urgent: boolean;
-  quantityError?: string;
-  error: string | null;
-  isSubmitting: boolean;
-  listId: string | null;
-  onChangeName: (value: string) => void;
-  onChangeQuantity: (value: string) => void;
-  onChangeNotes: (value: string) => void;
-  onChangeCategory: (value: PurchaseCategory) => void;
-  onChangeUrgent: (value: boolean) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-}) {
-  const { t } = useI18n();
-  const formSheet = useFormSheet();
-
-  return (
-    <FloatedCard>
-      <FloatedCardHeader title={t("addItem")} subtitle={t("addItemSubtitle")} />
-
-      <View className="gap-4">
-        <FloatedCardSection title={t("formEssentials")}>
-          <View className="flex-row items-stretch gap-3">
-            <View className="min-w-0 flex-1">
-              <AppTextField
-                compact
-                glass
-                label={t("itemNameLabel")}
-                value={name}
-                onChangeText={onChangeName}
-                placeholder={t("itemNamePlaceholder")}
-                userText
-                onFocus={() => formSheet?.scrollToStart()}
-              />
-            </View>
-            <View className="w-20">
-              <AppTextField
-                compact
-                glass
-                label={t("quantity")}
-                value={quantity}
-                onChangeText={onChangeQuantity}
-                placeholder="1"
-                keyboardType="decimal-pad"
-                error={quantityError}
-                onFocus={() => formSheet?.scrollToStart()}
-              />
-            </View>
-          </View>
-          <CategoryField glass value={category} onChange={onChangeCategory} />
-        </FloatedCardSection>
-
-        <FloatedCardSection title={t("formExtra")} divided>
-          <UrgentToggle compact value={urgent} onValueChange={onChangeUrgent} />
-          <AppTextField
-            compact
-            glass
-            label={t("notes")}
-            value={notes}
-            onChangeText={onChangeNotes}
-            placeholder={t("notesPlaceholder")}
-            multiline
-            userText
-            onFocus={() => formSheet?.scrollToEnd()}
-          />
-        </FloatedCardSection>
-
-        <FormMessage message={error} />
-      </View>
-
-      <FloatedCardActions>
-        <AppButton
-          compact
-          label={t("cancel")}
-          variant="ghost"
-          disabled={isSubmitting}
-          onPress={onCancel}
-          style={{ flex: 1 }}
-        />
-        <AppButton
-          compact
-          label={t("saveItem")}
-          disabled={!name.trim() || !listId}
-          loading={isSubmitting}
-          onPress={onSubmit}
-          style={{ flex: 1 }}
-        />
-      </FloatedCardActions>
-    </FloatedCard>
   );
 }

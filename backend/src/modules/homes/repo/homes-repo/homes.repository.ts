@@ -1,5 +1,5 @@
 import type { User } from "../../../../users/user.entity";
-import type { Home } from "../../entities/home.entity";
+import type { Home, TripCostMode } from "../../entities/home.entity";
 import type { HomeMember, MemberRole } from "../../entities/home-member.entity";
 
 export type HouseholdMember = {
@@ -18,6 +18,7 @@ export type Household = {
   askCostOnSingleBuy: boolean;
   askCostOnBulkBuy: boolean;
   askCostOnTripEnd: boolean;
+  tripCostMode: TripCostMode;
   members: HouseholdMember[];
 };
 

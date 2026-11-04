@@ -94,6 +94,9 @@ export async function updatePin(
     category: PurchaseCategory;
     urgent: boolean;
     intervalDays: PinInterval;
+    quantity?: number;
+    /** Omit to keep; "" clears. */
+    unit?: string;
   },
 ) {
   try {
@@ -102,6 +105,8 @@ export async function updatePin(
       category: input.category,
       urgent: input.urgent,
       intervalDays: input.intervalDays,
+      ...(typeof input.quantity === "number" ? { quantity: input.quantity } : {}),
+      ...(typeof input.unit === "string" ? { unit: input.unit.trim() } : {}),
     });
     return { error: null };
   } catch (error) {

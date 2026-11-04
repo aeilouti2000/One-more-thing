@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
+import { useInSheet } from "@/components/ui/BottomSheet";
 import { floatedCardStyle, iconSize, withAlpha } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -25,6 +26,16 @@ export function FloatedCard({
   size = "md",
 }: FloatedCardProps) {
   const { colors, scheme } = useTheme();
+  const inSheet = useInSheet();
+
+  // Inside a bottom sheet the sheet is the surface: no card, border or shadow.
+  if (inSheet) {
+    return (
+      <View className={`w-full pb-1 pt-1 ${className}`.trim()} style={style}>
+        {children}
+      </View>
+    );
+  }
 
   return (
     <View

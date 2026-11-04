@@ -6,6 +6,7 @@ import {
   CreateCategoryDto,
   CreateItemDto,
   CreateListDto,
+  CreateTripReceiptDto,
   ItemIdsDto,
   MarkBoughtDto,
   MarkBoughtItemsDto,
@@ -154,6 +155,15 @@ export class ItemsController {
     @Body() body: UpdateItemCostDto,
   ) {
     return this.items.updateCost(user.id, itemId, body.cost);
+  }
+
+  @Post("homes/:homeId/receipts")
+  createReceipt(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Body() body: CreateTripReceiptDto,
+  ) {
+    return this.items.createReceipt(user.id, homeId, body);
   }
 
   @Post("items/:itemId/bought")

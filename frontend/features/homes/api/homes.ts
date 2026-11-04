@@ -20,6 +20,7 @@ function withCostDefaults(home: Household): Household {
     askCostOnSingleBuy: home.askCostOnSingleBuy !== false,
     askCostOnBulkBuy: home.askCostOnBulkBuy !== false,
     askCostOnTripEnd: home.askCostOnTripEnd !== false,
+    tripCostMode: home.tripCostMode === "total" ? "total" : "items",
   };
 }
 

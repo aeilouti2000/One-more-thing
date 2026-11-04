@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1120" viewBox="0 0 1560 1120">
+  <defs>
+    <linearGradient id="btn" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#3d9bf0"/><stop offset="1" stop-color="#2479cf"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.6"><stop offset="0" stop-color="#2e8ae6" stop-opacity="0.28"/><stop offset="1" stop-color="#2e8ae6" stop-opacity="0"/></radialGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity=".55"/></filter>
+    <style>
+      text{font-family:system-ui,"Segoe UI",sans-serif}
+      .H{font-size:34px;font-weight:700;fill:#f3f7fb}
+      .T{font-size:17px;fill:#93a6b8}
+      .L{font-size:21px;font-weight:700;fill:#e8eef4}
+      .N{font-size:14px;fill:#9fb1c2}
+      .app{font-size:15px;font-weight:700;fill:#e8eef4}
+      .hero{font-size:27px;font-weight:700;fill:#f3f7fb}
+      .sub{font-size:14.5px;fill:#9fb1c2}
+      .row{font-size:14px;font-weight:600;fill:#e6edf3}
+      .meta{font-size:11px;fill:#7f93a5}
+      .step{font-size:12px;font-weight:600;fill:#cfdbe6}
+      .btn{font-size:16px;font-weight:700;fill:#fff}
+      .btn2{font-size:16px;font-weight:600;fill:#e6edf3}
+      .foot{font-size:12px;fill:#6f8397}
+    </style>
+    <g id="logo">
+      <circle r="18" fill="#0f2742"/>
+      <rect x="-9" y="-9" width="5" height="5" rx="1" fill="#4aa3ff"/><rect x="-2" y="-8" width="11" height="2.6" rx="1.3" fill="#dfe7ee"/>
+      <rect x="-9" y="-1" width="5" height="5" rx="1" fill="#4aa3ff"/><rect x="-2" y="0" width="11" height="2.6" rx="1.3" fill="#dfe7ee"/>
+      <circle cx="-6.5" cy="9" r="3" fill="none" stroke="#e0a64a" stroke-width="1.6"/>
+    </g>
+    <g id="toolbar">
+      <circle cx="318" cy="56" r="17" fill="#141c25"/><circle cx="318" cy="56" r="5" fill="none" stroke="#cfdbe6" stroke-width="1.6"/>
+      <g stroke="#cfdbe6" stroke-width="1.5" stroke-linecap="round"><path d="M318 44v3M318 65v3M306 56h3M327 56h3"/></g>
+      <circle cx="360" cy="56" r="17" fill="#141c25"/><text x="360" y="61" font-size="13" font-weight="700" fill="#cfdbe6" text-anchor="middle">ع</text>
+    </g>
+  </defs>
+
+  <rect width="1560" height="1120" fill="#070b10"/>
+  <text x="60" y="64" class="H">Welcome screen — two directions</text>
+  <text x="60" y="96" class="T">Clear promise, a picture of the product, readable steps, and sign-up as the main action.</text>
+
+  <!-- ===================================================== A -->
+  <text x="60" y="150" class="L">A · Shared-list hero (recommended)</text>
+  <text x="60" y="172" class="N">One screen, no carousel. Shows the app instead of describing it.</text>
+  <g transform="translate(60 196)">
+    <rect width="400" height="860" rx="34" fill="#0a0f15" stroke="#2a333d" stroke-width="2"/>
+    <rect width="400" height="520" rx="34" fill="url(#glow)"/>
+    <!-- brand + toolbar -->
+    <g transform="translate(42 56)"><use href="#logo"/></g>
+    <text x="70" y="61" class="app">One More Thing</text>
+    <use href="#toolbar"/>
+
+    <!-- product card -->
+    <g filter="url(#sh)">
+      <rect x="40" y="110" width="320" height="236" rx="24" fill="#121a23" stroke="#24313d"/>
+    </g>
+    <text x="62" y="146" class="row" font-size="13" fill="#9fb1c2">Home list</text>
+    <!-- avatars -->
+    <circle cx="316" cy="141" r="13" fill="#2e8ae6"/><text x="316" y="146" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">A</text>
+    <circle cx="336" cy="141" r="13" fill="#e0a64a" stroke="#121a23" stroke-width="2"/><text x="336" y="146" font-size="12" font-weight="700" fill="#1a1205" text-anchor="middle">S</text>
+    <!-- rows -->
+    <rect x="56" y="162" width="288" height="50" rx="16" fill="#18222d"/>
+    <circle cx="80" cy="187" r="10" fill="#2e8ae6"/><path d="M75 187l3.5 3.5 6.5-7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <text x="100" y="185" class="row" fill="#7f93a5" text-decoration="line-through">Milk</text><text x="100" y="201" class="meta">bought by Sara · now</text>
+    <rect x="56" y="220" width="288" height="50" rx="16" fill="#18222d"/>
+    <circle cx="80" cy="245" r="10" fill="none" stroke="#4d6175" stroke-width="2"/>
+    <text x="100" y="243" class="row">Bread</text><text x="100" y="259" class="meta">added by you</text>
+    <rect x="56" y="278" width="288" height="50" rx="16" fill="#132a42" stroke="#2e8ae6" stroke-dasharray="5 4"/>
+    <circle cx="80" cy="303" r="10" fill="none" stroke="#e0a64a" stroke-width="2"/>
+    <text x="100" y="308" class="row" fill="#cfe4fa">One more thing…</text>
+    <rect x="216" y="294" width="2" height="18" fill="#4aa3ff"/>
+    <!-- sync badge -->
+    <rect x="248" y="96" width="112" height="28" rx="14" fill="#173a2a" stroke="#2f7a52"/>
+    <circle cx="264" cy="110" r="4" fill="#5fd08a"/><text x="276" y="115" font-size="11.5" font-weight="700" fill="#8fe0ad">Synced live</text>
+
+    <!-- promise -->
+    <text x="200" y="404" class="hero" text-anchor="middle">One list for your home</text>
+    <text x="200" y="432" class="sub" text-anchor="middle">Add it once — your partner sees it instantly,</text>
+    <text x="200" y="452" class="sub" text-anchor="middle">and you never buy the same thing twice.</text>
+
+    <!-- steps (static) -->
+    <g transform="translate(40 488)">
+      <rect width="320" height="86" rx="20" fill="#10171f" stroke="#1d2833"/>
+      <circle cx="54" cy="30" r="15" fill="#132a42"/><path d="M47 33v-5l7-6 7 6v5z" fill="none" stroke="#4aa3ff" stroke-width="1.7" stroke-linejoin="round"/>
+      <text x="54" y="68" class="step" text-anchor="middle">Start a home</text>
+      <path d="M92 30h20" stroke="#2e3e4e" stroke-width="2" stroke-dasharray="3 4"/>
+      <circle cx="160" cy="30" r="15" fill="#132a42"/><circle cx="155" cy="28" r="4" fill="none" stroke="#4aa3ff" stroke-width="1.7"/><circle cx="166" cy="28" r="4" fill="none" stroke="#4aa3ff" stroke-width="1.7"/><path d="M149 38c1-4 4-5 6-5s5 1 6 5M160 38c1-4 4-5 6-5s5 1 6 5" stroke="#4aa3ff" stroke-width="1.5" fill="none"/>
+      <text x="160" y="68" class="step" text-anchor="middle">Invite partner</text>
+      <path d="M198 30h20" stroke="#2e3e4e" stroke-width="2" stroke-dasharray="3 4"/>
+      <circle cx="266" cy="30" r="15" fill="#132a42"/><path d="M259 30l5 5 9-10" stroke="#4aa3ff" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <text x="266" y="68" class="step" text-anchor="middle">Shop together</text>
+    </g>
+
+    <!-- actions -->
+    <rect x="40" y="620" width="320" height="56" rx="18" fill="url(#btn)"/>
+    <text x="200" y="654" class="btn" text-anchor="middle">Create account</text>
+    <rect x="40" y="688" width="320" height="56" rx="18" fill="none" stroke="#33414f" stroke-width="1.5"/>
+    <text x="200" y="722" class="btn2" text-anchor="middle">I already have an account</text>
+    <text x="200" y="806" class="foot" text-anchor="middle">By continuing you agree to the Terms · Privacy</text>
+  </g>
+
+  <!-- ===================================================== B -->
+  <text x="560" y="150" class="L">B · Three-slide intro</text>
+  <text x="560" y="172" class="N">Swipe through: Add · Share · Shop. Buttons stay fixed at the bottom.</text>
+
+  <!-- slide 1 -->
+  <g transform="translate(560 196)">
+    <rect width="300" height="860" rx="30" fill="#0a0f15" stroke="#2a333d" stroke-width="2"/>
+    <rect width="300" height="460" rx="30" fill="url(#glow)"/>
+    <g transform="translate(30 52)"><use href="#logo" transform="scale(.8)"/></g>
+    <text x="270" y="57" class="foot" text-anchor="end" fill="#4aa3ff" font-weight="600">Skip</text>
+    <!-- illustration: phone add -->
+    <rect x="70" y="120" width="160" height="230" rx="22" fill="#121a23" stroke="#24313d"/>
+    <rect x="86" y="146" width="128" height="34" rx="17" fill="#132a42" stroke="#2e8ae6"/>
+    <text x="102" y="168" font-size="12" fill="#cfe4fa">Milk</text><circle cx="198" cy="163" r="11" fill="#2e8ae6"/><path d="M193 163h10M198 158v10" stroke="#fff" stroke-width="1.8"/>
+    <rect x="86" y="192" width="128" height="28" rx="12" fill="#18222d"/><rect x="86" y="228" width="128" height="28" rx="12" fill="#18222d"/><rect x="86" y="264" width="128" height="28" rx="12" fill="#18222d"/>
+    <text x="150" y="420" class="hero" style="font-size:21px" text-anchor="middle">Jot it down</text>
+    <text x="150" y="448" class="sub" font-size="13.5" text-anchor="middle">Add anything the moment you</text>
+    <text x="150" y="467" class="sub" font-size="13.5" text-anchor="middle">notice you’re running low.</text>
+    <circle cx="134" cy="516" r="4" fill="#4aa3ff"/><circle cx="150" cy="516" r="4" fill="#33414f"/><circle cx="166" cy="516" r="4" fill="#33414f"/>
+    <rect x="28" y="690" width="244" height="54" rx="18" fill="url(#btn)"/>
+    <text x="150" y="723" class="btn" text-anchor="middle">Get started</text>
+    <text x="150" y="776" class="btn2" style="font-size:14px;fill:#4aa3ff" text-anchor="middle">I have an account</text>
+  </g>
+  <!-- slide 2 -->
+  <g transform="translate(900 196)">
+    <rect width="300" height="860" rx="30" fill="#0a0f15" stroke="#2a333d" stroke-width="2"/>
+    <rect width="300" height="460" rx="30" fill="url(#glow)"/>
+    <g transform="translate(30 52)"><use href="#logo" transform="scale(.8)"/></g>
+    <text x="270" y="57" class="foot" text-anchor="end" fill="#4aa3ff" font-weight="600">Skip</text>
+    <!-- two phones syncing -->
+    <rect x="40" y="150" width="100" height="160" rx="16" fill="#121a23" stroke="#24313d"/>
+    <rect x="160" y="150" width="100" height="160" rx="16" fill="#121a23" stroke="#24313d"/>
+    <rect x="52" y="174" width="76" height="22" rx="10" fill="#2e8ae6"/><text x="90" y="189" font-size="10.5" font-weight="700" fill="#fff" text-anchor="middle">Bread</text>
+    <rect x="172" y="174" width="76" height="22" rx="10" fill="#2e8ae6"/><text x="210" y="189" font-size="10.5" font-weight="700" fill="#fff" text-anchor="middle">Bread</text>
+    <rect x="52" y="204" width="76" height="18" rx="8" fill="#18222d"/><rect x="172" y="204" width="76" height="18" rx="8" fill="#18222d"/>
+    <path d="M142 230c6-12 10-12 16 0" stroke="#4aa3ff" stroke-width="2" fill="none" stroke-dasharray="3 3"/>
+    <circle cx="90" cy="130" r="13" fill="#2e8ae6"/><text x="90" y="135" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">A</text>
+    <circle cx="210" cy="130" r="13" fill="#e0a64a"/><text x="210" y="135" font-size="12" font-weight="700" fill="#1a1205" text-anchor="middle">S</text>
+    <text x="150" y="420" class="hero" style="font-size:21px" text-anchor="middle">Share with your partner</text>
+    <text x="150" y="448" class="sub" font-size="13.5" text-anchor="middle">One invite code — then you both</text>
+    <text x="150" y="467" class="sub" font-size="13.5" text-anchor="middle">see the same list, live.</text>
+    <circle cx="134" cy="516" r="4" fill="#33414f"/><circle cx="150" cy="516" r="4" fill="#4aa3ff"/><circle cx="166" cy="516" r="4" fill="#33414f"/>
+    <rect x="28" y="690" width="244" height="54" rx="18" fill="url(#btn)"/>
+    <text x="150" y="723" class="btn" text-anchor="middle">Get started</text>
+    <text x="150" y="776" class="btn2" style="font-size:14px;fill:#4aa3ff" text-anchor="middle">I have an account</text>
+  </g>
+  <!-- slide 3 -->
+  <g transform="translate(1240 196)">
+    <rect width="300" height="860" rx="30" fill="#0a0f15" stroke="#2a333d" stroke-width="2"/>
+    <rect width="300" height="460" rx="30" fill="url(#glow)"/>
+    <g transform="translate(30 52)"><use href="#logo" transform="scale(.8)"/></g>
+    <!-- cart + checks -->
+    <rect x="70" y="140" width="160" height="170" rx="22" fill="#121a23" stroke="#24313d"/>
+    <g transform="translate(92 168)">
+      <circle cx="10" cy="10" r="9" fill="#2e8ae6"/><path d="M6 10l3 3 6-6" stroke="#fff" stroke-width="1.8" fill="none"/><rect x="28" y="5" width="78" height="10" rx="5" fill="#33414f"/>
+      <circle cx="10" cy="44" r="9" fill="#2e8ae6"/><path d="M6 44l3 3 6-6" stroke="#fff" stroke-width="1.8" fill="none"/><rect x="28" y="39" width="64" height="10" rx="5" fill="#33414f"/>
+      <circle cx="10" cy="78" r="9" fill="none" stroke="#e0a64a" stroke-width="2"/><rect x="28" y="73" width="70" height="10" rx="5" fill="#33414f"/>
+    </g>
+    <text x="150" y="420" class="hero" style="font-size:21px" text-anchor="middle">Shop together, calmly</text>
+    <text x="150" y="448" class="sub" font-size="13.5" text-anchor="middle">Check things off as you go. Your</text>
+    <text x="150" y="467" class="sub" font-size="13.5" text-anchor="middle">partner sees it’s handled.</text>
+    <circle cx="134" cy="516" r="4" fill="#33414f"/><circle cx="150" cy="516" r="4" fill="#33414f"/><circle cx="166" cy="516" r="4" fill="#4aa3ff"/>
+    <rect x="28" y="690" width="244" height="54" rx="18" fill="url(#btn)"/>
+    <text x="150" y="723" class="btn" text-anchor="middle">Create account</text>
+    <text x="150" y="776" class="btn2" style="font-size:14px;fill:#4aa3ff" text-anchor="middle">I have an account</text>
+    <text x="150" y="826" class="foot" text-anchor="middle">Terms · Privacy</text>
+  </g>
+</svg>

@@ -1,6 +1,6 @@
-import { ActivityIndicator, Modal, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import {
   FloatedCard,
   FloatedCardActions,
@@ -29,17 +29,7 @@ export function ReceiptSourceModal({
   const { colors, scheme } = useTheme();
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={() => {
-        if (!reading) onClose();
-      }}
-    >
-      <View className="flex-1 items-center justify-center px-6">
-        <BlurBackdrop onPress={reading ? undefined : onClose} />
+    <BottomSheet visible={visible} onClose={onClose} locked={reading}>
         <FloatedCard size="sm">
           <FloatedCardHeader
             title={reading ? t("scanReceiptWorking") : t("scanReceipt")}
@@ -109,7 +99,6 @@ export function ReceiptSourceModal({
             </>
           )}
         </FloatedCard>
-      </View>
-    </Modal>
+    </BottomSheet>
   );
 }

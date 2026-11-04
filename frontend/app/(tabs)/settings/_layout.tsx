@@ -1,5 +1,6 @@
 import { Platform, StyleSheet, View } from "react-native";
 import { Stack } from "expo-router";
+import { Stack as JsStack } from "expo-router/js-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SettingsMasterPane } from "@/features/settings/components/settings-master-pane";
 import { useWideLayout } from "@/hooks/use-wide-layout";
@@ -20,31 +21,49 @@ export default function SettingsLayout() {
   const headerBandHeight =
     insets.top + spacing.xl + SPLIT_HEADER_BODY + SPLIT_HEADER_PAD_BOTTOM;
 
-  const stack = (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        // ios_from_right avoids the Android native-stack edge/shadow seam on pop.
-        animation: wide
-          ? "fade"
-          : Platform.OS === "android"
-            ? "ios_from_right"
-            : "slide_from_right",
-        contentStyle: { backgroundColor: colors.ice },
-        fullScreenGestureShadowEnabled: false,
-      }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="account" />
-      <Stack.Screen name="app" />
-      <Stack.Screen name="swipe-actions" />
-      <Stack.Screen name="categories" />
-      <Stack.Screen name="pins" />
-      <Stack.Screen name="costs" />
-      <Stack.Screen name="language" />
-      <Stack.Screen name="appearance" />
-    </Stack>
-  );
+  const screens = [
+    "index",
+    "account",
+    "app",
+    "swipe-actions",
+    "categories",
+    "pins",
+    "costs",
+    "language",
+    "appearance",
+  ];
+
+  // Android: JS stack. With the native stack, Android's back gesture (forced
+  // on in Expo Go / Android 16 predictive back) drops the leaving page without
+  // its slide-out, so "back" looked broken. The JS stack animates push and pop
+  // the same way. iOS keeps the native stack and its swipe-back.
+  const stack =
+    Platform.OS === "android" ? (
+      <JsStack
+        screenOptions={{
+          headerShown: false,
+          animation: wide ? "fade" : "slide_from_right",
+          cardStyle: { backgroundColor: colors.ice },
+        }}
+      >
+        {screens.map((name) => (
+          <JsStack.Screen key={name} name={name} />
+        ))}
+      </JsStack>
+    ) : (
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: wide ? "fade" : "slide_from_right",
+          contentStyle: { backgroundColor: colors.ice },
+          fullScreenGestureShadowEnabled: false,
+        }}
+      >
+        {screens.map((name) => (
+          <Stack.Screen key={name} name={name} />
+        ))}
+      </Stack>
+    );
 
   if (!wide) {
     return (

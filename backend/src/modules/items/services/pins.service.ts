@@ -95,6 +95,8 @@ export class PinsService {
       category: ItemCategory;
       urgent: boolean;
       intervalDays: PinInterval;
+      quantity?: number;
+      unit?: string;
     },
   ) {
     const membership = await this.homes.requireMembership(userId);
@@ -110,6 +112,8 @@ export class PinsService {
     pin.name = input.name.trim();
     pin.category = input.category;
     pin.urgent = input.urgent;
+    if (typeof input.quantity === "number") pin.quantity = input.quantity;
+    if (input.unit !== undefined) pin.unit = blankToNull(input.unit);
     if (pin.intervalDays !== input.intervalDays) {
       const now = new Date();
       pin.intervalDays = input.intervalDays;

@@ -1,4 +1,4 @@
-import { sumKnownCosts } from "@/features/items/utils/currency";
+import { summarizeSpend } from "@/features/items/utils/currency";
 import type { Purchase } from "@/features/items/types/purchase";
 
 const TRIP_GAP_MS = 90 * 60 * 1000;
@@ -14,15 +14,30 @@ export type ShoppingTrip = {
 };
 
 export function groupPurchasesIntoTrips(items: Purchase[]): ShoppingTrip[] {
-  const byList = new Map<string, Purchase[]>();
+  const trips: ShoppingTrip[] = [];
+
+  // Items saved under one trip total are exactly one trip.
+  const byReceipt = new Map<string, Purchase[]>();
+  const loose: Purchase[] = [];
   for (const item of items) {
+    if (item.receiptId) {
+      const bucket = byReceipt.get(item.receiptId) ?? [];
+      bucket.push(item);
+      byReceipt.set(item.receiptId, bucket);
+    } else {
+      loose.push(item);
+    }
+  }
+  for (const bucket of byReceipt.values()) trips.push(toTrip(bucket));
+
+  const byList = new Map<string, Purchase[]>();
+  for (const item of loose) {
     const key = item.listId ?? "";
     const bucket = byList.get(key) ?? [];
     bucket.push(item);
     byList.set(key, bucket);
   }
 
-  const trips: ShoppingTrip[] = [];
   for (const bucket of byList.values()) {
     const ordered = [...bucket].sort((a, b) => boughtMs(a) - boughtMs(b));
     let current: Purchase[] = [];
@@ -45,7 +60,7 @@ export function groupPurchasesIntoTrips(items: Purchase[]): ShoppingTrip[] {
 function toTrip(items: Purchase[]): ShoppingTrip {
   const ordered = [...items].sort((a, b) => boughtMs(a) - boughtMs(b));
   const first = ordered[0];
-  const spend = sumKnownCosts(ordered.map((item) => item.cost));
+  const spend = summarizeSpend(ordered);
   return {
     id: first?.id ?? "",
     listName: first?.listName ?? "",

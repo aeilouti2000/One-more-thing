@@ -13,6 +13,7 @@ import Animated, {
   useSharedValue,
   type SharedValue,
 } from "react-native-reanimated";
+import type { ViewHandle } from "@/lib/native-refs";
 
 export type DragFrame = {
   x: number;
@@ -40,7 +41,7 @@ export function useDragOverlay() {
 }
 
 export function DragOverlayProvider({ children }: { children: ReactNode }) {
-  const hostRef = useRef<View>(null);
+  const hostRef = useRef<ViewHandle>(null);
   const ticket = useRef(0);
   const [node, setNode] = useState<ReactNode>(null);
   const originX = useSharedValue(0);

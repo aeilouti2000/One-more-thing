@@ -40,3 +40,22 @@ test("keeps other lists as their own trips", () => {
   ]);
   assert.equal(trips.length, 2);
 });
+
+test("a trip saved with one total is its own trip and uses that total", () => {
+  const withReceipt = (id: string, at: string): Purchase => ({
+    ...item(id, at, "groceries", null),
+    receiptId: "r1",
+    receiptTotal: 12.5,
+  });
+  const trips = groupPurchasesIntoTrips([
+    withReceipt("milk", "2026-10-17T10:00:00.000Z"),
+    withReceipt("bread", "2026-10-17T10:10:00.000Z"),
+    // Same list, inside the gap, but not on the receipt: separate trip.
+    item("soap", "2026-10-17T10:20:00.000Z", "groceries", 2),
+  ]);
+  assert.equal(trips.length, 2);
+  const receiptTrip = trips.find((trip) => trip.items.some((entry) => entry.id === "milk"));
+  assert.equal(receiptTrip?.total, 12.5);
+  assert.equal(receiptTrip?.priced, 2);
+  assert.equal(receiptTrip?.count, 2);
+});

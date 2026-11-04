@@ -12,18 +12,40 @@ function resolveApiUrl() {
     const url = new URL(configured);
     const isLoopback = url.hostname === "localhost" || url.hostname === "127.0.0.1";
     const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
-    const lanHost = hostUri?.split(":")[0];
-    if (!isLoopback || !lanHost || lanHost === "localhost" || lanHost === "127.0.0.1") {
+    const devHost = hostUri?.split(":")[0];
+    if (!isLoopback || !devHost || devHost === "localhost" || devHost === "127.0.0.1") {
       return configured;
     }
-    url.hostname = lanHost;
-    return url.toString().replace(/\/$/, "");
+    // `expo start --lan`: the dev machine is reachable by IP, so call the API
+    // on its own port there.
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(devHost)) {
+      url.hostname = devHost;
+      return url.toString().replace(/\/$/, "");
+    }
+    // `expo start --tunnel`: only the Metro port is tunnelled (over HTTPS).
+    // metro.config.js proxies /api through it to the local backend.
+    return `https://${devHost}${url.pathname}`.replace(/\/$/, "");
   } catch {
     return configured;
   }
 }
 
 const API_URL = resolveApiUrl();
+const REQUEST_TIMEOUT_MS = 20000;
+
+/** fetch that gives up instead of hanging forever on an unreachable host. */
+async function fetchWithTimeout(input: string, init: RequestInit = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("Network request timed out");
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 const SESSION_KEY = "omt.session";
 
 export type AuthUser = {
@@ -132,6 +154,8 @@ async function refreshSession() {
 
   let response: Response;
   try {
+    // Plain fetch on purpose: if a slow refresh succeeds on the server after we
+    // gave up, a rotated refresh token would be lost and the user signed out.
     response = await fetch(`${API_URL}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -164,7 +188,7 @@ async function request<T>(path: string, init: RequestInit = {}, auth = true, all
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetchWithTimeout(`${API_URL}${path}`, {
       ...init,
       headers,
       // Avoid serving a stale household after cost-settings PATCH (web HTTP cache).

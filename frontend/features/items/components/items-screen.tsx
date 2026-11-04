@@ -43,7 +43,8 @@ import { ItemDetailCard } from "@/features/items/components/item-detail-card";
 import { PurchaseRow } from "@/features/items/components/purchase-row";
 import { QuickAddBar } from "@/features/items/components/quick-add-bar";
 import { ReorderableList } from "@/features/items/components/reorderable-list";
-import { ShopButton } from "@/features/items/components/shop-button";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { ItemsFab } from "@/features/items/components/items-fab";
 import { SwipeableItem } from "@/features/items/components/swipeable-item";
 import { useWideLayout } from "@/hooks/use-wide-layout";
 import { firstName } from "@/features/items/api/shop-locks";
@@ -55,7 +56,7 @@ import {
   type SwipeActionPrefs,
 } from "@/features/items/utils/swipe-actions";
 import { AppText } from "@/components/ui/AppText";
-import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
+import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
@@ -87,7 +88,6 @@ import { scaleFontSize, singleLineInput } from "@/constants/font";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import {
   iconSize,
-  floatedCardStyle,
   spacing,
   tabBar,
   withAlpha,
@@ -99,6 +99,7 @@ import { useCategoryLabel } from "@/features/items/providers/categories-provider
 import type { Purchase, PurchaseCategory } from "@/features/items/types/purchase";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import type { ViewHandle } from "@/lib/native-refs";
 
 export default function ItemsScreen() {
   const { household, refresh: refreshHome } = useHousehold();
@@ -177,7 +178,7 @@ export default function ItemsScreen() {
     width: number;
     height: number;
   } | null>(null);
-  const categoryButtonRef = useRef<View>(null);
+  const categoryButtonRef = useRef<ViewHandle>(null);
   const [isAddingDetails, setIsAddingDetails] = useState(false);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [bulkCostIds, setBulkCostIds] = useState<string[] | null>(null);
@@ -220,7 +221,6 @@ export default function ItemsScreen() {
   );
   const quickCategoryLabel =
     quickCategory === "all" ? t("all") : selectedCategoryLabel;
-  const categoryLabelIsLong = quickCategoryLabel.trim().length > 6;
   const addCategory: PurchaseCategory =
     quickCategory === "all" ? "other" : quickCategory;
   const isSelecting = selectedIds.size > 0;
@@ -833,6 +833,18 @@ export default function ItemsScreen() {
     });
   }
 
+  function openCategoryMenu() {
+    const node = categoryButtonRef.current;
+    if (!node) {
+      setIsChoosingCategory(true);
+      return;
+    }
+    node.measureInWindow((x, y, width, height) => {
+      setCategoryAnchor({ x, y, width, height });
+      setIsChoosingCategory(true);
+    });
+  }
+
   function openListMenu() {
     setListMenuMounted(true);
     setIsChoosingList(true);
@@ -923,15 +935,46 @@ export default function ItemsScreen() {
             {showListSkeleton ? (
               <HeaderInfoShimmer color={headerFg} />
             ) : (
-              <Animated.View entering={FadeIn.duration(220)}>
+              <Animated.View
+                entering={FadeIn.duration(220)}
+                className="mt-1 flex-row items-center gap-2"
+              >
                 <AppText
-                  className="mt-1 text-sm font-medium"
+                  numberOfLines={1}
+                  className="shrink text-sm font-medium"
                   style={{ color: headerFg }}
                 >
-                  {currentList
-                    ? `${t("stillToGet", { count: listItems.length })} · ${listLabel(currentList.name, t("defaultList"))}`
-                    : t("stillToGet", { count: listItems.length })}
+                  {t("stillToGet", { count: listItems.length })}
                 </AppText>
+                <View ref={categoryButtonRef} collapsable={false} className="min-w-0 shrink">
+                  <Pressable
+                    onPress={openCategoryMenu}
+                    accessibilityRole="button"
+                    accessibilityLabel={quickCategoryLabel}
+                    hitSlop={8}
+                    className="flex-row items-center gap-1 rounded-full px-2.5 py-0.5 active:opacity-70"
+                    style={{
+                      backgroundColor: withAlpha(
+                        headerFg,
+                        quickCategory === "all" ? 0.1 : 0.2,
+                      ),
+                    }}
+                  >
+                    <Ionicons
+                      name={quickCategory === "all" ? "grid-outline" : "grid"}
+                      size={11}
+                      color={headerFg}
+                    />
+                    <AppText
+                      numberOfLines={1}
+                      className="shrink text-sm font-semibold"
+                      style={{ color: headerFg }}
+                    >
+                      {quickCategoryLabel}
+                    </AppText>
+                    <Ionicons name="chevron-down" size={12} color={headerFg} />
+                  </Pressable>
+                </View>
               </Animated.View>
             )}
           </View>
@@ -969,6 +1012,21 @@ export default function ItemsScreen() {
       }
       top={isSelecting ? header : null}
       dock={wide ? null : selectionDock}
+      fab={
+        isSelecting ? null : (
+          <ItemsFab
+            onAdd={() => {
+              setOpenItemId(null);
+              setIsAddingDetails(true);
+            }}
+            onPins={() => router.push("/pins")}
+            shopCount={visibleItems.length}
+            shopDisabled={shopDisabled}
+            shopLockedByName={shopBlocked ? shopLock?.shopperName : null}
+            onShop={openShop}
+          />
+        )
+      }
     >
       {isSelecting ? null : header}
 
@@ -978,89 +1036,8 @@ export default function ItemsScreen() {
             value={quickName}
             onChangeText={setQuickName}
             onSubmit={() => void quickAdd()}
-            onOpenDetails={() => {
-              setOpenItemId(null);
-              setIsAddingDetails(true);
-            }}
             busy={isQuickAdding}
             inputStyle={quickInputStyle}
-            footer={
-              <View
-                className="flex-row items-center gap-2"
-                style={{ direction: isRTL ? "rtl" : "ltr" }}
-              >
-                <View
-                  ref={categoryButtonRef}
-                  collapsable={false}
-                  className={categoryLabelIsLong ? "min-w-0 flex-1" : "shrink-0"}
-                >
-                  <Pressable
-                    onPress={() => {
-                      const node = categoryButtonRef.current;
-                      if (!node) {
-                        setIsChoosingCategory(true);
-                        return;
-                      }
-                      node.measureInWindow((x, y, width, height) => {
-                        setCategoryAnchor({ x, y, width, height });
-                        setIsChoosingCategory(true);
-                      });
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={quickCategoryLabel}
-                    className={`${categoryLabelIsLong ? "w-full" : ""} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2.5 active:opacity-60`}
-                    style={{
-                      backgroundColor: colors.paper,
-                      borderWidth: tabBar.borderWidth,
-                      borderColor: withAlpha(
-                        scheme === "dark" ? colors.muted : colors.accent,
-                        0.34,
-                      ),
-                      minWidth: 100,
-                    }}
-                  >
-                    <AppText
-                      numberOfLines={1}
-                      className="shrink text-sm font-semibold"
-                      style={{ color: colors.ink }}
-                    >
-                      {quickCategoryLabel}
-                    </AppText>
-                    <Ionicons name="chevron-down" size={14} color={colors.ink} />
-                  </Pressable>
-                </View>
-                <Pressable
-                  onPress={() => router.push("/pins")}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("pin")}
-                  className={`${categoryLabelIsLong ? "shrink-0" : "min-w-0 flex-1"} flex-row items-center justify-center gap-1 rounded-xl px-3 py-2.5 active:opacity-60`}
-                  style={{
-                    backgroundColor: colors.paper,
-                    borderWidth: tabBar.borderWidth,
-                    borderColor: withAlpha(
-                      scheme === "dark" ? colors.muted : colors.accent,
-                      0.34,
-                    ),
-                  }}
-                >
-                  <MaterialCommunityIcons name="pin" size={16} color={colors.ink} />
-                  <AppText
-                    numberOfLines={1}
-                    className="shrink text-sm font-semibold"
-                    style={{ color: colors.ink }}
-                  >
-                    {t("pin")}
-                  </AppText>
-                </Pressable>
-                <ShopButton
-                  count={visibleItems.length}
-                  disabled={shopDisabled}
-                  lockedByName={shopBlocked ? shopLock?.shopperName : null}
-                  className={categoryLabelIsLong ? "shrink-0" : "min-w-0 flex-1"}
-                  onPress={openShop}
-                />
-              </View>
-            }
           />
           <CategoryFilter
             layout="none"
@@ -1226,33 +1203,16 @@ export default function ItemsScreen() {
         }}
       />
 
-      <Modal
+      <BottomSheet
         visible={isMovingToList}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => {
-          if (busyAction === "move") return;
+        locked={busyAction === "move"}
+        onClose={() => {
           setIsMovingToList(false);
           setMoveIds(null);
           setActionError(null);
         }}
       >
-        <View className="flex-1 items-center justify-center px-6">
-          <BlurBackdrop
-            onPress={() => {
-              if (busyAction === "move") return;
-              setIsMovingToList(false);
-              setMoveIds(null);
-              setActionError(null);
-            }}
-            disabled={busyAction === "move"}
-          />
-          <View
-            className="w-full max-w-md gap-3 overflow-hidden p-5"
-            style={floatedCardStyle(scheme, colors)}
-          >
-            <GlassFill soft neutral />
+          <View className="gap-3">
             <AppText className="text-xl font-semibold text-cove-ink">
               {t("moveToList")}
             </AppText>
@@ -1303,23 +1263,14 @@ export default function ItemsScreen() {
                 ))}
             </ScrollView>
           </View>
-        </View>
-      </Modal>
+      </BottomSheet>
 
-      <Modal
+      <BottomSheet
         visible={isCreatingList}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={closeListForm}
+        locked={isSavingList}
+        onClose={closeListForm}
       >
-        <View className="flex-1 items-center justify-center px-6">
-          <BlurBackdrop onPress={closeListForm} disabled={isSavingList} />
-          <View
-            className="w-full max-w-md gap-4 overflow-hidden p-5"
-            style={floatedCardStyle(scheme, colors)}
-          >
-            <GlassFill soft neutral />
+          <View className="gap-4">
             <AppText className="text-xl font-semibold text-cove-ink">
               {editingListId ? t("editList") : t("newList")}
             </AppText>
@@ -1339,7 +1290,7 @@ export default function ItemsScreen() {
             <Pressable
               disabled={!listName.trim() || isSavingList}
               onPress={() => void saveList()}
-              className={`items-center rounded-2xl bg-cove-accent px-3 py-3 ${
+              className={`h-[52px] items-center justify-center rounded-2xl bg-cove-accent px-3 ${
                 !listName.trim() || isSavingList
                   ? "opacity-45"
                   : "active:opacity-80"
@@ -1357,8 +1308,7 @@ export default function ItemsScreen() {
               )}
             </Pressable>
           </View>
-        </View>
-      </Modal>
+      </BottomSheet>
 
       <Modal
         visible={listMenuMounted}
@@ -1691,7 +1641,7 @@ function ListSkeleton() {
       {[0, 1, 2, 3].map((index) => (
         <View
           key={index}
-          className="flex-row items-center gap-3 rounded-2xl px-[18px] py-4"
+          className="flex-row items-center gap-3 rounded-[22px] px-[18px] py-4"
           style={{ backgroundColor: colors.paper }}
         >
           <View className="min-w-0 flex-1 gap-2.5">
@@ -1827,7 +1777,6 @@ function SelectionBar({
         accessibilityLabel={label}
         accessibilityState={{ disabled: inactive }}
         style={[selectionStyles.cell, { opacity: inactive ? 0.5 : 1 }]}
-        android_ripple={null}
       >
         {busy ? (
           <ActivityIndicator color={color} />

@@ -10,6 +10,7 @@ import { useCategories, useCategoryLabel } from "@/features/items/providers/cate
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
+import type { ViewHandle } from "@/lib/native-refs";
 
 type Anchor = { x: number; y: number; width: number; height: number };
 
@@ -41,7 +42,7 @@ export function CategoryFilter({
   const { t, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
   const { categories, addCategory, removeCategory } = useCategories();
-  const triggerRef = useRef<View>(null);
+  const triggerRef = useRef<ViewHandle>(null);
   const [selfAnchor, setSelfAnchor] = useState<Anchor | null>(null);
   const selectedLabel = useCategoryLabel(value === "all" ? "" : value);
   const filtered = value !== "all";

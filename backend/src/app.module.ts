@@ -11,6 +11,7 @@ import { CustomCategories1740000000008 } from "./database/migrations/17400000000
 import { ItemCosts1740000000009 } from "./database/migrations/1740000000009-ItemCosts";
 import { SoftDeleteLists1740000000010 } from "./database/migrations/1740000000010-SoftDeleteLists";
 import { ListShopLocks1740000000011 } from "./database/migrations/1740000000011-ListShopLocks";
+import { TripReceipts1740000000012 } from "./database/migrations/1740000000012-TripReceipts";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
 import { ShoppingTrip1740000000004 } from "./database/migrations/1740000000004-ShoppingTrip";
@@ -29,6 +30,7 @@ import { Item } from "./modules/items/entities/item.entity";
 import { ListShopLock } from "./modules/items/entities/list-shop-lock.entity";
 import { Pin } from "./modules/items/entities/pin.entity";
 import { ShoppingList } from "./modules/items/entities/shopping-list.entity";
+import { TripReceipt } from "./modules/items/entities/trip-receipt.entity";
 import { ItemsModule } from "./modules/items/items.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { PushToken } from "./modules/notifications/entities/push-token.entity";
@@ -63,6 +65,7 @@ import { User } from "./users/user.entity";
             PushToken,
             CustomCategory,
             HiddenCategory,
+            TripReceipt,
           ],
           migrations: [
             Init1740000000000,
@@ -77,6 +80,7 @@ import { User } from "./users/user.entity";
             ItemCosts1740000000009,
             SoftDeleteLists1740000000010,
             ListShopLocks1740000000011,
+            TripReceipts1740000000012,
           ],
           migrationsRun: true,
         };

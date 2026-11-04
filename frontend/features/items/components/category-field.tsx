@@ -12,6 +12,7 @@ import {
   glassFieldStyle,
 } from "@/constants/theme";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
+import type { ViewHandle } from "@/lib/native-refs";
 
 type Anchor = { x: number; y: number; width: number; height: number };
 
@@ -28,7 +29,7 @@ export function CategoryField({ value, onChange, glass = false }: CategoryFieldP
   const { colors, scheme, shadow } = useTheme();
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
-  const fieldRef = useRef<View>(null);
+  const fieldRef = useRef<ViewHandle>(null);
   const frame = categoryMenuFrame(anchor, categories.length);
 
   function openMenu() {

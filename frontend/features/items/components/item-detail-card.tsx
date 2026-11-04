@@ -1,24 +1,21 @@
 import { useEffect, useState } from "react";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
-import { CategoryField } from "@/features/items/components/category-field";
+import { Ionicons } from "@expo/vector-icons";
+import { Pressable, ScrollView, View } from "react-native";
+import { ItemSheetForm, ItemSheetToggle } from "@/features/items/components/item-sheet-form";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
 import { StatusBadge } from "@/features/items/components/status-badge";
-import { UrgentToggle } from "@/features/items/components/urgent-toggle";
 import { AppButton } from "@/components/ui/AppButton";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { AppText } from "@/components/ui/AppText";
-import { AppTextField } from "@/components/ui/AppTextField";
 import {
   FloatedCard,
   FloatedCardActions,
   FloatedCardHeader,
-  FloatedCardMeta,
   FloatedCardSection,
 } from "@/components/ui/FloatedCard";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { FormSheetModal, useFormSheet } from "@/components/ui/FormSheetModal";
-import { floatedControlRadius, withAlpha } from "@/constants/theme";
+import { FormSheetModal } from "@/components/ui/FormSheetModal";
+import { withAlpha } from "@/constants/theme";
 import { useCategoryLabel } from "@/features/items/providers/categories-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
@@ -51,6 +48,7 @@ export function ItemDetailCard({
   const { colors } = useTheme();
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
+  const [unit, setUnit] = useState("");
   const [notes, setNotes] = useState("");
   const [category, setCategory] = useState<PurchaseCategory>("vegetables");
   const [urgent, setUrgent] = useState(false);
@@ -60,7 +58,6 @@ export function ItemDetailCard({
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingOpen, setEditingOpen] = useState(false);
   const [costPromptOpen, setCostPromptOpen] = useState(false);
   const [editCostOpen, setEditCostOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -73,6 +70,7 @@ export function ItemDetailCard({
   function fill(item: Purchase) {
     setName(item.name);
     setQuantity(String(item.quantity));
+    setUnit(item.unit ?? "");
     setNotes(item.notes ?? "");
     setCategory(item.category);
     setUrgent(item.urgent);
@@ -80,7 +78,6 @@ export function ItemDetailCard({
     setPinBaseline(false);
     setPinnedPinId(null);
     setQuantityError(undefined);
-    setEditingOpen(false);
   }
 
   async function loadPin(item: Purchase) {
@@ -137,6 +134,7 @@ export function ItemDetailCard({
       category,
       urgent,
       notes,
+      unit,
     });
     if (result.error) {
       setIsSubmitting(false);
@@ -149,6 +147,7 @@ export function ItemDetailCard({
         const pinResult = await createPin(household.id, {
           name: name.trim(),
           quantity: parsedQuantity,
+          unit: unit || undefined,
           category,
           urgent,
           intervalDays: 7,
@@ -222,11 +221,28 @@ export function ItemDetailCard({
     void loadPin(item);
   }
 
+  // Fold pane: re-fill the form when a different item opens (during render),
+  // then look up its pin (network) in an effect.
+  const paneItemId = presentation === "pane" && visible && purchase ? purchase.id : null;
+  const [syncedPaneItemId, setSyncedPaneItemId] = useState<string | null>(null);
+  if (paneItemId !== syncedPaneItemId) {
+    setSyncedPaneItemId(paneItemId);
+    if (purchase && paneItemId) {
+      fill(purchase);
+      setError(null);
+      setCostPromptOpen(false);
+      setEditCostOpen(false);
+      setDeleteOpen(false);
+      setDeleteError(null);
+    }
+  }
   useEffect(() => {
-    if (presentation !== "pane" || !visible || !purchase) return;
-    syncFromPurchase(purchase);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when the open item changes
-  }, [presentation, visible, purchase?.id]);
+    if (!paneItemId || !purchase) return;
+    // Async lookup: state is only set after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadPin(purchase);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the open item changes
+  }, [paneItemId]);
 
   const detailBody =
     purchase && !editable ? (
@@ -245,6 +261,7 @@ export function ItemDetailCard({
         purchase={purchase}
         name={name}
         quantity={quantity}
+        unit={unit}
         notes={notes}
         category={category}
         urgent={urgent}
@@ -253,8 +270,8 @@ export function ItemDetailCard({
         quantityError={quantityError}
         error={error}
         isSubmitting={isSubmitting}
-        editingOpen={editingOpen}
-        onToggleEditing={() => setEditingOpen((open) => !open)}
+        onClose={presentation === "sheet" ? close : undefined}
+        onChangeUnit={setUnit}
         onChangeName={setName}
         onChangeQuantity={(value) => {
           setQuantity(value);
@@ -408,6 +425,7 @@ function EditItemForm({
   purchase,
   name,
   quantity,
+  unit,
   notes,
   category,
   urgent,
@@ -416,10 +434,10 @@ function EditItemForm({
   quantityError,
   error,
   isSubmitting,
-  editingOpen,
-  onToggleEditing,
+  onClose,
   onChangeName,
   onChangeQuantity,
+  onChangeUnit,
   onChangeNotes,
   onChangeCategory,
   onChangeUrgent,
@@ -430,6 +448,7 @@ function EditItemForm({
   purchase: Purchase | null;
   name: string;
   quantity: string;
+  unit: string;
   notes: string;
   category: PurchaseCategory;
   urgent: boolean;
@@ -438,10 +457,10 @@ function EditItemForm({
   quantityError?: string;
   error: string | null;
   isSubmitting: boolean;
-  editingOpen: boolean;
-  onToggleEditing: () => void;
+  onClose?: () => void;
   onChangeName: (value: string) => void;
   onChangeQuantity: (value: string) => void;
+  onChangeUnit: (value: string) => void;
   onChangeNotes: (value: string) => void;
   onChangeCategory: (value: PurchaseCategory) => void;
   onChangeUrgent: (value: boolean) => void;
@@ -450,12 +469,6 @@ function EditItemForm({
   onMarkBought: () => void;
 }) {
   const { t, locale } = useI18n();
-  const { colors } = useTheme();
-  const formSheet = useFormSheet();
-  const categoryLabel = useCategoryLabel(category);
-  const quantityLabel = purchase?.unit
-    ? `${quantity} ${purchase.unit}`
-    : quantity;
   const parsedQuantity = parseQuantity(quantity);
   const hasChanges = Boolean(
     purchase &&
@@ -463,193 +476,58 @@ function EditItemForm({
         (parsedQuantity === null
           ? quantity.trim() !== String(purchase.quantity)
           : parsedQuantity !== purchase.quantity) ||
+        unit.trim() !== (purchase.unit ?? "").trim() ||
         notes.trim() !== (purchase.notes ?? "").trim() ||
         category !== purchase.category ||
         urgent !== purchase.urgent ||
         pinned !== pinBaseline),
   );
 
-  useEffect(() => {
-    if (editingOpen) {
-      formSheet?.scrollToEnd();
-    }
-  }, [editingOpen, formSheet]);
-
   const dateLabel = purchase
     ? new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
         month: "short",
         day: "numeric",
-        year: "numeric",
       }).format(new Date(purchase.createdAt))
     : null;
+  const subtitle = purchase
+    ? [t("addedByName", { name: purchase.addedByName }), dateLabel].filter(Boolean).join(" · ")
+    : undefined;
 
   return (
     <FloatedCard>
-      <View className="mb-5 gap-3">
-        <View className="flex-row items-start gap-3">
-          <View className="min-w-0 flex-1 gap-1">
-            <AppText className="text-lg font-semibold text-cove-ink" numberOfLines={2}>
-              {name.trim() || purchase?.name || t("item")}
-            </AppText>
-            {purchase?.urgent && purchase.status !== "bought" ? (
-              <AppText className="text-xs font-semibold" style={{ color: "#F87171" }}>
-                {t("urgent")}
-              </AppText>
-            ) : null}
-          </View>
-          {purchase ? (
-            <FloatedCardMeta
-              lines={[
-                t("addedByName", { name: purchase.addedByName }),
-                ...(dateLabel ? [dateLabel] : []),
-              ]}
-            />
-          ) : null}
-        </View>
-        <View
-          className="h-0.5 w-10 rounded-full"
-          style={{ backgroundColor: colors.accent }}
-        />
-      </View>
-
-      {purchase ? (
-        <View className="gap-4">
-          {!editingOpen ? (
-            <View className="gap-3">
-              <View className="flex-row flex-wrap items-center gap-2">
-                <SummaryChip label={`${t("quantity")}: ${quantityLabel}`} />
-                <SummaryChip label={categoryLabel} />
-                {pinned ? <SummaryChip label={t("pinSelected")} /> : null}
-              </View>
-              {notes.trim() ? (
-                <AppText className="text-sm text-cove-muted" numberOfLines={3}>
-                  {notes}
-                </AppText>
-              ) : null}
-            </View>
-          ) : null}
-
-          <Pressable
-            onPress={onToggleEditing}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: editingOpen }}
-            className="flex-row items-center justify-between py-1 active:opacity-80"
-          >
-            <AppText className="text-sm font-semibold text-cove-ink">{t("editItem")}</AppText>
-            <Ionicons
-              name={editingOpen ? "chevron-up" : "chevron-down"}
-              size={18}
-              color={colors.muted}
-            />
-          </Pressable>
-
-          {editingOpen ? (
-            <View className="gap-4">
-              <FloatedCardSection title={t("formEssentials")}>
-                <View className="flex-row items-stretch gap-3">
-                  <View className="min-w-0 flex-1">
-                    <AppTextField
-                      compact
-                      glass
-                      label={t("itemNameLabel")}
-                      value={name}
-                      onChangeText={onChangeName}
-                      placeholder={t("itemNamePlaceholder")}
-                      userText
-                      onFocus={() => formSheet?.scrollToStart()}
-                    />
-                  </View>
-                  <View className="w-20">
-                    <AppTextField
-                      compact
-                      glass
-                      label={t("quantity")}
-                      value={quantity}
-                      onChangeText={onChangeQuantity}
-                      placeholder="1"
-                      keyboardType="decimal-pad"
-                      error={quantityError}
-                      onFocus={() => formSheet?.scrollToStart()}
-                    />
-                  </View>
-                </View>
-                <CategoryField glass value={category} onChange={onChangeCategory} />
-              </FloatedCardSection>
-
-              <FloatedCardSection title={t("formExtra")} divided>
-                <View className="flex-row flex-wrap gap-4">
-                  <UrgentToggle compact value={urgent} onValueChange={onChangeUrgent} />
-                  <UrgentToggle
-                    compact
-                    label={t("pinSelected")}
-                    value={pinned}
-                    onValueChange={onChangePinned}
-                  />
-                </View>
-                <AppTextField
-                  compact
-                  glass
-                  label={t("notes")}
-                  value={notes}
-                  onChangeText={onChangeNotes}
-                  placeholder={t("notesPlaceholder")}
-                  multiline
-                  userText
-                  onFocus={() => formSheet?.scrollToEnd()}
-                />
-              </FloatedCardSection>
-            </View>
-          ) : null}
-
-          <FormMessage message={error} />
-
-          <FloatedCardActions className="mt-2">
-            <Pressable
-              disabled={isSubmitting || (hasChanges && !name.trim())}
-              onPress={hasChanges ? onSubmit : onMarkBought}
-              accessibilityRole="button"
-              className={`h-12 flex-1 flex-row items-center justify-center gap-2 bg-cove-accent px-4 ${
-                isSubmitting || (hasChanges && !name.trim())
-                  ? "opacity-50"
-                  : "active:opacity-80"
-              }`}
-              style={{ borderRadius: floatedControlRadius }}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color={colors.onAccent} />
-              ) : hasChanges ? (
-                <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
-                  {t("saveChanges")}
-                </AppText>
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="cart-check" size={18} color={colors.onAccent} />
-                  <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
-                    {t("markBought")}
-                  </AppText>
-                </>
-              )}
-            </Pressable>
-          </FloatedCardActions>
-        </View>
-      ) : null}
+      <ItemSheetForm
+        title={t("editItem")}
+        subtitle={subtitle}
+        onClose={onClose}
+        name={name}
+        onChangeName={onChangeName}
+        quantity={quantity}
+        onChangeQuantity={onChangeQuantity}
+        quantityError={quantityError}
+        unit={unit}
+        onChangeUnit={onChangeUnit}
+        urgent={urgent}
+        onChangeUrgent={onChangeUrgent}
+        category={category}
+        onChangeCategory={onChangeCategory}
+        notes={notes}
+        onChangeNotes={onChangeNotes}
+        extra={
+          <ItemSheetToggle
+            label={t("pinSelected")}
+            icon="pin"
+            value={pinned}
+            onChange={onChangePinned}
+          />
+        }
+        error={error}
+        // One button: "Mark as bought" until something changes, then "Save changes".
+        submitLabel={hasChanges ? t("saveChanges") : t("markBought")}
+        canSubmit={hasChanges ? Boolean(name.trim()) : true}
+        submitting={isSubmitting}
+        onSubmit={hasChanges ? onSubmit : onMarkBought}
+      />
     </FloatedCard>
-  );
-}
-
-function SummaryChip({ label }: { label: string }) {
-  const { colors, scheme } = useTheme();
-
-  return (
-    <View
-      className="px-3 py-1"
-      style={{
-        borderRadius: floatedControlRadius,
-        backgroundColor: scheme === "dark" ? colors.mist : colors.soft,
-      }}
-    >
-      <AppText className="text-xs font-medium text-cove-ink">{label}</AppText>
-    </View>
   );
 }
 

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState, type ReactNode } from "react";
+import { router, type Href } from "expo-router";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { FoldPaneEmpty, FoldSplit } from "@/components/ui/FoldSplit";
 import { HomeCard } from "@/features/homes/components/home-card";
@@ -26,20 +27,29 @@ import {
   updateHomeName,
 } from "@/features/homes/api/homes";
 import { useAuth } from "@/features/auth/providers/auth-provider";
+import {
+  SettingsCardCopy,
+  SettingsCardIcon,
+} from "@/features/settings/components/settings-ui";
 import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { HomeSummary, HouseholdMember } from "@/features/homes/types/household";
 
-export default function HomeScreen() {
+type HomeView = "hub" | "homes" | "add";
+
+/**
+ * Home tab. On phones it's a hub (current home, invite code, links) with two
+ * sub-pages — Your homes and Add a home — reached like the settings pages.
+ * Fold keeps the existing master/detail layout for every view.
+ */
+export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
   const { user } = useAuth();
   const { household, homes, isLoading, error, refresh, adoptHome } = useHousehold();
   const { t, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
   const wide = useWideLayout();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [homesOpen, setHomesOpen] = useState(true);
-  const [addOpen, setAddOpen] = useState(false);
   const [widePane, setWidePane] = useState<"home" | "add">("home");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [memberToRemove, setMemberToRemove] = useState<HouseholdMember | null>(null);
@@ -47,9 +57,9 @@ export default function HomeScreen() {
   const [isRemovingMember, setIsRemovingMember] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState("");
-  const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [isJoinOpen, setIsJoinOpen] = useState(view === "add");
   const [newHomeName, setNewHomeName] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(view === "add");
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -150,6 +160,7 @@ export default function HomeScreen() {
     setNewHomeName("");
     setIsCreateOpen(false);
     await refresh();
+    if (view === "add" && router.canGoBack()) router.back();
   }
 
   async function joinAnotherHome() {
@@ -173,6 +184,7 @@ export default function HomeScreen() {
     setInviteCode("");
     setIsJoinOpen(false);
     await refresh();
+    if (view === "add" && router.canGoBack()) router.back();
   }
 
   async function openHome(homeId: string) {
@@ -468,21 +480,85 @@ export default function HomeScreen() {
   );
 
   if (!wide) {
+    const floating = floatMessage ? (
+      <FloatMessage message={floatMessage} tone={floatTone} />
+    ) : null;
+
+    if (view === "homes") {
+      return (
+        <Screen
+          refreshing={isRefreshing}
+          onRefresh={() => void onRefresh()}
+          floating={floating}
+        >
+          <ScreenHeader
+            showBack
+            title={t("yourHomes")}
+            subtitle={t("homesCount", { count: homeCards.length })}
+          />
+          <FormMessage message={error} />
+          <View className="gap-3">
+            {homeCards.map((home) => {
+              const current = home.id === household?.id;
+              return (
+                <View
+                  key={home.id}
+                  className="overflow-hidden rounded-3xl bg-cove-paper"
+                  style={{
+                    borderWidth: 1,
+                    borderColor: current
+                      ? withAlpha(colors.accent, scheme === "dark" ? 0.45 : 0.3)
+                      : "transparent",
+                  }}
+                >
+                  <HomeCard {...homeCardProps(home, expandedId === home.id)} />
+                </View>
+              );
+            })}
+            <HubLink
+              icon="add-circle-outline"
+              title={t("addAHome")}
+              summary={t("addAHomeSummary")}
+              href={"/home/add" as Href}
+            />
+          </View>
+          {modals}
+        </Screen>
+      );
+    }
+
+    if (view === "add") {
+      return (
+        <Screen floating={floating}>
+          <ScreenHeader showBack title={t("addAHome")} subtitle={t("addAHomeSummary")} />
+          {addHomeForms}
+        </Screen>
+      );
+    }
+
     return (
       <Screen
         tabBarInset
         refreshing={isRefreshing}
         onRefresh={() => void onRefresh()}
-        floating={
-          floatMessage ? (
-            <FloatMessage message={floatMessage} tone={floatTone} />
-          ) : null
-        }
+        floating={floating}
       >
         {header}
         <FormMessage message={error} />
         {household ? (
-          <View className="gap-6">
+          <View className="gap-5">
+            <CurrentHomeCard
+              name={household.name}
+              role={
+                household.members.some(
+                  (member) => member.id === user?.id && member.role === "owner",
+                )
+                  ? "owner"
+                  : "partner"
+              }
+              members={household.members}
+              currentUserId={user?.id}
+            />
             <InviteCodeCard
               code={household.inviteCode}
               homeName={household.name}
@@ -492,35 +568,34 @@ export default function HomeScreen() {
               }}
             />
             <View className="gap-3">
-              <SectionCard
+              <HubLink
                 icon="home-outline"
                 title={t("yourHomes")}
-                summary={household.name}
-                open={homesOpen}
-                onToggle={() => setHomesOpen((open) => !open)}
-                colors={colors}
-              >
-                {homeCards.map((home) => (
-                  <HomeCard
-                    key={home.id}
-                    {...homeCardProps(home, expandedId === home.id)}
-                  />
-                ))}
-              </SectionCard>
-              <SectionCard
-                icon="add-outline"
+                summary={
+                  homeCards.length > 1
+                    ? `${t("homesCount", { count: homeCards.length })} · ${household.name}`
+                    : household.name
+                }
+                href={"/home/homes" as Href}
+              />
+              <HubLink
+                icon="add-circle-outline"
                 title={t("addAHome")}
                 summary={t("addAHomeSummary")}
-                open={addOpen}
-                onToggle={() => setAddOpen((open) => !open)}
-                colors={colors}
-              >
-                {addHomeForms}
-              </SectionCard>
+                href={"/home/add" as Href}
+              />
             </View>
           </View>
         ) : (
-          <EmptyState title={t("noHomeYet")} message={t("noHomeYetBody")} />
+          <View className="gap-4">
+            <EmptyState title={t("noHomeYet")} message={t("noHomeYetBody")} />
+            <HubLink
+              icon="add-circle-outline"
+              title={t("addAHome")}
+              summary={t("addAHomeSummary")}
+              href={"/home/add" as Href}
+            />
+          </View>
         )}
         {modals}
       </Screen>
@@ -660,60 +735,122 @@ export default function HomeScreen() {
   );
 }
 
-function SectionCard({
+/** Hub row that opens a Home sub-page (same look as the settings hub). */
+function HubLink({
   icon,
   title,
   summary,
-  open,
-  onToggle,
-  colors,
-  children,
+  href,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   summary: string;
-  open: boolean;
-  onToggle: () => void;
-  colors: { mist: string; accent: string; ink: string };
-  children: ReactNode;
+  href: Href;
 }) {
+  const { colors } = useTheme();
+  const { isRTL } = useI18n();
   return (
-    <View className="overflow-hidden rounded-3xl bg-cove-paper">
-      <View className="flex-row items-center gap-3 px-4 py-4">
-        <Pressable
-          onPress={onToggle}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: open }}
-          className="min-w-0 flex-1 flex-row items-center gap-3 active:opacity-80"
+    <Pressable
+      onPress={() => router.push(href)}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      className="flex-row items-center gap-3 overflow-hidden rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
+    >
+      <SettingsCardIcon icon={icon} colors={colors} />
+      <SettingsCardCopy title={title} body={summary} bodyLines={1} />
+      <Ionicons
+        name={isRTL ? "chevron-back" : "chevron-forward"}
+        size={iconSize.sm}
+        color={colors.ink}
+      />
+    </Pressable>
+  );
+}
+
+const AVATAR_COLORS = ["#2E8AE6", "#E0A64A", "#58C27D", "#B07CE8", "#E07A5F"];
+
+/** The home you're in: name, your role, and who shares it. */
+function CurrentHomeCard({
+  name,
+  role,
+  members,
+  currentUserId,
+}: {
+  name: string;
+  role: "owner" | "partner";
+  members: HouseholdMember[];
+  currentUserId?: string;
+}) {
+  const { colors, scheme } = useTheme();
+  const { t } = useI18n();
+  const dark = scheme === "dark";
+  const ordered = [...members].sort((a, b) =>
+    a.id === currentUserId ? -1 : b.id === currentUserId ? 1 : 0,
+  );
+  const names = ordered.map((member) =>
+    member.id === currentUserId ? t("you") : member.name,
+  );
+
+  return (
+    <View
+      className="overflow-hidden rounded-3xl px-4 py-4"
+      style={{
+        backgroundColor: colors.paper,
+        borderWidth: 1,
+        borderColor: withAlpha(colors.accent, dark ? 0.35 : 0.25),
+      }}
+    >
+      <View className="flex-row items-center gap-3">
+        <View
+          className="h-12 w-12 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: withAlpha(colors.accent, dark ? 0.18 : 0.12) }}
         >
-          <View
-            className="h-11 w-11 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: colors.mist }}
-          >
-            <Ionicons name={icon} size={22} color={colors.accent} />
-          </View>
-          <View className="min-w-0 flex-1">
-            <AppText className="text-base font-semibold text-cove-ink">{title}</AppText>
-            <AppText className="mt-1 text-sm text-cove-muted" numberOfLines={1}>
-              {summary}
-            </AppText>
-          </View>
-        </Pressable>
-        <Pressable
-          onPress={onToggle}
-          accessibilityRole="button"
-          accessibilityLabel={title}
-          hitSlop={12}
-          className="items-center justify-center active:opacity-80"
+          <Ionicons name="home" size={22} color={colors.accent} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <AppText className="text-xs font-semibold text-cove-muted">{t("currentHome")}</AppText>
+          <AppText className="text-xl font-semibold text-cove-ink" numberOfLines={1}>
+            {name}
+          </AppText>
+        </View>
+        <View
+          className="rounded-full px-3 py-1"
+          style={{ backgroundColor: withAlpha(colors.accent, dark ? 0.16 : 0.1) }}
         >
-          <Ionicons
-            name={open ? "chevron-up" : "chevron-down"}
-            size={iconSize.sm}
-            color={colors.ink}
-          />
-        </Pressable>
+          <AppText className="text-xs font-semibold" style={{ color: colors.accent }}>
+            {role === "owner" ? t("host") : t("partner")}
+          </AppText>
+        </View>
       </View>
-      {open ? <View className="gap-2.5 px-3 pb-3">{children}</View> : null}
+
+      <View className="mt-4 flex-row items-center gap-3">
+        <View className="flex-row">
+          {ordered.slice(0, 4).map((member, index) => (
+            <View
+              key={member.id}
+              className="h-8 w-8 items-center justify-center rounded-full"
+              style={{
+                backgroundColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
+                borderWidth: 2,
+                borderColor: colors.paper,
+                marginStart: index === 0 ? 0 : -8,
+              }}
+            >
+              <AppText className="text-xs font-bold" style={{ color: "#FFFFFF" }}>
+                {(member.id === currentUserId ? t("you") : member.name).trim().charAt(0).toUpperCase()}
+              </AppText>
+            </View>
+          ))}
+        </View>
+        <View className="min-w-0 flex-1">
+          <AppText className="text-sm font-semibold text-cove-ink" numberOfLines={1}>
+            {names.join(", ")}
+          </AppText>
+          <AppText className="text-xs text-cove-muted">
+            {members.length > 1 ? t("membersCount", { count: members.length }) : t("inviteToShare")}
+          </AppText>
+        </View>
+      </View>
     </View>
   );
 }
