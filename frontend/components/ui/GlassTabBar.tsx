@@ -26,6 +26,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 
 const CONTENT_PAD = 16;
 const EDGE_GAP = 4;
+const CENTER_PILL_EXTRA = 0;
 const MOVE_MS = 250;
 
 /** Gap between the middle tabs reserved for the center button. */
@@ -111,11 +112,24 @@ export function GlassTabBar({
     let middle = centerOf(from) + (centerOf(to) - centerOf(from)) * (pos.value - from);
     if (rtl.value === 1) middle = width - middle;
     const room = Math.min(middle - EDGE_GAP, width - EDGE_GAP - middle);
+    // 0 normally, 1 while the center "+" is shown (animates with the gap).
+    const centered = gap.value / TAB_BAR_CENTER_GAP;
+    // With the center "+" the tabs get narrow and the edge tabs would shrink
+    // the pill, so it grows wider and slides inward instead of squashing.
+    const extra = CENTER_PILL_EXTRA * centered;
     const pill = Math.max(
       0,
-      Math.min(content.value + CONTENT_PAD * 2, tab, room * 2),
+      Math.min(
+        content.value + CONTENT_PAD * 2 + extra,
+        tab + extra,
+        room * 2 + (tab + extra) * centered,
+      ),
     );
-    return { opacity: 1, width: pill, left: middle - pill / 2 };
+    const left = Math.min(
+      Math.max(middle - pill / 2, EDGE_GAP),
+      width - EDGE_GAP - pill,
+    );
+    return { opacity: 1, width: pill, left };
   });
 
   if (hidden || keyboardOpen) return null;
