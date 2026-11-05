@@ -1,21 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
-import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { EditButton } from "@/components/ui/EditButton";
-import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
-import { iconSize } from "@/constants/theme";
+import { withAlpha } from "@/constants/theme";
 import { useAuth } from "@/features/auth/providers/auth-provider";
-import { useHousehold } from "@/features/homes/hooks/use-household";
 import {
-  CardBlock,
-  SettingsCardIcon,
+  SettingsNavCard,
   SettingsSection,
 } from "@/features/settings/components/settings-ui";
 import {
@@ -23,35 +18,19 @@ import {
   useSettingsSplitJoin,
   useSettingsTabBarInset,
 } from "@/features/settings/hooks/use-settings-chrome";
-import { isValidPassword, isValidUsername } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
+const DANGER = "#E5484D";
+
+/** Account hub: each row opens its own page, like the other settings. */
 export default function AccountSettingsScreen() {
-  const { user, signOut, changePassword, updateProfile, deleteAccount } = useAuth();
-  const { refresh: refreshHome } = useHousehold();
+  const { user, signOut, deleteAccount } = useAuth();
   const { colors } = useTheme();
-  const { t, isRTL } = useI18n();
+  const { t } = useI18n();
   const showBack = useSettingsShowBack();
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
-  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [name, setName] = useState(user?.name?.trim() || t("member"));
-  const [username, setUsername] = useState(user?.email ?? "");
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [nameSuccess, setNameSuccess] = useState<string | null>(null);
-  const [usernameError, setUsernameError] = useState<string | null>(null);
-  const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
-  const [isSavingName, setIsSavingName] = useState(false);
-  const [isSavingUsername, setIsSavingUsername] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -60,93 +39,8 @@ export default function AccountSettingsScreen() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
-  if (user && !isEditingName) {
-    const nextName = user.name?.trim() || t("member");
-    if (name !== nextName) setName(nextName);
-  }
-  if (user && !isEditingUsername) {
-    const nextUsername = user.email ?? "";
-    if (username !== nextUsername) setUsername(nextUsername);
-  }
-
-  const canUpdatePassword =
-    currentPassword.length > 0 &&
-    isValidPassword(newPassword) &&
-    confirmPassword.length > 0;
-
   const displayName = user?.name?.trim() || t("member");
   const displayUsername = user?.email ?? t("noEmail");
-
-  async function onSaveName() {
-    const next = name.trim();
-    if (!next) {
-      setNameSuccess(null);
-      setNameError(t("errorEnterName"));
-      return;
-    }
-    setIsSavingName(true);
-    setNameError(null);
-    setNameSuccess(null);
-    const result = await updateProfile({ name: next });
-    setIsSavingName(false);
-    if (result.error) {
-      setNameError(result.error);
-      return;
-    }
-    setIsEditingName(false);
-    setNameSuccess(t("nameUpdated"));
-    void refreshHome();
-  }
-
-  async function onSaveUsername() {
-    const next = username.trim();
-    if (!isValidUsername(next)) {
-      setUsernameSuccess(null);
-      setUsernameError(t("errorInvalidEmail"));
-      return;
-    }
-    setIsSavingUsername(true);
-    setUsernameError(null);
-    setUsernameSuccess(null);
-    const result = await updateProfile({ email: next });
-    setIsSavingUsername(false);
-    if (result.error) {
-      setUsernameError(result.error);
-      return;
-    }
-    setIsEditingUsername(false);
-    setUsernameSuccess(t("usernameUpdated"));
-  }
-
-  async function onChangePassword() {
-    if (!isValidPassword(newPassword)) {
-      setPasswordSuccess(null);
-      setPasswordError(t("errorPasswordTooShort"));
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setPasswordSuccess(null);
-      setPasswordError(t("errorPasswordsMismatch"));
-      return;
-    }
-
-    setIsUpdatingPassword(true);
-    setPasswordError(null);
-    setPasswordSuccess(null);
-    const result = await changePassword(currentPassword, newPassword);
-    setIsUpdatingPassword(false);
-
-    if (result.error) {
-      setPasswordError(result.error);
-      return;
-    }
-
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setPasswordSuccess(t("passwordUpdated"));
-  }
 
   async function onSignOut() {
     setIsSigningOut(true);
@@ -190,248 +84,63 @@ export default function AccountSettingsScreen() {
       />
 
       <SettingsSection>
-        <CardBlock>
-          {isEditingName ? (
-            <View className="gap-4">
-              <AppTextField
-                label={t("name")}
-                hint={t("nameHint")}
-                value={name}
-                onChangeText={setName}
-                placeholder={t("namePlaceholder")}
-                autoComplete="name"
-                userText
-              />
-              <FormMessage message={nameError} />
-              <View className="gap-2">
-                <AppButton
-                  label={t("saveName")}
-                  disabled={!name.trim()}
-                  loading={isSavingName}
-                  onPress={() => void onSaveName()}
-                />
-                <AppButton
-                  label={t("cancel")}
-                  variant="ghost"
-                  disabled={isSavingName}
-                  onPress={() => {
-                    setIsEditingName(false);
-                    setName(displayName);
-                    setNameError(null);
-                  }}
-                />
-              </View>
-            </View>
-          ) : (
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="min-w-0 flex-1 flex-row items-start gap-3">
-                <SettingsCardIcon icon="person-outline" colors={colors} />
-                <View className="min-w-0 flex-1">
-                  <AppText className="text-sm font-medium text-cove-muted">{t("name")}</AppText>
-                  <AppText className="mt-2 text-base font-semibold text-cove-ink">
-                    {displayName}
-                  </AppText>
-                  <FormMessage
-                    message={nameSuccess}
-                    tone="success"
-                    onDismiss={() => setNameSuccess(null)}
-                  />
-                </View>
-              </View>
-              <EditButton
-                compact
-                variant="paper"
-                accessibilityLabel={t("editName")}
-                onPress={() => {
-                  setName(displayName);
-                  setIsEditingName(true);
-                  setNameSuccess(null);
-                  setNameError(null);
-                }}
-              />
-            </View>
-          )}
-        </CardBlock>
-
-        <CardBlock>
-          {isEditingUsername ? (
-            <View className="gap-4">
-              <AppTextField
-                label={t("username")}
-                hint={t("usernameHint")}
-                value={username}
-                onChangeText={setUsername}
-                placeholder={t("usernamePlaceholder")}
-                autoCapitalize="none"
-                autoComplete="username"
-                autoCorrect={false}
-              />
-              <FormMessage message={usernameError} />
-              <View className="gap-2">
-                <AppButton
-                  label={t("saveUsername")}
-                  disabled={!username.trim()}
-                  loading={isSavingUsername}
-                  onPress={() => void onSaveUsername()}
-                />
-                <AppButton
-                  label={t("cancel")}
-                  variant="ghost"
-                  disabled={isSavingUsername}
-                  onPress={() => {
-                    setIsEditingUsername(false);
-                    setUsername(user?.email ?? "");
-                    setUsernameError(null);
-                  }}
-                />
-              </View>
-            </View>
-          ) : (
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="min-w-0 flex-1 flex-row items-start gap-3">
-                <SettingsCardIcon icon="at-outline" colors={colors} />
-                <View className="min-w-0 flex-1">
-                  <AppText className="text-sm font-medium text-cove-muted">{t("username")}</AppText>
-                  <AppText className="mt-2 text-base font-semibold text-cove-ink">
-                    {displayUsername}
-                  </AppText>
-                  <FormMessage
-                    message={usernameSuccess}
-                    tone="success"
-                    onDismiss={() => setUsernameSuccess(null)}
-                  />
-                </View>
-              </View>
-              <EditButton
-                compact
-                variant="paper"
-                accessibilityLabel={t("editUsername")}
-                onPress={() => {
-                  setUsername(user?.email ?? "");
-                  setIsEditingUsername(true);
-                  setUsernameSuccess(null);
-                  setUsernameError(null);
-                }}
-              />
-            </View>
-          )}
-        </CardBlock>
-
-        <CardBlock>
-          <Pressable
-            onPress={() => setIsPasswordOpen((open) => !open)}
-            className="flex-row items-center justify-between gap-3 active:opacity-80"
-          >
-            <View className="min-w-0 flex-1 flex-row items-center gap-3">
-              <SettingsCardIcon icon="lock-closed-outline" colors={colors} />
-              <View className="min-w-0 flex-1">
-                <AppText className="text-sm font-medium text-cove-muted">{t("password")}</AppText>
-                <AppText className="mt-2 text-base font-semibold text-cove-ink">
-                  {t("changePassword")}
-                </AppText>
-              </View>
-            </View>
-            <Ionicons
-              name={isPasswordOpen ? "chevron-up" : "chevron-down"}
-              size={iconSize.sm}
-              color={colors.ink}
-            />
-          </Pressable>
-
-          {isPasswordOpen ? (
-            <View className="mt-4 gap-4">
-              <AppTextField
-                label={t("currentPassword")}
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                placeholder={t("currentPasswordPlaceholder")}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="password"
-              />
-              <AppTextField
-                label={t("newPassword")}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                placeholder={t("passwordMinPlaceholder")}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="new-password"
-              />
-              <AppTextField
-                label={t("confirmNewPassword")}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder={t("confirmPasswordPlaceholder")}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="new-password"
-              />
-              <FormMessage message={passwordError} />
-              <FormMessage
-                message={passwordSuccess}
-                tone="success"
-                onDismiss={() => setPasswordSuccess(null)}
-              />
-              <AppButton
-                label={t("updatePassword")}
-                disabled={!canUpdatePassword}
-                loading={isUpdatingPassword}
-                onPress={() => void onChangePassword()}
-              />
-            </View>
-          ) : null}
-        </CardBlock>
-
-        {/* Log out: a normal, neutral action — kept apart from Delete account. */}
-        <Pressable
+        <SettingsNavCard
+          icon="person-outline"
+          title={t("name")}
+          summary={displayName}
+          onPress={() => router.push("/settings/account-name" as Href)}
+          colors={colors}
+        />
+        <SettingsNavCard
+          icon="at-outline"
+          title={t("username")}
+          summary={displayUsername}
+          onPress={() => router.push("/settings/account-username" as Href)}
+          colors={colors}
+        />
+        <SettingsNavCard
+          icon="lock-closed-outline"
+          title={t("password")}
+          summary={t("changePassword")}
+          onPress={() => router.push("/settings/account-password" as Href)}
+          colors={colors}
+        />
+        <SettingsNavCard
+          icon="log-out-outline"
+          title={t("logOut")}
+          summary={t("signedInAs", { name: user?.email ?? displayName })}
           onPress={() => {
             setSignOutError(null);
             setIsConfirmingSignOut(true);
           }}
-          disabled={isSigningOut}
-          accessibilityRole="button"
-          accessibilityLabel={t("logOut")}
-          className="flex-row items-center gap-3 overflow-hidden rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
-          style={{ opacity: isSigningOut ? 0.5 : 1 }}
-        >
+          colors={colors}
+        />
+      </SettingsSection>
+
+      {/* Destructive, so set apart and plain: red text, no red fill. */}
+      <Pressable
+        onPress={() => {
+          setDeleteError(null);
+          setDeletePassword("");
+          setIsConfirmingDelete(true);
+        }}
+        disabled={isDeletingAccount}
+        accessibilityRole="button"
+        accessibilityLabel={t("deleteAccount")}
+        className="mt-6 active:opacity-70"
+      >
+        <View className="flex-row items-center gap-3 overflow-hidden rounded-3xl bg-cove-paper px-4 py-4">
           <View
             className="h-11 w-11 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: colors.mist }}
+            style={{ backgroundColor: withAlpha(DANGER, 0.1) }}
           >
-            <Ionicons
-              name="log-out-outline"
-              size={22}
-              color={colors.accent}
-              style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
-            />
+            <Ionicons name="trash-outline" size={20} color={DANGER} />
           </View>
-          <View className="min-w-0 flex-1">
-            <AppText className="text-base font-semibold text-cove-ink">{t("logOut")}</AppText>
-            <AppText className="mt-0.5 text-sm text-cove-muted" numberOfLines={1}>
-              {t("signedInAs", { name: user?.email ?? displayName })}
-            </AppText>
-          </View>
-          <Ionicons
-            name={isRTL ? "chevron-back" : "chevron-forward"}
-            size={iconSize.sm}
-            color={colors.ink}
-          />
-        </Pressable>
-
-        <CardBlock>
-          <AppButton
-            label={t("deleteAccount")}
-            variant="danger"
-            disabled={isDeletingAccount}
-            onPress={() => {
-              setDeleteError(null);
-              setDeletePassword("");
-              setIsConfirmingDelete(true);
-            }}
-          />
-        </CardBlock>
-      </SettingsSection>
+          <AppText className="flex-1 text-base font-semibold" style={{ color: DANGER }}>
+            {t("deleteAccount")}
+          </AppText>
+        </View>
+      </Pressable>
 
       <ConfirmModal
         visible={isConfirmingSignOut}

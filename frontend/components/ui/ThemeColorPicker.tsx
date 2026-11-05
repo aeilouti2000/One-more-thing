@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useRef, useState } from "react";
 import {
   type GestureResponderEvent,
@@ -77,6 +78,18 @@ const HUE_COLORS = [
 ] as const;
 
 const PANEL_HEIGHT = 168;
+const SWATCH = 44;
+/** Quick accent choices; anything else comes from the custom palette. */
+const PRESETS = [
+  DEFAULT_ACCENT,
+  "#5B6CFF",
+  "#8E5BE8",
+  "#E5487A",
+  "#E5484D",
+  "#F08C2E",
+  "#2EAD6B",
+  "#14A8A0",
+] as const;
 const SLIDER_HEIGHT = 28;
 const THUMB = 22;
 
@@ -103,6 +116,7 @@ export function ThemeColorPicker() {
   );
   const pureHue = useMemo(() => hsvToHex({ h: draft.h, s: 1, v: 1 }), [draft.h]);
   const dirty = draftHex.toUpperCase() !== accent.toUpperCase();
+  const isPreset = PRESETS.some((hex) => hex.toUpperCase() === accent.toUpperCase());
   const depthDirty = surfaceDepth !== DEFAULT_SURFACE_DEPTH;
 
   function openPicker() {
@@ -206,35 +220,106 @@ export function ThemeColorPicker() {
 
   return (
     <View accessibilityLabel={t("themeColor")}>
-      <AppText className="text-sm font-medium text-cove-muted">{t("themeColor")}</AppText>
-      <AppText className="mt-1 text-sm text-cove-muted">{t("themeColorBody")}</AppText>
-
-      <View className="mt-4 flex-row items-center gap-3">
+      {/* Preset swatches + a custom one that opens the full palette. */}
+      <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+        {PRESETS.map((hex) => {
+          const selected = hex.toUpperCase() === accent.toUpperCase();
+          return (
+            <Pressable
+              key={hex}
+              onPress={() => setAccent(hex)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={hex}
+              hitSlop={4}
+              className="active:opacity-80"
+            >
+              <View
+                style={{
+                  width: SWATCH,
+                  height: SWATCH,
+                  borderRadius: SWATCH / 2,
+                  padding: 3,
+                  borderWidth: 2,
+                  borderColor: selected ? hex : "transparent",
+                }}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    borderRadius: SWATCH / 2,
+                    backgroundColor: hex,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {selected ? <Ionicons name="checkmark" size={18} color="#FFFFFF" /> : null}
+                </View>
+              </View>
+            </Pressable>
+          );
+        })}
         <Pressable
           onPress={openPicker}
           accessibilityRole="button"
-          accessibilityLabel={t("themeColor")}
+          accessibilityLabel={t("themeColorCustom")}
+          hitSlop={4}
           className="active:opacity-80"
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: accent,
-            borderWidth: 2,
-            borderColor: withAlpha(colors.ink, 0.18),
-          }}
-        />
-        <View className="min-w-0 flex-1">
-          <AppText className="text-base font-semibold text-cove-ink">{accent}</AppText>
-          <AppText className="mt-0.5 text-xs text-cove-muted">{t("themeColorPreview")}</AppText>
-        </View>
+        >
+          <View
+            style={{
+              width: SWATCH,
+              height: SWATCH,
+              borderRadius: SWATCH / 2,
+              padding: 3,
+              borderWidth: 2,
+              borderColor: isPreset ? "transparent" : accent,
+            }}
+          >
+            <View style={{ flex: 1, borderRadius: SWATCH / 2, overflow: "hidden" }}>
+              <LinearGradient
+                colors={isPreset ? [...HUE_COLORS] : [accent, accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+              >
+                <Ionicons
+                  name={isPreset ? "color-wand-outline" : "checkmark"}
+                  size={isPreset ? 16 : 18}
+                  color="#FFFFFF"
+                />
+              </LinearGradient>
+            </View>
+          </View>
+        </Pressable>
       </View>
 
-      {accent.toUpperCase() !== DEFAULT_ACCENT.toUpperCase() || depthDirty ? (
-        <Pressable onPress={resetColor} className="mt-3 self-start active:opacity-80">
-          <AppText className="text-sm font-semibold text-cove-accent">{t("themeColorReset")}</AppText>
-        </Pressable>
-      ) : null}
+      <View className="mt-4 gap-3">
+        <View className="flex-row items-center gap-2">
+          <View
+            style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: accent }}
+          />
+          <AppText numberOfLines={1} className="min-w-0 flex-1 text-sm text-cove-muted">
+            {isPreset ? t("themeColorPreview") : t("themeColorCustom")} · {accent.toUpperCase()}
+          </AppText>
+        </View>
+        {accent.toUpperCase() !== DEFAULT_ACCENT.toUpperCase() || depthDirty ? (
+          <Pressable
+            onPress={resetColor}
+            accessibilityRole="button"
+            accessibilityLabel={t("themeColorReset")}
+            className="self-start active:opacity-80"
+          >
+            <View
+              className="flex-row items-center gap-1.5 px-3.5"
+              style={{ height: 34, borderRadius: 17, backgroundColor: withAlpha(colors.accent, 0.1) }}
+            >
+              <Ionicons name="refresh" size={15} color={colors.accent} />
+              <AppText className="text-sm font-semibold text-cove-accent">{t("themeColorReset")}</AppText>
+            </View>
+          </Pressable>
+        ) : null}
+      </View>
 
       {scheme === "dark" ? (
         <View className="mt-5">
@@ -387,8 +472,7 @@ export function ThemeColorPicker() {
               label={t("themeColorApply")}
               disabled={!dirty}
               onPress={applyColor}
-              style={{ backgroundColor: draftPalette.accent }}
-              labelStyle={{ color: draftPalette.onAccent }}
+              fill={{ background: draftPalette.accent, label: draftPalette.onAccent }}
             />
             <AppButton
               label={t("themeColorClose")}

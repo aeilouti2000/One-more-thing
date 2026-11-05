@@ -25,6 +25,10 @@ import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
+/** Matches the action buttons in the item sheets. */
+const ACTION_HEIGHT = 54;
+const ACTION_RADIUS = 18;
+
 export type CostSheetItem = {
   id: string;
   name: string;
@@ -633,23 +637,24 @@ function CostSheetBody({
         <FormMessage message={error} />
       </View>
 
-      <View className="mt-5 flex-row flex-wrap items-center justify-center gap-2">
+      <View className="mt-5 flex-row gap-3">
         <Pressable
           disabled={loading || scanning}
           onPress={onSkip}
           accessibilityRole="button"
           accessibilityLabel={skipLabel}
           accessibilityState={{ disabled: loading }}
-          className={`items-center px-3 py-2.5 ${
-            loading ? "opacity-45" : "active:opacity-80"
+          className={`flex-1 items-center justify-center px-3 ${
+            loading ? "opacity-45" : "active:opacity-75"
           }`}
           style={{
-            alignSelf: "center",
-            borderRadius: floatedControlRadius,
-            backgroundColor: scheme === "dark" ? colors.mist : "#F4F5F7",
+            height: ACTION_HEIGHT,
+            borderRadius: ACTION_RADIUS,
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.accent, 0.6),
           }}
         >
-          <AppText className="text-xs font-semibold text-cove-ink">
+          <AppText numberOfLines={1} className="text-sm font-semibold" style={{ color: colors.accent }}>
             {skipLabel}
           </AppText>
         </Pressable>
@@ -659,19 +664,20 @@ function CostSheetBody({
           accessibilityRole="button"
           accessibilityLabel={confirmLabel}
           accessibilityState={{ disabled: loading, busy: loading }}
-          className={`items-center px-4 py-3 ${
+          className={`flex-1 items-center justify-center px-3 ${
             loading ? "opacity-50" : "active:opacity-80"
           }`}
           style={{
-            alignSelf: "center",
+            height: ACTION_HEIGHT,
+            borderRadius: ACTION_RADIUS,
             backgroundColor: colors.accent,
-            borderRadius: floatedControlRadius,
           }}
         >
           {loading ? (
             <ActivityIndicator color={colors.onAccent} />
           ) : (
             <AppText
+              numberOfLines={1}
               className="text-sm font-semibold"
               style={{ color: colors.onAccent }}
             >

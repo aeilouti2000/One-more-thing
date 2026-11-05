@@ -57,9 +57,8 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
   const [isRemovingMember, setIsRemovingMember] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState("");
-  const [isJoinOpen, setIsJoinOpen] = useState(view === "add");
   const [newHomeName, setNewHomeName] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(view === "add");
+  const [addMode, setAddMode] = useState<"create" | "join">("create");
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -158,7 +157,6 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
 
     adoptHome(result.home);
     setNewHomeName("");
-    setIsCreateOpen(false);
     await refresh();
     if (view === "add" && router.canGoBack()) router.back();
   }
@@ -182,7 +180,6 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
 
     adoptHome(result.home);
     setInviteCode("");
-    setIsJoinOpen(false);
     await refresh();
     if (view === "add" && router.canGoBack()) router.back();
   }
@@ -304,89 +301,122 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
     };
   }
 
+  const creating = addMode === "create";
   const addHomeForms = (
-    <View className="gap-3">
-      <View className="rounded-2xl bg-cove-mist px-3.5 py-3.5">
-        <Pressable
-          onPress={() => setIsCreateOpen((open) => !open)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: isCreateOpen }}
-          className="min-h-11 flex-row items-center justify-between gap-3 active:opacity-80"
-        >
-          <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
-            {t("createAnotherHome")}
-          </AppText>
-          <View className="h-11 w-11 items-center justify-center">
-            <Ionicons
-              name={isCreateOpen ? "chevron-up" : "chevron-down"}
-              size={iconSize.sm}
-              color={colors.ink}
-            />
-          </View>
-        </Pressable>
-        {isCreateOpen ? (
-          <View className="mt-4 gap-4">
-            <AppText className="text-sm text-cove-muted">
-              {t("createAnotherHomeHint")}
-            </AppText>
-            <AppTextField
-              label={t("homeName")}
-              value={newHomeName}
-              onChangeText={setNewHomeName}
-              placeholder={t("homeNamePlaceholder")}
-              userText
-            />
-            <FormMessage message={createError} />
-            <AppButton
-              label={t("createAnotherHome")}
-              disabled={!newHomeName.trim()}
-              loading={isCreating}
-              onPress={() => void createAnotherHome()}
-            />
-          </View>
-        ) : null}
+    <View className="gap-4">
+      {/* Create / Join switch */}
+      <View
+        accessibilityRole="tablist"
+        style={{
+          flexDirection: "row",
+          padding: 4,
+          borderRadius: 22,
+          backgroundColor: scheme === "dark" ? withAlpha(colors.white, 0.05) : colors.mist,
+        }}
+      >
+        {(["create", "join"] as const).map((mode) => {
+          const active = addMode === mode;
+          return (
+            <Pressable
+              key={mode}
+              onPress={() => setAddMode(mode)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              style={{ flex: 1 }}
+            >
+              <View
+                style={{
+                  height: 38,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                {/* Always mounted with a fixed color: Android drops the
+                    radius when a View's background flips from transparent. */}
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    borderRadius: 19,
+                    overflow: "hidden",
+                    opacity: active ? 1 : 0,
+                    backgroundColor:
+                      scheme === "dark" ? withAlpha(colors.accent, 0.22) : colors.paper,
+                  }}
+                />
+                <Ionicons
+                  name={mode === "create" ? "add-circle-outline" : "key-outline"}
+                  size={16}
+                  color={active ? colors.accent : colors.muted}
+                />
+                <AppText
+                  className="text-sm font-semibold"
+                  style={{ color: active ? colors.ink : colors.muted }}
+                >
+                  {t(mode === "create" ? "addHomeCreateTab" : "addHomeJoinTab")}
+                </AppText>
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
 
-      <View className="rounded-2xl bg-cove-mist px-3.5 py-3.5">
-        <Pressable
-          onPress={() => setIsJoinOpen((open) => !open)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: isJoinOpen }}
-          className="min-h-11 flex-row items-center justify-between gap-3 active:opacity-80"
-        >
-          <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
-            {t("joinAnotherHome")}
-          </AppText>
-          <View className="h-11 w-11 items-center justify-center">
+      <View className="gap-5 rounded-3xl bg-cove-paper p-5">
+        <View className="items-center gap-3 pt-1">
+          <View
+            className="h-16 w-16 items-center justify-center rounded-3xl"
+            style={{ backgroundColor: withAlpha(colors.accent, 0.12) }}
+          >
             <Ionicons
-              name={isJoinOpen ? "chevron-up" : "chevron-down"}
-              size={iconSize.sm}
-              color={colors.ink}
+              name={creating ? "home-outline" : "people-outline"}
+              size={30}
+              color={colors.accent}
             />
           </View>
-        </Pressable>
-        {isJoinOpen ? (
-          <View className="mt-4 gap-4">
-            <AppText className="text-sm text-cove-muted">
-              {t("joinAnotherHomeHint")}
+          <View className="items-center gap-1">
+            <AppText className="text-center text-lg font-semibold text-cove-ink">
+              {t(creating ? "createAnotherHome" : "joinAnotherHome")}
             </AppText>
-            <AppTextField
-              label={t("inviteCode")}
-              value={inviteCode}
-              onChangeText={(value) => setInviteCode(value.toUpperCase())}
-              placeholder={t("inviteCodePlaceholder")}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-            <FormMessage message={joinError} />
-            <AppButton
-              label={t("joinThisHome")}
-              disabled={!inviteCode.trim()}
-              loading={isJoining}
-              onPress={() => void joinAnotherHome()}
-            />
+            <AppText className="text-center text-sm leading-5 text-cove-muted">
+              {t(creating ? "createAnotherHomeHint" : "joinAnotherHomeHint")}
+            </AppText>
           </View>
-        ) : null}
+        </View>
+
+        {creating ? (
+          <AppTextField
+            key="create"
+            label={t("homeName")}
+            value={newHomeName}
+            onChangeText={setNewHomeName}
+            placeholder={t("homeNamePlaceholder")}
+            userText
+          />
+        ) : (
+          <AppTextField
+            key="join"
+            label={t("inviteCode")}
+            value={inviteCode}
+            onChangeText={(value) => setInviteCode(value.toUpperCase())}
+            placeholder={t("inviteCodePlaceholder")}
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+        )}
+        <FormMessage message={creating ? createError : joinError} />
+        <AppButton
+          label={t(creating ? "createAnotherHome" : "joinThisHome")}
+          icon={creating ? "add" : "enter-outline"}
+          disabled={creating ? !newHomeName.trim() : !inviteCode.trim()}
+          loading={creating ? isCreating : isJoining}
+          onPress={() => void (creating ? createAnotherHome() : joinAnotherHome())}
+        />
       </View>
     </View>
   );
@@ -654,7 +684,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                 <Pressable
                   onPress={() => {
                     setWidePane("add");
-                    setIsCreateOpen(true);
+                    setAddMode("create");
                   }}
                   accessibilityRole="button"
                   accessibilityState={{ selected: widePane === "add" }}

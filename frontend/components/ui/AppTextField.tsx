@@ -25,6 +25,7 @@ type AppTextFieldProps = {
   compact?: boolean;
   glass?: boolean;
   onFocus?: TextInputProps["onFocus"];
+  autoFocus?: boolean;
 };
 
 export function AppTextField({
@@ -45,6 +46,7 @@ export function AppTextField({
   compact = false,
   glass = false,
   onFocus,
+  autoFocus,
 }: AppTextFieldProps) {
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
@@ -86,6 +88,7 @@ export function AppTextField({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
+        autoFocus={autoFocus}
         autoCorrect={autoCorrect}
         editable={editable}
         onFocus={onFocus}

@@ -50,13 +50,13 @@ type AuthLinkProps = {
 export function AuthFrame({
   children,
   scroll = true,
-  bare = false,
+  dense = false,
 }: {
   children: ReactNode;
   /** When false, the auth card fills the viewport without scrolling. */
   scroll?: boolean;
-  /** Full-screen content without the bordered card (welcome screen). */
-  bare?: boolean;
+  /** Tighter card padding for content-heavy, non-scrolling pages (welcome). */
+  dense?: boolean;
 }) {
   const { colors, scheme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -65,10 +65,9 @@ export function AuthFrame({
     paddingTop: Math.max(insets.top, 18),
     paddingBottom: Math.max(insets.bottom, 18),
   };
-  const cardStyle = bare
-    ? [styles.card, styles.cardBare]
-    : [
+  const cardStyle = [
     styles.card,
+    dense ? styles.cardDense : null,
     dark
       ? {
           backgroundColor: colors.paper,
@@ -382,14 +381,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
   },
-  cardBare: {
-    borderWidth: 0,
-    borderRadius: 0,
-    backgroundColor: "transparent",
-    paddingHorizontal: 4,
-    paddingTop: 4,
-    paddingBottom: 4,
-    overflow: "visible",
+  cardDense: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 16,
   },
   brand: {
     alignItems: "center",

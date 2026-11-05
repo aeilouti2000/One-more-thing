@@ -6,6 +6,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AppState, BackHandler, Platform, Pressable, View, type LayoutChangeEvent } from "react-native";
 import Animated, {
   Easing,
+  FadeInDown,
+  FadeOutDown,
   Extrapolation,
   interpolate,
   runOnJS,
@@ -42,6 +44,7 @@ import { canUndoBought, formatNeededShare, shareNeededText } from "@/features/it
 import { pickReceiptPhoto, interpretReceiptPhoto, type ReceiptScan } from "@/features/items/utils/scan-receipt";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Purchase } from "@/features/items/types/purchase";
 
 const ROW_GAP = 12;
@@ -50,11 +53,8 @@ const LEAVE_DELAY = 140;
 const LEAVE_MS = 380;
 const TRIP_REFRESH_MS = 5000;
 
-/**
- * Pause after the last check before closing the trip / opening costs — long
- * enough to tap Undo on the last item (undoing cancels the auto-finish).
- */
-const AUTO_FINISH_DELAY_MS = 2500;
+/** How long the floating Undo toast stays up after a check. */
+const UNDO_TOAST_MS = 5000;
 /** Row id for the single "Total paid" field in trip-total mode. */
 const TRIP_TOTAL_ROW_ID = "trip-total";
 
@@ -195,7 +195,11 @@ function TripBody() {
   useEffect(() => {
     if (!undoId) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
+    const hide = setTimeout(() => setUndoId(null), UNDO_TOAST_MS);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(hide);
+    };
   }, [undoId]);
 
   const multiMemberHome = (household?.members.length ?? 0) > 1;
@@ -318,7 +322,9 @@ function TripBody() {
       return false;
     }
     setSessionBoughtIds((current) => (current.includes(id) ? current : [...current, id]));
-    setUndoId(id);
+    // The last item finishes the trip right away, so it gets no Undo.
+    const isLast = tripItems.length === 0 || tripItems.every((row) => row.id === id);
+    setUndoId(isLast ? null : id);
     setNow(Date.now());
     return true;
   }
@@ -438,10 +444,10 @@ function TripBody() {
         return;
       }
       autoFinishedRef.current = true;
+      setUndoId(null);
       leaveTripRef.current();
     };
-    // Short beat so the final check registers before the page changes.
-    timer = setTimeout(attempt, AUTO_FINISH_DELAY_MS);
+    timer = setTimeout(attempt, 0);
     return () => clearTimeout(timer);
   }, [tripCleared]);
 
@@ -543,7 +549,17 @@ function TripBody() {
   }
 
   return (
-    <Screen>
+    <Screen
+      fab={
+        recent && !tripCleared ? (
+          <UndoToast
+            key={recent.id}
+            name={sessionNames.get(recent.id) ?? recent.name}
+            onUndo={() => void undoLast()}
+          />
+        ) : null
+      }
+    >
       <ScreenHeader
         title={listName ?? t("tripTitle")}
         subtitle={t("tripSubtitle")}
@@ -564,15 +580,6 @@ function TripBody() {
       />
 
       <FormMessage message={actionError ?? error} />
-
-      {recent ? (
-        <View className="mb-5 flex-row items-center justify-between gap-3 rounded-3xl bg-cove-paper px-4 py-3">
-          <AppText className="min-w-0 flex-1 text-sm text-cove-ink">{t("markedBoughtUndo")}</AppText>
-          <Pressable onPress={() => void undoLast()} className="active:opacity-80">
-            <AppText className="text-sm font-semibold text-cove-accent">{t("undoBought")}</AppText>
-          </Pressable>
-        </View>
-      ) : null}
 
       {tripItems.length === 0 ? (
         <EmptyState title={t("tripEmpty")} message={t("tripEmptyBody")} />
@@ -921,5 +928,58 @@ function TripCheckRow({
         </View>
       </Animated.View>
     </Animated.View>
+  );
+}
+
+/** Floating snackbar: overlays the list instead of pushing it down. */
+function UndoToast({ name, onUndo }: { name: string; onUndo: () => void }) {
+  const { t } = useI18n();
+  const { colors, scheme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const dark = scheme === "dark";
+  const surface = dark ? colors.paper : colors.ink;
+  const text = dark ? colors.ink : colors.paper;
+  return (
+    <View
+      pointerEvents="box-none"
+      style={{ position: "absolute", left: 16, right: 16, bottom: insets.bottom + 16, zIndex: 40 }}
+    >
+      <Animated.View
+        entering={FadeInDown.duration(220)}
+        exiting={FadeOutDown.duration(180)}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          paddingVertical: 10,
+          paddingStart: 16,
+          paddingEnd: 8,
+          borderRadius: 18,
+          backgroundColor: surface,
+          shadowColor: "#000",
+          shadowOpacity: 0.22,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 8,
+        }}
+      >
+        <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+        <AppText numberOfLines={1} className="min-w-0 flex-1 text-sm" style={{ color: text }}>
+          {t("boughtToast", { name })}
+        </AppText>
+        <Pressable
+          onPress={onUndo}
+          accessibilityRole="button"
+          accessibilityLabel={t("undoBought")}
+          hitSlop={8}
+          className="flex-row items-center gap-1 rounded-xl px-3 py-2 active:opacity-70"
+        >
+          <Ionicons name="arrow-undo" size={15} color={colors.accent} />
+          <AppText className="text-sm font-semibold" style={{ color: colors.accent }}>
+            {t("undoBought")}
+          </AppText>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }

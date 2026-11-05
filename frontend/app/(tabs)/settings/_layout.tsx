@@ -24,6 +24,9 @@ export default function SettingsLayout() {
   const screens = [
     "index",
     "account",
+    "account-name",
+    "account-username",
+    "account-password",
     "app",
     "swipe-actions",
     "categories",

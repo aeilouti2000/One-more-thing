@@ -36,13 +36,18 @@ type ItemDetailCardProps = {
 };
 
 export function ItemDetailCard({
-  purchase,
+  purchase: purchaseProp,
   visible,
   onClose,
   onDelete,
   presentation = "sheet",
 }: ItemDetailCardProps) {
   const { updateItem, updateCost, markBought } = usePurchases();
+  // Keep showing the last item while the sheet slides closed; otherwise the
+  // body flips to the empty edit form for a frame when the parent clears it.
+  const [lastPurchase, setLastPurchase] = useState<Purchase | null>(purchaseProp);
+  if (purchaseProp && purchaseProp !== lastPurchase) setLastPurchase(purchaseProp);
+  const purchase = purchaseProp ?? lastPurchase;
   const { household } = useHousehold();
   const { t, isRTL } = useI18n();
   const { colors } = useTheme();

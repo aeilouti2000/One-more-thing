@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, type Href } from "expo-router";
@@ -18,16 +18,10 @@ import { AuthFrame, AuthLegal, AuthLink } from "@/features/auth/components/auth-
 import { GuestOnly } from "@/features/auth/components/guest-only";
 import { AppLogo } from "@/components/ui/AppLogo";
 import { AppText } from "@/components/ui/AppText";
-import type { TranslationKey } from "@/constants/i18n";
 import { withAlpha } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
-const STEPS: { key: TranslationKey; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: "welcomeStepHome", icon: "home-outline" },
-  { key: "welcomeStepInvite", icon: "people-outline" },
-  { key: "welcomeStepShop", icon: "checkmark-done-outline" },
-];
 
 /** Static colors from the app icon — do not follow theme. */
 const ICON_MARK = "#FFB020";
@@ -40,10 +34,13 @@ const LAND_DELAY_MS = 450;
 /** How long the landed item stays before the loop restarts. */
 const LAND_HOLD_MS = 2400;
 const BOB_MS = 3200;
+/** Spend chart in the Costs tile (last bar = this month). */
+const BAR_HEIGHTS = [10, 16, 8, 20, 13, 24];
 
 /**
- * Welcome (design A): a live picture of the shared list, one clear promise,
- * the three steps at a glance, and sign-up as the main action.
+ * Welcome: a live shared list where "One more thing" types itself in; when it
+ * lands, a notification shows it reaching your partner. Trip and Costs tiles
+ * below hint at the rest of the app; sign-up is the main action.
  */
 export default function WelcomeScreen() {
   const { t, locale, setLocale, isRTL } = useI18n();
@@ -60,6 +57,8 @@ export default function WelcomeScreen() {
   const scale = slotHeight > 0 && cardHeight > 0 ? Math.min(1, slotHeight / cardHeight) : 1;
   // Each time the typed item lands, the "Synced live" badge blips.
   const [blip, setBlip] = useState(0);
+  // The partner notification shows while the typed item is on the list.
+  const [notified, setNotified] = useState(false);
   // Gentle float so the preview feels alive.
   const bob = useSharedValue(0);
   useEffect(() => {
@@ -78,7 +77,7 @@ export default function WelcomeScreen() {
 
   return (
     <GuestOnly>
-      <AuthFrame scroll={false} bare>
+      <AuthFrame scroll={false} dense>
         <View style={styles.page}>
           <LinearGradient
             pointerEvents="none"
@@ -119,6 +118,8 @@ export default function WelcomeScreen() {
             onLayout={(event) => setCardHeight(event.nativeEvent.layout.height)}
             style={[styles.cardWrap, { transform: [{ scale }], transformOrigin: "top" }]}
           >
+            <PartnerNotification visible={notified} item={t("previewOpen")} row={row} textAlign={textAlign} />
+
             <Animated.View style={bobStyle}>
             <View
               style={[
@@ -126,7 +127,8 @@ export default function WelcomeScreen() {
                 {
                   // Solid surface: a see-through card let Android's elevation
                   // shadow show through as a square behind it.
-                  backgroundColor: dark ? colors.paper : colors.white,
+                  // Solid, and a step off the page card so it reads as its own surface.
+                  backgroundColor: dark ? colors.deep : colors.ice,
                   borderColor: dark ? withAlpha(colors.white, 0.08) : withAlpha("#12141A", 0.08),
                 },
               ]}
@@ -167,68 +169,63 @@ export default function WelcomeScreen() {
                   text={t("previewOpen")}
                   row={row}
                   textAlign={textAlign}
-                  onLanded={() => setBlip((value) => value + 1)}
+                  onLanded={() => {
+                    setBlip((value) => value + 1);
+                    setNotified(true);
+                  }}
+                  onReset={() => setNotified(false)}
                 />
               </Animated.View>
             </View>
             </Animated.View>
+
+
+            <Animated.View
+              entering={FadeInDown.delay(380).duration(360)}
+              style={[styles.tiles, { flexDirection: row }]}
+            >
+              <FeatureTile icon="cart-outline" title={t("welcomeTripTitle")} row={row} textAlign={textAlign}>
+                <AppText className="text-[22px] font-bold" style={{ color: colors.ink, textAlign }}>
+                  7<AppText className="text-sm font-semibold" style={{ color: colors.muted }}>/10</AppText>
+                </AppText>
+                <View style={[styles.track, { backgroundColor: withAlpha(colors.muted, 0.2) }]}>
+                  <View
+                    style={[
+                      styles.trackFill,
+                      { backgroundColor: colors.accent, alignSelf: row === "row" ? "flex-start" : "flex-end" },
+                    ]}
+                  />
+                </View>
+                <AppText numberOfLines={1} className="text-[11px]" style={{ color: colors.muted, textAlign }}>
+                  {t("welcomeTripBody")}
+                </AppText>
+              </FeatureTile>
+              <FeatureTile icon="receipt-outline" title={t("welcomeCostsTitle")} row={row} textAlign={textAlign}>
+                <AppText className="text-[22px] font-bold" style={{ color: colors.ink, textAlign }}>
+                  {t("welcomeCostsValue")}
+                </AppText>
+                <View style={[styles.bars, { flexDirection: row }]}>
+                  {BAR_HEIGHTS.map((height, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.bar,
+                        {
+                          height,
+                          backgroundColor:
+                            index === BAR_HEIGHTS.length - 1 ? colors.accent : withAlpha(colors.muted, 0.25),
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+                <AppText numberOfLines={1} className="text-[11px]" style={{ color: colors.muted, textAlign }}>
+                  {t("welcomeCostsBody")}
+                </AppText>
+              </FeatureTile>
+            </Animated.View>
           </Animated.View>
           </View>
-
-          {/* Promise */}
-          <Animated.View entering={FadeIn.delay(260).duration(360)} style={styles.copy}>
-
-            <AppText
-              className="text-[17px] font-semibold leading-[24px]"
-              style={{ color: colors.ink, textAlign: "center" }}
-            >
-              {t("welcomeBody")}
-            </AppText>
-          </Animated.View>
-
-          {/* Steps */}
-          <Animated.View
-            entering={FadeIn.delay(380).duration(360)}
-            accessible
-            accessibilityLabel={`${t("howItWorks")}: ${STEPS.map((step) => t(step.key)).join(", ")}`}
-            style={[
-              styles.steps,
-              {
-                flexDirection: row,
-                backgroundColor: dark ? withAlpha(colors.white, 0.03) : withAlpha("#12141A", 0.03),
-                borderColor: dark ? withAlpha(colors.white, 0.06) : withAlpha("#12141A", 0.06),
-              },
-            ]}
-          >
-            {STEPS.map((step, index) => (
-              <View key={step.key} style={[styles.stepWrap, { flexDirection: row }]}>
-                <View style={styles.step}>
-                  <View
-                    style={[styles.stepIcon, { backgroundColor: withAlpha(colors.accent, dark ? 0.16 : 0.12) }]}
-                  >
-                    <Ionicons name={step.icon} size={18} color={colors.accent} />
-                    <View style={[styles.stepNumber, { backgroundColor: colors.accent, borderColor: dark ? colors.deep : colors.ice }]}>
-                      <AppText className="text-[10px] font-bold" style={{ color: colors.onAccent }}>
-                        {index + 1}
-                      </AppText>
-                    </View>
-                  </View>
-                  <AppText
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
-                    className="text-xs font-semibold"
-                    style={{ color: colors.ink, textAlign: "center" }}
-                  >
-                    {t(step.key)}
-                  </AppText>
-                </View>
-                {index < STEPS.length - 1 ? (
-                  <View style={[styles.connector, { borderColor: withAlpha(colors.muted, 0.35) }]} />
-                ) : null}
-              </View>
-            ))}
-          </Animated.View>
 
           {/* Actions */}
           <Animated.View entering={FadeInDown.delay(440).duration(360)} style={styles.actions}>
@@ -414,6 +411,107 @@ function PreviewRow({
 }
 
 /**
+ * What your partner's phone shows when the typed item lands. Space is always
+ * reserved so the tiles below never jump; it slides/fades in and out.
+ */
+function PartnerNotification({
+  visible,
+  item,
+  row,
+  textAlign,
+}: {
+  visible: boolean;
+  item: string;
+  row: "row" | "row-reverse";
+  textAlign: "left" | "right";
+}) {
+  const { t } = useI18n();
+  const { colors, scheme } = useTheme();
+  const dark = scheme === "dark";
+  const shown = useSharedValue(0);
+  useEffect(() => {
+    shown.set(
+      withTiming(visible ? 1 : 0, {
+        duration: visible ? 360 : 220,
+        easing: visible ? Easing.out(Easing.back(1.4)) : Easing.in(Easing.quad),
+      }),
+    );
+  }, [shown, visible]);
+  const style = useAnimatedStyle(() => ({
+    opacity: shown.value,
+    transform: [{ translateY: (1 - shown.value) * -10 }, { scale: 0.96 + shown.value * 0.04 }],
+  }));
+  return (
+    <Animated.View
+      accessibilityElementsHidden={!visible}
+      importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
+      style={[
+        styles.notice,
+        {
+          flexDirection: row,
+          backgroundColor: dark ? colors.mist : colors.white,
+          borderColor: dark ? withAlpha(colors.white, 0.1) : withAlpha("#12141A", 0.08),
+        },
+        style,
+      ]}
+    >
+      <AppLogo size={30} />
+      <View style={styles.rowText}>
+        <View style={[styles.noticeHead, { flexDirection: row }]}>
+          <AppText numberOfLines={1} className="flex-1 text-[13px] font-bold" style={{ color: colors.ink, textAlign }}>
+            {t("welcomeNotifyTitle")}
+          </AppText>
+          <AppText className="text-[11px]" style={{ color: colors.muted }}>
+            {t("welcomeNow")}
+          </AppText>
+        </View>
+        <AppText numberOfLines={1} className="text-xs" style={{ color: colors.muted, textAlign }}>
+          {t("welcomeNotifyBody", { item })}
+        </AppText>
+      </View>
+    </Animated.View>
+  );
+}
+
+function FeatureTile({
+  icon,
+  title,
+  row,
+  textAlign,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  row: "row" | "row-reverse";
+  textAlign: "left" | "right";
+  children: ReactNode;
+}) {
+  const { colors, scheme } = useTheme();
+  const dark = scheme === "dark";
+  return (
+    <View
+      style={[
+        styles.tile,
+        {
+          backgroundColor: dark ? colors.deep : colors.ice,
+          borderColor: dark ? withAlpha(colors.white, 0.08) : withAlpha("#12141A", 0.08),
+        },
+      ]}
+    >
+      <View style={[styles.tileHead, { flexDirection: row }]}>
+        <View style={[styles.tileIcon, { backgroundColor: withAlpha(colors.accent, dark ? 0.16 : 0.12) }]}>
+          <Ionicons name={icon} size={15} color={colors.accent} />
+        </View>
+        <AppText numberOfLines={1} className="flex-1 text-[13px] font-semibold" style={{ color: colors.ink, textAlign }}>
+          {title}
+        </AppText>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/**
  * "One more thing…" types itself, lands on the list as a real item ("added by
  * you · just now"), stays a moment, then the loop restarts.
  */
@@ -422,11 +520,13 @@ function TypingRow({
   row,
   textAlign,
   onLanded,
+  onReset,
 }: {
   text: string;
   row: "row" | "row-reverse";
   textAlign: "left" | "right";
   onLanded?: () => void;
+  onReset?: () => void;
 }) {
   const { t } = useI18n();
   const { colors, scheme } = useTheme();
@@ -435,8 +535,10 @@ function TypingRow({
   const [landed, setLanded] = useState(false);
   const caret = useSharedValue(1);
   const landedRef = useRef(onLanded);
+  const resetRef = useRef(onReset);
   useEffect(() => {
     landedRef.current = onLanded;
+    resetRef.current = onReset;
   });
 
   useEffect(() => {
@@ -460,6 +562,7 @@ function TypingRow({
         landedRef.current?.();
         later(LAND_HOLD_MS, () => {
           setLanded(false);
+          resetRef.current?.();
           setCount(0);
           next = 0;
           later(500, type);
@@ -650,45 +753,64 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     marginHorizontal: 1,
   },
-  copy: {
-    marginTop: 20,
-    paddingHorizontal: 8,
+  notice: {
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 18,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
   },
-  steps: {
-    marginTop: 18,
+  noticeHead: {
+    alignItems: "center",
+    gap: 8,
+  },
+  tiles: {
+    gap: 10,
+    marginTop: 10,
+  },
+  tile: {
+    flex: 1,
     borderRadius: 20,
     borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    alignItems: "flex-start",
+    padding: 12,
+    gap: 6,
   },
-  stepWrap: {
-    flex: 1,
-    alignItems: "flex-start",
-  },
-  step: {
-    flex: 1,
+  tileHead: {
     alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 2,
+    gap: 8,
+    marginBottom: 2,
   },
-  stepIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepNumber: {
-    position: "absolute",
-    top: -4,
-    end: -6,
-    width: 17,
-    height: 17,
+  tileIcon: {
+    width: 26,
+    height: 26,
     borderRadius: 9,
-    borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
+  },
+  track: {
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  trackFill: {
+    width: "70%",
+    height: "100%",
+    borderRadius: 3,
+  },
+  bars: {
+    alignItems: "flex-end",
+    gap: 4,
+    height: 24,
+  },
+  bar: {
+    width: 7,
+    borderRadius: 2,
   },
   primaryButton: {
     gap: 8,
@@ -696,12 +818,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 6,
-  },
-  connector: {
-    width: 14,
-    marginTop: 18,
-    borderTopWidth: 1.5,
-    borderStyle: "dashed",
   },
   actions: {
     gap: 14,
