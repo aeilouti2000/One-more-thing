@@ -48,6 +48,28 @@ export function formatAppError(
   if (code === "email_exists" || code === "user_already_exists" || code === "EMAIL_TAKEN") {
     return translate("errorEmailTaken");
   }
+  const codeKeys: Record<string, Parameters<typeof translate>[0]> = {
+    EMAIL_IN_USE: "errorEmailInUse",
+    CODE_INVALID: "errorCodeInvalid",
+    CODE_EXPIRED: "errorCodeExpired",
+    CODE_TOO_MANY_ATTEMPTS: "errorCodeAttempts",
+    CODE_COOLDOWN: "errorTryAgainSoon",
+    GOOGLE_IN_USE: "errorGoogleInUse",
+    GOOGLE_MISMATCH: "errorGoogleMismatch",
+    GOOGLE_TOKEN_INVALID: "errorGoogleFailed",
+    GOOGLE_UNAVAILABLE: "googleUnavailable",
+    LAST_SIGN_IN_METHOD: "googleNeedsPassword",
+    EMAIL_SEND_FAILED: "errorEmailSend",
+    EMAIL_UNAVAILABLE: "errorEmailSend",
+    IMAGE_INVALID: "errorPhotoInvalid",
+    IMAGE_REQUIRED: "errorPhotoInvalid",
+  };
+  if (codeKeys[code]) {
+    return translate(codeKeys[code]);
+  }
+  if (lower.includes("file too large")) {
+    return translate("errorPhotoTooLarge");
+  }
   if (code === "INVALID_CREDENTIALS") {
     return translate("errorWrongEmailOrPassword");
   }

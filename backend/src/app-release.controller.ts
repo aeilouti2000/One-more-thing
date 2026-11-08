@@ -11,9 +11,11 @@ export class AppReleaseController {
   @Get("release")
   release() {
     const minVersion = this.config.get("APP_MIN_VERSION", { infer: true }).trim();
+    const latestVersion = this.config.get("APP_LATEST_VERSION", { infer: true }).trim();
     const downloadUrl = this.config.get("APP_DOWNLOAD_URL", { infer: true }).trim();
     return {
       minVersion: minVersion || null,
+      latestVersion: latestVersion || null,
       downloadUrl: downloadUrl || null,
     };
   }

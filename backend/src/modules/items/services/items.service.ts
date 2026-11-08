@@ -29,6 +29,8 @@ export type ItemView = {
   /** Trip receipt this item was priced under (trip-total mode). */
   receiptId: string | null;
   receiptTotal: number | null;
+  /** Photo id; load it from GET /item-images/:imageId. */
+  imageId: string | null;
   addedBy: string;
   boughtBy: string | null;
   addedByName: string;
@@ -434,7 +436,14 @@ export class ItemsService {
     return list;
   }
 
-  private async requireItem(userId: string, itemId: string) {
+  /** The item as the app sees it, after checking the user may touch it. */
+  async view(userId: string, itemId: string) {
+    const item = await this.requireItem(userId, itemId);
+    const [view] = await this.withNames([item]);
+    return view;
+  }
+
+  async requireItem(userId: string, itemId: string) {
     const membership = await this.homes.requireMembership(userId);
     const item = await this.items.findInHome(itemId, membership.homeId);
     if (!item) {
@@ -471,6 +480,7 @@ export class ItemsService {
       cost: row.cost === null || row.cost === undefined ? null : Number(row.cost),
       receiptId: row.receiptId ?? null,
       receiptTotal: row.receiptId ? (receiptTotals.get(row.receiptId) ?? null) : null,
+      imageId: row.imageId ?? null,
       addedBy: row.addedBy,
       boughtBy: row.boughtBy,
       addedByName: names.get(row.addedBy) ?? "Member",

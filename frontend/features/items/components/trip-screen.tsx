@@ -19,6 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { RequireSession } from "@/features/auth/components/require-session";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
+import { ItemPhotoThumb, ItemPhotoViewer, itemPhotoUri } from "@/features/items/components/item-photo";
 import { ReceiptSourceModal } from "@/features/items/components/receipt-source-modal";
 import { AppText } from "@/components/ui/AppText";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -708,8 +709,10 @@ function TripCheckRow({
   onInflight: (delta: number) => void;
 }) {
   const { colors } = useTheme();
-  const { isRTL } = useI18n();
+  const { t, isRTL } = useI18n();
   const quantity = item.unit ? `${item.quantity} ${item.unit}` : `x${item.quantity}`;
+  const photoUri = itemPhotoUri(item);
+  const [viewingPhoto, setViewingPhoto] = useState(false);
   const locked = useRef(false);
   const pendingCost = useRef<number | null>(null);
   const mounted = useRef(true);
@@ -923,10 +926,28 @@ function TripCheckRow({
                 ) : null}
                 <AppText className="mt-1 text-sm text-cove-muted">{quantity}</AppText>
               </View>
+              {photoUri ? (
+                // Its own press target: look at the photo without checking the item off.
+                <Pressable
+                  onPress={() => setViewingPhoto(true)}
+                  disabled={leaving}
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={t("itemPhotoView")}
+                  hitSlop={6}
+                  className="active:opacity-80"
+                >
+                  <ItemPhotoThumb uri={photoUri} size={52} radius={14} />
+                </Pressable>
+              ) : null}
             </View>
           </Pressable>
         </View>
       </Animated.View>
+      <ItemPhotoViewer
+        uri={viewingPhoto ? photoUri : null}
+        title={item.name}
+        onClose={() => setViewingPhoto(false)}
+      />
     </Animated.View>
   );
 }

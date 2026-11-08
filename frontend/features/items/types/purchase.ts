@@ -15,6 +15,11 @@ export type Purchase = {
   /** Set when the trip was priced as one total instead of per item. */
   receiptId?: string | null;
   receiptTotal?: number | null;
+  /** Server photo id (see itemImageUrl). */
+  imageId?: string | null;
+  /** Local photo shown while it uploads (and until the next refresh). */
+  localImageUri?: string;
+  photoUploading?: boolean;
   listId?: string;
   listName?: string;
   addedByName: string;

@@ -45,9 +45,32 @@ class EnvironmentVariables {
   @IsString()
   APP_MIN_VERSION = "";
 
+  /** Newest released version. Older installs get an optional "update or later" prompt. */
+  @IsOptional()
+  @IsString()
+  APP_LATEST_VERSION = "";
+
   @IsOptional()
   @IsString()
   APP_DOWNLOAD_URL = "";
+
+  /** OAuth Web client ID; Google ID tokens from the app are issued for it. */
+  @IsOptional()
+  @IsString()
+  GOOGLE_CLIENT_ID = "";
+
+  /** Brevo transactional email. Without a key, codes are only logged. */
+  @IsOptional()
+  @IsString()
+  BREVO_API_KEY = "";
+
+  @IsOptional()
+  @IsString()
+  MAIL_FROM_EMAIL = "";
+
+  @IsOptional()
+  @IsString()
+  MAIL_FROM_NAME = "One More Thing";
 }
 
 export function validateEnv(config: Record<string, unknown>) {

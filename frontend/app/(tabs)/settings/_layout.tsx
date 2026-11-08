@@ -27,6 +27,7 @@ export default function SettingsLayout() {
     "account-name",
     "account-username",
     "account-password",
+    "account-email",
     "app",
     "swipe-actions",
     "categories",

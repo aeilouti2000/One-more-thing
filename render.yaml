@@ -23,5 +23,15 @@ services:
         value: ""
       - key: APP_MIN_VERSION
         value: "2.2.2"
+      - key: APP_LATEST_VERSION
+        value: ""
       - key: APP_DOWNLOAD_URL
-        value: "https://expo.dev/artifacts/eas/RtaP4Eov_znHtCGLcR4Qkea3lz9k-80iWbVw4eHIFew.apk"
+        value: "https://expo.dev/artifacts/eas/YsYtyqNfqhzxCX-J4KdSxYJ9upJpkz4JJux7VE4_q2w.apk"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM_EMAIL
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: One More Thing

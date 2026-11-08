@@ -7,7 +7,7 @@ import {
   ReadexPro_700Bold,
   useFonts,
 } from "@expo-google-fonts/readex-pro";
-import { Platform } from "react-native";
+import { Modal, Platform } from "react-native";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
@@ -15,7 +15,7 @@ import { BlurScreen } from "@/components/ui/BlurBackdrop";
 import { DragOverlayProvider } from "@/components/ui/DragOverlay";
 import { TabBlurProvider } from "@/components/ui/TabBlurTarget";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
-import { requiredAppUpdate } from "@/lib/app-release";
+import { checkAppUpdate, dismissAppUpdate, type AppUpdate } from "@/lib/app-release";
 import { AuthProvider } from "@/features/auth/providers/auth-provider";
 import { CategoriesProvider } from "@/features/items/providers/categories-provider";
 import { PurchasesProvider } from "@/features/items/hooks/use-purchases";
@@ -39,8 +39,8 @@ function ThemedNavigation() {
         }}
       >
         <Stack.Screen name="index" />
-        <Stack.Screen name="welcome" />
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="verify-email" />
         <Stack.Screen name="create-home" />
         <Stack.Screen name="join-home" />
         <Stack.Screen name="(tabs)" />
@@ -62,11 +62,11 @@ function ThemedNavigation() {
 }
 
 function UpdateGate() {
-  const [release, setRelease] = useState<{ downloadUrl: string | null } | null>(null);
+  const [release, setRelease] = useState<AppUpdate | null>(null);
 
   useEffect(() => {
     let active = true;
-    void requiredAppUpdate().then((update) => {
+    void checkAppUpdate().then((update) => {
       if (!active || !update) return;
       setRelease(update);
     });
@@ -75,8 +75,30 @@ function UpdateGate() {
     };
   }, []);
 
-  if (release) return <ForceUpdate downloadUrl={release.downloadUrl} />;
-  return <ThemedNavigation />;
+  if (release?.required) {
+    return <ForceUpdate downloadUrl={release.downloadUrl} />;
+  }
+  const later = () => {
+    if (!release) return;
+    dismissAppUpdate(release.version);
+    setRelease(null);
+  };
+  // An optional update shows over the app, so whatever the user already
+  // opened or typed is still there after "Later".
+  return (
+    <>
+      <ThemedNavigation />
+      <Modal
+        visible={release !== null}
+        animationType="fade"
+        statusBarTranslucent
+        navigationBarTranslucent
+        onRequestClose={later}
+      >
+        {release ? <ForceUpdate downloadUrl={release.downloadUrl} onLater={later} /> : null}
+      </Modal>
+    </>
+  );
 }
 
 export default function RootLayout() {

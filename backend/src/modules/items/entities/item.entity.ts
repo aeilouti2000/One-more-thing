@@ -119,4 +119,8 @@ export class Item {
   /** Set when this item's trip was priced as one total (see TripReceipt). */
   @Column({ name: "receipt_id", type: "uuid", nullable: true })
   receiptId: string | null;
+
+  /** Current photo (item_images row). A new id on every replace. */
+  @Column({ name: "image_id", type: "uuid", nullable: true })
+  imageId: string | null;
 }

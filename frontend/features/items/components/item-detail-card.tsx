@@ -1,8 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, ScrollView, View } from "react-native";
 import { ItemSheetForm, ItemSheetToggle } from "@/features/items/components/item-sheet-form";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
+import {
+  ItemPhotoField,
+  ItemPhotoViewer,
+  PhotoSourceSheet,
+  itemPhotoUri,
+  useItemPhotoChooser,
+} from "@/features/items/components/item-photo";
 import { StatusBadge } from "@/features/items/components/status-badge";
 import { AppButton } from "@/components/ui/AppButton";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -42,7 +49,7 @@ export function ItemDetailCard({
   onDelete,
   presentation = "sheet",
 }: ItemDetailCardProps) {
-  const { updateItem, updateCost, markBought } = usePurchases();
+  const { updateItem, updateCost, markBought, setItemPhoto } = usePurchases();
   // Keep showing the last item while the sheet slides closed; otherwise the
   // body flips to the empty edit form for a frame when the parent clears it.
   const [lastPurchase, setLastPurchase] = useState<Purchase | null>(purchaseProp);
@@ -69,6 +76,32 @@ export function ItemDetailCard({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const editable = purchase?.status === "needed";
+  const [viewingPhoto, setViewingPhoto] = useState(false);
+  // Photo changes save at once, apart from "Save changes".
+  const photoUri = itemPhotoUri(purchase);
+  const photoTarget = purchase && !purchase.id.startsWith("temp-") ? purchase.id : null;
+  const chooser = useItemPhotoChooser({
+    onPicked: (photo) => {
+      if (!photoTarget) return;
+      void setItemPhoto(photoTarget, photo).then((result) => {
+        if (result.error) setError(result.error);
+      });
+    },
+    onRemove: () => {
+      if (!photoTarget) return;
+      void setItemPhoto(photoTarget, null).then((result) => {
+        if (result.error) setError(result.error);
+      });
+    },
+  });
+  const photoField = photoTarget ? (
+    <ItemPhotoField
+      uri={photoUri}
+      uploading={purchase?.photoUploading === true}
+      onAdd={chooser.open}
+      onView={() => setViewingPhoto(true)}
+    />
+  ) : null;
   const askSingleCost =
     household?.costsEnabled === true && household.askCostOnSingleBuy !== false;
 
@@ -83,6 +116,8 @@ export function ItemDetailCard({
     setPinBaseline(false);
     setPinnedPinId(null);
     setQuantityError(undefined);
+    setViewingPhoto(false);
+    chooser.setError(null);
   }
 
   async function loadPin(item: Purchase) {
@@ -255,7 +290,8 @@ export function ItemDetailCard({
         purchase={purchase}
         currency={household?.currency ?? "JOD"}
         costsEnabled={household?.costsEnabled === true}
-        error={error}
+        error={error ?? chooser.error}
+        photo={photoField}
         showClose={presentation === "sheet"}
         onEditCost={() => setEditCostOpen(true)}
         onAskDelete={onDelete ? () => setDeleteOpen(true) : undefined}
@@ -273,7 +309,8 @@ export function ItemDetailCard({
         pinned={pinned}
         pinBaseline={pinBaseline}
         quantityError={quantityError}
-        error={error}
+        error={error ?? chooser.error}
+        photo={photoField}
         isSubmitting={isSubmitting}
         onClose={presentation === "sheet" ? close : undefined}
         onChangeUnit={setUnit}
@@ -345,6 +382,23 @@ export function ItemDetailCard({
     </>
   );
 
+  const photoLayers = (
+    <>
+      <PhotoSourceSheet
+        visible={chooser.sourceOpen}
+        canRemove={Boolean(photoUri)}
+        onChoose={chooser.choose}
+        onRemove={chooser.remove}
+        onClose={chooser.close}
+      />
+      <ItemPhotoViewer
+        uri={viewingPhoto ? photoUri : null}
+        title={purchase?.name}
+        onClose={() => setViewingPhoto(false)}
+      />
+    </>
+  );
+
   const deleteConfirm = (
     <ConfirmModal
       visible={deleteOpen && purchase !== null}
@@ -404,6 +458,7 @@ export function ItemDetailCard({
           )}
         </ScrollView>
         {deleteConfirm}
+        {photoLayers}
       </>
     );
   }
@@ -412,6 +467,7 @@ export function ItemDetailCard({
     <>
       <FormSheetModal
         visible={visible && purchase !== null && !costPromptOpen && !editCostOpen && !deleteOpen}
+        covered={chooser.covered}
         onClose={close}
         onShow={() => {
           if (!purchase) return;
@@ -422,6 +478,7 @@ export function ItemDetailCard({
       </FormSheetModal>
       {costSheets}
       {deleteConfirm}
+      {photoLayers}
     </>
   );
 }
@@ -438,6 +495,7 @@ function EditItemForm({
   pinBaseline,
   quantityError,
   error,
+  photo,
   isSubmitting,
   onClose,
   onChangeName,
@@ -461,6 +519,7 @@ function EditItemForm({
   pinBaseline: boolean;
   quantityError?: string;
   error: string | null;
+  photo: ReactNode;
   isSubmitting: boolean;
   onClose?: () => void;
   onChangeName: (value: string) => void;
@@ -517,6 +576,7 @@ function EditItemForm({
         onChangeCategory={onChangeCategory}
         notes={notes}
         onChangeNotes={onChangeNotes}
+        photo={photo}
         extra={
           <ItemSheetToggle
             label={t("pinSelected")}
@@ -541,6 +601,7 @@ function HistoryItemCard({
   currency,
   costsEnabled,
   error,
+  photo,
   showClose = true,
   onEditCost,
   onAskDelete,
@@ -550,6 +611,7 @@ function HistoryItemCard({
   currency: string;
   costsEnabled: boolean;
   error: string | null;
+  photo: ReactNode;
   showClose?: boolean;
   onEditCost: () => void;
   onAskDelete?: () => void;
@@ -655,6 +717,8 @@ function HistoryItemCard({
             <AppText className="text-base font-medium text-cove-ink">{purchase.notes}</AppText>
           </FloatedCardSection>
         ) : null}
+
+        {photo}
 
         <FormMessage message={error} />
       </View>

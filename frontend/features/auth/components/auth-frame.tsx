@@ -8,8 +8,11 @@ import {
   StyleSheet,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
+  type ViewStyle,
 } from "react-native";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,6 +25,9 @@ import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const GOOGLE_G = require("../../../assets/images/google-g.png");
+
 type AuthFieldProps = {
   label: string;
   value: string;
@@ -32,6 +38,12 @@ type AuthFieldProps = {
   autoComplete?: TextInputProps["autoComplete"];
   autoCorrect?: boolean;
   error?: string;
+  keyboardType?: TextInputProps["keyboardType"];
+  textContentType?: TextInputProps["textContentType"];
+  maxLength?: number;
+  autoFocus?: boolean;
+  /** Small muted line under the field (hidden while an error shows). */
+  hint?: string;
 };
 
 type AuthButtonProps = {
@@ -80,7 +92,12 @@ export function AuthFrame({
   ];
 
   return (
-    <View style={[styles.root, { backgroundColor: dark ? colors.deep : colors.ice }]}>
+    <View
+      style={[
+        styles.root,
+        { backgroundColor: dark ? colors.deep : colors.ice },
+      ]}
+    >
       <StatusBar style={dark ? "light" : "dark"} />
 
       <KeyboardAvoidingView
@@ -133,7 +150,13 @@ export function AuthBrand({ showName = true }: { showName?: boolean } = {}) {
   );
 }
 
-export function AuthHeading({ title, subtitle }: { title: string; subtitle: string }) {
+export function AuthHeading({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
   const { colors } = useTheme();
 
   return (
@@ -174,6 +197,11 @@ export function AuthField({
   autoComplete,
   autoCorrect,
   error,
+  keyboardType,
+  textContentType,
+  maxLength,
+  autoFocus,
+  hint,
 }: AuthFieldProps) {
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
@@ -181,11 +209,17 @@ export function AuthField({
   const inputSize = scaleFontSize(15, scale);
   const dark = scheme === "dark";
   const inputAlign = isRTL ? "right" : "left";
-  const messageAlign = !isRTL ? "left" : Platform.OS === "android" ? "left" : "right";
+  const messageAlign = !isRTL
+    ? "left"
+    : Platform.OS === "android"
+      ? "left"
+      : "right";
 
   return (
     <View style={styles.field}>
-      <AppText style={{ color: colors.muted, fontSize: 13, lineHeight: 18 }}>{label}</AppText>
+      <AppText style={{ color: colors.muted, fontSize: 13, lineHeight: 18 }}>
+        {label}
+      </AppText>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -194,6 +228,10 @@ export function AuthField({
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
         autoCorrect={autoCorrect}
+        keyboardType={keyboardType}
+        textContentType={textContentType}
+        maxLength={maxLength}
+        autoFocus={autoFocus}
         accessibilityLabel={label}
         textAlign={inputAlign}
         textAlignVertical="center"
@@ -208,8 +246,14 @@ export function AuthField({
           {
             fontSize: inputSize,
             color: colors.ink,
-            backgroundColor: dark ? withAlpha(colors.white, 0.06) : colors.paper,
-            borderColor: error ? "#F87171" : dark ? withAlpha(colors.white, 0.12) : colors.line,
+            backgroundColor: dark
+              ? withAlpha(colors.white, 0.06)
+              : colors.paper,
+            borderColor: error
+              ? "#F87171"
+              : dark
+                ? withAlpha(colors.white, 0.12)
+                : colors.line,
             writingDirection: isRTL ? "rtl" : "ltr",
             ...(Platform.OS === "web" ? { outlineWidth: 0 } : null),
           },
@@ -228,12 +272,30 @@ export function AuthField({
         >
           {error}
         </AppText>
+      ) : hint ? (
+        <AppText
+          style={{
+            width: "100%",
+            color: withAlpha(colors.muted, 0.85),
+            fontSize: 12,
+            lineHeight: 16,
+            textAlign: messageAlign,
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {hint}
+        </AppText>
       ) : null}
     </View>
   );
 }
 
-export function AuthButton({ label, onPress, disabled = false, loading = false }: AuthButtonProps) {
+export function AuthButton({
+  label,
+  onPress,
+  disabled = false,
+  loading = false,
+}: AuthButtonProps) {
   const { colors } = useTheme();
   const { isRTL } = useI18n();
   const isDisabled = disabled || loading;
@@ -275,6 +337,136 @@ export function AuthButton({ label, onPress, disabled = false, loading = false }
           </AppText>
         )}
       </LinearGradient>
+    </Pressable>
+  );
+}
+
+/** "Continue with Google": neutral surface + the standard multicolor G. */
+const GOOGLE_LIGHT = { fill: "#FFFFFF", border: "#747775", text: "#1F1F1F" };
+const GOOGLE_DARK = { fill: "#131314", border: "#8E918F", text: "#E3E3E3" };
+
+export function AuthGoogleButton({
+  label,
+  onPress,
+  loading = false,
+  disabled = false,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  /** Size overrides so the button can match the screen's other buttons. */
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { scheme } = useTheme();
+  // Google's branding colors: a white button in light mode, near-black in dark.
+  const palette = scheme === "dark" ? GOOGLE_DARK : GOOGLE_LIGHT;
+  const isDisabled = disabled || loading;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      style={({ pressed }) => ({
+        opacity:
+          pressed && !isDisabled ? 0.85 : isDisabled && !loading ? 0.6 : 1,
+      })}
+    >
+      <View
+        style={[
+          styles.googleButton,
+          { backgroundColor: palette.fill, borderColor: palette.border },
+          style,
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator color={palette.text} />
+        ) : (
+          <>
+            <Image
+              source={GOOGLE_G}
+              style={{ width: 20, height: 20 }}
+              contentFit="contain"
+            />
+            <AppText
+              style={{
+                color: palette.text,
+                fontWeight: "600",
+                fontSize: 15,
+                lineHeight: 20,
+              }}
+            >
+              {label}
+            </AppText>
+          </>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+export function AuthDivider({ label }: { label: string }) {
+  const { colors, scheme } = useTheme();
+  const line = scheme === "dark" ? withAlpha(colors.white, 0.12) : colors.line;
+
+  return (
+    <View
+      style={styles.divider}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <View style={[styles.dividerLine, { backgroundColor: line }]} />
+      <AppText style={{ color: colors.muted, fontSize: 12, lineHeight: 16 }}>
+        {label}
+      </AppText>
+      <View style={[styles.dividerLine, { backgroundColor: line }]} />
+    </View>
+  );
+}
+
+/** A small accent text button, e.g. "Forgot password?". */
+export function AuthTextAction({
+  label,
+  onPress,
+  align = "end",
+  disabled = false,
+}: {
+  label: string;
+  onPress: () => void;
+  align?: "start" | "center" | "end";
+  disabled?: boolean;
+}) {
+  const { colors } = useTheme();
+  const alignSelf =
+    align === "start"
+      ? "flex-start"
+      : align === "center"
+        ? "center"
+        : "flex-end";
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={8}
+      style={{ alignSelf, paddingVertical: 2, opacity: disabled ? 0.5 : 1 }}
+    >
+      <AppText
+        style={{
+          color: disabled ? colors.muted : colors.accent,
+          fontWeight: "600",
+          fontSize: 13,
+          lineHeight: 18,
+        }}
+      >
+        {label}
+      </AppText>
     </Pressable>
   );
 }
@@ -418,6 +610,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 36,
+  },
+  googleButton: {
+    height: 50,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingHorizontal: 20,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth * 2,
   },
   link: {
     alignItems: "center",

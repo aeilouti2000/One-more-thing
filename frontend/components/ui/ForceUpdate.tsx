@@ -7,9 +7,11 @@ import { useTheme } from "@/providers/ThemeProvider";
 
 type ForceUpdateProps = {
   downloadUrl: string | null;
+  /** When set, the update is optional and a "Later" button calls this. */
+  onLater?: () => void;
 };
 
-export function ForceUpdate({ downloadUrl }: ForceUpdateProps) {
+export function ForceUpdate({ downloadUrl, onLater }: ForceUpdateProps) {
   const { t } = useI18n();
   const { colors } = useTheme();
 
@@ -20,19 +22,22 @@ export function ForceUpdate({ downloadUrl }: ForceUpdateProps) {
     >
       <AppLogo size={88} />
       <AppText className="mt-6 text-center text-2xl font-semibold text-cove-ink">
-        {t("updateRequired")}
+        {t(onLater ? "updateAvailable" : "updateRequired")}
       </AppText>
       <AppText className="mt-3 text-center text-base leading-6 text-cove-muted">
-        {t("updateRequiredBody")}
+        {t(onLater ? "updateAvailableBody" : "updateRequiredBody")}
       </AppText>
-      {downloadUrl ? (
-        <View className="mt-8 w-full max-w-sm">
+      <View className="mt-8 w-full max-w-sm gap-3">
+        {downloadUrl ? (
           <AppButton
             label={t("updateNow")}
             onPress={() => void Linking.openURL(downloadUrl)}
           />
-        </View>
-      ) : null}
+        ) : null}
+        {onLater ? (
+          <AppButton label={t("updateLater")} variant="ghost" onPress={onLater} />
+        ) : null}
+      </View>
     </View>
   );
 }

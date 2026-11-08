@@ -7,7 +7,14 @@ import {
   useAmountLabel,
   type RecentPick,
 } from "@/features/items/components/item-sheet-form";
+import {
+  ItemPhotoField,
+  ItemPhotoViewer,
+  PhotoSourceSheet,
+  useItemPhotoChooser,
+} from "@/features/items/components/item-photo";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
+import type { PickedPhoto } from "@/features/items/api/items";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
@@ -45,6 +52,12 @@ export function AddItemCard({
   const [quantityError, setQuantityError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [photo, setPhoto] = useState<PickedPhoto | null>(null);
+  const [viewing, setViewing] = useState(false);
+  const chooser = useItemPhotoChooser({
+    onPicked: setPhoto,
+    onRemove: () => setPhoto(null),
+  });
 
   function reset(nextCategory: PurchaseCategory, nextName = "") {
     setName(nextName);
@@ -55,6 +68,9 @@ export function AddItemCard({
     setUrgent(false);
     setQuantityError(undefined);
     setError(null);
+    setPhoto(null);
+    setViewing(false);
+    chooser.setError(null);
   }
 
   function close() {
@@ -86,6 +102,7 @@ export function AddItemCard({
       unit: unit || undefined,
       urgent,
       listId,
+      photo,
     });
     setIsSubmitting(false);
     if (result.error) {
@@ -157,7 +174,14 @@ export function AddItemCard({
         onChangeCategory={setCategory}
         notes={notes}
         onChangeNotes={setNotes}
-        error={error}
+        photo={
+          <ItemPhotoField
+            uri={photo?.uri ?? null}
+            onAdd={chooser.open}
+            onView={() => setViewing(true)}
+          />
+        }
+        error={error ?? chooser.error}
         submitLabel={t("addAmountName", { amount: amountLabel(quantity, unit), name: trimmedName })}
         disabledLabel={t("typeNameToAdd")}
         canSubmit={Boolean(trimmedName) && Boolean(listId)}
@@ -167,27 +191,51 @@ export function AddItemCard({
     </FloatedCard>
   );
 
+  const photoLayers = (
+    <>
+      <PhotoSourceSheet
+        visible={chooser.sourceOpen}
+        canRemove={photo !== null}
+        onChoose={chooser.choose}
+        onRemove={chooser.remove}
+        onClose={chooser.close}
+      />
+      <ItemPhotoViewer
+        uri={viewing ? (photo?.uri ?? null) : null}
+        title={trimmedName || undefined}
+        onClose={() => setViewing(false)}
+      />
+    </>
+  );
+
   if (presentation === "pane") {
     if (!visible) return null;
     return (
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="px-4 pb-10 pt-2"
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {form}
-      </ScrollView>
+      <>
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="px-4 pb-10 pt-2"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {form}
+        </ScrollView>
+        {photoLayers}
+      </>
     );
   }
 
   return (
-    <FormSheetModal
-      visible={visible}
-      onClose={close}
-      onShow={() => reset(initialCategory, initialName.trim())}
-    >
-      {form}
-    </FormSheetModal>
+    <>
+      <FormSheetModal
+        visible={visible}
+        covered={chooser.covered}
+        onClose={close}
+        onShow={() => reset(initialCategory, initialName.trim())}
+      >
+        {form}
+      </FormSheetModal>
+      {photoLayers}
+    </>
   );
 }

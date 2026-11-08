@@ -3,11 +3,13 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { User } from "../../users/user.entity";
 import { HomesModule } from "../homes/homes.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { ItemImagesController } from "./controllers/item-images.controller";
 import { ItemsController } from "./controllers/items.controller";
 import { PinsController } from "./controllers/pins.controller";
 import { CustomCategory } from "./entities/custom-category.entity";
 import { HiddenCategory } from "./entities/hidden-category.entity";
 import { Item } from "./entities/item.entity";
+import { ItemImage } from "./entities/item-image.entity";
 import { ListShopLock } from "./entities/list-shop-lock.entity";
 import { Pin } from "./entities/pin.entity";
 import { ShoppingList } from "./entities/shopping-list.entity";
@@ -21,6 +23,7 @@ import { TypeormListsRepository } from "./repo/lists-repo/typeorm-lists.reposito
 import { PINS_REPOSITORY } from "./repo/pins-repo/pins.repository";
 import { TypeormPinsRepository } from "./repo/pins-repo/typeorm-pins.repository";
 import { CategoriesService } from "./services/categories.service";
+import { ItemImagesService } from "./services/item-images.service";
 import { ItemsService } from "./services/items.service";
 import { PinsScheduler } from "./services/pins.scheduler";
 import { PinsService } from "./services/pins.service";
@@ -37,13 +40,15 @@ import { ShopLocksService } from "./services/shop-locks.service";
       CustomCategory,
       HiddenCategory,
       TripReceipt,
+      ItemImage,
     ]),
     HomesModule,
     NotificationsModule,
   ],
-  controllers: [ItemsController, PinsController],
+  controllers: [ItemsController, ItemImagesController, PinsController],
   providers: [
     ItemsService,
+    ItemImagesService,
     PinsService,
     PinsScheduler,
     CategoriesService,

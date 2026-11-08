@@ -5,6 +5,8 @@ import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { useI18n } from "@/providers/LanguageProvider";
 
+const SUPPORT_EMAIL = "onemorething95@gmail.com";
+
 export default function PrivacyPolicyScreen() {
   const { t } = useI18n();
   const app = t("appName");
@@ -18,6 +20,9 @@ export default function PrivacyPolicyScreen() {
         <LegalParagraph>{t("privacy3")}</LegalParagraph>
         <LegalParagraph>{t("privacy4")}</LegalParagraph>
         <LegalParagraph>{t("privacy5")}</LegalParagraph>
+        <LegalParagraph>{t("privacy6")}</LegalParagraph>
+        <LegalParagraph>{t("privacy7")}</LegalParagraph>
+        <LegalParagraph>{t("privacy8", { contact: SUPPORT_EMAIL })}</LegalParagraph>
       </View>
     </Screen>
   );

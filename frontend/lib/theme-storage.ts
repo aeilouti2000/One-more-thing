@@ -8,7 +8,12 @@ import {
   type ThemeScheme,
 } from "@/constants/theme";
 
-const THEME_STORAGE_KEY = "one-more-thing.theme";
+/**
+ * The user's own choice: "system" (follow the phone) until they pick light or
+ * dark. A new key on purpose — the old one was written on every launch, so it
+ * can't tell a real choice from the old dark default.
+ */
+const THEME_PREFERENCE_KEY = "one-more-thing.theme-preference";
 const THEME_ACCENT_STORAGE_KEY = "one-more-thing.theme-accent";
 const THEME_SURFACE_DEPTH_STORAGE_KEY = "one-more-thing.theme-surface-depth";
 
@@ -23,22 +28,23 @@ function storage() {
   return null;
 }
 
-export function readStoredTheme(): ThemeScheme {
+export type ThemePreference = ThemeScheme | "system";
+
+export function readStoredThemePreference(): ThemePreference {
   try {
-    const value = storage()?.getItem(THEME_STORAGE_KEY);
-    if (value === "light") return "light";
-    if (value === "dark") return "dark";
-    return "dark";
+    const value = storage()?.getItem(THEME_PREFERENCE_KEY);
+    if (value === "light" || value === "dark") return value;
+    return "system";
   } catch {
-    return "dark";
+    return "system";
   }
 }
 
-export function writeStoredTheme(scheme: ThemeScheme) {
+export function writeStoredThemePreference(preference: ThemePreference) {
   try {
-    storage()?.setItem(THEME_STORAGE_KEY, scheme);
+    storage()?.setItem(THEME_PREFERENCE_KEY, preference);
   } catch {
-    // Keep the active in-memory theme when persistence is unavailable.
+    // Keep the active in-memory preference when persistence is unavailable.
   }
 }
 
@@ -71,7 +77,10 @@ export function readStoredSurfaceDepth(): SurfaceDepth {
 
 export function writeStoredSurfaceDepth(depth: SurfaceDepth) {
   try {
-    storage()?.setItem(THEME_SURFACE_DEPTH_STORAGE_KEY, normalizeSurfaceDepth(depth));
+    storage()?.setItem(
+      THEME_SURFACE_DEPTH_STORAGE_KEY,
+      normalizeSurfaceDepth(depth),
+    );
   } catch {
     // Keep the active in-memory depth when persistence is unavailable.
   }

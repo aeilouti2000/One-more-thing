@@ -16,11 +16,23 @@ import {
   onAuthChange,
   restoreSession,
   deleteAccount as removeAccount,
+  linkGoogle as linkGoogleAccount,
+  requestPasswordReset as sendResetCode,
+  resendEmailCode as resendCode,
+  resetPassword as resetAccountPassword,
+  setEmail as setAccountEmail,
+  signInWithGoogle as googleSignIn,
   signOut as endSession,
   signUp as register,
+  unlinkGoogle as unlinkGoogleAccount,
   updateProfile as updateAccountProfile,
+  verifyEmail as verifyAccountEmail,
   type AuthUser,
 } from "@/lib/api";
+import {
+  getGoogleIdToken,
+  type GoogleTokenResult,
+} from "@/features/auth/lib/google-sign-in";
 import { formatAppError, logError } from "@/lib/errors";
 import { unregisterPushDevice } from "@/features/notifications/api/push";
 
@@ -30,14 +42,75 @@ type AuthResult = {
   error: string | null;
 };
 
+/** `cancelled`: the person closed Google's picker; show nothing. */
+type GoogleResult = AuthResult & { cancelled?: boolean };
+
+function googleError(
+  result: Exclude<GoogleTokenResult, { type: "success" }>,
+): GoogleResult {
+  if (result.type === "cancelled") return { error: null, cancelled: true };
+  if (result.code === "unavailable")
+    return { error: translate("googleUnavailable") };
+  if (result.code === "play_services")
+    return { error: translate("errorPlayServices") };
+  return { error: translate("errorGoogleFailed") };
+}
+
+async function attempt(
+  scope: string,
+  run: () => Promise<unknown>,
+): Promise<AuthResult> {
+  try {
+    await run();
+    return { error: null };
+  } catch (error) {
+    logError(scope, error);
+    return { error: formatAppError(error) };
+  }
+}
+
+async function withGoogle(
+  scope: string,
+  run: (idToken: string) => Promise<unknown>,
+): Promise<GoogleResult> {
+  const token = await getGoogleIdToken();
+  if (token.type !== "success") return googleError(token);
+  return attempt(scope, () => run(token.idToken));
+}
+
 type AuthContextValue = {
   user: AuthUser | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<AuthResult>;
-  signUp: (name: string, email: string, password: string) => Promise<AuthResult>;
-  updateProfile: (input: { name?: string; email?: string }) => Promise<AuthResult>;
-  changePassword: (currentPassword: string, newPassword: string) => Promise<AuthResult>;
+  signUp: (
+    name: string,
+    username: string,
+    password: string,
+    email: string,
+  ) => Promise<AuthResult>;
+  signInWithGoogle: () => Promise<GoogleResult>;
+  linkGoogle: () => Promise<GoogleResult>;
+  unlinkGoogle: () => Promise<AuthResult>;
+  setEmail: (email: string) => Promise<AuthResult>;
+  resendEmailCode: () => Promise<AuthResult>;
+  verifyEmail: (code: string) => Promise<AuthResult>;
+  requestPasswordReset: (login: string) => Promise<AuthResult>;
+  resetPassword: (
+    login: string,
+    code: string,
+    newPassword: string,
+  ) => Promise<AuthResult>;
+  updateProfile: (input: {
+    name?: string;
+    email?: string;
+  }) => Promise<AuthResult>;
+  /** Omit `currentPassword` to set a first password on a Google-only account. */
+  changePassword: (
+    currentPassword: string | undefined,
+    newPassword: string,
+  ) => Promise<AuthResult>;
   deleteAccount: (password: string) => Promise<AuthResult>;
+  deleteAccountWithGoogle: () => Promise<GoogleResult>;
   signOut: () => Promise<AuthResult>;
 };
 
@@ -83,53 +156,109 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signUp = useCallback(async (name: string, email: string, password: string) => {
-    try {
-      await register(name.trim(), email.trim(), password);
-      return { error: null };
-    } catch (error) {
-      logError("sign_up", error);
-      return { error: formatAppError(error) };
-    }
-  }, []);
+  const signUp = useCallback(
+    (name: string, username: string, password: string, email: string) =>
+      attempt("sign_up", () =>
+        register(name.trim(), username.trim(), password, email.trim()),
+      ),
+    [],
+  );
 
-  const updateProfile = useCallback(async (input: { name?: string; email?: string }) => {
-    try {
-      await updateAccountProfile(input);
-      return { error: null };
-    } catch (error) {
-      logError("update_profile", error);
-      return { error: formatAppError(error) };
-    }
-  }, []);
+  const signInWithGoogle = useCallback(
+    () => withGoogle("google_sign_in", (idToken) => googleSignIn(idToken)),
+    [],
+  );
+  const linkGoogle = useCallback(
+    () => withGoogle("google_link", (idToken) => linkGoogleAccount(idToken)),
+    [],
+  );
+  const unlinkGoogle = useCallback(
+    () => attempt("google_unlink", unlinkGoogleAccount),
+    [],
+  );
+  const setEmail = useCallback(
+    (email: string) =>
+      attempt("set_email", () => setAccountEmail(email.trim())),
+    [],
+  );
+  const resendEmailCode = useCallback(
+    () => attempt("resend_code", resendCode),
+    [],
+  );
+  const verifyEmail = useCallback(
+    (code: string) =>
+      attempt("verify_email", () => verifyAccountEmail(code.trim())),
+    [],
+  );
+  const requestPasswordReset = useCallback(
+    (login: string) =>
+      attempt("forgot_password", () => sendResetCode(login.trim())),
+    [],
+  );
+  const resetPassword = useCallback(
+    (login: string, code: string, newPassword: string) =>
+      attempt("reset_password", () =>
+        resetAccountPassword(login.trim(), code.trim(), newPassword),
+      ),
+    [],
+  );
 
-  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
-    if (currentPassword === newPassword) {
-      return { error: translate("errorNewPasswordDifferent") };
-    }
+  const updateProfile = useCallback(
+    async (input: { name?: string; email?: string }) => {
+      try {
+        await updateAccountProfile(input);
+        return { error: null };
+      } catch (error) {
+        logError("update_profile", error);
+        return { error: formatAppError(error) };
+      }
+    },
+    [],
+  );
 
-    try {
-      await unregisterPushDevice();
-      await changeAccountPassword(currentPassword, newPassword);
-      return { error: null };
-    } catch (error) {
-      logError("change_password", error);
-      return { error: formatAppError(error) };
-    }
-  }, []);
+  const changePassword = useCallback(
+    async (currentPassword: string | undefined, newPassword: string) => {
+      if (currentPassword === newPassword) {
+        return { error: translate("errorNewPasswordDifferent") };
+      }
+
+      try {
+        // Setting a first password keeps the session (and its push device).
+        if (currentPassword !== undefined) await unregisterPushDevice();
+        await changeAccountPassword(currentPassword, newPassword);
+        return { error: null };
+      } catch (error) {
+        logError("change_password", error);
+        return { error: formatAppError(error) };
+      }
+    },
+    [],
+  );
 
   const deleteAccount = useCallback(async (password: string) => {
     try {
       await unregisterPushDevice();
-      await removeAccount(password);
+      await removeAccount({ password });
       return { error: null };
     } catch (error) {
-      if (error instanceof ApiError && error.code === "CURRENT_PASSWORD_WRONG") {
+      if (
+        error instanceof ApiError &&
+        error.code === "CURRENT_PASSWORD_WRONG"
+      ) {
         return { error: translate("errorDeletePasswordWrong") };
       }
       logError("delete_account", error);
       return { error: formatAppError(error) };
     }
+  }, []);
+
+  const deleteAccountWithGoogle = useCallback(async () => {
+    const token = await getGoogleIdToken();
+    if (token.type !== "success") return googleError(token);
+    return attempt("delete_account", async () => {
+      await unregisterPushDevice();
+      await removeAccount({ googleIdToken: token.idToken });
+    });
   }, []);
 
   const signOut = useCallback(async () => {
@@ -149,12 +278,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       signIn,
       signUp,
+      signInWithGoogle,
+      linkGoogle,
+      unlinkGoogle,
+      setEmail,
+      resendEmailCode,
+      verifyEmail,
+      requestPasswordReset,
+      resetPassword,
       updateProfile,
       changePassword,
       deleteAccount,
+      deleteAccountWithGoogle,
       signOut,
     }),
-    [user, isLoading, signIn, signUp, updateProfile, changePassword, deleteAccount, signOut],
+    [
+      user,
+      isLoading,
+      signIn,
+      signUp,
+      signInWithGoogle,
+      linkGoogle,
+      unlinkGoogle,
+      setEmail,
+      resendEmailCode,
+      verifyEmail,
+      requestPasswordReset,
+      resetPassword,
+      updateProfile,
+      changePassword,
+      deleteAccount,
+      deleteAccountWithGoogle,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

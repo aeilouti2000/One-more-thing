@@ -14,8 +14,22 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column({ name: "password_hash" })
-  passwordHash: string;
+  /** Null for accounts that only sign in with Google. */
+  @Column({ name: "password_hash", type: "varchar", nullable: true })
+  passwordHash: string | null;
+
+  /** Real email address (the `email` column above holds the username). */
+  @Column({ name: "contact_email", type: "varchar", length: 254, nullable: true })
+  contactEmail: string | null;
+
+  @Column({ name: "email_verified_at", type: "timestamptz", nullable: true })
+  emailVerifiedAt: Date | null;
+
+  @Column({ name: "google_sub", type: "varchar", length: 64, nullable: true })
+  googleSub: string | null;
+
+  @Column({ name: "google_email", type: "varchar", length: 254, nullable: true })
+  googleEmail: string | null;
 
   @Column()
   name: string;

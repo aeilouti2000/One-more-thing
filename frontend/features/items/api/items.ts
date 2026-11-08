@@ -1,4 +1,6 @@
-import { api } from "@/lib/api";
+import { File } from "expo-file-system";
+import { Platform } from "react-native";
+import { api, apiUrl } from "@/lib/api";
 import { formatAppError, isOfflineError } from "@/lib/errors";
 import { readCachedItems } from "@/features/offline/profile-cache";
 import type { Purchase, PurchaseCategory } from "@/features/items/types/purchase";
@@ -37,6 +39,7 @@ type ItemResponse = {
   cost?: number | null;
   receiptId?: string | null;
   receiptTotal?: number | string | null;
+  imageId?: string | null;
   listId?: string;
   listName?: string;
   addedByName: string;
@@ -70,6 +73,7 @@ function toPurchase(item: ItemResponse): Purchase {
         : Number.isFinite(Number(item.receiptTotal))
           ? Number(item.receiptTotal)
           : null,
+    imageId: item.imageId ?? null,
     listId: item.listId,
     listName: item.listName,
     addedByName: item.addedByName,
@@ -239,5 +243,52 @@ export async function moveItems(itemIds: string[], listId: string) {
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
+  }
+}
+
+export type PickedPhoto = {
+  uri: string;
+  mimeType?: string | null;
+  fileName?: string | null;
+};
+
+/** Where <Image> loads an item photo from. */
+export function itemImageUrl(imageId: string) {
+  return apiUrl(`/item-images/${imageId}`);
+}
+
+/** Attach or replace an item's photo. The server resizes it. */
+export async function uploadItemImage(itemId: string, photo: PickedPhoto) {
+  try {
+    const type = photo.mimeType || "image/jpeg";
+    const name = photo.fileName || `item-${itemId}.jpg`;
+    const form = new FormData();
+    if (Platform.OS === "web") {
+      // Web pickers hand back a blob:/data: URI; send the bytes themselves.
+      const blob = await (await fetch(photo.uri)).blob();
+      form.append("image", blob, name);
+    } else {
+      // Expo's fetch can't stream React Native's {uri} parts, but takes any
+      // part with name, type and bytes(); read them straight from the file.
+      const file = new File(photo.uri);
+      form.append("image", {
+        name,
+        type,
+        bytes: async () => new Uint8Array(await file.arrayBuffer()),
+      } as unknown as Blob);
+    }
+    const updated = await api.upload<ItemResponse>(`/items/${itemId}/image`, form);
+    return { item: toPurchase(updated), error: null };
+  } catch (error) {
+    return { item: null as Purchase | null, error: formatAppError(error) };
+  }
+}
+
+export async function removeItemImage(itemId: string) {
+  try {
+    const updated = await api.delete<ItemResponse>(`/items/${itemId}/image`);
+    return { item: toPurchase(updated), error: null };
+  } catch (error) {
+    return { item: null as Purchase | null, error: formatAppError(error) };
   }
 }

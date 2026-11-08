@@ -8,6 +8,7 @@ import { useCategoryLabel } from "@/features/items/providers/categories-provider
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/features/items/types/purchase";
+import { ItemPhotoThumb, itemPhotoUri } from "./item-photo";
 import { StatusBadge } from "./status-badge";
 
 export const CARD_RADIUS = 22;
@@ -47,6 +48,7 @@ export function PurchaseRow({
   const { household } = useHousehold();
   const categoryLabel = useCategoryLabel(purchase.category);
   const { colors, scheme } = useTheme();
+  const photoUri = itemPhotoUri(purchase);
   const showsStepper = !selected && Boolean(onChangeQuantity) && purchase.status === "needed";
   const isUrgent = purchase.urgent && purchase.status !== "bought";
   const quantityLabel = purchase.unit
@@ -95,6 +97,7 @@ export function PurchaseRow({
           purchase.name,
           isUrgent ? t("urgent") : null,
           purchase.notes?.trim() ? t("notes") : null,
+          photoUri ? t("itemPhoto") : null,
         ]
           .filter(Boolean)
           .join(", ")}
@@ -114,6 +117,11 @@ export function PurchaseRow({
           {leading ? (
             <View pointerEvents="box-none">
               {leading}
+            </View>
+          ) : null}
+          {photoUri ? (
+            <View pointerEvents="none">
+              <ItemPhotoThumb uri={photoUri} size={44} radius={12} uploading={purchase.photoUploading} />
             </View>
           ) : null}
           <View pointerEvents="box-none" className="min-w-0 flex-1 gap-2.5">

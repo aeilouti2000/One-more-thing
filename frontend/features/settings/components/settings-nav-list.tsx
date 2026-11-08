@@ -83,7 +83,7 @@ function NavRow({
 export function SettingsNavList() {
   const { user } = useAuth();
   const { household } = useHousehold();
-  const { scheme } = useTheme();
+  const { scheme, preference } = useTheme();
   const { t, locale } = useI18n();
   const pathname = usePathname();
   const selected = activeNavId(pathname);
@@ -130,7 +130,9 @@ export function SettingsNavList() {
       <NavRow
         icon="color-palette-outline"
         title={t("appearance")}
-        summary={`${scheme === "dark" ? t("dark") : t("light")} · ${t("textSize")}`}
+        summary={`${
+          preference === "system" ? t("themeSystem") : scheme === "dark" ? t("dark") : t("light")
+        } · ${t("textSize")}`}
         href={"/settings/appearance" as Href}
         selected={selected === "appearance"}
       />

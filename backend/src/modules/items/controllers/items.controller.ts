@@ -1,5 +1,19 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { CurrentUser } from "../../../common/current-user.decorator";
 import { User } from "../../../users/user.entity";
 import {
@@ -16,6 +30,7 @@ import {
   UpdateItemDto,
 } from "../dto/items.dto";
 import { CategoriesService } from "../services/categories.service";
+import { ItemImagesService, type UploadedPhoto } from "../services/item-images.service";
 import { ItemsService } from "../services/items.service";
 import { ShopLocksService } from "../services/shop-locks.service";
 
@@ -26,6 +41,7 @@ export class ItemsController {
     private readonly items: ItemsService,
     private readonly categories: CategoriesService,
     private readonly shopLocks: ShopLocksService,
+    private readonly images: ItemImagesService,
   ) {}
 
   @Get("homes/:homeId/lists")
@@ -146,6 +162,22 @@ export class ItemsController {
     @Body() body: UpdateItemDto,
   ) {
     return this.items.updateDetails(user.id, itemId, body);
+  }
+
+  /** Multipart field "image". The server resizes it and strips metadata. */
+  @Put("items/:itemId/image")
+  @UseInterceptors(FileInterceptor("image", { limits: { fileSize: 15 * 1024 * 1024, files: 1 } }))
+  setImage(
+    @CurrentUser() user: User,
+    @Param("itemId", ParseUUIDPipe) itemId: string,
+    @UploadedFile() file: UploadedPhoto | undefined,
+  ) {
+    return this.images.set(user.id, itemId, file);
+  }
+
+  @Delete("items/:itemId/image")
+  removeImage(@CurrentUser() user: User, @Param("itemId", ParseUUIDPipe) itemId: string) {
+    return this.images.remove(user.id, itemId);
   }
 
   @Patch("items/:itemId/cost")

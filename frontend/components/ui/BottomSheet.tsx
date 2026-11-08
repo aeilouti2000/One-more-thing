@@ -93,10 +93,16 @@ export function BottomSheet({
   const [mounted, setMounted] = useState(visible);
   const [trackedVisible, setTrackedVisible] = useState(visible);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // The native modal fires onShow again when it comes back from `covered`
+  // (e.g. after the photo picker); callers only want it once per opening.
+  const [shownOnce, setShownOnce] = useState(false);
   if (visible !== trackedVisible) {
     setTrackedVisible(visible);
     if (visible) setMounted(true);
-    else setKeyboardHeight(0);
+    else {
+      setKeyboardHeight(0);
+      setShownOnce(false);
+    }
   }
 
   const progress = useSharedValue(0);
@@ -211,7 +217,11 @@ export function BottomSheet({
       animationType="none"
       statusBarTranslucent
       navigationBarTranslucent
-      onShow={onShow}
+      onShow={() => {
+        if (shownOnce) return;
+        setShownOnce(true);
+        onShow?.();
+      }}
       onRequestClose={backPressed}
     >
       <GestureHandlerRootView style={styles.fill}>

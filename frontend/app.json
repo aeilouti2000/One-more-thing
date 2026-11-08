@@ -2,18 +2,18 @@
   "expo": {
     "name": "One More Thing",
     "slug": "one-more-thing",
-    "version": "2.3.1",
+    "version": "2.4.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "onemorething",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "package": "com.onemorething.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 41,
+      "versionCode": 42,
       "adaptiveIcon": {
         "backgroundColor": "#071633",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -61,11 +61,12 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "One More Thing reads a receipt photo on this phone to fill prices. The photo is not uploaded.",
-          "cameraPermission": "One More Thing uses the camera to read a receipt on this phone. The photo is not uploaded.",
+          "photosPermission": "One More Thing uses your photos to add a picture to an item for your household, or to read a receipt on this phone (receipt photos are not uploaded).",
+          "cameraPermission": "One More Thing uses the camera to add a picture to an item for your household, or to read a receipt on this phone (receipt photos are not uploaded).",
           "microphonePermission": false
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,

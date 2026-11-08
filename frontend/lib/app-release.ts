@@ -1,3 +1,4 @@
+import "@/features/auth/utils/session-storage";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { api } from "@/lib/api";
@@ -5,6 +6,7 @@ import { withTimeout } from "@/lib/with-timeout";
 
 type AppRelease = {
   minVersion: string | null;
+  latestVersion?: string | null;
   downloadUrl: string | null;
 };
 
@@ -25,13 +27,62 @@ export function isOlderVersion(installed: string, required: string) {
   return false;
 }
 
-export async function requiredAppUpdate() {
+export type AppUpdate = {
+  /** True when the installed version is below the minimum: the user cannot skip it. */
+  required: boolean;
+  version: string;
+  downloadUrl: string | null;
+};
+
+const DISMISS_KEY = "omt.updateDismissed";
+/** After "Later", the optional prompt stays hidden this long for the same version. */
+const DISMISS_FOR_MS = 3 * 24 * 60 * 60 * 1000;
+
+function storage() {
+  try {
+    if (typeof localStorage !== "undefined") return localStorage;
+  } catch {
+    // Storage unavailable.
+  }
+  return null;
+}
+
+function recentlyDismissed(version: string) {
+  try {
+    const raw = storage()?.getItem(DISMISS_KEY);
+    if (!raw) return false;
+    const saved = JSON.parse(raw) as { version?: string; at?: number };
+    return saved.version === version && typeof saved.at === "number" && Date.now() - saved.at < DISMISS_FOR_MS;
+  } catch {
+    return false;
+  }
+}
+
+export function dismissAppUpdate(version: string) {
+  try {
+    storage()?.setItem(DISMISS_KEY, JSON.stringify({ version, at: Date.now() }));
+  } catch {
+    // Ignore: the prompt will simply show again next launch.
+  }
+}
+
+export async function checkAppUpdate(): Promise<AppUpdate | null> {
   if (Platform.OS === "web") return null;
   try {
     const release = await withTimeout(api.get<AppRelease>("/app/release", false), 2500);
-    if (!release.minVersion) return null;
-    if (!isOlderVersion(installedAppVersion(), release.minVersion)) return null;
-    return { downloadUrl: release.downloadUrl };
+    const installed = installedAppVersion();
+    if (release.minVersion && isOlderVersion(installed, release.minVersion)) {
+      return { required: true, version: release.minVersion, downloadUrl: release.downloadUrl };
+    }
+    if (
+      release.latestVersion &&
+      release.downloadUrl &&
+      isOlderVersion(installed, release.latestVersion) &&
+      !recentlyDismissed(release.latestVersion)
+    ) {
+      return { required: false, version: release.latestVersion, downloadUrl: release.downloadUrl };
+    }
+    return null;
   } catch {
     return null;
   }

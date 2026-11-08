@@ -8,14 +8,25 @@ import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
-import { CardBlock, SettingsSection } from "@/features/settings/components/settings-ui";
+import {
+  CardBlock,
+  SettingsSection,
+} from "@/features/settings/components/settings-ui";
 import {
   useSettingsShowBack,
   useSettingsSplitJoin,
   useSettingsTabBarInset,
 } from "@/features/settings/hooks/use-settings-chrome";
-import { isValidPassword, isValidUsername } from "@/lib/validation";
+import { useResendCountdown } from "@/hooks/use-resend-countdown";
+import {
+  isValidEmail,
+  isValidPassword,
+  isValidUsername,
+} from "@/lib/validation";
+import { withAlpha } from "@/constants/theme";
+import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useTheme } from "@/providers/ThemeProvider";
 
 function goBack() {
   if (router.canGoBack()) router.back();
@@ -37,7 +48,12 @@ function AccountSubPage({
   const splitJoin = useSettingsSplitJoin("detail");
   return (
     <Screen tabBarInset={tabBarInset}>
-      <ScreenHeader title={title} subtitle={subtitle} showBack={showBack} splitJoin={splitJoin} />
+      <ScreenHeader
+        title={title}
+        subtitle={subtitle}
+        showBack={showBack}
+        splitJoin={splitJoin}
+      />
       <SettingsSection>
         <CardBlock>
           <View className="gap-4">{children}</View>
@@ -151,8 +167,10 @@ export function AccountUsernameScreen() {
 }
 
 export function AccountPasswordScreen() {
-  const { changePassword } = useAuth();
+  const { user, changePassword } = useAuth();
   const { t } = useI18n();
+  // Google-only accounts have no password yet: they set one (no current field).
+  const [settingFirst, setSettingFirst] = useState(user?.hasPassword === false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -160,7 +178,9 @@ export function AccountPasswordScreen() {
   const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const canSave =
-    currentPassword.length > 0 && isValidPassword(newPassword) && confirmPassword.length > 0;
+    (settingFirst || currentPassword.length > 0) &&
+    isValidPassword(newPassword) &&
+    confirmPassword.length > 0;
 
   async function save() {
     if (!isValidPassword(newPassword)) {
@@ -174,7 +194,10 @@ export function AccountPasswordScreen() {
     setSaving(true);
     setError(null);
     setSuccess(null);
-    const result = await changePassword(currentPassword, newPassword);
+    const result = await changePassword(
+      settingFirst ? undefined : currentPassword,
+      newPassword,
+    );
     setSaving(false);
     if (result.error) {
       setError(result.error);
@@ -183,20 +206,27 @@ export function AccountPasswordScreen() {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
-    setSuccess(t("passwordUpdated"));
+    setSuccess(settingFirst ? t("passwordSetDone") : t("passwordUpdated"));
+    // The account has a password now: a later change needs the current one.
+    if (settingFirst) setSettingFirst(false);
   }
 
   return (
-    <AccountSubPage title={t("password")} subtitle={t("changePassword")}>
-      <AppTextField
-        label={t("currentPassword")}
-        value={currentPassword}
-        onChangeText={setCurrentPassword}
-        placeholder={t("currentPasswordPlaceholder")}
-        secureTextEntry
-        autoCapitalize="none"
-        autoComplete="password"
-      />
+    <AccountSubPage
+      title={settingFirst ? t("setPassword") : t("password")}
+      subtitle={settingFirst ? t("setPasswordHint") : t("changePassword")}
+    >
+      {settingFirst ? null : (
+        <AppTextField
+          label={t("currentPassword")}
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
+          placeholder={t("currentPasswordPlaceholder")}
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="password"
+        />
+      )}
       <AppTextField
         label={t("newPassword")}
         value={newPassword}
@@ -216,13 +246,198 @@ export function AccountPasswordScreen() {
         autoComplete="new-password"
       />
       <FormMessage message={error} />
-      <FormMessage message={success} tone="success" onDismiss={() => setSuccess(null)} />
+      <FormMessage
+        message={success}
+        tone="success"
+        onDismiss={() => setSuccess(null)}
+      />
       <AppButton
-        label={t("updatePassword")}
+        label={settingFirst ? t("setPassword") : t("updatePassword")}
         disabled={!canSave}
         loading={saving}
         onPress={() => void save()}
       />
+    </AccountSubPage>
+  );
+}
+
+/**
+ * Add, verify, or change the account email. A verified address stays until a
+ * new one is confirmed with the code we send to it.
+ */
+export function AccountEmailScreen() {
+  const { user, setEmail, verifyEmail, resendEmailCode } = useAuth();
+  const { colors } = useTheme();
+  const { t } = useI18n();
+  const current = user?.contactEmail ?? null;
+  const verified = !!user?.emailVerified;
+  const [pending, setPending] = useState<string | null>(
+    !verified && current ? current : null,
+  );
+  const [address, setAddress] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Arriving with an unverified email: a code was sent at sign-up, allow resend now.
+  const { seconds, restart } = useResendCountdown(0);
+
+  async function sendCode() {
+    const next = address.trim();
+    if (!isValidEmail(next)) {
+      setError(t("errorInvalidEmailAddress"));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const result = await setEmail(next);
+    setBusy(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setPending(next.toLowerCase());
+    setCode("");
+    restart();
+  }
+
+  async function verify() {
+    if (!/^\d{6}$/.test(code)) {
+      setError(t("errorEnterCode"));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const result = await verifyEmail(code);
+    setBusy(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setPending(null);
+    setAddress("");
+    setCode("");
+    setNotice(t("emailVerifiedDone"));
+  }
+
+  async function resend() {
+    setError(null);
+    setNotice(null);
+    const result = await resendEmailCode();
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    restart();
+    setNotice(t("codeSent"));
+  }
+
+  return (
+    <AccountSubPage title={t("email")} subtitle={t("addEmailBody")}>
+      {current ? (
+        <View className="flex-row items-center gap-3">
+          <AppText
+            className="min-w-0 flex-1 text-base font-semibold text-cove-ink"
+            numberOfLines={1}
+          >
+            {current}
+          </AppText>
+          <View
+            className="rounded-full px-2.5 py-1"
+            style={{
+              backgroundColor: withAlpha(
+                verified ? colors.accent : "#F08C2E",
+                0.14,
+              ),
+            }}
+          >
+            <AppText
+              className="text-xs font-semibold"
+              style={{ color: verified ? colors.accent : "#F08C2E" }}
+            >
+              {verified ? t("emailVerifiedBadge") : t("emailPendingBadge")}
+            </AppText>
+          </View>
+        </View>
+      ) : null}
+
+      {pending ? (
+        <>
+          <AppText className="text-sm text-cove-muted">
+            {t("verifyEmailSubtitle", { email: pending })}
+          </AppText>
+          <AppTextField
+            label={t("verificationCode")}
+            value={code}
+            onChangeText={(value) => {
+              setCode(value.replace(/\D/g, "").slice(0, 6));
+              setError(null);
+            }}
+            placeholder={t("codePlaceholder")}
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            maxLength={6}
+            autoFocus
+          />
+          <FormMessage message={error} />
+          <FormMessage message={notice} tone="success" />
+          <AppButton
+            label={t("verify")}
+            disabled={code.length !== 6}
+            loading={busy}
+            onPress={() => void verify()}
+          />
+          <View className="flex-row justify-between gap-3">
+            <AppButton
+              compact
+              fit
+              variant="ghost"
+              label={seconds > 0 ? t("resendIn", { seconds }) : t("resendCode")}
+              disabled={seconds > 0}
+              onPress={() => void resend()}
+            />
+            <AppButton
+              compact
+              fit
+              variant="ghost"
+              label={t("changeEmail")}
+              onPress={() => {
+                setPending(null);
+                setError(null);
+                setNotice(null);
+              }}
+            />
+          </View>
+        </>
+      ) : (
+        <>
+          <AppTextField
+            label={current ? t("newEmail") : t("email")}
+            value={address}
+            onChangeText={(value) => {
+              setAddress(value);
+              setError(null);
+            }}
+            placeholder={t("emailPlaceholder")}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            autoCorrect={false}
+            autoFocus={!current}
+          />
+          <FormMessage message={error} />
+          <FormMessage message={notice} tone="success" />
+          <AppButton
+            label={t("sendCode")}
+            icon="mail-outline"
+            disabled={!address.trim()}
+            loading={busy}
+            onPress={() => void sendCode()}
+          />
+        </>
+      )}
     </AccountSubPage>
   );
 }

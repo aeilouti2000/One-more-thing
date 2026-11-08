@@ -32,11 +32,18 @@ function resolveApiUrl() {
 
 const API_URL = resolveApiUrl();
 const REQUEST_TIMEOUT_MS = 20000;
+/** Photo uploads can be slow on mobile data. */
+const UPLOAD_TIMEOUT_MS = 60000;
+
+/** Absolute URL for an API path, e.g. an image to hand to <Image>. */
+export function apiUrl(path: string) {
+  return `${API_URL}${path}`;
+}
 
 /** fetch that gives up instead of hanging forever on an unreachable host. */
-async function fetchWithTimeout(input: string, init: RequestInit = {}) {
+async function fetchWithTimeout(input: string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (error) {
@@ -50,9 +57,16 @@ const SESSION_KEY = "omt.session";
 
 export type AuthUser = {
   id: string;
+  /** The username (historical field name). */
   email: string;
   name: string;
   createdAt: string;
+  /** Real email address. Optional: profiles cached by older versions lack it. */
+  contactEmail?: string | null;
+  emailVerified?: boolean;
+  hasPassword?: boolean;
+  googleEmail?: string | null;
+  googleLinked?: boolean;
 };
 
 export type AuthSession = {
@@ -179,7 +193,9 @@ async function refreshSession() {
 async function request<T>(path: string, init: RequestInit = {}, auth = true, allowRefresh = true): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
-  if (init.body && !headers.has("Content-Type")) {
+  // FormData sets its own multipart Content-Type (with the boundary).
+  const isForm = typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body && !isForm && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -188,12 +204,16 @@ async function request<T>(path: string, init: RequestInit = {}, auth = true, all
 
   let response: Response;
   try {
-    response = await fetchWithTimeout(`${API_URL}${path}`, {
-      ...init,
-      headers,
-      // Avoid serving a stale household after cost-settings PATCH (web HTTP cache).
-      cache: "no-store",
-    });
+    response = await fetchWithTimeout(
+      `${API_URL}${path}`,
+      {
+        ...init,
+        headers,
+        // Avoid serving a stale household after cost-settings PATCH (web HTTP cache).
+        cache: "no-store",
+      },
+      isForm ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+    );
   } catch (error) {
     throw new ApiError(error instanceof Error ? error.message : "Network request failed", "NETWORK");
   }
@@ -230,6 +250,9 @@ export const api = {
     request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }, auth),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  /** Multipart upload (e.g. a photo). */
+  upload: <T>(path: string, form: FormData, method: "POST" | "PUT" = "PUT") =>
+    request<T>(path, { method, body: form }),
   delete: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "DELETE", body: body === undefined ? undefined : JSON.stringify(body) }),
 };
@@ -258,16 +281,75 @@ export async function login(email: string, password: string) {
   return session.user;
 }
 
-export async function signUp(name: string, email: string, password: string) {
-  const session = await api.post<AuthSession>("/auth/signup", { name, email, password }, false);
+export async function signUp(name: string, email: string, password: string, contactEmail: string) {
+  const session = await api.post<AuthSession>(
+    "/auth/signup",
+    { name, email, password, contactEmail },
+    false,
+  );
   writeSession(session);
   return session.user;
 }
 
-export async function changePassword(currentPassword: string, newPassword: string) {
-  await api.post("/auth/change-password", { currentPassword, newPassword });
+export async function signInWithGoogle(idToken: string) {
+  const session = await api.post<AuthSession & { isNew: boolean }>("/auth/google", { idToken }, false);
+  writeSession({ accessToken: session.accessToken, refreshToken: session.refreshToken, user: session.user });
+  return session;
+}
+
+function storeUser(user: AuthUser) {
+  const session = readSession();
+  if (session) writeSession({ ...session, user });
+  else emit(user);
+  return user;
+}
+
+export async function linkGoogle(idToken: string) {
+  return storeUser(await api.post<AuthUser>("/auth/google/link", { idToken }));
+}
+
+export async function unlinkGoogle() {
+  return storeUser(await api.delete<AuthUser>("/auth/google"));
+}
+
+export async function setEmail(email: string) {
+  return storeUser(await api.post<AuthUser>("/auth/email", { email }));
+}
+
+export async function resendEmailCode() {
+  return api.post<{ sent: boolean; email: string }>("/auth/email/resend");
+}
+
+export async function verifyEmail(code: string) {
+  return storeUser(await api.post<AuthUser>("/auth/email/verify", { code }));
+}
+
+export async function requestPasswordReset(login: string) {
+  await api.post("/auth/password/forgot", { login }, false);
+}
+
+export async function resetPassword(login: string, code: string, newPassword: string) {
+  const session = await api.post<AuthSession>("/auth/password/reset", { login, code, newPassword }, false);
+  writeSession(session);
+  return session.user;
+}
+
+/** `currentPassword` is omitted when a Google-only account sets its first password. */
+/** Resolves true when the server ended every session (a changed password). */
+export async function changePassword(currentPassword: string | undefined, newPassword: string) {
+  const result = await api.post<{ signedOut?: boolean } | undefined>("/auth/change-password", {
+    currentPassword,
+    newPassword,
+  });
+  // A first password on a Google-only account keeps this session.
+  if (result?.signedOut === false) {
+    const session = readSession();
+    if (session) await refreshStoredProfile(session);
+    return false;
+  }
   clearCurrentProfileCache();
   clearSession();
+  return true;
 }
 
 export async function updateProfile(input: { name?: string; email?: string }) {
@@ -278,8 +360,8 @@ export async function updateProfile(input: { name?: string; email?: string }) {
   return user;
 }
 
-export async function deleteAccount(password: string) {
-  await api.delete("/auth/me", { password });
+export async function deleteAccount(proof: { password?: string; googleIdToken?: string }) {
+  await api.delete("/auth/me", proof);
   clearCurrentProfileCache();
   clearSession();
 }

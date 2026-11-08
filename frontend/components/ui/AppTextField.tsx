@@ -26,6 +26,7 @@ type AppTextFieldProps = {
   glass?: boolean;
   onFocus?: TextInputProps["onFocus"];
   autoFocus?: boolean;
+  maxLength?: number;
 };
 
 export function AppTextField({
@@ -47,6 +48,7 @@ export function AppTextField({
   glass = false,
   onFocus,
   autoFocus,
+  maxLength,
 }: AppTextFieldProps) {
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
@@ -89,6 +91,7 @@ export function AppTextField({
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
         autoFocus={autoFocus}
+        maxLength={maxLength}
         autoCorrect={autoCorrect}
         editable={editable}
         onFocus={onFocus}

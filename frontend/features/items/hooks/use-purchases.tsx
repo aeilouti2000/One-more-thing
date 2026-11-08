@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useFocusEffect } from "expo-router";
+import { Alert } from "react-native";
 import {
   addItem as insertItem,
   deleteItems,
@@ -22,7 +23,10 @@ import {
   updateItemCost,
   createTripReceipt,
   updateItemDetails,
+  uploadItemImage,
+  removeItemImage,
   type BoughtCostEntry,
+  type PickedPhoto,
   type NewItemInput,
   type UpdateItemInput,
 } from "@/features/items/api/items";
@@ -37,7 +41,10 @@ import { useAuth } from "@/features/auth/providers/auth-provider";
 import { readCachedItems, writeCachedItems } from "@/features/offline/profile-cache";
 import type { Purchase, PurchaseStatus } from "@/features/items/types/purchase";
 
-type AddItemValues = Omit<NewItemInput, "homeId" | "userId">;
+type AddItemValues = Omit<NewItemInput, "homeId" | "userId"> & {
+  /** Uploaded right after the item is created; the row shows it meanwhile. */
+  photo?: PickedPhoto | null;
+};
 
 type UsePurchasesResult = {
   purchases: Purchase[];
@@ -48,6 +55,11 @@ type UsePurchasesResult = {
   error: string | null;
   refresh: () => Promise<void>;
   addItem: (values: AddItemValues) => Promise<{ error: string | null }>;
+  /** Attach/replace (photo) or remove (null) an item's photo. */
+  setItemPhoto: (
+    id: string,
+    photo: PickedPhoto | null,
+  ) => Promise<{ error: string | null }>;
   updateItem: (
     id: string,
     values: UpdateItemInput,
@@ -133,7 +145,16 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
 
   const rememberItems = useCallback((items: Purchase[]) => {
     const activeHome = homeIdRef.current;
-    if (activeHome) writeCachedItems(activeHome, items);
+    if (!activeHome) return;
+    // A photo still uploading only exists on this phone for now.
+    writeCachedItems(
+      activeHome,
+      items.map((item) => {
+        if (!item.localImageUri && !item.photoUploading) return item;
+        const { localImageUri: _local, photoUploading: _busy, ...rest } = item;
+        return rest;
+      }),
+    );
   }, []);
 
   const refresh = useCallback(() => {
@@ -169,7 +190,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
               setPurchases(cached ?? []);
               setError(cached ? null : fetchError);
             } else {
-              setPurchases(items);
+              setPurchases((current) => keepLocalPhotos(items, current));
               setError(fetchError);
               if (!fetchError) writeCachedItems(activeHome, items);
             }
@@ -202,6 +223,54 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const setItemPhoto = useCallback(
+    async (id: string, photo: PickedPhoto | null) => {
+      if (!user) return { error: translate("errorNeedLogin") };
+      const endLocalChange = noteLocalChange();
+      const previous = purchasesRef.current.find((item) => item.id === id);
+      setPurchases((current) =>
+        current.map((item) =>
+          item.id === id
+            ? photo
+              ? { ...item, localImageUri: photo.uri, photoUploading: true }
+              : { ...item, imageId: null, localImageUri: undefined }
+            : item,
+        ),
+      );
+      let result: { item: Purchase | null; error: string | null };
+      try {
+        result = photo ? await uploadItemImage(id, photo) : await removeItemImage(id);
+      } finally {
+        endLocalChange();
+      }
+      if (result.error || !result.item) {
+        setPurchases((current) =>
+          current.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  imageId: previous?.imageId ?? null,
+                  localImageUri: undefined,
+                  photoUploading: false,
+                }
+              : item,
+          ),
+        );
+        return { error: result.error ?? translate("errorGeneric") };
+      }
+      const imageId = result.item.imageId ?? null;
+      // Keep showing the local file while it is the same photo the server has
+      // (see keepLocalPhotos), so the thumbnail doesn't blink after upload.
+      const withId = (item: Purchase) =>
+        item.id === id ? { ...item, imageId, photoUploading: false } : item;
+      setPurchases((current) => current.map(withId));
+      rememberItems(purchasesRef.current.map(withId));
+      emitListChanged();
+      return { error: null };
+    },
+    [noteLocalChange, rememberItems, user],
+  );
+
   const addItem = useCallback(
     async (values: AddItemValues) => {
       if (!household || !user) {
@@ -221,6 +290,8 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         status: "needed",
         urgent: values.urgent === true,
         cost: null,
+        localImageUri: values.photo?.uri,
+        photoUploading: Boolean(values.photo),
         listId: values.listId,
         addedByName: user.name,
         createdAt: new Date().toISOString(),
@@ -229,10 +300,11 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       const endLocalChange = noteLocalChange();
       setPurchases((current) => placeNeededLocally(current, optimistic));
 
+      const { photo, ...fields } = values;
       let result: { item: Purchase | null; error: string | null };
       try {
         result = await insertItem({
-          ...values,
+          ...fields,
           homeId: household.id,
           userId: user.id,
         });
@@ -247,10 +319,18 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       }
 
       if (result.item) {
-        const created = result.item;
+        const created: Purchase = photo
+          ? { ...result.item, localImageUri: photo.uri, photoUploading: true }
+          : result.item;
         setPurchases((current) =>
           current.map((item) => (item.id === tempId ? created : item)),
         );
+        if (photo) {
+          // The sheet closes now; the row shows the local photo while it uploads.
+          void setItemPhoto(created.id, photo).then((upload) => {
+            if (upload.error) Alert.alert(translate("itemPhoto"), upload.error);
+          });
+        }
         rememberItems(
           purchasesRef.current.map((item) =>
             item.id === tempId ? created : item,
@@ -261,7 +341,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       }
       return { error: null };
     },
-    [household, noteLocalChange, refresh, rememberItems, user],
+    [household, noteLocalChange, refresh, rememberItems, setItemPhoto, user],
   );
 
   const markBought = useCallback(
@@ -621,6 +701,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       error,
       refresh,
       addItem,
+      setItemPhoto,
       updateItem,
       updateCost,
       updateCosts,
@@ -643,6 +724,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       error,
       refresh,
       addItem,
+      setItemPhoto,
       updateItem,
       updateCost,
       updateCosts,
@@ -688,6 +770,25 @@ export function filterPurchasesByStatus(
   status: PurchaseStatus,
 ) {
   return purchases.filter((item) => item.status === status);
+}
+
+/**
+ * A photo picked on this phone stays on screen from the local file while the
+ * server still has that same photo; it avoids a blank flash after upload.
+ */
+function keepLocalPhotos(next: Purchase[], current: Purchase[]): Purchase[] {
+  const local = new Map(
+    current
+      .filter((item) => item.localImageUri && item.imageId && !item.photoUploading)
+      .map((item) => [item.id, item]),
+  );
+  if (local.size === 0) return next;
+  return next.map((item) => {
+    const mine = local.get(item.id);
+    return mine && mine.imageId === item.imageId
+      ? { ...item, localImageUri: mine.localImageUri }
+      : item;
+  });
 }
 
 /** Mirror backend placeNeeded: urgent at top, else after the urgent block. */

@@ -8,7 +8,8 @@
       "distribution": "internal",
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://one-more-thing-api.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://one-more-thing-api.onrender.com/api",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "210910217936-vc6kp149jkqv7s9lann8n88bd282t4ko.apps.googleusercontent.com"
       },
       "android": {
         "buildType": "apk"

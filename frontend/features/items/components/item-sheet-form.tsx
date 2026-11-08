@@ -88,6 +88,8 @@ type ItemSheetFormProps = {
   repeat?: { value: PinInterval; onChange: (value: PinInterval) => void };
   /** Small extra controls under the note (e.g. pin / add-now toggles). */
   extra?: ReactNode;
+  /** Photo row under the note (see ItemPhotoField). */
+  photo?: ReactNode;
 
   error?: string | null;
   submitLabel: string;
@@ -130,6 +132,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
     onChangeNotes,
     repeat,
     extra,
+    photo,
     error,
     submitLabel,
     disabledLabel,
@@ -225,12 +228,13 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
         textAlign={textAlign}
         className="text-cove-ink"
         style={{
-          fontSize: 26,
+          fontSize: 22,
           fontFamily: "ReadexPro_600SemiBold",
           paddingVertical: 6,
           paddingHorizontal: 0,
           borderBottomWidth: 2,
-          borderBottomColor: nameFocused ? colors.accent : subtle,
+          // Neutral underline: a little stronger while typing, never blue.
+          borderBottomColor: nameFocused ? withAlpha(colors.ink, dark ? 0.32 : 0.28) : subtle,
           color: colors.ink,
         }}
       />
@@ -451,6 +455,8 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
           <AppText className="text-sm font-semibold text-cove-accent">{t("addNote")}</AppText>
         </Pressable>
       )}
+
+      {photo ? <View className="mt-3">{photo}</View> : null}
 
       {extra ? <View className="mt-4">{extra}</View> : null}
 

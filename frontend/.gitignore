@@ -7,3 +7,6 @@ dist/
 web-build/
 expo-env.d.ts
 # @end expo-cli
+# Native folders from `expo prebuild` (local dev builds only; EAS stays managed)
+/android
+/ios

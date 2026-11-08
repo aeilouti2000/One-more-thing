@@ -17,8 +17,6 @@ import {
 } from "react-native";
 import {
   GestureDetector,
-  RefreshControl as GestureRefreshControl,
-  ScrollView as GestureScrollView,
   usePanGesture,
   type PanGesture,
 } from "react-native-gesture-handler";
@@ -303,14 +301,11 @@ export function Screen({
     [translateX],
   );
 
-  // Android 0.85+ defaults nested scrolling on. Inside a gesture-handler scroll
-  // view that leaves the refresh spinner on screen after the pull ends.
+  // Android 0.85+ defaults nested scrolling on, which can leave the refresh
+  // spinner on screen after the pull ends.
   const nestedScrollEnabled = Platform.OS === "android" ? false : undefined;
-  // The gesture-handler scroll view waits on its own RefreshControl. The web
-  // build of that control is only a placeholder view.
-  const SwipeRefreshControl = Platform.OS === "web" ? RefreshControl : GestureRefreshControl;
   const refreshControl = onRefresh ? (
-    <SwipeRefreshControl
+    <RefreshControl
       refreshing={refreshing}
       onRefresh={onRefresh}
       tintColor={colors.accent}
@@ -331,9 +326,12 @@ export function Screen({
 
   const swipeBody = (
     <View style={{ flex: 1, width: "100%" }}>
-      <GestureDetector gesture={listPan}>
-        <GestureScrollView
-          simultaneousWith={listPan}
+      {/* A plain ScrollView, not gesture-handler's: when a text field's
+          long-press asks parents to let go of the touch, the gesture-handler
+          scroll view cancels the touch and selection never opens.
+          enableContextMenu keeps the browser's copy/paste menu on web. */}
+      <GestureDetector gesture={listPan} enableContextMenu>
+        <ScrollView
           style={{ flex: 1, width: "100%" }}
           scrollEnabled={scrollEnabled}
           removeClippedSubviews={false}
@@ -349,7 +347,7 @@ export function Screen({
           refreshControl={refreshControl}
         >
           {scrollContent}
-        </GestureScrollView>
+        </ScrollView>
       </GestureDetector>
     </View>
   );

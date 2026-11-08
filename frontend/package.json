@@ -1,7 +1,7 @@
 {
   "name": "react_native",
   "main": "expo-router/entry",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "scripts": {
     "start": "expo start --lan --port 8082",
     "start:device": "expo start --lan --port 8082",
@@ -17,6 +17,7 @@
     "@expo-google-fonts/readex-pro": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-community/datetimepicker": "9.2.1",
+    "@react-native-google-signin/google-signin": "^17.0.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
@@ -26,6 +27,7 @@
     "expo-clipboard": "~58.0.4",
     "expo-constants": "~58.0.15",
     "expo-device": "~58.0.5",
+    "expo-file-system": "~58.0.13",
     "expo-font": "~58.0.11",
     "expo-haptics": "~58.0.7",
     "expo-image": "~58.0.18",

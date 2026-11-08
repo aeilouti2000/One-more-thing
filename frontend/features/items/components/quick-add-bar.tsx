@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -359,5 +360,9 @@ const styles = StyleSheet.create({
   input: {
     zIndex: 2,
     backgroundColor: "transparent",
+    ...(Platform.OS === "web"
+      ? // The pill shows focus; the browser box and the swipe's no-select don't belong here.
+        ({ outlineStyle: "none", userSelect: "text" } as object)
+      : null),
   },
 });

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Redirect } from "expo-router";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { useHousehold } from "@/features/homes/hooks/use-household";
+import { peekPostAuthRoute } from "@/features/auth/lib/post-auth-route";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 
 export function GuestOnly({ children }: { children: ReactNode }) {
@@ -13,7 +14,11 @@ export function GuestOnly({ children }: { children: ReactNode }) {
   }
 
   if (user) {
-    return <Redirect href={hasHousehold ? "/items" : "/create-home"} />;
+    return (
+      <Redirect
+        href={peekPostAuthRoute() ?? (hasHousehold ? "/items" : "/create-home")}
+      />
+    );
   }
 
   return children;

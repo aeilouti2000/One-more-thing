@@ -18,7 +18,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 
 export default function AppearanceSettingsScreen() {
   const { t } = useI18n();
-  const { scheme, setScheme } = useTheme();
+  const { scheme, preference, setPreference } = useTheme();
   const showBack = useSettingsShowBack();
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
@@ -27,7 +27,13 @@ export default function AppearanceSettingsScreen() {
     <Screen tabBarInset={tabBarInset}>
       <ScreenHeader
         title={t("appearance")}
-        subtitle={`${scheme === "dark" ? t("dark") : t("light")} · ${t("textSize")}`}
+        subtitle={`${
+          preference === "system"
+            ? t("themeSystem")
+            : scheme === "dark"
+              ? t("dark")
+              : t("light")
+        } · ${t("textSize")}`}
         showBack={showBack}
         splitJoin={splitJoin}
       />
@@ -35,8 +41,24 @@ export default function AppearanceSettingsScreen() {
       <View className="gap-6">
         <Section title={t("theme")}>
           <View accessibilityRole="radiogroup" className="flex-row gap-3">
-            <ThemeTile mode="light" label={t("light")} selected={scheme === "light"} onPress={() => setScheme("light")} />
-            <ThemeTile mode="dark" label={t("dark")} selected={scheme === "dark"} onPress={() => setScheme("dark")} />
+            <ThemeTile
+              mode="system"
+              label={t("themeSystem")}
+              selected={preference === "system"}
+              onPress={() => setPreference("system")}
+            />
+            <ThemeTile
+              mode="light"
+              label={t("light")}
+              selected={preference === "light"}
+              onPress={() => setPreference("light")}
+            />
+            <ThemeTile
+              mode="dark"
+              label={t("dark")}
+              selected={preference === "dark"}
+              onPress={() => setPreference("dark")}
+            />
           </View>
         </Section>
 
@@ -67,20 +89,22 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** A small picture of the app in that theme, so the choice is visual. */
+/**
+ * A small picture of the app in that theme, so the choice is visual.
+ * "Match phone" shows light and dark side by side.
+ */
 function ThemeTile({
   mode,
   label,
   selected,
   onPress,
 }: {
-  mode: "light" | "dark";
+  mode: "light" | "dark" | "system";
   label: string;
   selected: boolean;
   onPress: () => void;
 }) {
-  const { colors, accent, surfaceDepth } = useTheme();
-  const preview = getColors(mode, accent, surfaceDepth);
+  const { colors } = useTheme();
 
   return (
     <Pressable
@@ -99,52 +123,52 @@ function ThemeTile({
           borderColor: selected ? colors.accent : "transparent",
         }}
       >
-        {/* Mini screen */}
-        <View style={{ borderRadius: 18, overflow: "hidden", backgroundColor: preview.ice, height: 116 }}>
-          <View style={{ height: 30, backgroundColor: preview.accent, paddingHorizontal: 10, justifyContent: "center" }}>
-            <View style={{ width: 44, height: 6, borderRadius: 3, backgroundColor: withAlpha("#FFFFFF", 0.85) }} />
-          </View>
-          <View style={{ padding: 8, gap: 6 }}>
-            {[0.7, 0.5, 0.6].map((width, index) => (
+        {mode === "system" ? (
+          <View style={{ borderRadius: 18, overflow: "hidden", height: 116 }}>
+            <MiniScreen mode="light" />
+            {/* Right half: the dark version, cut down the middle */}
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: "50%",
+                right: 0,
+                overflow: "hidden",
+              }}
+            >
               <View
-                key={index}
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  height: 20,
-                  paddingHorizontal: 7,
-                  borderRadius: 7,
-                  backgroundColor: preview.paper,
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  right: 0,
+                  width: "200%",
                 }}
               >
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    borderWidth: 1.5,
-                    borderColor: index === 0 ? preview.accent : withAlpha(preview.muted, 0.6),
-                    backgroundColor: index === 0 ? preview.accent : "transparent",
-                  }}
-                />
-                <View
-                  style={{
-                    width: `${width * 100}%`,
-                    height: 5,
-                    borderRadius: 3,
-                    backgroundColor: withAlpha(preview.ink, 0.35),
-                  }}
-                />
+                <MiniScreen mode="dark" />
               </View>
-            ))}
+            </View>
           </View>
-        </View>
-
-        <View className="flex-row items-center justify-between px-2 pb-1 pt-2.5">
-          <AppText className="text-sm font-semibold text-cove-ink">{label}</AppText>
+        ) : (
+          <View style={{ borderRadius: 18, overflow: "hidden" }}>
+            <MiniScreen mode={mode} />
+          </View>
+        )}
+        <View className="flex-row items-center justify-between gap-1.5 px-2 pb-1 pt-2.5">
+          {/* One line that shrinks on narrow tiles instead of wrapping into the check. */}
+          <AppText
+            className="text-sm font-semibold text-cove-ink"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            style={{ flex: 1, minWidth: 0 }}
+          >
+            {label}
+          </AppText>
           <View
             style={{
+              flexShrink: 0,
               width: 20,
               height: 20,
               borderRadius: 10,
@@ -155,10 +179,74 @@ function ThemeTile({
               backgroundColor: selected ? colors.accent : "transparent",
             }}
           >
-            {selected ? <Ionicons name="checkmark" size={13} color={colors.onAccent} /> : null}
+            {selected ? (
+              <Ionicons name="checkmark" size={13} color={colors.onAccent} />
+            ) : null}
           </View>
         </View>
       </View>
     </Pressable>
+  );
+}
+
+function MiniScreen({ mode }: { mode: "light" | "dark" }) {
+  const { accent, surfaceDepth } = useTheme();
+  const preview = getColors(mode, accent, surfaceDepth);
+  return (
+    <View style={{ backgroundColor: preview.ice, height: 116 }}>
+      <View
+        style={{
+          height: 30,
+          backgroundColor: preview.accent,
+          paddingHorizontal: 10,
+          justifyContent: "center",
+        }}
+      >
+        <View
+          style={{
+            width: 44,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: withAlpha("#FFFFFF", 0.85),
+          }}
+        />
+      </View>
+      <View style={{ padding: 8, gap: 6 }}>
+        {[0.7, 0.5, 0.6].map((width, index) => (
+          <View
+            key={index}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              height: 20,
+              paddingHorizontal: 7,
+              borderRadius: 7,
+              backgroundColor: preview.paper,
+            }}
+          >
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                borderWidth: 1.5,
+                borderColor:
+                  index === 0 ? preview.accent : withAlpha(preview.muted, 0.6),
+                backgroundColor: index === 0 ? preview.accent : "transparent",
+              }}
+            />
+            <View
+              style={{
+                width: `${width * 100}%`,
+                height: 5,
+                borderRadius: 3,
+                backgroundColor: withAlpha(preview.ink, 0.35),
+              }}
+            />
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }

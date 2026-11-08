@@ -9,7 +9,7 @@ describe("AuthService", () => {
   const jwt = { signAsync: jest.fn<(payload: object, options: object) => Promise<string>>() };
   const config = { get: jest.fn(() => "15m") };
 
-  const service = new AuthService(auth as never, jwt as never, config as never, {} as never);
+  const service = new AuthService(auth as never, jwt as never, config as never, {} as never, {} as never, {} as never);
 
   beforeEach(() => {
     jest.clearAllMocks();

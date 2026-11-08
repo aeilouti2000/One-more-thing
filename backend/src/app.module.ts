@@ -12,6 +12,10 @@ import { ItemCosts1740000000009 } from "./database/migrations/1740000000009-Item
 import { SoftDeleteLists1740000000010 } from "./database/migrations/1740000000010-SoftDeleteLists";
 import { ListShopLocks1740000000011 } from "./database/migrations/1740000000011-ListShopLocks";
 import { TripReceipts1740000000012 } from "./database/migrations/1740000000012-TripReceipts";
+import { EmailAndGoogle1740000000013 } from "./database/migrations/1740000000013-EmailAndGoogle";
+import { LegalController } from "./legal/legal.controller";
+import { ItemImages1740000000014 } from "./database/migrations/1740000000014-ItemImages";
+import { EmailCode } from "./modules/auth/entities/email-code.entity";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
 import { ShoppingTrip1740000000004 } from "./database/migrations/1740000000004-ShoppingTrip";
@@ -31,6 +35,7 @@ import { ListShopLock } from "./modules/items/entities/list-shop-lock.entity";
 import { Pin } from "./modules/items/entities/pin.entity";
 import { ShoppingList } from "./modules/items/entities/shopping-list.entity";
 import { TripReceipt } from "./modules/items/entities/trip-receipt.entity";
+import { ItemImage } from "./modules/items/entities/item-image.entity";
 import { ItemsModule } from "./modules/items/items.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { PushToken } from "./modules/notifications/entities/push-token.entity";
@@ -66,6 +71,8 @@ import { User } from "./users/user.entity";
             CustomCategory,
             HiddenCategory,
             TripReceipt,
+            ItemImage,
+            EmailCode,
           ],
           migrations: [
             Init1740000000000,
@@ -81,6 +88,8 @@ import { User } from "./users/user.entity";
             SoftDeleteLists1740000000010,
             ListShopLocks1740000000011,
             TripReceipts1740000000012,
+            EmailAndGoogle1740000000013,
+            ItemImages1740000000014,
           ],
           migrationsRun: true,
         };
@@ -91,7 +100,7 @@ import { User } from "./users/user.entity";
     ItemsModule,
     NotificationsModule,
   ],
-  controllers: [HealthController, AppReleaseController],
+  controllers: [HealthController, AppReleaseController, LegalController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
