@@ -11,7 +11,11 @@ const whenKey: Record<Exclude<PinInterval, 0>, TranslationKey> = {
 export function pinnedNotice(
   t: (key: TranslationKey, vars?: TranslateVars) => string,
   intervalDays: PinInterval,
+  monthDay?: number | null,
 ) {
   if (intervalDays === 0) return t("pinnedNoticeOnce");
+  if (intervalDays === 30 && monthDay) {
+    return t("pinnedNotice", { when: t("pinReturnsMonthDay", { day: monthDay }) });
+  }
   return t("pinnedNotice", { when: t(whenKey[intervalDays]) });
 }

@@ -16,7 +16,7 @@ import {
   PINS_REPOSITORY,
   type IPinsRepository,
 } from "../repo/pins-repo/pins.repository";
-import { advanceDue } from "../utils/shopping";
+import { nextPinDue } from "../utils/shopping";
 import { CategoriesService } from "./categories.service";
 
 export type PinView = {
@@ -27,7 +27,11 @@ export type PinView = {
   category: ItemCategory;
   urgent: boolean;
   intervalDays: PinInterval;
+  /** Monthly pins: day of the month it returns on (null: every 30 days). */
+  monthDay: number | null;
   nextDueAt: Date;
+  /** The list it repeats onto (null: the home's first list). */
+  listId: string | null;
 };
 
 @Injectable()
@@ -57,30 +61,33 @@ export class PinsService {
       unit?: string;
       urgent?: boolean;
       intervalDays: PinInterval;
+      monthDay?: number;
+      utcOffsetMin?: number;
+      listId?: string;
     },
     createItem: (notify: boolean) => Promise<unknown>,
   ) {
     await this.homes.requireMembership(userId, homeId);
     await this.categories.assertUsable(homeId, input.category);
-    const count = await this.pins.count(homeId);
-    if (count >= PIN_LIMIT) {
-      throw new DomainError(
-        "PIN_LIMIT",
-        "You can pin up to 12 items.",
-        HttpStatus.CONFLICT,
-      );
-    }
+    const list = await this.resolveList(homeId, input.listId);
+    await this.assertRoom(homeId, list.id);
 
     const now = new Date();
+    const schedule = {
+      intervalDays: input.intervalDays,
+      monthDay: input.intervalDays === 30 ? (input.monthDay ?? null) : null,
+      utcOffsetMin: input.utcOffsetMin ?? 0,
+    };
     const pin = await this.pins.insert({
       homeId,
+      listId: list.id,
       name: input.name.trim(),
       quantity: input.quantity,
       category: input.category,
       unit: blankToNull(input.unit),
       urgent: input.urgent === true,
-      intervalDays: input.intervalDays,
-      nextDueAt: advanceDue(now, input.intervalDays, now),
+      ...schedule,
+      nextDueAt: nextPinDue(schedule, now, now),
       createdBy: userId,
     });
     await createItem(true);
@@ -95,8 +102,11 @@ export class PinsService {
       category: ItemCategory;
       urgent: boolean;
       intervalDays: PinInterval;
+      monthDay?: number | null;
+      utcOffsetMin?: number;
       quantity?: number;
       unit?: string;
+      listId?: string;
     },
   ) {
     const membership = await this.homes.requireMembership(userId);
@@ -109,15 +119,29 @@ export class PinsService {
       );
     }
     await this.categories.assertUsable(membership.homeId, input.category);
+    if (input.listId && input.listId !== pin.listId) {
+      const list = await this.resolveList(membership.homeId, input.listId);
+      await this.assertRoom(membership.homeId, list.id, pin.id);
+      pin.listId = list.id;
+    }
     pin.name = input.name.trim();
     pin.category = input.category;
     pin.urgent = input.urgent;
     if (typeof input.quantity === "number") pin.quantity = input.quantity;
     if (input.unit !== undefined) pin.unit = blankToNull(input.unit);
-    if (pin.intervalDays !== input.intervalDays) {
+    // monthDay omitted keeps the current day; only monthly pins keep one.
+    const monthDay =
+      input.intervalDays !== 30
+        ? null
+        : input.monthDay === undefined
+          ? pin.monthDay
+          : input.monthDay;
+    if (pin.intervalDays !== input.intervalDays || pin.monthDay !== monthDay) {
       const now = new Date();
       pin.intervalDays = input.intervalDays;
-      pin.nextDueAt = advanceDue(now, input.intervalDays, now);
+      pin.monthDay = monthDay;
+      if (input.utcOffsetMin !== undefined) pin.utcOffsetMin = input.utcOffsetMin;
+      pin.nextDueAt = nextPinDue(pin, now, now);
     }
     return toView(await this.pins.save(pin));
   }
@@ -136,6 +160,33 @@ export class PinsService {
     return { deleted: true };
   }
 
+  /** A deleted list's pins move to the home's first remaining list. */
+  async moveOffList(homeId: string, deletedListId: string) {
+    const fallback = await this.lists.findFirstActive(homeId);
+    await this.pins.moveList(homeId, deletedListId, fallback?.id ?? null);
+  }
+
+  private async resolveList(homeId: string, listId?: string) {
+    const list = listId
+      ? await this.lists.findActiveById(listId, homeId)
+      : await this.lists.findFirstActive(homeId);
+    if (!list) {
+      throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
+    }
+    return list;
+  }
+
+  private async assertRoom(homeId: string, listId: string, exceptPinId?: string) {
+    const count = await this.pins.countOnList(homeId, listId, exceptPinId);
+    if (count >= PIN_LIMIT) {
+      throw new DomainError(
+        "PIN_LIMIT",
+        `You can pin up to ${PIN_LIMIT} items per list.`,
+        HttpStatus.CONFLICT,
+      );
+    }
+  }
+
   async materializeDueHomes() {
     const homeIds = await this.pins.findDueHomeIds();
     for (const homeId of homeIds) {
@@ -147,11 +198,23 @@ export class PinsService {
     const due = await this.pins.findDue(homeId);
     if (due.length === 0) return;
 
-    const list = await this.lists.findFirstActive(homeId);
-    if (!list) return;
+    const fallback = await this.lists.findFirstActive(homeId);
+    if (!fallback) return;
+    const activeLists = new Map<string, boolean>();
+    const targetList = async (listId: string | null) => {
+      if (!listId || listId === fallback.id) return fallback.id;
+      if (!activeLists.has(listId)) {
+        activeLists.set(listId, Boolean(await this.lists.findActiveById(listId, homeId)));
+      }
+      return activeLists.get(listId) ? listId : fallback.id;
+    };
 
+    // "Already on the list" is checked per list: the same name on another
+    // list doesn't stop a pin from arriving on its own list.
     const needed = await this.items.findNeeded(homeId);
-    const names = new Set(needed.map((item) => item.name.trim().toLowerCase()));
+    const onList = new Set(
+      needed.map((item) => `${item.listId}:${item.name.trim().toLowerCase()}`),
+    );
     const now = new Date();
     const arrived: string[] = [];
 
@@ -161,16 +224,17 @@ export class PinsService {
 
       const claimed = await this.pins.claimDue(
         pin.id,
-        advanceDue(pin.nextDueAt, pin.intervalDays, now),
+        nextPinDue(pin, pin.nextDueAt, now),
       );
       if (!claimed) continue;
 
-      const key = pin.name.trim().toLowerCase();
-      if (names.has(key)) continue;
+      const listId = await targetList(pin.listId);
+      const key = `${listId}:${pin.name.trim().toLowerCase()}`;
+      if (onList.has(key)) continue;
 
       const created = await this.items.insert({
         homeId,
-        listId: list.id,
+        listId,
         name: pin.name,
         quantity: pin.quantity,
         unit: pin.unit,
@@ -189,7 +253,7 @@ export class PinsService {
         pin.urgent ? "top" : "after-urgent",
         created.listId,
       );
-      names.add(key);
+      onList.add(key);
       arrived.push(pin.name);
     }
 
@@ -208,7 +272,9 @@ function toView(pin: Pin): PinView {
     category: pin.category,
     urgent: pin.urgent,
     intervalDays: pin.intervalDays,
+    monthDay: pin.monthDay ?? null,
     nextDueAt: pin.nextDueAt,
+    listId: pin.listId ?? null,
   };
 }
 

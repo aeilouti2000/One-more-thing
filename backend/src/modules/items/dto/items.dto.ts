@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -141,6 +142,20 @@ export class CreatePinDto extends CreateItemDto {
   @IsIn(PIN_INTERVALS)
   intervalDays: PinInterval;
 
+  /** Monthly pins: day of the month to return on (1–31). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  monthDay?: number;
+
+  /** Device offset east of UTC, in minutes, for monthDay. */
+  @IsOptional()
+  @IsInt()
+  @Min(-840)
+  @Max(840)
+  utcOffsetMin?: number;
+
   @IsOptional()
   @IsBoolean()
   addNow?: boolean;
@@ -163,6 +178,20 @@ export class UpdatePinDto {
   @IsIn(PIN_INTERVALS)
   intervalDays: PinInterval;
 
+  /** Monthly pins: day of the month (1–31); null goes back to every 30 days. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  monthDay?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(-840)
+  @Max(840)
+  utcOffsetMin?: number;
+
   @IsOptional()
   @IsNumber()
   @Min(1)
@@ -174,6 +203,11 @@ export class UpdatePinDto {
   @IsString()
   @MaxLength(40)
   unit?: string;
+
+  /** Move the pin to another list of the home. */
+  @IsOptional()
+  @IsUUID()
+  listId?: string;
 }
 
 export class ItemIdsDto {

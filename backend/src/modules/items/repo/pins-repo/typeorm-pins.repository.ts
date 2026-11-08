@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Not, Repository } from "typeorm";
 import { Pin } from "../../entities/pin.entity";
 import { IPinsRepository, type NewPinInput } from "./pins.repository";
 
@@ -12,8 +12,14 @@ export class TypeormPinsRepository implements IPinsRepository {
     return this.pins.find({ where: { homeId }, order: { name: "ASC" } });
   }
 
-  count(homeId: string) {
-    return this.pins.count({ where: { homeId } });
+  countOnList(homeId: string, listId: string, exceptPinId?: string) {
+    return this.pins.count({
+      where: { homeId, listId, ...(exceptPinId ? { id: Not(exceptPinId) } : {}) },
+    });
+  }
+
+  async moveList(homeId: string, fromListId: string, toListId: string | null) {
+    await this.pins.update({ homeId, listId: fromListId }, { listId: toListId });
   }
 
   insert(input: NewPinInput) {

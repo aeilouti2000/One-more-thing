@@ -142,6 +142,7 @@ export default function ItemDetailScreen() {
           urgent: editUrgent,
           intervalDays: 7,
           addNow: false,
+          listId: purchase?.listId,
         });
         if (pinResult.error) {
           setIsSaving(false);
@@ -189,8 +190,11 @@ export default function ItemDetailScreen() {
     if (!household) return;
     const existing = await fetchPins(household.id);
     if (existing.error) return;
+    // Pins belong to a list: only a pin for this item's list counts.
     const match = existing.pins.find(
-      (pin) => pin.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
+      (pin) =>
+        pin.name.trim().toLowerCase() === item.name.trim().toLowerCase() &&
+        (!pin.listId || !item.listId || pin.listId === item.listId),
     );
     setPinnedPinId(match?.id ?? null);
     setEditPinned(Boolean(match));

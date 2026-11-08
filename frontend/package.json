@@ -1,7 +1,7 @@
 {
   "name": "react_native",
   "main": "expo-router/entry",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "scripts": {
     "start": "expo start --lan --port 8082",
     "start:device": "expo start --lan --port 8082",

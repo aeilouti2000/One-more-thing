@@ -423,6 +423,7 @@ export class ItemsService {
     await this.items.deleteNeededOnList(homeId, listId);
     list.deletedAt = new Date();
     await this.shoppingLists.save(list);
+    await this.pins.moveOffList(homeId, listId);
     return { deleted: true };
   }
 

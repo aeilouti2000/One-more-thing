@@ -15,7 +15,11 @@ export type Pin = {
   category: PurchaseCategory;
   urgent: boolean;
   intervalDays: PinInterval;
+  /** Monthly pins: day of the month it returns on (null: every 30 days). */
+  monthDay: number | null;
   nextDueAt: string;
+  /** The list it repeats onto; null means the home's first list. */
+  listId: string | null;
 };
 
 type PinResponse = {
@@ -26,8 +30,15 @@ type PinResponse = {
   category: PurchaseCategory;
   urgent: boolean;
   intervalDays: PinInterval;
+  monthDay?: number | null;
   nextDueAt: string;
+  listId?: string | null;
 };
+
+/** Device offset east of UTC, so the server finds "day N" in local time. */
+function utcOffsetMin() {
+  return -new Date().getTimezoneOffset();
+}
 
 function toPin(row: PinResponse): Pin {
   const quantity = Number(row.quantity);
@@ -39,7 +50,9 @@ function toPin(row: PinResponse): Pin {
     category: row.category,
     urgent: Boolean(row.urgent),
     intervalDays: row.intervalDays,
+    monthDay: row.monthDay ?? null,
     nextDueAt: row.nextDueAt,
+    listId: row.listId ?? null,
   };
 }
 
@@ -65,6 +78,8 @@ export async function createPin(
     category: PurchaseCategory;
     urgent: boolean;
     intervalDays: PinInterval;
+    /** Monthly pins: day of the month (1–31). */
+    monthDay?: number;
     addNow: boolean;
     unit?: string;
     listId?: string;
@@ -77,6 +92,9 @@ export async function createPin(
       category: input.category,
       urgent: input.urgent,
       intervalDays: input.intervalDays,
+      ...(input.intervalDays === 30 && input.monthDay
+        ? { monthDay: input.monthDay, utcOffsetMin: utcOffsetMin() }
+        : {}),
       addNow: input.addNow,
       unit: input.unit?.trim() || undefined,
       listId: input.listId,
@@ -94,9 +112,12 @@ export async function updatePin(
     category: PurchaseCategory;
     urgent: boolean;
     intervalDays: PinInterval;
+    /** Monthly pins: day of the month (1–31). */
+    monthDay?: number;
     quantity?: number;
     /** Omit to keep; "" clears. */
     unit?: string;
+    listId?: string;
   },
 ) {
   try {
@@ -105,8 +126,12 @@ export async function updatePin(
       category: input.category,
       urgent: input.urgent,
       intervalDays: input.intervalDays,
+      ...(input.intervalDays === 30 && input.monthDay
+        ? { monthDay: input.monthDay, utcOffsetMin: utcOffsetMin() }
+        : {}),
       ...(typeof input.quantity === "number" ? { quantity: input.quantity } : {}),
       ...(typeof input.unit === "string" ? { unit: input.unit.trim() } : {}),
+      ...(input.listId ? { listId: input.listId } : {}),
     });
     return { error: null };
   } catch (error) {

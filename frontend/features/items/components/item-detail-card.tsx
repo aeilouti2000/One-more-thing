@@ -32,6 +32,7 @@ import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase, PurchaseCategory } from "@/features/items/types/purchase";
+import type { PickedPhoto } from "@/features/items/api/items";
 
 type ItemDetailCardProps = {
   purchase: Purchase | null;
@@ -77,18 +78,32 @@ export function ItemDetailCard({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const editable = purchase?.status === "needed";
   const [viewingPhoto, setViewingPhoto] = useState(false);
-  // Photo changes save at once, apart from "Save changes".
-  const photoUri = itemPhotoUri(purchase);
+  // On an editable item a new or removed photo is a draft: it counts as a
+  // change (shows "Save changes") and is only sent when the user saves.
+  // undefined = untouched, null = remove, object = new photo.
+  const [photoDraft, setPhotoDraft] = useState<PickedPhoto | null | undefined>(undefined);
+  const photoChanged = editable && photoDraft !== undefined;
+  const savedPhotoUri = itemPhotoUri(purchase);
+  const photoUri = photoChanged ? (photoDraft?.uri ?? null) : savedPhotoUri;
   const photoTarget = purchase && !purchase.id.startsWith("temp-") ? purchase.id : null;
   const chooser = useItemPhotoChooser({
     onPicked: (photo) => {
       if (!photoTarget) return;
+      if (editable) {
+        setPhotoDraft(photo);
+        return;
+      }
       void setItemPhoto(photoTarget, photo).then((result) => {
         if (result.error) setError(result.error);
       });
     },
     onRemove: () => {
       if (!photoTarget) return;
+      if (editable) {
+        // Removing a photo that was never saved just drops the draft.
+        setPhotoDraft(savedPhotoUri ? null : undefined);
+        return;
+      }
       void setItemPhoto(photoTarget, null).then((result) => {
         if (result.error) setError(result.error);
       });
@@ -97,7 +112,7 @@ export function ItemDetailCard({
   const photoField = photoTarget ? (
     <ItemPhotoField
       uri={photoUri}
-      uploading={purchase?.photoUploading === true}
+      uploading={!photoChanged && purchase?.photoUploading === true}
       onAdd={chooser.open}
       onView={() => setViewingPhoto(true)}
     />
@@ -117,6 +132,7 @@ export function ItemDetailCard({
     setPinnedPinId(null);
     setQuantityError(undefined);
     setViewingPhoto(false);
+    setPhotoDraft(undefined);
     chooser.setError(null);
   }
 
@@ -124,8 +140,11 @@ export function ItemDetailCard({
     if (!household || item.status !== "needed") return;
     const existing = await fetchPins(household.id);
     if (existing.error) return;
+    // Pins belong to a list now: only a pin for this item's list counts.
     const match = existing.pins.find(
-      (pin) => pin.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
+      (pin) =>
+        pin.name.trim().toLowerCase() === item.name.trim().toLowerCase() &&
+        (!pin.listId || !item.listId || pin.listId === item.listId),
     );
     const isPinned = Boolean(match);
     setPinnedPinId(match?.id ?? null);
@@ -192,6 +211,7 @@ export function ItemDetailCard({
           urgent,
           intervalDays: 7,
           addNow: false,
+          listId: purchase.listId,
         });
         if (pinResult.error) {
           setIsSubmitting(false);
@@ -207,6 +227,12 @@ export function ItemDetailCard({
         }
       }
     }
+
+    if (photoChanged && photoTarget) {
+      // Upload in the background; the row shows a spinner until it lands.
+      void setItemPhoto(photoTarget, photoDraft ?? null);
+    }
+    setPhotoDraft(undefined);
 
     setIsSubmitting(false);
     onClose();
@@ -308,6 +334,7 @@ export function ItemDetailCard({
         urgent={urgent}
         pinned={pinned}
         pinBaseline={pinBaseline}
+        photoChanged={photoChanged}
         quantityError={quantityError}
         error={error ?? chooser.error}
         photo={photoField}
@@ -493,6 +520,7 @@ function EditItemForm({
   urgent,
   pinned,
   pinBaseline,
+  photoChanged,
   quantityError,
   error,
   photo,
@@ -517,6 +545,7 @@ function EditItemForm({
   urgent: boolean;
   pinned: boolean;
   pinBaseline: boolean;
+  photoChanged: boolean;
   quantityError?: string;
   error: string | null;
   photo: ReactNode;
@@ -544,7 +573,8 @@ function EditItemForm({
         notes.trim() !== (purchase.notes ?? "").trim() ||
         category !== purchase.category ||
         urgent !== purchase.urgent ||
-        pinned !== pinBaseline),
+        pinned !== pinBaseline ||
+        photoChanged),
   );
 
   const dateLabel = purchase

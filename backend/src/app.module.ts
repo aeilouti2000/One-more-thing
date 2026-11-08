@@ -15,6 +15,8 @@ import { TripReceipts1740000000012 } from "./database/migrations/1740000000012-T
 import { EmailAndGoogle1740000000013 } from "./database/migrations/1740000000013-EmailAndGoogle";
 import { LegalController } from "./legal/legal.controller";
 import { ItemImages1740000000014 } from "./database/migrations/1740000000014-ItemImages";
+import { PinLists1740000000015 } from "./database/migrations/1740000000015-PinLists";
+import { PinMonthDay1740000000016 } from "./database/migrations/1740000000016-PinMonthDay";
 import { EmailCode } from "./modules/auth/entities/email-code.entity";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
@@ -90,6 +92,8 @@ import { User } from "./users/user.entity";
             TripReceipts1740000000012,
             EmailAndGoogle1740000000013,
             ItemImages1740000000014,
+            PinLists1740000000015,
+            PinMonthDay1740000000016,
           ],
           migrationsRun: true,
         };

@@ -85,7 +85,13 @@ type ItemSheetFormProps = {
   onChangeNotes?: (value: string) => void;
 
   /** Pins: repeat interval chips above quantity. */
-  repeat?: { value: PinInterval; onChange: (value: PinInterval) => void };
+  repeat?: {
+    value: PinInterval;
+    onChange: (value: PinInterval) => void;
+    /** Monthly: the day of the month it returns on. */
+    monthDay?: number;
+    onChangeMonthDay?: (day: number) => void;
+  };
   /** Small extra controls under the note (e.g. pin / add-now toggles). */
   extra?: ReactNode;
   /** Photo row under the note (see ItemPhotoField). */
@@ -280,6 +286,9 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
               />
             ))}
           </ScrollView>
+          {repeat.value === 30 && repeat.monthDay && repeat.onChangeMonthDay ? (
+            <MonthDayPicker value={repeat.monthDay} onChange={repeat.onChangeMonthDay} />
+          ) : null}
         </View>
       ) : null}
 
@@ -571,7 +580,67 @@ export function ItemSheetToggle({
   );
 }
 
-function Chip({
+const MONTH_DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
+
+/** Day-of-month grid for monthly pins (29–31 use the last day in short months). */
+function MonthDayPicker({ value, onChange }: { value: number; onChange: (day: number) => void }) {
+  const { colors, scheme } = useTheme();
+  const { t } = useI18n();
+  const dark = scheme === "dark";
+  return (
+    <View
+      className="mt-1 gap-2.5 rounded-2xl p-3"
+      style={{ backgroundColor: dark ? withAlpha(colors.white, 0.04) : withAlpha("#12141A", 0.03) }}
+    >
+      <View className="flex-row items-center gap-1.5">
+        <Ionicons name="calendar-outline" size={14} color={colors.muted} />
+        <AppText className="text-xs font-semibold text-cove-muted">
+          {t("pinMonthDayLabel", { day: value })}
+        </AppText>
+      </View>
+      <View className="flex-row flex-wrap" style={{ gap: 6 }}>
+        {MONTH_DAYS.map((day) => {
+          const selected = day === value;
+          return (
+            <Pressable
+              key={day}
+              onPress={() => {
+                void Haptics.selectionAsync();
+                onChange(day);
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={t("pinMonthDayLabel", { day })}
+              hitSlop={2}
+              className="items-center justify-center rounded-full active:opacity-70"
+              style={{
+                width: 34,
+                height: 34,
+                backgroundColor: selected
+                  ? colors.accent
+                  : dark
+                    ? withAlpha(colors.white, 0.07)
+                    : withAlpha("#12141A", 0.05),
+              }}
+            >
+              <AppText
+                className="text-[13px] font-semibold"
+                style={{ color: selected ? colors.onAccent : colors.ink }}
+              >
+                {day}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </View>
+      {value > 28 ? (
+        <AppText className="text-xs text-cove-muted">{t("pinMonthDayShortHint")}</AppText>
+      ) : null}
+    </View>
+  );
+}
+
+export function Chip({
   label,
   selected,
   compact = false,

@@ -7,6 +7,7 @@ import { CategoryFilter } from "@/features/items/components/category-filter";
 import { AppText } from "@/components/ui/AppText";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import {
+  Chip,
   ItemSheetForm,
   ItemSheetToggle,
   PIN_INTERVAL_KEYS,
@@ -26,7 +27,7 @@ import { useCategories } from "@/features/items/providers/categories-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { resolvePreferredListId } from "@/features/items/utils/list-storage";
-import { fetchLists, listLabel } from "@/features/items/api/lists";
+import { fetchLists, listLabel, type HomeList } from "@/features/items/api/lists";
 import { readCachedPins } from "@/features/offline/profile-cache";
 import { pinnedNotice } from "@/features/items/utils/pin-notice";
 import {
@@ -89,6 +90,7 @@ function PinsBody() {
   const [category, setCategory] = useState<PurchaseCategory>("supermarket");
   const [urgent, setUrgent] = useState(false);
   const [intervalDays, setIntervalDays] = useState<PinInterval>(7);
+  const [monthDay, setMonthDay] = useState(() => new Date().getDate());
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("");
   const [addNow, setAddNow] = useState(true);
@@ -104,6 +106,19 @@ function PinsBody() {
   const [isChoosingCategory, setIsChoosingCategory] = useState(false);
   const [pinPendingDelete, setPinPendingDelete] = useState<Pin | null>(null);
   const [floatMessage, setFloatMessage] = useState<string | null>(null);
+  const [lists, setLists] = useState<HomeList[]>([]);
+  const [pinListId, setPinListId] = useState<string | null>(null);
+  const showLists = lists.length > 1;
+
+  function listName(id: string | null | undefined) {
+    const list = lists.find((entry) => entry.id === id) ?? lists[0];
+    return listLabel(list?.name ?? t("defaultList"), t("defaultList"));
+  }
+
+  /** The list a pin repeats onto: its own, else the home's first. */
+  function pinList(pin: Pin) {
+    return lists.some((list) => list.id === pin.listId) ? pin.listId : (lists[0]?.id ?? null);
+  }
 
   const load = useCallback(async () => {
     if (!household) {
@@ -111,6 +126,9 @@ function PinsBody() {
       setIsLoading(false);
       return;
     }
+    void fetchLists(household.id).then((result) => {
+      if (!result.error) setLists(result.lists);
+    });
     const cached = readCachedPins<Pin>(household.id);
     if (cached) {
       setPins(cached);
@@ -154,8 +172,10 @@ function PinsBody() {
         category,
         urgent,
         intervalDays,
+        monthDay,
         quantity: parsedQuantity,
         unit,
+        listId: pinListId ?? undefined,
       });
       setIsSaving(false);
       if (result.error) {
@@ -169,8 +189,9 @@ function PinsBody() {
       return;
     }
 
-    let listId: string | undefined;
-    if (addNow) {
+    // The pin repeats onto this list, and "Add to the list now" uses it too.
+    let listId = pinListId ?? undefined;
+    if (!listId) {
       const listsResult = await fetchLists(household.id);
       if (listsResult.error) {
         setIsSaving(false);
@@ -186,6 +207,7 @@ function PinsBody() {
       category,
       urgent,
       intervalDays,
+      monthDay,
       addNow,
       listId,
     });
@@ -197,7 +219,7 @@ function PinsBody() {
     setName("");
     setUrgent(false);
     setIsAdding(false);
-    setFloatMessage(pinnedNotice(t, intervalDays));
+    setFloatMessage(pinnedNotice(t, intervalDays, monthDay));
     await load();
   }
 
@@ -219,9 +241,11 @@ function PinsBody() {
     setCategory("supermarket");
     setUrgent(false);
     setIntervalDays(7);
+    setMonthDay(new Date().getDate());
     setQuantity("1");
     setUnit("");
     setAddNow(true);
+    setPinListId(household ? resolvePreferredListId(lists, household.id) : null);
     setError(null);
     setIsAdding(true);
   }
@@ -232,9 +256,15 @@ function PinsBody() {
     setCategory(pin.category);
     setUrgent(pin.urgent);
     setIntervalDays(pin.intervalDays);
+    // Older monthly pins have no day yet: start from their next due date.
+    setMonthDay(
+      pin.monthDay ??
+        (pin.intervalDays === 30 ? new Date(pin.nextDueAt).getDate() : new Date().getDate()),
+    );
     setQuantity(String(pin.quantity || 1));
     setUnit(pin.unit ?? "");
     setAddNow(false);
+    setPinListId(pinList(pin));
     setError(null);
     setIsAdding(true);
   }
@@ -250,7 +280,11 @@ function PinsBody() {
       return;
     }
 
-    const listId = resolvePreferredListId(listsResult.lists, household.id) ?? undefined;
+    // Into the pin's own list (if it still exists), like when it repeats.
+    const listId =
+      (listsResult.lists.some((list) => list.id === pin.listId) ? pin.listId : null) ??
+      resolvePreferredListId(listsResult.lists, household.id) ??
+      undefined;
     const targetList = listId
       ? listsResult.lists.find((list) => list.id === listId) ?? null
       : null;
@@ -472,6 +506,7 @@ function PinsBody() {
                     <View className="flex-row flex-wrap items-center gap-1.5">
                       <MetaChip label={categoryName(pin.category)} />
                       <MetaChip label={t(intervalKeys[pin.intervalDays])} />
+                      {showLists ? <MetaChip label={listName(pinList(pin))} /> : null}
                       {due ? <MetaChip label={due} /> : null}
                       {listPresence[pin.id] ? (
                         <MetaChip
@@ -540,7 +575,12 @@ function PinsBody() {
             setError(null);
           }}
           autoFocusName={!editingPin}
-          repeat={{ value: intervalDays, onChange: setIntervalDays }}
+          repeat={{
+            value: intervalDays,
+            onChange: setIntervalDays,
+            monthDay,
+            onChangeMonthDay: setMonthDay,
+          }}
           quantity={quantity}
           onChangeQuantity={setQuantity}
           unit={unit}
@@ -550,14 +590,35 @@ function PinsBody() {
           category={category}
           onChangeCategory={setCategory}
           extra={
-            editingPin ? null : (
-              <ItemSheetToggle
-                label={t("addToListNow")}
-                icon="playlist-plus"
-                value={addNow}
-                onChange={setAddNow}
-              />
-            )
+            <View className="gap-4">
+              {showLists ? (
+                <View className="gap-2">
+                  <AppText className="text-xs font-semibold text-cove-muted">{t("pinAddsTo")}</AppText>
+                  <View className="flex-row flex-wrap gap-2">
+                    {lists.map((list) => (
+                      <Chip
+                        key={list.id}
+                        label={listName(list.id)}
+                        selected={pinListId === list.id}
+                        compact
+                        onPress={() => {
+                          setPinListId(list.id);
+                          setError(null);
+                        }}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+              {editingPin ? null : (
+                <ItemSheetToggle
+                  label={t("addToListNow")}
+                  icon="playlist-plus"
+                  value={addNow}
+                  onChange={setAddNow}
+                />
+              )}
+            </View>
           }
           error={error}
           submitLabel={

@@ -545,12 +545,6 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                 </View>
               );
             })}
-            <HubLink
-              icon="add-circle-outline"
-              title={t("addAHome")}
-              summary={t("addAHomeSummary")}
-              href={"/home/add" as Href}
-            />
           </View>
           {modals}
         </Screen>

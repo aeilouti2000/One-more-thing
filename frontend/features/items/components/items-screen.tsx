@@ -370,12 +370,11 @@ export default function ItemsScreen() {
       return;
     }
 
-    const pinnedNames = new Set(
-      existing.pins.map((pin) => pin.name.trim().toLowerCase()),
-    );
-    const toPin = selected.filter(
-      (item) => !pinnedNames.has(item.name.trim().toLowerCase()),
-    );
+    // Pins belong to a list: an item counts as pinned only on the same list.
+    const pinKey = (listId: string | null | undefined, name: string) =>
+      `${listId ?? ""}:${name.trim().toLowerCase()}`;
+    const pinned = new Set(existing.pins.map((pin) => pinKey(pin.listId, pin.name)));
+    const toPin = selected.filter((item) => !pinned.has(pinKey(item.listId, item.name)));
     if (toPin.length === 0) {
       setBusyAction(null);
       setFloatTone("error");
@@ -395,6 +394,7 @@ export default function ItemsScreen() {
         urgent: item.urgent,
         intervalDays,
         addNow: false,
+        listId: item.listId,
       });
       if (result.error) {
         setBusyAction(null);

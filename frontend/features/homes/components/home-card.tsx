@@ -197,64 +197,41 @@ export function HomeCard({
             ))}
           </View>
 
-          {!selected ? (
-            <AppButton
-              label={t("switchToHome")}
-              loading={switching}
-              disabled={switching}
-              onPress={onSwitch}
-            />
-          ) : null}
-
-          {isHost ? (
-            <View className="flex-row gap-2">
-              <ActionPill
-                icon="pencil-outline"
-                label={t("rename")}
-                color={colors.accent}
-                background={withAlpha(colors.accent, dark ? 0.14 : 0.1)}
-                onPress={startEditing}
-              />
-              <ActionPill
-                icon="trash-outline"
-                label={t("deleteHome")}
-                color="#F07178"
-                background={dark ? "rgba(240,113,120,0.14)" : "rgba(194,65,74,0.08)"}
-                onPress={onDelete}
-              />
+          {!selected || isHost ? (
+            <View className="mt-1 gap-2">
+              {!selected ? (
+                <AppButton
+                  label={t("switchToHome")}
+                  icon="swap-horizontal"
+                  loading={switching}
+                  disabled={switching}
+                  onPress={onSwitch}
+                />
+              ) : null}
+              {isHost ? (
+                <View className="flex-row gap-2">
+                  <AppButton
+                    label={t("rename")}
+                    icon="pencil-outline"
+                    variant="secondary"
+                    compact
+                    style={{ flex: 1 }}
+                    onPress={startEditing}
+                  />
+                  <AppButton
+                    label={t("delete")}
+                    icon="trash-outline"
+                    variant="danger"
+                    compact
+                    style={{ flex: 1 }}
+                    onPress={onDelete}
+                  />
+                </View>
+              ) : null}
             </View>
           ) : null}
         </View>
       ) : null}
     </View>
-  );
-}
-
-function ActionPill({
-  icon,
-  label,
-  color,
-  background,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  color: string;
-  background: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      className="h-10 flex-row items-center gap-1.5 rounded-full px-4 active:opacity-75"
-      style={{ backgroundColor: background }}
-    >
-      <Ionicons name={icon} size={15} color={color} />
-      <AppText className="text-sm font-semibold" style={{ color }}>
-        {label}
-      </AppText>
-    </Pressable>
   );
 }
