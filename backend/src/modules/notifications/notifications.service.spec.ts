@@ -134,6 +134,32 @@ describe("NotificationsService", () => {
     await expect(service.flushPending()).resolves.toBeUndefined();
   });
 
+  it("re-sends per project when tokens from different Expo projects are mixed", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: async () =>
+        JSON.stringify({
+          errors: [
+            {
+              code: "PUSH_TOO_MANY_EXPERIENCE_IDS",
+              message: "mixed",
+              details: {
+                "@me/app": ["ExponentPushToken[a]"],
+                "@anonymous/old": ["ExponentPushToken[b]"],
+              },
+            },
+          ],
+        }),
+    } as unknown as Response);
+    fetchMock.mockResolvedValue(ok({ data: [{ status: "ok", id: "t1" }] }));
+    service.notifyItemAdded({ homeId: "h1", actorId: "u1", actorName: "Alex", itemName: "Milk", urgent: false });
+    await service.flushPending();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(sentMessages(1).map((message) => message.to)).toEqual(["ExponentPushToken[a]"]);
+    expect(sentMessages(2).map((message) => message.to)).toEqual(["ExponentPushToken[b]"]);
+  });
+
   it("removes the old token when the phone's token rotates", async () => {
     repo.findByToken.mockResolvedValue(null);
     await service.register("u1", "ExponentPushToken[new]", "en", "ExponentPushToken[old]");

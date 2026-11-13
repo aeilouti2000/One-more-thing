@@ -36,6 +36,37 @@ type ExpoTicket = {
   details?: { error?: string };
 };
 
+type ExpoRequestError = {
+  code?: string;
+  message?: string;
+  /** For PUSH_TOO_MANY_EXPERIENCE_IDS: project name → its tokens. */
+  details?: Record<string, unknown>;
+};
+
+/**
+ * Splits a rejected batch by Expo project, using the token lists Expo returns
+ * with PUSH_TOO_MANY_EXPERIENCE_IDS. Null when the error is something else.
+ */
+export function splitByProject<M extends { to: string }>(
+  errors: ExpoRequestError[],
+  messages: M[],
+): M[][] | null {
+  const error = errors.find((entry) => entry.code === "PUSH_TOO_MANY_EXPERIENCE_IDS");
+  if (!error?.details) return null;
+  const groups: M[][] = [];
+  const placed = new Set<string>();
+  for (const tokens of Object.values(error.details)) {
+    if (!Array.isArray(tokens)) continue;
+    const wanted = new Set(tokens.filter((token): token is string => typeof token === "string"));
+    const group = messages.filter((message) => wanted.has(message.to) && !placed.has(message.to));
+    group.forEach((message) => placed.add(message.to));
+    if (group.length > 0) groups.push(group);
+  }
+  // Each group must be smaller than the batch, or the same request would repeat.
+  if (groups.length < 2) return null;
+  return groups;
+}
+
 type ExpoReceipt = {
   status?: string;
   details?: { error?: string };
@@ -183,17 +214,30 @@ export class NotificationsService implements OnModuleDestroy {
       const sent: { id: string; token: string }[] = [];
       const expired: string[] = [];
 
+      const batches: (typeof messages)[] = [];
       for (let index = 0; index < messages.length; index += SEND_CHUNK) {
-        const chunk = messages.slice(index, index + SEND_CHUNK);
-        const payload = await this.post<{ data?: ExpoTicket[] }>(EXPO_PUSH_URL, chunk);
-        if (!payload) continue;
+        batches.push(messages.slice(index, index + SEND_CHUNK));
+      }
 
-        (payload.data ?? []).forEach((ticket, ticketIndex) => {
+      while (batches.length > 0) {
+        const chunk = batches.shift()!;
+        const result = await this.post<{ data?: ExpoTicket[] }>(EXPO_PUSH_URL, chunk);
+        if (!result.ok) {
+          // Tokens from different Expo projects (an old dev or Expo Go install
+          // next to the real app) can't share one request: Expo rejects all of
+          // them. Send each project's tokens on its own.
+          const split = splitByProject(result.errors, chunk);
+          if (split) batches.push(...split);
+          continue;
+        }
+
+        (result.data.data ?? []).forEach((ticket, ticketIndex) => {
           const token = chunk[ticketIndex]?.to;
           if (!token) return;
           if (ticket.status === "ok" && ticket.id) sent.push({ id: ticket.id, token });
-          if (ticket.status === "error" && ticket.details?.error === "DeviceNotRegistered") {
-            expired.push(token);
+          if (ticket.status === "error") {
+            if (ticket.details?.error === "DeviceNotRegistered") expired.push(token);
+            else this.logger.warn(`Push ticket error: ${ticket.details?.error ?? "unknown"}`);
           }
         });
       }
@@ -225,11 +269,12 @@ export class NotificationsService implements OnModuleDestroy {
 
       for (let index = 0; index < ids.length; index += RECEIPT_CHUNK) {
         const chunk = ids.slice(index, index + RECEIPT_CHUNK);
-        const payload = await this.post<{ data?: Record<string, ExpoReceipt> }>(
+        const result = await this.post<{ data?: Record<string, ExpoReceipt> }>(
           EXPO_RECEIPTS_URL,
           { ids: chunk },
         );
-        for (const [id, receipt] of Object.entries(payload?.data ?? {})) {
+        if (!result.ok) continue;
+        for (const [id, receipt] of Object.entries(result.data.data ?? {})) {
           if (receipt.status !== "error") continue;
           if (receipt.details?.error === "DeviceNotRegistered") {
             const token = tokenById.get(id);
@@ -248,7 +293,10 @@ export class NotificationsService implements OnModuleDestroy {
     }
   }
 
-  private async post<T>(url: string, body: unknown): Promise<T | null> {
+  private async post<T>(
+    url: string,
+    body: unknown,
+  ): Promise<{ ok: true; data: T } | { ok: false; errors: ExpoRequestError[] }> {
     const headers: Record<string, string> = {
       Accept: "application/json",
       "Accept-Encoding": "gzip, deflate",
@@ -263,10 +311,20 @@ export class NotificationsService implements OnModuleDestroy {
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
     if (!response.ok) {
-      this.logger.warn(`Expo push request failed with ${response.status}`);
-      return null;
+      const text = await response.text().catch(() => "");
+      let errors: ExpoRequestError[] = [];
+      try {
+        errors = (JSON.parse(text) as { errors?: ExpoRequestError[] }).errors ?? [];
+      } catch {
+        // Not JSON; the raw text is logged below.
+      }
+      const reason = errors.map((error) => `${error.code ?? "?"}: ${error.message ?? ""}`).join("; ");
+      this.logger.warn(
+        `Expo push request failed with ${response.status}: ${(reason || text).slice(0, 500)}`,
+      );
+      return { ok: false, errors };
     }
-    return (await response.json()) as T;
+    return { ok: true, data: (await response.json()) as T };
   }
 }
 

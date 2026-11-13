@@ -70,7 +70,7 @@ function ThemedNavigation() {
  * Coming back after this long counts as opening the app again. Shorter trips
  * (the camera, the photo picker, a share sheet) don't bring the prompt back.
  */
-const REOPEN_AFTER_MS = 60_000;
+const REOPEN_AFTER_MS = 15_000;
 
 function UpdateGate() {
   const [release, setRelease] = useState<AppUpdate | null>(null);

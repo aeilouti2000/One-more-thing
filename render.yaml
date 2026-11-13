@@ -22,7 +22,7 @@ services:
       - key: CORS_ORIGINS
         value: ""
       - key: APP_MIN_VERSION
-        value: "2.2.2"
+        value: "2.5.0"
       - key: APP_LATEST_VERSION
         value: "2.5.0"
       - key: APP_DOWNLOAD_URL
