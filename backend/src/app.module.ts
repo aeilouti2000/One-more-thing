@@ -17,6 +17,8 @@ import { LegalController } from "./legal/legal.controller";
 import { ItemImages1740000000014 } from "./database/migrations/1740000000014-ItemImages";
 import { PinLists1740000000015 } from "./database/migrations/1740000000015-PinLists";
 import { PinMonthDay1740000000016 } from "./database/migrations/1740000000016-PinMonthDay";
+import { HomeNotifications1740000000017 } from "./database/migrations/1740000000017-HomeNotifications";
+import { NamedInvoices1740000000018 } from "./database/migrations/1740000000018-NamedInvoices";
 import { EmailCode } from "./modules/auth/entities/email-code.entity";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
@@ -94,6 +96,8 @@ import { User } from "./users/user.entity";
             ItemImages1740000000014,
             PinLists1740000000015,
             PinMonthDay1740000000016,
+            HomeNotifications1740000000017,
+            NamedInvoices1740000000018,
           ],
           migrationsRun: true,
         };

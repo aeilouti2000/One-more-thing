@@ -1,4 +1,4 @@
-import { IsIn, IsString, Matches } from "class-validator";
+import { IsIn, IsOptional, IsString, Matches } from "class-validator";
 
 export class PushTokenDto {
   @IsString()
@@ -7,6 +7,12 @@ export class PushTokenDto {
 
   @IsIn(["en", "ar"])
   locale: "en" | "ar";
+
+  /** The token this phone had before; removed when it rotates. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^Expo(nent)?PushToken\[[^\]]+\]$/)
+  previousToken?: string;
 }
 
 export class RemovePushTokenDto {

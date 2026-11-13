@@ -2,7 +2,15 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type ReactNode } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Dimensions, Modal, Pressable, ScrollView, View } from "react-native";
+import {
+  ActivityIndicator,
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from "react-native";
 import { FoldPaneEmpty, FoldSplit } from "@/components/ui/FoldSplit";
 import { HistoryDateField } from "@/features/items/components/history-date-field";
 import { ItemDetailCard } from "@/features/items/components/item-detail-card";
@@ -18,7 +26,13 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { formatMoney, summarizeSpend } from "@/features/items/utils/currency";
-import { groupPurchasesIntoTrips } from "@/features/items/utils/trips";
+import {
+  groupPurchasesIntoTrips,
+  invoiceAnchors,
+  moveTargets,
+  type ShoppingTrip,
+} from "@/features/items/utils/trips";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeList } from "@/features/items/api/lists";
 import { readCachedHistoryLists, readCachedLists } from "@/features/offline/profile-cache";
 import { canUndoBought } from "@/features/items/utils/share-list";
@@ -42,7 +56,17 @@ type Anchor = { x: number; y: number; width: number; height: number };
 const HISTORY_RANGES: HistoryRange[] = ["all", "today", "week", "month"];
 
 export default function HistoryScreen() {
-  const { bought, isLoading, error, refresh, undoBought, addItem, deleteMany } = usePurchases();
+  const {
+    bought,
+    isLoading,
+    error,
+    refresh,
+    undoBought,
+    addItem,
+    deleteMany,
+    renameTrip,
+    moveToTrip,
+  } = usePurchases();
   const { household } = useHousehold();
   const { t, locale, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
@@ -91,16 +115,19 @@ export default function HistoryScreen() {
       return a.name.localeCompare(b.name);
     });
   }, [historyLists, bought, activeLists]);
+  const anchors = useMemo(() => invoiceAnchors(bought), [bought]);
   const visible = useMemo(
     () =>
       bought.filter((item) => {
-        const inList = listId === "all" || item.listId === listId;
+        // An invoice is filtered by its first item, so it's never split.
+        const at = (item.receiptId ? anchors.get(item.receiptId) : null) ?? item;
+        const inList = listId === "all" || at.listId === listId;
         const inDate = pickedDate
-          ? sameLocalDay(item.boughtAt, pickedDate)
-          : boughtInRange(item.boughtAt, range, now);
+          ? sameLocalDay(at.boughtAt, pickedDate)
+          : boughtInRange(at.boughtAt, range, now);
         return inList && inDate;
       }),
-    [bought, listId, now, pickedDate, range],
+    [anchors, bought, listId, now, pickedDate, range],
   );
 
   const openItem = openItemId ? (bought.find((item) => item.id === openItemId) ?? null) : null;
@@ -111,6 +138,80 @@ export default function HistoryScreen() {
   const trips = useMemo(() => groupPurchasesIntoTrips(visible), [visible]);
   const openTrip = trips.find((trip) => trip.id === openTripId) ?? null;
   if (openTripId && !openTrip) setOpenTripId(null);
+  // Move targets ignore the list/date filter: any trip of the item's month.
+  const allTrips = useMemo(() => groupPurchasesIntoTrips(bought), [bought]);
+  const [renaming, setRenaming] = useState<ShoppingTrip | null>(null);
+  const [tripName, setTripName] = useState("");
+  const [movingItem, setMovingItem] = useState<Purchase | null>(null);
+  const [tripBusy, setTripBusy] = useState(false);
+  const [tripError, setTripError] = useState<string | null>(null);
+  const targets = movingItem ? moveTargets(allTrips, movingItem) : [];
+
+  function tripRef(trip: ShoppingTrip) {
+    return {
+      receiptId: trip.receiptId,
+      itemIds: trip.items.map((item) => item.id),
+      listId: trip.items[0]?.listId ?? null,
+    };
+  }
+
+  function startRename(trip: ShoppingTrip) {
+    setTripError(null);
+    setTripName(trip.name ?? "");
+    setRenaming(trip);
+  }
+
+  async function saveTripName() {
+    if (!renaming || tripBusy) return;
+    setTripBusy(true);
+    setTripError(null);
+    const result = await renameTrip(tripRef(renaming), tripName);
+    setTripBusy(false);
+    if (result.error) {
+      setTripError(result.error);
+      return;
+    }
+    // A trip without an invoice got one: its id is now the invoice id.
+    if (openTripId === renaming.id && result.receiptId) setOpenTripId(result.receiptId);
+    setRenaming(null);
+  }
+
+  async function moveItemTo(trip: ShoppingTrip) {
+    if (!movingItem || tripBusy) return;
+    setTripBusy(true);
+    setTripError(null);
+    const result = await moveToTrip(movingItem.id, tripRef(trip));
+    setTripBusy(false);
+    if (result.error) {
+      setTripError(result.error);
+      return;
+    }
+    setMovingItem(null);
+    void Haptics.selectionAsync();
+  }
+
+  function tripInvoice(trip: ShoppingTrip) {
+    const when = formatTripWhen(trip.startedAt, locale);
+    return (
+      <InvoiceView
+        items={trip.items}
+        currency={currency}
+        periodTitle={trip.name ?? when}
+        listTitle={`${trip.name ? `${when} · ` : ""}${listLabel(trip.listName, t("defaultList"))}`}
+        locale={locale}
+        total={trip.total}
+        priced={trip.priced}
+        count={trip.count}
+        onPressItem={(purchase) => setOpenItemId(purchase.id)}
+        onRename={() => startRename(trip)}
+        onMoveItem={(purchase) => {
+          setTripError(null);
+          setMovingItem(purchase);
+        }}
+        actions={<TripInvoiceCosts items={trip.items} currency={currency} />}
+      />
+    );
+  }
   const pickedLabel = pickedDate
     ? new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
         year: "numeric",
@@ -392,18 +493,7 @@ export default function HistoryScreen() {
                 {t("invoiceAllTrips")}
               </AppText>
             </Pressable>
-            <InvoiceView
-              items={openTrip.items}
-              currency={currency}
-              periodTitle={formatTripWhen(openTrip.startedAt, locale)}
-              listTitle={listLabel(openTrip.listName, t("defaultList"))}
-              locale={locale}
-              total={openTrip.total}
-              priced={openTrip.priced}
-              count={openTrip.count}
-              onPressItem={(purchase) => setOpenItemId(purchase.id)}
-              actions={<TripInvoiceCosts items={openTrip.items} currency={currency} />}
-            />
+            {tripInvoice(openTrip)}
           </View>
         ) : mode === "invoice" ? (
           <TripInvoiceList
@@ -447,6 +537,79 @@ export default function HistoryScreen() {
           onDelete={openItem ? () => deleteMany([openItem.id]) : undefined}
         />
       )}
+
+      <BottomSheet visible={renaming !== null} locked={tripBusy} onClose={() => setRenaming(null)}>
+        <View className="gap-4">
+          <AppText className="text-xl font-semibold text-cove-ink">{t("renameTrip")}</AppText>
+          <AppText className="text-sm text-cove-muted">{t("renameTripBody")}</AppText>
+          <TextInput
+            value={tripName}
+            onChangeText={setTripName}
+            placeholder={t("tripNamePlaceholder")}
+            placeholderTextColor={colors.muted}
+            textAlign={isRTL ? "right" : "left"}
+            maxLength={80}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={() => void saveTripName()}
+            className="h-12 rounded-2xl border border-cove-line bg-cove-ice px-4 text-base text-cove-ink"
+          />
+          <FormMessage message={tripError} />
+          <Pressable
+            disabled={tripBusy}
+            onPress={() => void saveTripName()}
+            className={`h-[52px] items-center justify-center rounded-2xl bg-cove-accent px-3 ${
+              tripBusy ? "opacity-45" : "active:opacity-80"
+            }`}
+          >
+            {tripBusy ? (
+              <ActivityIndicator color={colors.onAccent} />
+            ) : (
+              <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
+                {t("saveChanges")}
+              </AppText>
+            )}
+          </Pressable>
+        </View>
+      </BottomSheet>
+
+      <BottomSheet visible={movingItem !== null} locked={tripBusy} onClose={() => setMovingItem(null)}>
+        <View className="gap-3">
+          <AppText className="text-xl font-semibold text-cove-ink">{t("moveToTrip")}</AppText>
+          <AppText className="text-sm text-cove-muted">
+            {t("moveToTripBody", { item: movingItem?.name ?? "" })}
+          </AppText>
+          {targets.length === 0 ? (
+            <AppText className="py-2 text-sm text-cove-muted">{t("moveToTripNone")}</AppText>
+          ) : (
+            targets.map((trip) => (
+              <Pressable
+                key={trip.id}
+                disabled={tripBusy}
+                onPress={() => void moveItemTo(trip)}
+                accessibilityRole="button"
+                className="flex-row items-center justify-between gap-3 rounded-2xl px-4 py-3 active:opacity-80"
+                style={{ backgroundColor: colors.mist }}
+              >
+                <View className="min-w-0 flex-1">
+                  <AppText className="text-base font-semibold text-cove-ink" numberOfLines={1}>
+                    {trip.name ?? formatTripWhen(trip.startedAt, locale)}
+                  </AppText>
+                  <AppText className="mt-1 text-xs text-cove-muted" numberOfLines={1}>
+                    {trip.name ? `${formatTripWhen(trip.startedAt, locale)} · ` : ""}
+                    {t("invoiceTripCount", { count: trip.count })}
+                  </AppText>
+                </View>
+                <AppText className="text-sm font-semibold" style={{ color: colors.accent }}>
+                  {formatMoney(trip.total, currency)}
+                </AppText>
+              </Pressable>
+            ))
+          )}
+          {tripBusy ? <ActivityIndicator color={colors.accent} /> : null}
+          <FormMessage message={tripError} />
+        </View>
+      </BottomSheet>
 
       <OptionMenu
         visible={isChoosingList}
@@ -502,18 +665,7 @@ export default function HistoryScreen() {
             {t("invoiceAllTrips")}
           </AppText>
         </Pressable>
-        <InvoiceView
-          items={openTrip.items}
-          currency={currency}
-          periodTitle={formatTripWhen(openTrip.startedAt, locale)}
-          listTitle={listLabel(openTrip.listName, t("defaultList"))}
-          locale={locale}
-          total={openTrip.total}
-          priced={openTrip.priced}
-          count={openTrip.count}
-          onPressItem={(purchase) => setOpenItemId(purchase.id)}
-          actions={<TripInvoiceCosts items={openTrip.items} currency={currency} />}
-        />
+        {tripInvoice(openTrip)}
       </View>
     ) : null;
 
@@ -622,12 +774,13 @@ function TripInvoiceList({
                 className="text-base font-semibold text-cove-ink"
                 style={{ textAlign: isRTL ? "right" : "left" }}
               >
-                {formatTripWhen(trip.startedAt, locale)}
+                {trip.name ?? formatTripWhen(trip.startedAt, locale)}
               </AppText>
               <AppText
                 className="mt-1 text-xs text-cove-muted"
                 style={{ textAlign: isRTL ? "right" : "left" }}
               >
+                {trip.name ? `${formatTripWhen(trip.startedAt, locale)} · ` : ""}
                 {listLabel(trip.listName, t("defaultList"))}
                 {" · "}
                 {t("invoiceTripCount", { count: trip.count })}
@@ -671,6 +824,8 @@ function InvoiceView({
   priced,
   count,
   onPressItem,
+  onRename,
+  onMoveItem,
   actions,
 }: {
   items: Purchase[];
@@ -682,6 +837,9 @@ function InvoiceView({
   priced: number;
   count: number;
   onPressItem: (item: Purchase) => void;
+  /** Opened trip: rename it, or move one of its items to another trip. */
+  onRename?: () => void;
+  onMoveItem?: (item: Purchase) => void;
   /** Cost actions for an opened trip (scan / item prices / trip total). */
   actions?: ReactNode;
 }) {
@@ -703,7 +861,23 @@ function InvoiceView({
       className="overflow-hidden rounded-3xl border border-cove-line px-4 py-4"
       style={{ backgroundColor: scheme === "dark" ? colors.paper : colors.paper }}
     >
-      <AppText className="text-lg font-semibold text-cove-ink">{periodTitle}</AppText>
+      <View className="flex-row items-center gap-2">
+        <AppText className="min-w-0 flex-1 text-lg font-semibold text-cove-ink" numberOfLines={2}>
+          {periodTitle}
+        </AppText>
+        {onRename ? (
+          <Pressable
+            onPress={onRename}
+            accessibilityRole="button"
+            accessibilityLabel={t("renameTrip")}
+            hitSlop={8}
+            className="h-9 w-9 items-center justify-center rounded-full active:opacity-70"
+            style={{ backgroundColor: colors.mist }}
+          >
+            <Ionicons name="pencil" size={16} color={colors.accent} />
+          </Pressable>
+        ) : null}
+      </View>
       {listTitle ? (
         <AppText className="mt-1 text-sm text-cove-muted">{listTitle}</AppText>
       ) : null}
@@ -741,7 +915,19 @@ function InvoiceView({
                   {when ? ` · ${when}` : ""}
                 </AppText>
               </View>
-              {item.receiptId ? (
+              {onMoveItem ? (
+                <Pressable
+                  onPress={() => onMoveItem(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("moveToTrip")}
+                  hitSlop={8}
+                  className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+                  style={{ backgroundColor: colors.mist }}
+                >
+                  <Ionicons name="swap-horizontal" size={15} color={colors.accent} />
+                </Pressable>
+              ) : null}
+              {item.receiptId && item.receiptTotal !== null && item.receiptTotal !== undefined ? (
                 // Counted in the trip total; show its own price if one was typed.
                 <AppText className="text-xs font-medium text-cove-muted">
                   {item.cost !== null && item.cost !== undefined

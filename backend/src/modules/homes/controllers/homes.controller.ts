@@ -4,7 +4,13 @@ import { CurrentUser } from "../../../common/current-user.decorator";
 import { DomainError } from "../../../common/domain.error";
 import { HttpStatus } from "@nestjs/common";
 import { User } from "../../../users/user.entity";
-import { CreateHomeDto, JoinHomeDto, UpdateCostSettingsDto, UpdateHomeNameDto } from "../dto/homes.dto";
+import {
+  CreateHomeDto,
+  JoinHomeDto,
+  UpdateCostSettingsDto,
+  UpdateHomeNameDto,
+  UpdateNotificationSettingsDto,
+} from "../dto/homes.dto";
 import { HomesService } from "../services/homes.service";
 
 @Controller("homes")
@@ -67,6 +73,15 @@ export class HomesController {
     @Body() body: UpdateCostSettingsDto,
   ) {
     return this.homes.updateCostSettings(user.id, homeId, body);
+  }
+
+  @Patch(":homeId/notification-settings")
+  updateNotificationSettings(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Body() body: UpdateNotificationSettingsDto,
+  ) {
+    return this.homes.updateNotificationSettings(user.id, homeId, body.notificationsEnabled);
   }
 
   @Delete(":homeId")

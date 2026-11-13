@@ -2,6 +2,7 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { View } from "react-native";
 import { RequireSession } from "@/features/auth/components/require-session";
+import { maybeAskForPush } from "@/features/notifications/api/push";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -35,6 +36,8 @@ export default function JoinHomeScreen() {
       adoptHome(result.home);
       await refresh();
       router.replace("/items");
+      // Joining someone's home is when list alerts become useful.
+      void maybeAskForPush();
       return;
     }
 

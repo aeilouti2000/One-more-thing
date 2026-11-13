@@ -71,12 +71,14 @@ export function summarizeSpend(
   let priced = 0;
   const receipts = new Set<string>();
   for (const item of items) {
-    if (item.receiptId) {
+    const amount = item.receiptTotal;
+    // An invoice without a total yet (only named, or items moved in) counts
+    // its items' own prices instead.
+    if (item.receiptId && amount !== null && amount !== undefined && Number.isFinite(amount)) {
       priced += 1;
       if (!receipts.has(item.receiptId)) {
         receipts.add(item.receiptId);
-        const amount = item.receiptTotal;
-        if (amount !== null && amount !== undefined && Number.isFinite(amount)) total += amount;
+        total += amount;
       }
       continue;
     }

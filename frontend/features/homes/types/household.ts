@@ -29,6 +29,8 @@ export type Household = {
   askCostOnBulkBuy: boolean;
   askCostOnTripEnd: boolean;
   tripCostMode: TripCostMode;
+  /** Host switch: off means nobody in this home gets list notifications. */
+  notificationsEnabled: boolean;
 };
 
 export type HomeSummary = {

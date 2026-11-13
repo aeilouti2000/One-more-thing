@@ -56,3 +56,8 @@ export class UpdateCostSettingsDto {
   @IsIn(TRIP_COST_MODES)
   tripCostMode?: TripCostMode;
 }
+
+export class UpdateNotificationSettingsDto {
+  @IsBoolean()
+  notificationsEnabled: boolean;
+}

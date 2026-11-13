@@ -93,6 +93,7 @@ import {
   withAlpha,
 } from "@/constants/theme";
 import { useHousehold } from "@/features/homes/hooks/use-household";
+import { onFocusList } from "@/features/items/utils/list-sync";
 import { CategoryFilter } from "@/features/items/components/category-filter";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { useCategoryLabel } from "@/features/items/providers/categories-provider";
@@ -428,7 +429,7 @@ export default function ItemsScreen() {
   ) {
     setBusyAction("bought");
     setActionError(null);
-    const result = await markManyBought(entries);
+    const result = await markManyBought(entries, { joinInvoice: true });
     setBusyAction(null);
 
     if (result.error) {
@@ -582,6 +583,16 @@ export default function ItemsScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async load updates list state on completion
     void loadLists(homeId);
   }, [homeId]);
+
+  // A tapped notification asks for its list (the home switch happens first).
+  useEffect(
+    () =>
+      onFocusList((focusHomeId, listId) => {
+        if (focusHomeId !== homeId) return;
+        if (lists.some((list) => list.id === listId)) setSelectedListId(listId);
+      }),
+    [homeId, lists],
+  );
 
   useLayoutEffect(() => {
     setTabBarHidden(isSelecting);

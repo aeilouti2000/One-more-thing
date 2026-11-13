@@ -1,7 +1,7 @@
 {
   "name": "react_native",
   "main": "expo-router/entry",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "scripts": {
     "start": "expo start --lan --port 8082",
     "start:device": "expo start --lan --port 8082",
@@ -11,7 +11,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "build:android:apk": "npx eas-cli build --platform android --profile apk"
+    "build:android:apk": "npx eas-cli build --platform android --profile apk",
+    "release:publish": "node scripts/publish-release.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/readex-pro": "^0.4.1",

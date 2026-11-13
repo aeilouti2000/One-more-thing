@@ -24,6 +24,8 @@ import {
   ItemIdsDto,
   MarkBoughtDto,
   MarkBoughtItemsDto,
+  MoveToReceiptDto,
+  UpdateTripReceiptDto,
   MoveItemsDto,
   SetUrgentItemsDto,
   UpdateItemCostDto,
@@ -198,13 +200,31 @@ export class ItemsController {
     return this.items.createReceipt(user.id, homeId, body);
   }
 
+  @Patch("receipts/:receiptId")
+  renameReceipt(
+    @CurrentUser() user: User,
+    @Param("receiptId", ParseUUIDPipe) receiptId: string,
+    @Body() body: UpdateTripReceiptDto,
+  ) {
+    return this.items.renameReceipt(user.id, receiptId, body.name);
+  }
+
+  @Post("items/:itemId/receipt")
+  moveToReceipt(
+    @CurrentUser() user: User,
+    @Param("itemId", ParseUUIDPipe) itemId: string,
+    @Body() body: MoveToReceiptDto,
+  ) {
+    return this.items.moveToReceipt(user.id, itemId, body.receiptId, body.utcOffsetMin);
+  }
+
   @Post("items/:itemId/bought")
   markBought(
     @CurrentUser() user: User,
     @Param("itemId", ParseUUIDPipe) itemId: string,
     @Body() body: MarkBoughtDto,
   ) {
-    return this.items.markBought(user.id, itemId, body?.cost);
+    return this.items.markBought(user.id, itemId, body?.cost, body?.receiptId);
   }
 
   @Post("items/:itemId/needed")
@@ -219,7 +239,7 @@ export class ItemsController {
 
   @Post("items/bought")
   markMany(@CurrentUser() user: User, @Body() body: MarkBoughtItemsDto) {
-    return this.items.markManyBought(user.id, body.items);
+    return this.items.markManyBought(user.id, body.items, body.receiptId);
   }
 
   @Post("items/delete")

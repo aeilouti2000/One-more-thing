@@ -22,6 +22,8 @@ import {
   undoItemBought,
   updateItemCost,
   createTripReceipt,
+  moveItemToReceipt,
+  renameTripReceipt,
   updateItemDetails,
   uploadItemImage,
   removeItemImage,
@@ -38,8 +40,10 @@ import {
 } from "@/features/items/utils/list-sync";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { useAuth } from "@/features/auth/providers/auth-provider";
+import { maybeAskForPush } from "@/features/notifications/api/push";
 import { readCachedItems, writeCachedItems } from "@/features/offline/profile-cache";
 import type { Purchase, PurchaseStatus } from "@/features/items/types/purchase";
+import { latestInvoiceThisMonth } from "@/features/items/utils/trips";
 
 type AddItemValues = Omit<NewItemInput, "homeId" | "userId"> & {
   /** Uploaded right after the item is created; the row shows it meanwhile. */
@@ -77,13 +81,25 @@ type UsePurchasesResult = {
     itemIds: string[];
     listId?: string | null;
   }) => Promise<{ error: string | null }>;
+  /** Name a trip's invoice; a trip without one gets an invoice (no total yet). */
+  renameTrip: (
+    trip: { receiptId: string | null; itemIds: string[]; listId?: string | null },
+    name: string,
+  ) => Promise<{ error: string | null; receiptId: string | null }>;
+  /** Move a bought item to another trip of the same month. */
+  moveToTrip: (
+    itemId: string,
+    trip: { receiptId: string | null; itemIds: string[]; listId?: string | null },
+  ) => Promise<{ error: string | null; receiptId: string | null }>;
   markBought: (
     id: string,
     cost?: number | null,
+    options?: BuyOptions,
   ) => Promise<{ error: string | null }>;
   undoBought: (id: string) => Promise<{ error: string | null }>;
   markManyBought: (
     entries: BoughtCostEntry[] | string[],
+    options?: BuyOptions,
   ) => Promise<{ error: string | null }>;
   deleteMany: (ids: string[]) => Promise<{ error: string | null }>;
   moveMany: (
@@ -96,6 +112,12 @@ type UsePurchasesResult = {
   ) => Promise<{ error: string | null }>;
   reorderNeeded: (ids: string[]) => Promise<{ error: string | null }>;
 };
+
+/**
+ * joinInvoice: bought from the list (not during a trip). In trip-total mode the
+ * item joins this month's latest invoice instead of floating on its own.
+ */
+type BuyOptions = { joinInvoice?: boolean };
 
 const PurchasesContext = createContext<UsePurchasesResult | null>(null);
 
@@ -339,14 +361,29 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       } else {
         emitListChanged();
       }
+      // A shared list is when alerts start to matter: ask once, softly.
+      if (household.members.length > 1) void maybeAskForPush();
       return { error: null };
     },
     [household, noteLocalChange, refresh, rememberItems, setItemPhoto, user],
   );
 
+  const invoiceFor = useCallback(
+    (itemId: string | undefined, options?: BuyOptions) => {
+      if (!itemId || !options?.joinInvoice) return null;
+      if (household?.costsEnabled !== true || household.tripCostMode !== "total") return null;
+      const item = purchasesRef.current.find((entry) => entry.id === itemId);
+      if (!item) return null;
+      // Same list only, so an invoice stays one shop's trip for that list.
+      return latestInvoiceThisMonth(purchasesRef.current, new Date(), item.listId ?? null);
+    },
+    [household],
+  );
+
   const markBought = useCallback(
-    async (id: string, cost?: number | null) => {
+    async (id: string, cost?: number | null, options?: BuyOptions) => {
       if (!user) return { error: translate("errorNeedLogin") };
+      const receiptId = invoiceFor(id, options);
       const endLocalChange = noteLocalChange();
       const boughtAt = new Date().toISOString();
       setPurchases((current) =>
@@ -364,15 +401,16 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       );
       let result: { error: string | null };
       try {
-        result = await markItemBought(id, cost);
+        result = await markItemBought(id, cost, receiptId);
       } finally {
         endLocalChange();
       }
-      if (result.error) await refresh();
+      // Joining an invoice changes its total and name on the server: reload.
+      if (result.error || receiptId) await refresh();
       else rememberItems(purchasesRef.current);
       return result;
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [invoiceFor, noteLocalChange, refresh, rememberItems, user],
   );
 
   const updateItem = useCallback(
@@ -424,6 +462,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   const updateCost = useCallback(
     async (id: string, cost: number | null) => {
       if (!user) return { error: translate("errorNeedLogin") };
+      const onInvoice = Boolean(purchasesRef.current.find((item) => item.id === id)?.receiptId);
       const endLocalChange = noteLocalChange();
       setPurchases((current) =>
         current.map((item) => (item.id === id ? { ...item, cost } : item)),
@@ -434,7 +473,8 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       } finally {
         endLocalChange();
       }
-      if (result.error) await refresh();
+      // Its price is part of the invoice total, which the server just changed.
+      if (result.error || onInvoice) await refresh();
       else rememberItems(purchasesRef.current);
       return result;
     },
@@ -470,6 +510,72 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     [noteLocalChange, rememberItems, user],
   );
 
+  const ensureInvoice = useCallback(
+    async (
+      trip: { receiptId: string | null; itemIds: string[]; listId?: string | null },
+      name?: string,
+    ) => {
+      const currentHomeId = homeIdRef.current;
+      if (!currentHomeId) return { error: translate("errorNeedLogin"), receiptId: null };
+      if (trip.receiptId) {
+        if (name === undefined) return { error: null, receiptId: trip.receiptId };
+        const renamed = await renameTripReceipt(trip.receiptId, name);
+        return { error: renamed.error, receiptId: trip.receiptId };
+      }
+      const created = await createTripReceipt(currentHomeId, {
+        total: null,
+        itemIds: trip.itemIds,
+        listId: trip.listId,
+        name: name?.trim() || null,
+      });
+      return { error: created.error, receiptId: created.receipt?.id ?? null };
+    },
+    [],
+  );
+
+  const renameTrip = useCallback(
+    async (
+      trip: { receiptId: string | null; itemIds: string[]; listId?: string | null },
+      name: string,
+    ) => {
+      if (!user) return { error: translate("errorNeedLogin"), receiptId: null };
+      const endLocalChange = noteLocalChange();
+      let result: { error: string | null; receiptId: string | null };
+      try {
+        result = await ensureInvoice(trip, name);
+      } finally {
+        endLocalChange();
+      }
+      await refresh();
+      return result;
+    },
+    [ensureInvoice, noteLocalChange, refresh, user],
+  );
+
+  const moveToTrip = useCallback(
+    async (
+      itemId: string,
+      trip: { receiptId: string | null; itemIds: string[]; listId?: string | null },
+    ) => {
+      if (!user) return { error: translate("errorNeedLogin"), receiptId: null };
+      const endLocalChange = noteLocalChange();
+      let result: { error: string | null; receiptId: string | null };
+      try {
+        // A trip without an invoice gets one first, so the item has somewhere to go.
+        result = await ensureInvoice(trip);
+        if (!result.error && result.receiptId) {
+          const moved = await moveItemToReceipt(itemId, result.receiptId);
+          result = { error: moved.error, receiptId: result.receiptId };
+        }
+      } finally {
+        endLocalChange();
+      }
+      await refresh();
+      return result;
+    },
+    [ensureInvoice, noteLocalChange, refresh, user],
+  );
+
   const updateCosts = useCallback(
     async (entries: { id: string; cost: number | null }[]) => {
       if (!user) return { error: translate("errorNeedLogin") };
@@ -502,6 +608,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   const undoBought = useCallback(
     async (id: string) => {
       if (!user) return { error: translate("errorNeedLogin") };
+      const onInvoice = Boolean(purchasesRef.current.find((item) => item.id === id)?.receiptId);
       const endLocalChange = noteLocalChange();
       setPurchases((current) =>
         current.map((item) =>
@@ -512,6 +619,9 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
                 boughtAt: undefined,
                 boughtByName: undefined,
                 cost: null,
+                receiptId: null,
+                receiptTotal: null,
+                receiptName: null,
               }
             : item,
         ),
@@ -524,7 +634,8 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       }
       if (result.error) await refresh();
       else {
-        rememberItems(purchasesRef.current);
+        if (onInvoice) await refresh();
+        else rememberItems(purchasesRef.current);
         emitListChanged();
       }
       return result;
@@ -533,10 +644,11 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   );
 
   const markManyBought = useCallback(
-    async (entries: BoughtCostEntry[] | string[]) => {
+    async (entries: BoughtCostEntry[] | string[], options?: BuyOptions) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
       const prepared = toEntries(entries);
+      const receiptId = invoiceFor(prepared[0]?.id, options);
+      const endLocalChange = noteLocalChange();
       const costs = new Map(
         prepared.map((entry) => [entry.id, entry.cost ?? null]),
       );
@@ -556,15 +668,15 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       );
       let result: { error: string | null };
       try {
-        result = await markItemsBought(prepared);
+        result = await markItemsBought(prepared, receiptId);
       } finally {
         endLocalChange();
       }
-      if (result.error) await refresh();
+      if (result.error || receiptId) await refresh();
       else rememberItems(purchasesRef.current);
       return result;
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [invoiceFor, noteLocalChange, refresh, rememberItems, user],
   );
 
   const deleteMany = useCallback(
@@ -706,6 +818,8 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       updateCost,
       updateCosts,
       saveTripTotal,
+      renameTrip,
+      moveToTrip,
       markBought,
       undoBought,
       markManyBought,
@@ -729,6 +843,8 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       updateCost,
       updateCosts,
       saveTripTotal,
+      renameTrip,
+      moveToTrip,
       markBought,
       undoBought,
       markManyBought,

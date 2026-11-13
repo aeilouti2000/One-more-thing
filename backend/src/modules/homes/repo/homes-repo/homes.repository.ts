@@ -19,6 +19,7 @@ export type Household = {
   askCostOnBulkBuy: boolean;
   askCostOnTripEnd: boolean;
   tripCostMode: TripCostMode;
+  notificationsEnabled: boolean;
   members: HouseholdMember[];
 };
 

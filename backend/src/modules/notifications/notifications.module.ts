@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { HomeMember } from "../homes/entities/home-member.entity";
+import { Home } from "../homes/entities/home.entity";
 import { NotificationsController } from "./controllers/notifications.controller";
 import { PushToken } from "./entities/push-token.entity";
 import { NOTIFICATIONS_REPOSITORY } from "./repo/notifications-repo/notifications.repository";
@@ -8,7 +9,7 @@ import { TypeormNotificationsRepository } from "./repo/notifications-repo/typeor
 import { NotificationsService } from "./services/notifications.service";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PushToken, HomeMember])],
+  imports: [TypeOrmModule.forFeature([PushToken, HomeMember, Home])],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,

@@ -6,6 +6,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { ItemImagesController } from "./controllers/item-images.controller";
 import { ItemsController } from "./controllers/items.controller";
 import { PinsController } from "./controllers/pins.controller";
+import { PinsCronController } from "./controllers/pins-cron.controller";
 import { CustomCategory } from "./entities/custom-category.entity";
 import { HiddenCategory } from "./entities/hidden-category.entity";
 import { Item } from "./entities/item.entity";
@@ -45,7 +46,7 @@ import { ShopLocksService } from "./services/shop-locks.service";
     HomesModule,
     NotificationsModule,
   ],
-  controllers: [ItemsController, ItemImagesController, PinsController],
+  controllers: [ItemsController, ItemImagesController, PinsController, PinsCronController],
   providers: [
     ItemsService,
     ItemImagesService,

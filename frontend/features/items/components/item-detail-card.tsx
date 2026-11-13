@@ -242,7 +242,7 @@ export function ItemDetailCard({
     if (!purchase) return;
     setIsSubmitting(true);
     setError(null);
-    const result = await markBought(purchase.id, cost);
+    const result = await markBought(purchase.id, cost, { joinInvoice: true });
     setIsSubmitting(false);
     if (result.error) {
       setError(result.error);

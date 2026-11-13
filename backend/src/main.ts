@@ -37,6 +37,8 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
+  // Lets queued notifications go out before a deploy or restart stops the process.
+  app.enableShutdownHooks();
   const port = config.get("PORT", { infer: true });
   await app.listen(port, "0.0.0.0");
 }

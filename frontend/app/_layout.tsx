@@ -1,5 +1,5 @@
 import "./global.css";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ReadexPro_400Regular,
   ReadexPro_500Medium,
@@ -7,7 +7,7 @@ import {
   ReadexPro_700Bold,
   useFonts,
 } from "@expo-google-fonts/readex-pro";
-import { Modal, Platform } from "react-native";
+import { AppState, Modal, Platform } from "react-native";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
@@ -15,7 +15,12 @@ import { BlurScreen } from "@/components/ui/BlurBackdrop";
 import { DragOverlayProvider } from "@/components/ui/DragOverlay";
 import { TabBlurProvider } from "@/components/ui/TabBlurTarget";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
-import { checkAppUpdate, dismissAppUpdate, type AppUpdate } from "@/lib/app-release";
+import {
+  checkAppUpdate,
+  dismissAppUpdate,
+  resetAppUpdateDismissal,
+  type AppUpdate,
+} from "@/lib/app-release";
 import { AuthProvider } from "@/features/auth/providers/auth-provider";
 import { CategoriesProvider } from "@/features/items/providers/categories-provider";
 import { PurchasesProvider } from "@/features/items/hooks/use-purchases";
@@ -61,17 +66,39 @@ function ThemedNavigation() {
   );
 }
 
+/**
+ * Coming back after this long counts as opening the app again. Shorter trips
+ * (the camera, the photo picker, a share sheet) don't bring the prompt back.
+ */
+const REOPEN_AFTER_MS = 60_000;
+
 function UpdateGate() {
   const [release, setRelease] = useState<AppUpdate | null>(null);
+  const backgroundedAt = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
-    void checkAppUpdate().then((update) => {
-      if (!active || !update) return;
-      setRelease(update);
+    const check = () => {
+      void checkAppUpdate().then((update) => {
+        if (active && update) setRelease(update);
+      });
+    };
+    check();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "background") {
+        backgroundedAt.current = Date.now();
+        return;
+      }
+      if (state !== "active" || backgroundedAt.current === null) return;
+      const away = Date.now() - backgroundedAt.current;
+      backgroundedAt.current = null;
+      if (away < REOPEN_AFTER_MS) return;
+      resetAppUpdateDismissal();
+      check();
     });
     return () => {
       active = false;
+      subscription.remove();
     };
   }, []);
 
@@ -116,8 +143,8 @@ export default function RootLayout() {
       <FontScaleProvider>
         <ThemeProvider>
           <AuthProvider>
-            <NotificationsProvider>
-              <HouseholdProvider>
+            <HouseholdProvider>
+              <NotificationsProvider>
                 <CategoriesProvider>
                 <PurchasesProvider>
                 <GestureHandlerRootView style={{ flex: 1 }}>
@@ -131,8 +158,8 @@ export default function RootLayout() {
                 </GestureHandlerRootView>
                 </PurchasesProvider>
                 </CategoriesProvider>
-              </HouseholdProvider>
-            </NotificationsProvider>
+              </NotificationsProvider>
+            </HouseholdProvider>
           </AuthProvider>
         </ThemeProvider>
       </FontScaleProvider>

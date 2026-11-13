@@ -92,6 +92,11 @@ export class MarkBoughtDto {
   @Min(0)
   @Max(999999.999)
   cost?: number | null;
+
+  /** Bought outside a trip: join this invoice (the latest one this month). */
+  @IsOptional()
+  @IsUUID()
+  receiptId?: string;
 }
 
 export class MarkBoughtItemEntryDto {
@@ -112,6 +117,10 @@ export class MarkBoughtItemsDto {
   @ValidateNested({ each: true })
   @Type(() => MarkBoughtItemEntryDto)
   items: MarkBoughtItemEntryDto[];
+
+  @IsOptional()
+  @IsUUID()
+  receiptId?: string;
 }
 
 export class UpdateItemCostDto {
@@ -123,10 +132,19 @@ export class UpdateItemCostDto {
 }
 
 export class CreateTripReceiptDto {
+  /** Null/omitted: an invoice without a total yet (e.g. only named). */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsNumber()
   @Min(0)
   @Max(999999.999)
-  total: number;
+  total?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(80)
+  name?: string | null;
 
   @IsArray()
   @ArrayNotEmpty()
@@ -136,6 +154,26 @@ export class CreateTripReceiptDto {
   @IsOptional()
   @IsUUID()
   listId?: string;
+}
+
+export class UpdateTripReceiptDto {
+  /** "" or null clears the name. */
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(80)
+  name: string | null;
+}
+
+export class MoveToReceiptDto {
+  @IsUUID()
+  receiptId: string;
+
+  /** Device offset east of UTC, so "same month" uses the user's calendar. */
+  @IsOptional()
+  @IsInt()
+  @Min(-840)
+  @Max(840)
+  utcOffsetMin?: number;
 }
 
 export class CreatePinDto extends CreateItemDto {

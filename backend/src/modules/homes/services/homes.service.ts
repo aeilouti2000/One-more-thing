@@ -96,6 +96,19 @@ export class HomesService {
     return this.homes.loadHome(homeId);
   }
 
+  async updateNotificationSettings(userId: string, homeId: string, notificationsEnabled: boolean) {
+    const membership = await this.requireMembership(userId, homeId);
+    if (membership.role !== "owner") {
+      throw new DomainError(
+        "ONLY_HOST_CAN_UPDATE_NOTIFICATIONS",
+        "Only the host can change home notifications",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    await this.homes.updateHome(homeId, { notificationsEnabled });
+    return this.homes.loadHome(homeId);
+  }
+
   async switchHome(userId: string, homeId: string) {
     await this.requireMembership(userId, homeId);
     await this.homes.setActiveHome(userId, homeId);

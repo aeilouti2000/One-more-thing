@@ -1,12 +1,23 @@
 import { isRunningInExpoGo } from "expo";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
+import "@/features/auth/utils/session-storage";
 import { api } from "@/lib/api";
-import { getLocale, type Locale } from "@/constants/i18n";
+import { getLocale, translate, type Locale } from "@/constants/i18n";
 
 const ENABLED_KEY = "omt.push.enabled";
 const TOKEN_KEY = "omt.push.token";
+const ASKED_KEY = "omt.push.asked";
 
-export type PushStatus = "on" | "off" | "denied" | "unsupported";
+/**
+ * on: this phone gets list notifications.
+ * off: the user turned them off in the app.
+ * ask: the phone has not asked for permission yet (we wait for a good moment).
+ * denied: blocked in the phone's settings.
+ * error: registration failed (offline, push service down); retried later.
+ */
+export type PushStatus = "on" | "off" | "ask" | "denied" | "error" | "unsupported";
+
+export type PermissionState = "granted" | "denied" | "undetermined" | "unsupported";
 
 function storage() {
   try {
@@ -52,40 +63,87 @@ function writeStoredToken(token: string | null) {
   else storage()?.removeItem(TOKEN_KEY);
 }
 
-export async function syncPushRegistration(locale: Locale = getLocale()): Promise<PushStatus> {
+/** The phone's notification permission, without asking. */
+export async function readNotificationPermission(): Promise<PermissionState> {
+  const Notifications = await loadNotifications();
+  if (!Notifications) return "unsupported";
+  try {
+    const current = await Notifications.getPermissionsAsync();
+    if (current.status === "granted") return "granted";
+    if (current.status === "denied" && !current.canAskAgain) return "denied";
+    return current.canAskAgain === false ? "denied" : "undetermined";
+  } catch {
+    return "unsupported";
+  }
+}
+
+/** Shows the phone's own permission prompt (when it still can). */
+export async function requestNotificationPermission(): Promise<PermissionState> {
+  const Notifications = await loadNotifications();
+  if (!Notifications) return "unsupported";
+  try {
+    const result = await Notifications.requestPermissionsAsync();
+    storage()?.setItem(ASKED_KEY, "1");
+    if (result.status === "granted") return "granted";
+    return result.canAskAgain ? "undetermined" : "denied";
+  } catch {
+    return "unsupported";
+  }
+}
+
+/**
+ * Registers this phone for list notifications when allowed.
+ * `prompt: true` may show the phone's permission prompt; only pass it after
+ * the user asked for notifications (a toggle, the Permissions page, a soft ask).
+ */
+export async function syncPushRegistration(
+  locale: Locale = getLocale(),
+  options: { prompt?: boolean } = {},
+): Promise<PushStatus> {
   if (!canUsePush()) return "unsupported";
   if (!readPushEnabled()) {
     await unregisterPushDevice();
     return "off";
   }
 
-  const Notifications = await loadNotifications();
-  if (!Notifications) return "unsupported";
-  const Device = await import("expo-device");
-  const Constants = await import("expo-constants");
+  try {
+    const Notifications = await loadNotifications();
+    if (!Notifications) return "unsupported";
+    const Device = await import("expo-device");
+    const Constants = await import("expo-constants");
 
-  if (!Device.isDevice) return "unsupported";
+    if (!Device.isDevice) return "unsupported";
 
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("list-updates", {
-      name: "List updates",
-      importance: Notifications.AndroidImportance.HIGH,
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("list-updates", {
+        name: translate("listAlerts", undefined, locale),
+        importance: Notifications.AndroidImportance.HIGH,
+      });
+    }
+
+    let permission = await readNotificationPermission();
+    if (permission === "undetermined" && options.prompt) {
+      permission = await requestNotificationPermission();
+    }
+    if (permission === "denied") return "denied";
+    if (permission !== "granted") return permission === "unsupported" ? "unsupported" : "ask";
+
+    const projectId =
+      Constants.default.expoConfig?.extra?.eas?.projectId ?? Constants.default.easConfig?.projectId;
+    if (!projectId) return "unsupported";
+
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    const previous = readStoredToken();
+    await api.post("/notifications/devices", {
+      token,
+      locale,
+      ...(previous && previous !== token ? { previousToken: previous } : {}),
     });
+    writeStoredToken(token);
+    return "on";
+  } catch {
+    return "error";
   }
-
-  const current = await Notifications.getPermissionsAsync();
-  const permission =
-    current.status === "granted" ? current : await Notifications.requestPermissionsAsync();
-  if (permission.status !== "granted") return "denied";
-
-  const projectId =
-    Constants.default.expoConfig?.extra?.eas?.projectId ?? Constants.default.easConfig?.projectId;
-  if (!projectId) return "unsupported";
-
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  await api.post("/notifications/devices", { token, locale });
-  writeStoredToken(token);
-  return "on";
 }
 
 export async function unregisterPushDevice() {
@@ -93,4 +151,34 @@ export async function unregisterPushDevice() {
   writeStoredToken(null);
   if (!token) return;
   await api.delete("/notifications/devices", { token }).catch(() => undefined);
+}
+
+let asking = false;
+
+/**
+ * A one-time, friendly ask at a moment where alerts make sense (the household
+ * has other people, or you just joined one). The phone's own prompt only
+ * appears if the user says yes here, so a "no" doesn't block it for good.
+ */
+export async function maybeAskForPush(locale: Locale = getLocale()) {
+  if (asking || !canUsePush() || !readPushEnabled()) return;
+  if (storage()?.getItem(ASKED_KEY) === "1") return;
+  if ((await readNotificationPermission()) !== "undetermined") return;
+
+  asking = true;
+  storage()?.setItem(ASKED_KEY, "1");
+  Alert.alert(
+    translate("pushAskTitle", undefined, locale),
+    translate("pushAskBody", undefined, locale),
+    [
+      { text: translate("notNow", undefined, locale), style: "cancel", onPress: () => (asking = false) },
+      {
+        text: translate("turnOnAlerts", undefined, locale),
+        onPress: () => {
+          void syncPushRegistration(locale, { prompt: true }).finally(() => (asking = false));
+        },
+      },
+    ],
+    { cancelable: true, onDismiss: () => (asking = false) },
+  );
 }

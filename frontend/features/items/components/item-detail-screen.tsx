@@ -71,7 +71,7 @@ export default function ItemDetailScreen() {
   async function completeBought(cost: number | null) {
     setIsSaving(true);
     setError(null);
-    const result = await markBought(item.id, cost);
+    const result = await markBought(item.id, cost, { joinInvoice: true });
     setIsSaving(false);
 
     if (result.error) {

@@ -5,7 +5,6 @@ import { AppText } from "@/components/ui/AppText";
 import { LOCALES } from "@/constants/i18n";
 import { iconSize, withAlpha } from "@/constants/theme";
 import { useAuth } from "@/features/auth/providers/auth-provider";
-import { useHousehold } from "@/features/homes/hooks/use-household";
 import {
   SettingsCardCopy,
   SettingsCardIcon,
@@ -14,7 +13,7 @@ import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
-type NavId = "account" | "app" | "costs" | "language" | "appearance";
+type NavId = "account" | "app" | "notifications" | "permissions" | "language" | "appearance";
 
 function activeNavId(pathname: string): NavId | null {
   if (pathname.startsWith("/settings/account")) return "account";
@@ -22,11 +21,13 @@ function activeNavId(pathname: string): NavId | null {
     pathname.startsWith("/settings/app") ||
     pathname.startsWith("/settings/categories") ||
     pathname.startsWith("/settings/pins") ||
+    pathname.startsWith("/settings/costs") ||
     pathname.startsWith("/settings/swipe-actions")
   ) {
     return "app";
   }
-  if (pathname.startsWith("/settings/costs")) return "costs";
+  if (pathname.startsWith("/settings/notifications")) return "notifications";
+  if (pathname.startsWith("/settings/permissions")) return "permissions";
   if (pathname.startsWith("/settings/language")) return "language";
   if (pathname.startsWith("/settings/appearance")) return "appearance";
   return null;
@@ -82,7 +83,6 @@ function NavRow({
 /** Shared settings destinations — phone hub cards and fold master pane. */
 export function SettingsNavList() {
   const { user } = useAuth();
-  const { household } = useHousehold();
   const { scheme, preference } = useTheme();
   const { t, locale } = useI18n();
   const pathname = usePathname();
@@ -91,9 +91,6 @@ export function SettingsNavList() {
   const displayName = user?.name?.trim() || t("member");
   const languageLabel =
     LOCALES.find((item) => item.id === locale)?.label ?? t("language");
-  const costsSummary = household?.costsEnabled
-    ? t("trackCosts")
-    : t("costsSectionBody");
 
   return (
     <View className="gap-3">
@@ -107,19 +104,24 @@ export function SettingsNavList() {
       <NavRow
         icon="options-outline"
         title={t("appSettings")}
-        summary={`${t("categories")} · ${t("pinsTitle")} · ${t("listAlerts")}`}
+        summary={`${t("categories")} · ${t("pinsTitle")} · ${t("costsSection")}`}
         href={"/settings/app" as Href}
         selected={selected === "app"}
       />
-      {household ? (
-        <NavRow
-          icon="cash-outline"
-          title={t("costsSection")}
-          summary={costsSummary}
-          href={"/settings/costs" as Href}
-          selected={selected === "costs"}
-        />
-      ) : null}
+      <NavRow
+        icon="notifications-outline"
+        title={t("notificationsTitle")}
+        summary={t("notificationsSubtitle")}
+        href={"/settings/notifications" as Href}
+        selected={selected === "notifications"}
+      />
+      <NavRow
+        icon="shield-checkmark-outline"
+        title={t("permissionsTitle")}
+        summary={t("permissionsSubtitle")}
+        href={"/settings/permissions" as Href}
+        selected={selected === "permissions"}
+      />
       <NavRow
         icon="language-outline"
         title={t("languageLabel")}

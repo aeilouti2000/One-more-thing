@@ -1,8 +1,8 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
 
 const moneyTransformer = {
-  to: (value: number) => value,
-  from: (value: string | number) => Number(value),
+  to: (value: number | null) => value,
+  from: (value: string | number | null) => (value === null ? null : Number(value)),
 };
 
 /** Total paid for one shopping trip, entered instead of per-item costs. */
@@ -17,8 +17,19 @@ export class TripReceipt {
   @Column({ name: "list_id", type: "uuid", nullable: true })
   listId: string | null;
 
-  @Column({ type: "numeric", precision: 12, scale: 3, transformer: moneyTransformer })
-  total: number;
+  /** Null until a total is entered (named trip, or an item moved in). */
+  @Column({
+    type: "numeric",
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: moneyTransformer,
+  })
+  total: number | null;
+
+  /** Optional label, e.g. the shop's name. */
+  @Column({ type: "varchar", length: 80, nullable: true })
+  name: string | null;
 
   /** Null once the author deletes their account (the total stays). */
   @Column({ name: "created_by", type: "uuid", nullable: true })

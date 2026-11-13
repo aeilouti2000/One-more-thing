@@ -7,6 +7,8 @@ describe("HomesService", () => {
     deletePartner: jest.fn<(homeId: string, memberId: string) => Promise<number>>(),
     listForUser: jest.fn<(userId: string) => Promise<{ id: string }[]>>(),
     deleteOwnedHome: jest.fn<(userId: string, homeId: string) => Promise<{ home: null }>>(),
+    updateHome: jest.fn<(homeId: string, patch: object) => Promise<void>>(),
+    loadHome: jest.fn<(homeId: string) => Promise<{ id: string }>>(),
   };
   const service = new HomesService(homes as never);
 
@@ -37,6 +39,19 @@ describe("HomesService", () => {
       response: { code: "ONLY_HOST_CAN_DELETE" },
     });
     expect(homes.deleteOwnedHome).not.toHaveBeenCalled();
+  });
+
+  it("lets only the host turn home notifications off", async () => {
+    homes.findMember.mockResolvedValue({ role: "partner" });
+    await expect(service.updateNotificationSettings("partner", "home", false)).rejects.toMatchObject({
+      response: { code: "ONLY_HOST_CAN_UPDATE_NOTIFICATIONS" },
+    });
+    expect(homes.updateHome).not.toHaveBeenCalled();
+
+    homes.findMember.mockResolvedValue({ role: "owner" });
+    homes.loadHome.mockResolvedValue({ id: "home" });
+    await service.updateNotificationSettings("host", "home", false);
+    expect(homes.updateHome).toHaveBeenCalledWith("home", { notificationsEnabled: false });
   });
 
   it("blocks deleting the last home", async () => {

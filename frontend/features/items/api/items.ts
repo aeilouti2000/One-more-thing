@@ -39,6 +39,7 @@ type ItemResponse = {
   cost?: number | null;
   receiptId?: string | null;
   receiptTotal?: number | string | null;
+  receiptName?: string | null;
   imageId?: string | null;
   listId?: string;
   listName?: string;
@@ -73,6 +74,7 @@ function toPurchase(item: ItemResponse): Purchase {
         : Number.isFinite(Number(item.receiptTotal))
           ? Number(item.receiptTotal)
           : null,
+    receiptName: item.receiptName ?? null,
     imageId: item.imageId ?? null,
     listId: item.listId,
     listName: item.listName,
@@ -153,23 +155,48 @@ export async function updateItemCost(itemId: string, cost: number | null) {
   }
 }
 
-/** Save one total for a finished trip and link its bought items to it. */
+/**
+ * Save an invoice for a trip and link its bought items to it. `total: null`
+ * creates it without a total (a named trip, or a target to move items into).
+ */
 export async function createTripReceipt(
   homeId: string,
-  input: { total: number; itemIds: string[]; listId?: string | null },
+  input: { total: number | null; itemIds: string[]; listId?: string | null; name?: string | null },
 ) {
   try {
-    const result = await api.post<{ receipt: { id: string; total: number } }>(
-      `/homes/${homeId}/receipts`,
-      {
-        total: input.total,
-        itemIds: input.itemIds,
-        ...(input.listId ? { listId: input.listId } : {}),
-      },
-    );
+    const result = await api.post<{
+      receipt: { id: string; total: number | null; name: string | null };
+    }>(`/homes/${homeId}/receipts`, {
+      total: input.total,
+      itemIds: input.itemIds,
+      ...(input.listId ? { listId: input.listId } : {}),
+      ...(input.name !== undefined ? { name: input.name } : {}),
+    });
     return { receipt: result.receipt, error: null };
   } catch (error) {
     return { receipt: null, error: formatAppError(error) };
+  }
+}
+
+export async function renameTripReceipt(receiptId: string, name: string | null) {
+  try {
+    await api.patch(`/receipts/${receiptId}`, { name: name?.trim() || null });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}
+
+/** Move a bought item to another invoice of the same month. */
+export async function moveItemToReceipt(itemId: string, receiptId: string) {
+  try {
+    await api.post(`/items/${itemId}/receipt`, {
+      receiptId,
+      utcOffsetMin: -new Date().getTimezoneOffset(),
+    });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
   }
 }
 
@@ -182,16 +209,19 @@ export async function undoItemBought(itemId: string) {
   }
 }
 
-export async function markItemBought(itemId: string, cost?: number | null) {
+export async function markItemBought(itemId: string, cost?: number | null, receiptId?: string | null) {
   try {
-    await api.post(`/items/${itemId}/bought`, { cost: cost ?? null });
+    await api.post(`/items/${itemId}/bought`, {
+      cost: cost ?? null,
+      ...(receiptId ? { receiptId } : {}),
+    });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
   }
 }
 
-export async function markItemsBought(entries: BoughtCostEntry[]) {
+export async function markItemsBought(entries: BoughtCostEntry[], receiptId?: string | null) {
   if (entries.length === 0) return { error: null };
   try {
     await api.post("/items/bought", {
@@ -199,6 +229,7 @@ export async function markItemsBought(entries: BoughtCostEntry[]) {
         id: entry.id,
         cost: entry.cost ?? null,
       })),
+      ...(receiptId ? { receiptId } : {}),
     });
     return { error: null };
   } catch (error) {

@@ -40,6 +40,10 @@ export class Home {
   @Column({ name: "trip_cost_mode", type: "varchar", length: 8, default: "items" })
   tripCostMode: TripCostMode;
 
+  /** Host-only switch: when off, nobody in this home gets list notifications. */
+  @Column({ name: "notifications_enabled", type: "boolean", default: true })
+  notificationsEnabled: boolean;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
 

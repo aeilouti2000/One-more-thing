@@ -71,6 +71,20 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   MAIL_FROM_NAME = "One More Thing";
+
+  /**
+   * Shared secret for POST /api/internal/pins/run. An outside scheduler calls it
+   * so due pins arrive (and notify) even after the free server went to sleep.
+   * Empty disables the endpoint.
+   */
+  @IsOptional()
+  @IsString()
+  CRON_SECRET = "";
+
+  /** Optional: Expo "enhanced push security" access token. */
+  @IsOptional()
+  @IsString()
+  EXPO_ACCESS_TOKEN = "";
 }
 
 export function validateEnv(config: Record<string, unknown>) {

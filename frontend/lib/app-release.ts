@@ -1,4 +1,3 @@
-import "@/features/auth/utils/session-storage";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { api } from "@/lib/api";
@@ -11,7 +10,8 @@ type AppRelease = {
 };
 
 export function installedAppVersion() {
-  return Constants.expoConfig?.version || Constants.nativeAppVersion || "0.0.0";
+  // The native version is what the installed APK was built as.
+  return Constants.nativeAppVersion || Constants.expoConfig?.version || "0.0.0";
 }
 
 export function isOlderVersion(installed: string, required: string) {
@@ -34,56 +34,54 @@ export type AppUpdate = {
   downloadUrl: string | null;
 };
 
-const DISMISS_KEY = "omt.updateDismissed";
-/** After "Later", the optional prompt stays hidden this long for the same version. */
-const DISMISS_FOR_MS = 3 * 24 * 60 * 60 * 1000;
+/**
+ * Versions the user pressed "Later" on during this run of the app. Kept in
+ * memory only, so the prompt comes back the next time the app is opened.
+ */
+const dismissed = new Set<string>();
 
-function storage() {
-  try {
-    if (typeof localStorage !== "undefined") return localStorage;
-  } catch {
-    // Storage unavailable.
+export function dismissAppUpdate(version: string) {
+  dismissed.add(version);
+}
+
+/** Forget "Later" so the prompt shows again, e.g. when the app is reopened. */
+export function resetAppUpdateDismissal() {
+  dismissed.clear();
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * The API runs on a host that sleeps when idle and can take close to a minute
+ * to wake, so keep retrying for a while instead of giving up after one try.
+ */
+async function fetchRelease(): Promise<AppRelease | null> {
+  const deadline = Date.now() + 90_000;
+  for (let attempt = 0; Date.now() < deadline; attempt += 1) {
+    try {
+      return await withTimeout(api.get<AppRelease>("/app/release", false), 30_000);
+    } catch {
+      await sleep(Math.min(2000 * 2 ** attempt, 10_000));
+    }
   }
   return null;
 }
 
-function recentlyDismissed(version: string) {
-  try {
-    const raw = storage()?.getItem(DISMISS_KEY);
-    if (!raw) return false;
-    const saved = JSON.parse(raw) as { version?: string; at?: number };
-    return saved.version === version && typeof saved.at === "number" && Date.now() - saved.at < DISMISS_FOR_MS;
-  } catch {
-    return false;
-  }
-}
-
-export function dismissAppUpdate(version: string) {
-  try {
-    storage()?.setItem(DISMISS_KEY, JSON.stringify({ version, at: Date.now() }));
-  } catch {
-    // Ignore: the prompt will simply show again next launch.
-  }
-}
-
 export async function checkAppUpdate(): Promise<AppUpdate | null> {
   if (Platform.OS === "web") return null;
-  try {
-    const release = await withTimeout(api.get<AppRelease>("/app/release", false), 2500);
-    const installed = installedAppVersion();
-    if (release.minVersion && isOlderVersion(installed, release.minVersion)) {
-      return { required: true, version: release.minVersion, downloadUrl: release.downloadUrl };
-    }
-    if (
-      release.latestVersion &&
-      release.downloadUrl &&
-      isOlderVersion(installed, release.latestVersion) &&
-      !recentlyDismissed(release.latestVersion)
-    ) {
-      return { required: false, version: release.latestVersion, downloadUrl: release.downloadUrl };
-    }
-    return null;
-  } catch {
-    return null;
+  const release = await fetchRelease();
+  if (!release) return null;
+  const installed = installedAppVersion();
+  if (release.minVersion && isOlderVersion(installed, release.minVersion)) {
+    return { required: true, version: release.minVersion, downloadUrl: release.downloadUrl };
   }
+  if (
+    release.latestVersion &&
+    release.downloadUrl &&
+    isOlderVersion(installed, release.latestVersion) &&
+    !dismissed.has(release.latestVersion)
+  ) {
+    return { required: false, version: release.latestVersion, downloadUrl: release.downloadUrl };
+  }
+  return null;
 }

@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { HomeMember } from "../../../homes/entities/home-member.entity";
+import { Home } from "../../../homes/entities/home.entity";
 import { PushToken } from "../../entities/push-token.entity";
 import { INotificationsRepository } from "./notifications.repository";
 
@@ -29,6 +30,8 @@ export class TypeormNotificationsRepository implements INotificationsRepository 
     const query = this.tokens
       .createQueryBuilder("token")
       .innerJoin(HomeMember, "member", "member.userId = token.userId")
+      // The host can turn notifications off for the whole home.
+      .innerJoin(Home, "home", "home.id = member.homeId AND home.notificationsEnabled = true")
       .where("member.homeId = :homeId", { homeId });
     if (actorId) query.andWhere("token.userId != :actorId", { actorId });
     return query.getMany();

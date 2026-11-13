@@ -24,7 +24,7 @@ services:
       - key: APP_MIN_VERSION
         value: "2.2.2"
       - key: APP_LATEST_VERSION
-        value: ""
+        value: "2.4.1"
       - key: APP_DOWNLOAD_URL
         value: "https://expo.dev/artifacts/eas/KWQ5LSJffWo1bz0JMq1A-Cq4ow9pWCrEsqojnbXex2I.apk"
       - key: GOOGLE_CLIENT_ID
@@ -35,3 +35,8 @@ services:
         sync: false
       - key: MAIL_FROM_NAME
         value: One More Thing
+      # Copy this value into the GitHub Actions secret CRON_SECRET (pins-tick workflow).
+      - key: CRON_SECRET
+        generateValue: true
+      - key: EXPO_ACCESS_TOKEN
+        sync: false

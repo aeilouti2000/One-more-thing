@@ -39,7 +39,9 @@ export function TripInvoiceCosts({
 
   const receiptTotal = items.find((item) => item.receiptId)?.receiptTotal ?? null;
   // A trip saved as one total is edited as a total (item prices wouldn't count).
-  const hasTotal = items.some((item) => item.receiptId);
+  const hasTotal = items.some(
+    (item) => item.receiptId && item.receiptTotal !== null && item.receiptTotal !== undefined,
+  );
   const listId = items[0]?.listId ?? null;
   const canScan = Platform.OS !== "web";
 

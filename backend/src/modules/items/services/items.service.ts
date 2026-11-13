@@ -1,6 +1,6 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, type Repository } from "typeorm";
+import { In, Not, type Repository } from "typeorm";
 import { DomainError } from "../../../common/domain.error";
 import { HomesService } from "../../homes/services/homes.service";
 import { NotificationsService } from "../../notifications/services/notifications.service";
@@ -29,6 +29,8 @@ export type ItemView = {
   /** Trip receipt this item was priced under (trip-total mode). */
   receiptId: string | null;
   receiptTotal: number | null;
+  /** The invoice's name (e.g. the shop), if one was given. */
+  receiptName: string | null;
   /** Photo id; load it from GET /item-images/:imageId. */
   imageId: string | null;
   addedBy: string;
@@ -85,12 +87,13 @@ export class ItemsService {
     await this.items.placeNeeded(homeId, item.id, item.urgent ? "top" : "after-urgent", item.listId);
     const [view] = await this.withNames([item]);
     if (options?.notify !== false) {
-      await this.notifications.notifyItemAdded({
+      this.notifications.notifyItemAdded({
         homeId,
         actorId: userId,
         actorName: view.addedByName,
         itemName: view.name,
         urgent: view.urgent,
+        listId: view.listId,
       });
     }
     return view;
@@ -128,18 +131,24 @@ export class ItemsService {
     const [view] = await this.withNames([saved]);
     if (becameUrgent) {
       const actorName = await this.items.findUserName(userId);
-      await this.notifications.notifyItemUrgent({
+      this.notifications.notifyItemUrgent({
         homeId: view.homeId,
         actorId: userId,
         actorName: actorName ?? "Member",
         itemName: view.name,
+        listId: view.listId,
       });
     }
     return view;
   }
 
-  async markBought(userId: string, itemId: string, cost?: number | null) {
+  async markBought(userId: string, itemId: string, cost?: number | null, receiptId?: string) {
     const item = await this.requireItem(userId, itemId);
+    // Someone else already bought it (a stale list): keep their purchase as is.
+    if (item.status !== "needed") {
+      const [view] = await this.withNames([item]);
+      return view;
+    }
     item.urgentBeforeBought = item.urgent;
     item.status = "bought";
     item.urgent = false;
@@ -147,7 +156,8 @@ export class ItemsService {
     item.boughtAt = new Date();
     item.cost = normalizeCost(cost);
     const saved = await this.items.save(item);
-    const [view] = await this.withNames([saved]);
+    if (receiptId) await this.joinReceipt(saved.homeId, [saved.id], receiptId, item.boughtAt);
+    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: saved.id } })]);
     return view;
   }
 
@@ -168,14 +178,38 @@ export class ItemsService {
       }
       item.listId = fallback.id;
     }
-    item.status = "needed";
-    item.urgent = item.urgentBeforeBought;
-    item.urgentBeforeBought = false;
-    item.boughtBy = null;
-    item.boughtAt = null;
-    item.cost = null;
-    item.receiptId = null;
-    const saved = await this.items.save(item);
+    const receiptId = item.receiptId;
+    const cost = item.cost === null || item.cost === undefined ? null : Number(item.cost);
+    // One step, and only while it's still bought: a double tap or a second
+    // phone can't take its price off the invoice twice.
+    await this.receipts.manager.transaction(async (manager) => {
+      const result = await manager.update(
+        Item,
+        { id: item.id, status: "bought" },
+        {
+          status: "needed",
+          listId: item.listId,
+          urgent: item.urgentBeforeBought,
+          urgentBeforeBought: false,
+          boughtBy: null,
+          boughtAt: null,
+          cost: null,
+          receiptId: null,
+        },
+      );
+      if (!result.affected) {
+        throw new DomainError(
+          "UNDO_EXPIRED",
+          "That item can no longer be moved back.",
+          HttpStatus.CONFLICT,
+        );
+      }
+      if (!receiptId) return;
+      // Its own price no longer belongs to the invoice it was on.
+      if (cost !== null) await this.adjustReceiptTotal(manager, receiptId, -cost);
+      await this.deleteIfEmpty(manager, receiptId);
+    });
+    const saved = await this.itemRows.findOneOrFail({ where: { id: item.id } });
     await this.items.placeNeeded(
       saved.homeId,
       saved.id,
@@ -195,7 +229,19 @@ export class ItemsService {
         HttpStatus.BAD_REQUEST,
       );
     }
+    const previous = item.cost === null || item.cost === undefined ? 0 : Number(item.cost);
     item.cost = normalizeCost(cost);
+    const next = item.cost === null || item.cost === undefined ? 0 : Number(item.cost);
+    // Its price is part of its invoice's total, so the total follows the change.
+    if (item.receiptId && next !== previous) {
+      const receiptId = item.receiptId;
+      await this.receipts.manager.transaction(async (manager) => {
+        await manager.update(Item, { id: item.id }, { cost: item.cost });
+        await this.adjustReceiptTotal(manager, receiptId, next - previous);
+      });
+      const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
+      return view;
+    }
     const saved = await this.items.save(item);
     const [view] = await this.withNames([saved]);
     return view;
@@ -208,13 +254,10 @@ export class ItemsService {
   async createReceipt(
     userId: string,
     homeId: string,
-    input: { total: number; itemIds: string[]; listId?: string | null },
+    input: { total?: number | null; name?: string | null; itemIds: string[]; listId?: string | null },
   ) {
     await this.homes.requireMembership(userId, homeId);
     const total = normalizeCost(input.total);
-    if (total === null) {
-      throw new DomainError("INVALID_COST", "Enter a valid cost.", HttpStatus.BAD_REQUEST);
-    }
     const ids = [...new Set(input.itemIds)];
     const rows = ids.length
       ? await this.itemRows.find({ where: { id: In(ids), homeId, status: "bought" } })
@@ -228,10 +271,41 @@ export class ItemsService {
     const previousReceiptIds = [
       ...new Set(rows.map((row) => row.receiptId).filter((id): id is string => Boolean(id))),
     ];
+    // Re-entering a total keeps the invoice's name unless a new one is given.
+    const previousName =
+      previousReceiptIds.length > 0
+        ? ((await this.receipts.findOne({ where: { id: previousReceiptIds[0] } }))?.name ?? null)
+        : null;
+    const name = input.name === undefined ? previousName : blankToNull(input.name ?? undefined);
+    // The same invoice re-priced (all its items, nothing else): update it in
+    // place, so its id, name and date stay the same.
+    if (previousReceiptIds.length === 1 && rows.every((row) => row.receiptId === previousReceiptIds[0])) {
+      const others = await this.itemRows.count({
+        where: { receiptId: previousReceiptIds[0], id: Not(In(itemIds)) },
+      });
+      const existing = others === 0
+        ? await this.receipts.findOne({ where: { id: previousReceiptIds[0], homeId } })
+        : null;
+      if (existing) {
+        existing.total = total;
+        existing.name = name;
+        const saved = await this.receipts.save(existing);
+        return {
+          receipt: {
+            id: saved.id,
+            listId: saved.listId,
+            total: saved.total,
+            name: saved.name,
+            createdAt: saved.createdAt,
+          },
+          items: await this.withNames(rows),
+        };
+      }
+    }
     // One transaction: never leave a receipt without items or items half-moved.
     const receipt = await this.receipts.manager.transaction(async (manager) => {
       const saved = await manager.save(
-        manager.create(TripReceipt, { homeId, listId, total, createdBy: userId }),
+        manager.create(TripReceipt, { homeId, listId, total, name, createdBy: userId }),
       );
       await manager.update(Item, { id: In(itemIds) }, { receiptId: saved.id });
       // Re-entering a trip's total replaces its old receipt: drop receipts that
@@ -252,10 +326,119 @@ export class ItemsService {
         id: receipt.id,
         listId: receipt.listId,
         total: receipt.total,
+        name: receipt.name,
         createdAt: receipt.createdAt,
       },
       items: await this.withNames(updated),
     };
+  }
+
+  async renameReceipt(userId: string, receiptId: string, name: string | null) {
+    const receipt = await this.requireReceipt(userId, receiptId);
+    receipt.name = blankToNull(name ?? undefined);
+    const saved = await this.receipts.save(receipt);
+    return { id: saved.id, name: saved.name, total: saved.total };
+  }
+
+  /**
+   * Move one bought item to another invoice from the same month. Its own price
+   * (if it has one) moves with it; an invoice left with no items is removed.
+   */
+  async moveToReceipt(userId: string, itemId: string, receiptId: string, utcOffsetMin = 0) {
+    const item = await this.requireItem(userId, itemId);
+    if (item.status !== "bought" || !item.boughtAt) {
+      throw new DomainError("ITEM_NOT_BOUGHT", "Only bought items can be moved.", HttpStatus.BAD_REQUEST);
+    }
+    const target = await this.receipts.findOne({ where: { id: receiptId, homeId: item.homeId } });
+    if (!target) {
+      throw new DomainError("RECEIPT_NOT_FOUND", "Invoice not found", HttpStatus.NOT_FOUND);
+    }
+    if (item.receiptId === target.id) {
+      const [view] = await this.withNames([item]);
+      return view;
+    }
+
+    const targetItems = await this.itemRows.find({ where: { receiptId: target.id } });
+    const targetStart = targetItems
+      .map((row) => row.boughtAt)
+      .filter((date): date is Date => Boolean(date))
+      .reduce<Date>((earliest, date) => (date < earliest ? date : earliest), target.createdAt);
+    if (monthKey(targetStart, utcOffsetMin) !== monthKey(item.boughtAt, utcOffsetMin)) {
+      throw new DomainError(
+        "RECEIPT_OTHER_MONTH",
+        "Items can only move between invoices of the same month.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const source = item.receiptId;
+    const cost = item.cost === null || item.cost === undefined ? null : Number(item.cost);
+    await this.receipts.manager.transaction(async (manager) => {
+      await manager.update(Item, { id: item.id }, { receiptId: target.id });
+      if (cost !== null) {
+        if (source) await this.adjustReceiptTotal(manager, source, -cost);
+        await this.adjustReceiptTotal(manager, target.id, cost);
+      }
+      if (source) await this.deleteIfEmpty(manager, source);
+    });
+
+    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
+    return view;
+  }
+
+  /** Items bought outside a trip join an invoice; their own prices add to its total. */
+  private async joinReceipt(homeId: string, itemIds: string[], receiptId: string, boughtAt: Date) {
+    const receipt = await this.receipts.findOne({ where: { id: receiptId, homeId } });
+    // A stale invoice (deleted meanwhile) just leaves the items loose.
+    if (!receipt) return;
+    await this.receipts.manager.transaction(async (manager) => {
+      const rows = await manager.find(Item, {
+        where: { id: In(itemIds), homeId, status: "bought" },
+      });
+      // Only what this request just bought; never older purchases sent by a stale list.
+      const joining = rows.filter(
+        (row) => !row.receiptId && row.boughtAt?.getTime() === boughtAt.getTime(),
+      );
+      if (joining.length === 0) return;
+      await manager.update(Item, { id: In(joining.map((row) => row.id)) }, { receiptId });
+      const added = joining.reduce(
+        (sum, row) => sum + (row.cost === null || row.cost === undefined ? 0 : Number(row.cost)),
+        0,
+      );
+      if (added > 0) await this.adjustReceiptTotal(manager, receiptId, added);
+    });
+  }
+
+  private async deleteIfEmpty(manager: TripReceiptManager, receiptId: string) {
+    await manager.query(
+      `delete from trip_receipts r
+        where r.id = $1
+          and not exists (select 1 from items i where i.receipt_id = r.id)`,
+      [receiptId],
+    );
+  }
+
+  /** Adds (or removes) an amount; an invoice without a total stays without one. */
+  private async adjustReceiptTotal(
+    manager: TripReceiptManager,
+    receiptId: string,
+    amount: number,
+  ) {
+    await manager.query(
+      `update trip_receipts
+          set total = round(greatest(total + $2::numeric, 0), 3)
+        where id = $1 and total is not null`,
+      [receiptId, amount],
+    );
+  }
+
+  private async requireReceipt(userId: string, receiptId: string) {
+    const receipt = await this.receipts.findOne({ where: { id: receiptId } });
+    if (!receipt) {
+      throw new DomainError("RECEIPT_NOT_FOUND", "Invoice not found", HttpStatus.NOT_FOUND);
+    }
+    await this.homes.requireMembership(userId, receipt.homeId);
+    return receipt;
   }
 
   async reorder(userId: string, ids: string[]) {
@@ -270,6 +453,7 @@ export class ItemsService {
   async markManyBought(
     userId: string,
     entries: { id: string; cost?: number | null }[],
+    receiptId?: string,
   ) {
     const unique = new Map<string, number | null | undefined>();
     for (const entry of entries) {
@@ -289,6 +473,7 @@ export class ItemsService {
       now,
       uniqueIds.map((id) => ({ id, cost: normalizeCost(unique.get(id)) })),
     );
+    if (receiptId) await this.joinReceipt(membership.homeId, uniqueIds, receiptId, now);
     return { updated };
   }
 
@@ -325,16 +510,16 @@ export class ItemsService {
 
     if (became.length > 0) {
       const actorName = (await this.items.findUserName(userId)) ?? "Member";
-      await Promise.all(
-        became.map((item) =>
-          this.notifications.notifyItemUrgent({
-            homeId: item.homeId,
-            actorId: userId,
-            actorName,
-            itemName: item.name,
-          }),
-        ),
-      );
+      // Queued per person, so a bulk mark arrives as one grouped notification.
+      for (const item of became) {
+        this.notifications.notifyItemUrgent({
+          homeId: item.homeId,
+          actorId: userId,
+          actorName,
+          itemName: item.name,
+          listId: item.listId,
+        });
+      }
     }
 
     return { updated: uniqueIds.length };
@@ -464,7 +649,7 @@ export class ItemsService {
     const receiptRows = receiptIds.length
       ? await this.receipts.find({ where: { id: In(receiptIds) } })
       : [];
-    const receiptTotals = new Map(receiptRows.map((receipt) => [receipt.id, Number(receipt.total)]));
+    const receiptsById = new Map(receiptRows.map((receipt) => [receipt.id, receipt]));
 
     return rows.map((row) => ({
       id: row.id,
@@ -480,7 +665,8 @@ export class ItemsService {
       urgent: row.urgent,
       cost: row.cost === null || row.cost === undefined ? null : Number(row.cost),
       receiptId: row.receiptId ?? null,
-      receiptTotal: row.receiptId ? (receiptTotals.get(row.receiptId) ?? null) : null,
+      receiptTotal: receiptAmount(row.receiptId ? receiptsById.get(row.receiptId) : undefined),
+      receiptName: (row.receiptId ? receiptsById.get(row.receiptId)?.name : null) ?? null,
       imageId: row.imageId ?? null,
       addedBy: row.addedBy,
       boughtBy: row.boughtBy,
@@ -495,6 +681,20 @@ export class ItemsService {
 function blankToNull(value: string | undefined) {
   const trimmed = value?.trim() ?? "";
   return trimmed ? trimmed : null;
+}
+
+type TripReceiptManager = Repository<TripReceipt>["manager"];
+
+function receiptAmount(receipt: TripReceipt | undefined) {
+  if (!receipt || receipt.total === null || receipt.total === undefined) return null;
+  const value = Number(receipt.total);
+  return Number.isFinite(value) ? value : null;
+}
+
+/** Calendar month of a date in the user's time zone, e.g. "2026-11". */
+export function monthKey(date: Date, utcOffsetMin: number) {
+  const local = new Date(date.getTime() + utcOffsetMin * 60_000);
+  return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function normalizeCost(cost: number | null | undefined): number | null {

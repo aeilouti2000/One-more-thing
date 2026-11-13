@@ -216,7 +216,7 @@ export class PinsService {
       needed.map((item) => `${item.listId}:${item.name.trim().toLowerCase()}`),
     );
     const now = new Date();
-    const arrived: string[] = [];
+    const arrived: { name: string; listId: string }[] = [];
 
     for (const pin of due) {
       // Once-pins are templates only; they must not auto-return.
@@ -254,11 +254,12 @@ export class PinsService {
         created.listId,
       );
       onList.add(key);
-      arrived.push(pin.name);
+      arrived.push({ name: pin.name, listId });
     }
 
-    for (const itemName of arrived) {
-      await this.notifications.notifyPinDue({ homeId, itemName });
+    // Queued together, so several due pins arrive as one notification.
+    for (const pin of arrived) {
+      this.notifications.notifyPinDue({ homeId, itemName: pin.name, listId: pin.listId });
     }
   }
 }

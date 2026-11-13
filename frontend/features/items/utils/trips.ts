@@ -5,6 +5,10 @@ const TRIP_GAP_MS = 90 * 60 * 1000;
 
 export type ShoppingTrip = {
   id: string;
+  /** The invoice behind this trip, once it has one. */
+  receiptId: string | null;
+  /** Name given to the invoice (e.g. the shop). */
+  name: string | null;
   listName: string;
   startedAt: string;
   items: Purchase[];
@@ -61,8 +65,11 @@ function toTrip(items: Purchase[]): ShoppingTrip {
   const ordered = [...items].sort((a, b) => boughtMs(a) - boughtMs(b));
   const first = ordered[0];
   const spend = summarizeSpend(ordered);
+  const receiptId = first?.receiptId ?? null;
   return {
-    id: first?.id ?? "",
+    id: receiptId ?? first?.id ?? "",
+    receiptId,
+    name: first?.receiptName?.trim() || null,
     listName: first?.listName ?? "",
     startedAt: first?.boughtAt ?? first?.createdAt ?? "",
     items: [...ordered].sort((a, b) => boughtMs(b) - boughtMs(a)),
@@ -76,4 +83,55 @@ function boughtMs(item: Purchase) {
   const value = item.boughtAt ?? item.createdAt;
   const ms = new Date(value).getTime();
   return Number.isNaN(ms) ? 0 : ms;
+}
+
+/** Calendar month (local time) of an ISO date, e.g. "2026-11". */
+export function monthOf(value: string | undefined | null) {
+  const date = new Date(value ?? "");
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * The invoice an item bought outside a trip should join: the most recent one
+ * this month on the same list. Null when there's none.
+ */
+export function latestInvoiceThisMonth(
+  items: Purchase[],
+  now = new Date(),
+  listId?: string | null,
+): string | null {
+  const month = monthOf(now.toISOString());
+  let best: { id: string; at: number } | null = null;
+  for (const item of items) {
+    if (item.status !== "bought" || !item.receiptId) continue;
+    if (listId !== undefined && (item.listId ?? null) !== (listId ?? null)) continue;
+    const at = boughtMs(item);
+    if (monthOf(item.boughtAt ?? item.createdAt) !== month) continue;
+    if (!best || at > best.at) best = { id: item.receiptId, at };
+  }
+  return best?.id ?? null;
+}
+
+/** Other trips an item can move to: same month, not its own trip. */
+export function moveTargets(trips: ShoppingTrip[], item: Purchase): ShoppingTrip[] {
+  const month = monthOf(item.boughtAt ?? item.createdAt);
+  return trips.filter(
+    (trip) => !trip.items.some((entry) => entry.id === item.id) && monthOf(trip.startedAt) === month,
+  );
+}
+
+/**
+ * Where each invoice sits in History: the date and list of its first item.
+ * Filters use this for every item of the invoice, so an invoice is shown (and
+ * its total counted) whole, never split across days or lists.
+ */
+export function invoiceAnchors(items: Purchase[]) {
+  const anchors = new Map<string, Purchase>();
+  for (const item of items) {
+    if (!item.receiptId) continue;
+    const current = anchors.get(item.receiptId);
+    if (!current || boughtMs(item) < boughtMs(current)) anchors.set(item.receiptId, item);
+  }
+  return anchors;
 }

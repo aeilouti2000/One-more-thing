@@ -21,6 +21,7 @@ function withCostDefaults(home: Household): Household {
     askCostOnBulkBuy: home.askCostOnBulkBuy !== false,
     askCostOnTripEnd: home.askCostOnTripEnd !== false,
     tripCostMode: home.tripCostMode === "total" ? "total" : "items",
+    notificationsEnabled: home.notificationsEnabled !== false,
   };
 }
 
@@ -90,6 +91,18 @@ export async function updateCostSettings(homeId: string, settings: Partial<CostS
   try {
     const home = withCostDefaults(
       await api.patch<Household>(`/homes/${homeId}/cost-settings`, settings),
+    );
+    writeCachedHousehold(home);
+    return { home, error: null };
+  } catch (error) {
+    return { home: null, error: formatAppError(error) };
+  }
+}
+
+export async function updateNotificationSettings(homeId: string, notificationsEnabled: boolean) {
+  try {
+    const home = withCostDefaults(
+      await api.patch<Household>(`/homes/${homeId}/notification-settings`, { notificationsEnabled }),
     );
     writeCachedHousehold(home);
     return { home, error: null };

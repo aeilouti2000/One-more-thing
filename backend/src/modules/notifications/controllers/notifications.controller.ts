@@ -12,7 +12,7 @@ export class NotificationsController {
 
   @Post("devices")
   register(@CurrentUser() user: User, @Body() body: PushTokenDto) {
-    return this.notifications.register(user.id, body.token, body.locale);
+    return this.notifications.register(user.id, body.token, body.locale, body.previousToken);
   }
 
   @Delete("devices")
