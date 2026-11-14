@@ -1,5 +1,7 @@
 import { File } from "expo-file-system";
 import { Platform } from "react-native";
+import { translate } from "@/constants/i18n";
+import { emitListChanged } from "@/features/items/utils/list-sync";
 import { api, apiUrl } from "@/lib/api";
 import { formatAppError, isOfflineError } from "@/lib/errors";
 import { readCachedItems } from "@/features/offline/profile-cache";
@@ -45,8 +47,12 @@ type ItemResponse = {
   listName?: string;
   addedByName: string;
   boughtByName: string | null;
+  boughtBy?: string | null;
   createdAt: string;
   boughtAt: string | null;
+  notFoundAt?: string | null;
+  notFoundBy?: string | null;
+  notFoundByName?: string | null;
 };
 
 function toPurchase(item: ItemResponse): Purchase {
@@ -80,9 +86,46 @@ function toPurchase(item: ItemResponse): Purchase {
     listName: item.listName,
     addedByName: item.addedByName,
     boughtByName: item.boughtByName ?? undefined,
+    boughtById: item.boughtBy ?? undefined,
     createdAt: item.createdAt,
     boughtAt: item.boughtAt ?? undefined,
+    notFoundAt: item.notFoundAt ?? undefined,
+    notFoundById: item.notFoundBy ?? undefined,
+    notFoundByName: item.notFoundByName ?? undefined,
   };
+}
+
+/**
+ * Rows shown at once, before the server has saved them, carry a temporary id.
+ * An action on such a row (check it off, reorder, delete) waits here for the
+ * save and then uses the real id, instead of sending an id the server rejects.
+ */
+const pendingSaves = new Map<string, Promise<string | null>>();
+
+export function isUnsavedItemId(id: string) {
+  return id.startsWith("temp-");
+}
+
+/** `saved` resolves to the real id, or null when the item could not be added. */
+export function trackUnsavedItem(tempId: string, saved: Promise<string | null>) {
+  pendingSaves.set(tempId, saved);
+  // Long after the row has its real id, nothing asks for the temporary one.
+  void saved.finally(() => setTimeout(() => pendingSaves.delete(tempId), 60_000));
+}
+
+async function savedItemId(id: string) {
+  if (!isUnsavedItemId(id)) return id;
+  const real = await pendingSaves.get(id);
+  if (!real) throw new Error(translate("errorGeneric"));
+  // The row was replaced by the saved item meanwhile: reload so the screen
+  // shows this action on it.
+  setTimeout(emitListChanged, 0);
+  return real;
+}
+
+async function savedItemIds(ids: string[]) {
+  const real = await Promise.all(ids.map((id) => savedItemId(id).catch(() => null)));
+  return real.filter((id): id is string => id !== null);
 }
 
 export async function fetchHomeItems(homeId: string) {
@@ -117,6 +160,7 @@ export async function addItem(input: NewItemInput) {
 
 export async function updateItemDetails(itemId: string, input: UpdateItemInput) {
   try {
+    const id = await savedItemId(itemId);
     const body: {
       name: string;
       quantity: number;
@@ -139,7 +183,7 @@ export async function updateItemDetails(itemId: string, input: UpdateItemInput) 
     if (typeof input.unit === "string") {
       body.unit = input.unit.trim();
     }
-    await api.patch(`/items/${itemId}`, body);
+    await api.patch(`/items/${id}`, body);
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
@@ -148,7 +192,8 @@ export async function updateItemDetails(itemId: string, input: UpdateItemInput) 
 
 export async function updateItemCost(itemId: string, cost: number | null) {
   try {
-    await api.patch(`/items/${itemId}/cost`, { cost });
+    const id = await savedItemId(itemId);
+    await api.patch(`/items/${id}/cost`, { cost });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
@@ -190,7 +235,8 @@ export async function renameTripReceipt(receiptId: string, name: string | null) 
 /** Move a bought item to another invoice of the same month. */
 export async function moveItemToReceipt(itemId: string, receiptId: string) {
   try {
-    await api.post(`/items/${itemId}/receipt`, {
+    const id = await savedItemId(itemId);
+    await api.post(`/items/${id}/receipt`, {
       receiptId,
       utcOffsetMin: -new Date().getTimezoneOffset(),
     });
@@ -200,35 +246,56 @@ export async function moveItemToReceipt(itemId: string, receiptId: string) {
   }
 }
 
-export async function undoItemBought(itemId: string) {
+/** onlyMine: from a trip, so a partner's purchase is never taken back. */
+export async function undoItemBought(itemId: string, options?: { onlyMine?: boolean }) {
   try {
-    await api.post(`/items/${itemId}/needed`);
+    const id = await savedItemId(itemId);
+    await api.post(`/items/${id}/needed`, options?.onlyMine ? { onlyMine: true } : undefined);
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
   }
 }
 
+/** Returns the item as the server has it: someone else may have bought it first. */
 export async function markItemBought(itemId: string, cost?: number | null, receiptId?: string | null) {
   try {
-    await api.post(`/items/${itemId}/bought`, {
+    const id = await savedItemId(itemId);
+    const item = await api.post<ItemResponse>(`/items/${id}/bought`, {
       cost: cost ?? null,
       ...(receiptId ? { receiptId } : {}),
     });
-    return { error: null };
+    return { item: item ? toPurchase(item) : null, error: null as string | null };
   } catch (error) {
-    return { error: formatAppError(error) };
+    return { item: null as Purchase | null, error: formatAppError(error) };
+  }
+}
+
+/** "Couldn't find it" in this shop (or put it back, with notFound false). */
+export async function setItemNotFound(itemId: string, notFound: boolean) {
+  try {
+    const id = await savedItemId(itemId);
+    const path = `/items/${id}/not-found`;
+    const item = notFound
+      ? await api.post<ItemResponse>(path)
+      : await api.delete<ItemResponse>(path);
+    return { item: item ? toPurchase(item) : null, error: null as string | null };
+  } catch (error) {
+    return { item: null as Purchase | null, error: formatAppError(error) };
   }
 }
 
 export async function markItemsBought(entries: BoughtCostEntry[], receiptId?: string | null) {
   if (entries.length === 0) return { error: null };
   try {
+    const items: { id: string; cost: number | null }[] = [];
+    for (const entry of entries) {
+      const id = await savedItemId(entry.id).catch(() => null);
+      if (id) items.push({ id, cost: entry.cost ?? null });
+    }
+    if (items.length === 0) return { error: null };
     await api.post("/items/bought", {
-      items: entries.map((entry) => ({
-        id: entry.id,
-        cost: entry.cost ?? null,
-      })),
+      items,
       ...(receiptId ? { receiptId } : {}),
     });
     return { error: null };
@@ -240,7 +307,9 @@ export async function markItemsBought(entries: BoughtCostEntry[], receiptId?: st
 export async function reorderItems(itemIds: string[]) {
   if (itemIds.length === 0) return { error: null };
   try {
-    await api.post("/items/order", { ids: itemIds });
+    const ids = await savedItemIds(itemIds);
+    if (ids.length === 0) return { error: null };
+    await api.post("/items/order", { ids });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
@@ -250,7 +319,9 @@ export async function reorderItems(itemIds: string[]) {
 export async function deleteItems(itemIds: string[]) {
   if (itemIds.length === 0) return { error: null };
   try {
-    await api.post("/items/delete", { ids: itemIds });
+    const ids = await savedItemIds(itemIds);
+    if (ids.length === 0) return { error: null };
+    await api.post("/items/delete", { ids });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
@@ -260,7 +331,34 @@ export async function deleteItems(itemIds: string[]) {
 export async function setItemsUrgent(itemIds: string[], urgent: boolean) {
   if (itemIds.length === 0) return { error: null };
   try {
-    await api.post("/items/urgent", { ids: itemIds, urgent });
+    const ids = await savedItemIds(itemIds);
+    if (ids.length === 0) return { error: null };
+    await api.post("/items/urgent", { ids, urgent });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}
+
+export async function setItemsCategory(itemIds: string[], category: PurchaseCategory) {
+  if (itemIds.length === 0) return { error: null };
+  try {
+    const ids = await savedItemIds(itemIds);
+    if (ids.length === 0) return { error: null };
+    await api.post("/items/category", { ids, category });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}
+
+/** unit "" clears it (plain pieces). */
+export async function setItemsUnit(itemIds: string[], unit: string) {
+  if (itemIds.length === 0) return { error: null };
+  try {
+    const ids = await savedItemIds(itemIds);
+    if (ids.length === 0) return { error: null };
+    await api.post("/items/unit", { ids, unit });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
@@ -270,7 +368,9 @@ export async function setItemsUrgent(itemIds: string[], urgent: boolean) {
 export async function moveItems(itemIds: string[], listId: string) {
   if (itemIds.length === 0) return { error: null };
   try {
-    await api.post("/items/move", { ids: itemIds, listId });
+    const ids = await savedItemIds(itemIds);
+    if (ids.length === 0) return { error: null };
+    await api.post("/items/move", { ids, listId });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };
@@ -291,8 +391,9 @@ export function itemImageUrl(imageId: string) {
 /** Attach or replace an item's photo. The server resizes it. */
 export async function uploadItemImage(itemId: string, photo: PickedPhoto) {
   try {
+    const id = await savedItemId(itemId);
     const type = photo.mimeType || "image/jpeg";
-    const name = photo.fileName || `item-${itemId}.jpg`;
+    const name = photo.fileName || `item-${id}.jpg`;
     const form = new FormData();
     if (Platform.OS === "web") {
       // Web pickers hand back a blob:/data: URI; send the bytes themselves.
@@ -308,7 +409,7 @@ export async function uploadItemImage(itemId: string, photo: PickedPhoto) {
         bytes: async () => new Uint8Array(await file.arrayBuffer()),
       } as unknown as Blob);
     }
-    const updated = await api.upload<ItemResponse>(`/items/${itemId}/image`, form);
+    const updated = await api.upload<ItemResponse>(`/items/${id}/image`, form);
     return { item: toPurchase(updated), error: null };
   } catch (error) {
     return { item: null as Purchase | null, error: formatAppError(error) };
@@ -317,7 +418,8 @@ export async function uploadItemImage(itemId: string, photo: PickedPhoto) {
 
 export async function removeItemImage(itemId: string) {
   try {
-    const updated = await api.delete<ItemResponse>(`/items/${itemId}/image`);
+    const id = await savedItemId(itemId);
+    const updated = await api.delete<ItemResponse>(`/items/${id}/image`);
     return { item: toPurchase(updated), error: null };
   } catch (error) {
     return { item: null as Purchase | null, error: formatAppError(error) };

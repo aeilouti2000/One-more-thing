@@ -1,3 +1,7 @@
+import { InlinePane, useReverseRows } from "@/components/ui/InlinePane";
+import { caretColors, caretGap } from "@/constants/text";
+import { usePurchasesData } from "@/features/items/hooks/use-purchases";
+import { lastPrice } from "@/features/items/utils/insights";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -62,12 +66,18 @@ function itemsIdentity(items: CostSheetItem[]) {
   return items.map((item) => `${item.id}:${item.name}`).join("|");
 }
 
-function costValues(items: CostSheetItem[]) {
+type LastPrices = Record<string, { cost: number; boughtAt: string }>;
+
+function costValues(items: CostSheetItem[], lastPrices: LastPrices, currency: string) {
   const next: Record<string, string> = {};
   for (const item of items) {
+    const remembered = lastPrices[item.id];
     next[item.id] =
       item.initialCost === null || item.initialCost === undefined
-        ? ""
+        ? // Start from what it cost last time; the user only types a change.
+          remembered
+          ? formatCostInput(remembered.cost, currency)
+          : ""
         : String(item.initialCost);
   }
   return next;
@@ -101,6 +111,18 @@ export function CostEntrySheet({
   const [lineByItem, setLineByItem] = useState<Record<string, string>>({});
   const [pendingLineId, setPendingLineId] = useState<string | null>(null);
   const symbol = currencySymbol(currency);
+  const { purchases } = usePurchasesData();
+  // Only real items with no price yet (not the trip-total row).
+  const lastPrices = useMemo(() => {
+    const found: LastPrices = {};
+    for (const item of items) {
+      if (item.initialCost !== null && item.initialCost !== undefined) continue;
+      if (!purchases.some((purchase) => purchase.id === item.id)) continue;
+      const remembered = lastPrice(purchases, item.name, item.id);
+      if (remembered) found[item.id] = remembered;
+    }
+    return found;
+  }, [items, purchases]);
   const sessionKey = useMemo(() => itemsIdentity(items), [items]);
   const [seenSession, setSeenSession] = useState({
     visible: false,
@@ -114,7 +136,7 @@ export function CostEntrySheet({
   let draftValues = values;
   if (sessionReset) {
     setSeenSession({ visible, sessionKey });
-    draftValues = costValues(items);
+    draftValues = costValues(items, lastPrices, currency);
     setValues(draftValues);
     setError(null);
     setHideExternalError(false);
@@ -201,6 +223,7 @@ export function CostEntrySheet({
       subtitle={subtitle}
       symbol={symbol}
       items={items}
+      lastPrices={lastPrices}
       values={values}
       error={error ?? (hideExternalError ? null : errorMessage)}
       loading={loading}
@@ -235,7 +258,8 @@ export function CostEntrySheet({
 
   if (presentation === "pane") {
     if (!visible) return null;
-    return body;
+    // Shown in the page, not in a sheet: rows already follow the language.
+    return <InlinePane>{body}</InlinePane>;
   }
 
   return (
@@ -266,6 +290,7 @@ function CostField({
 }) {
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
+  const reverseRows = useReverseRows();
   const { scale } = useFontScale();
   const inputSize = scaleFontSize(large ? 22 : 16, scale);
 
@@ -275,7 +300,7 @@ function CostField({
       style={[
         {
           borderRadius: floatedControlRadius,
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: reverseRows ? "row-reverse" : "row",
           backgroundColor:
             scheme === "dark" ? withAlpha(colors.white, 0.06) : "#F4F5F7",
           borderColor:
@@ -304,7 +329,8 @@ function CostField({
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        placeholder={caretGap(placeholder)}
+        {...caretColors(colors.accent)}
         placeholderTextColor={withAlpha(colors.muted, 0.55)}
         keyboardType="decimal-pad"
         onFocus={onFocus}
@@ -326,6 +352,30 @@ function CostField({
   );
 }
 
+/** Tells the user the filled-in price is last time's, not this trip's. */
+function LastPriceCaption({
+  last,
+  currency,
+}: {
+  last: { cost: number; boughtAt: string } | undefined;
+  currency: string;
+}) {
+  const { t, locale } = useI18n();
+  if (!last) return null;
+  const at = new Date(last.boughtAt);
+  const when = Number.isNaN(at.getTime())
+    ? ""
+    : new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+        day: "numeric",
+        month: "short",
+      }).format(at);
+  return (
+    <AppText className="text-xs text-cove-muted">
+      {t("lastPriceHint", { amount: formatMoney(last.cost, currency), date: when })}
+    </AppText>
+  );
+}
+
 function MatchedCaption({
   linked,
   name,
@@ -336,12 +386,13 @@ function MatchedCaption({
   onClear: () => void;
 }) {
   const { t, isRTL } = useI18n();
+  const reverseRows = useReverseRows();
   const { colors } = useTheme();
   if (!linked) return null;
   return (
     <View
       className="items-center justify-between gap-2"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+      style={{ flexDirection: reverseRows ? "row-reverse" : "row" }}
     >
       <AppText
         className="min-w-0 flex-1 text-xs text-cove-muted"
@@ -377,6 +428,7 @@ function ReceiptSummary({
   onPickLine: (lineId: string | null) => void;
 }) {
   const { t, isRTL } = useI18n();
+  const reverseRows = useReverseRows();
   const { colors, scheme } = useTheme();
   let placed = 0;
   for (const item of items) {
@@ -405,7 +457,7 @@ function ReceiptSummary({
           <AppText className="text-xs font-medium text-cove-muted" style={{ textAlign: isRTL ? "right" : "left" }}>
             {t("receiptLinesTitle")}
           </AppText>
-          <View className="flex-row flex-wrap gap-2" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+          <View className="flex-row flex-wrap gap-2" style={{ flexDirection: reverseRows ? "row-reverse" : "row" }}>
             {unused.map((line) => {
               const selected = line.id === pendingLineId;
               return (
@@ -442,6 +494,7 @@ function CostSheetBody({
   subtitle,
   symbol,
   items,
+  lastPrices,
   values,
   error,
   loading,
@@ -464,6 +517,7 @@ function CostSheetBody({
   subtitle?: string;
   symbol: string;
   items: CostSheetItem[];
+  lastPrices: LastPrices;
   values: Record<string, string>;
   error: string | null;
   loading: boolean;
@@ -483,6 +537,7 @@ function CostSheetBody({
   onSkip: () => void;
 }) {
   const { t, isRTL } = useI18n();
+  const reverseRows = useReverseRows();
   const { colors, scheme } = useTheme();
   const sheet = useFormSheet();
   const single = items.length === 1;
@@ -513,7 +568,7 @@ function CostSheetBody({
             loading || scanning ? "opacity-50" : "active:opacity-80"
           }`}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: reverseRows ? "row-reverse" : "row",
             borderColor:
               scheme === "dark"
                 ? withAlpha(colors.white, 0.14)
@@ -588,6 +643,7 @@ function CostSheetBody({
               placeholder={t("costPlaceholder")}
               onFocus={() => sheet?.scrollToEnd()}
             />
+            <LastPriceCaption last={lastPrices[items[0].id]} currency={currency} />
           </View>
         ) : (
           items.map((item) => (
@@ -631,6 +687,7 @@ function CostSheetBody({
                 placeholder={t("costPlaceholder")}
                 onFocus={() => sheet?.scrollToEnd()}
               />
+              <LastPriceCaption last={lastPrices[item.id]} currency={currency} />
             </View>
           ))
         )}

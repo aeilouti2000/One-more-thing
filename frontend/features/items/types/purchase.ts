@@ -26,6 +26,12 @@ export type Purchase = {
   listName?: string;
   addedByName: string;
   boughtByName?: string;
+  /** Who bought it (user id), to tell my purchases from a partner's. */
+  boughtById?: string;
+  /** Marked "couldn't find it" on a trip; cleared when bought or at the next trip. */
+  notFoundAt?: string;
+  notFoundById?: string;
+  notFoundByName?: string;
   createdAt: string;
   boughtAt?: string;
 };

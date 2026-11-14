@@ -5,7 +5,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 import { appFont, scaleFontSize, singleLineInput } from "@/constants/font";
 import { floatedControlRadius, glassFieldStyle, withAlpha } from "@/constants/theme";
 import { useFontScale } from "@/providers/FontScaleProvider";
-import { preserveSpaces } from "@/constants/text";
+import { caretColors, caretGap, preserveSpaces } from "@/constants/text";
 
 type AppTextFieldProps = {
   label?: string;
@@ -80,7 +80,8 @@ export function AppTextField({
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        placeholder={caretGap(placeholder)}
+        {...caretColors(colors.accent)}
         placeholderTextColor={
           glass && scheme === "dark" ? withAlpha(colors.muted, 0.62) : colors.line
         }

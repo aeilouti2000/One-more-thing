@@ -31,7 +31,7 @@ export function ForceUpdate({ downloadUrl, onLater }: ForceUpdateProps) {
         {downloadUrl ? (
           <AppButton
             label={t("updateNow")}
-            onPress={() => void Linking.openURL(downloadUrl)}
+            onPress={() => void Linking.openURL(downloadUrl).catch(() => undefined)}
           />
         ) : null}
         {onLater ? (

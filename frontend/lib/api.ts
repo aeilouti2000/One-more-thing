@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 import "@/features/auth/utils/session-storage";
 import { clearCurrentProfileCache } from "@/features/offline/profile-cache";
+import { readSecureTokens, writeSecureTokens } from "@/lib/secure-tokens";
 import { withTimeout } from "@/lib/with-timeout";
 
 function resolveApiUrl() {
@@ -77,11 +78,14 @@ export type AuthSession = {
 
 export class ApiError extends Error {
   code?: string;
+  /** HTTP status, when the server answered. */
+  status?: number;
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code?: string, status?: number) {
     super(message);
     this.name = "ApiError";
     this.code = code;
+    this.status = status;
   }
 }
 
@@ -124,31 +128,59 @@ function removeStorage(key: string) {
   }
 }
 
+let sessionCache: AuthSession | null | undefined;
+
+/**
+ * The signed-in session. The profile lives in regular storage; the tokens live
+ * in the phone's encrypted storage when the app build has it.
+ */
 export function readSession(): AuthSession | null {
+  if (sessionCache === undefined) sessionCache = loadSession();
+  return sessionCache;
+}
+
+function loadSession(): AuthSession | null {
   const raw = readStorage(SESSION_KEY);
   if (!raw) return null;
   try {
-    const session = JSON.parse(raw) as AuthSession;
-    if (!session.accessToken || !session.refreshToken || !session.user?.id) return null;
-    return session;
+    const stored = JSON.parse(raw) as Partial<AuthSession>;
+    if (!stored.user?.id) return null;
+    if (stored.accessToken && stored.refreshToken) {
+      // Saved by an earlier version, with the tokens beside the profile: move
+      // them to encrypted storage when this build can.
+      const tokens = { accessToken: stored.accessToken, refreshToken: stored.refreshToken };
+      if (writeSecureTokens(tokens)) {
+        writeStorage(SESSION_KEY, JSON.stringify({ user: stored.user }));
+      }
+      return { ...tokens, user: stored.user };
+    }
+    const tokens = readSecureTokens();
+    return tokens ? { ...tokens, user: stored.user } : null;
   } catch {
     return null;
   }
 }
 
 function writeSession(session: AuthSession) {
-  writeStorage(SESSION_KEY, JSON.stringify(session));
+  sessionCache = session;
+  const secured = writeSecureTokens({
+    accessToken: session.accessToken,
+    refreshToken: session.refreshToken,
+  });
+  writeStorage(SESSION_KEY, JSON.stringify(secured ? { user: session.user } : session));
   emit(session.user);
 }
 
 function clearSession() {
+  sessionCache = null;
+  writeSecureTokens(null);
   removeStorage(SESSION_KEY);
   emit(null);
 }
 
 function errorFromBody(body: unknown, status: number) {
   if (!body || typeof body !== "object") {
-    return new ApiError(`Request failed (${status})`);
+    return new ApiError(`Request failed (${status})`, undefined, status);
   }
   const record = body as { message?: unknown; code?: unknown };
   const message = Array.isArray(record.message)
@@ -157,7 +189,7 @@ function errorFromBody(body: unknown, status: number) {
       ? record.message
       : `Request failed (${status})`;
   const code = typeof record.code === "string" ? record.code : undefined;
-  return new ApiError(message, code);
+  return new ApiError(message, code, status);
 }
 
 let refreshTask: Promise<boolean> | null = null;
@@ -168,9 +200,9 @@ async function refreshSession() {
 
   let response: Response;
   try {
-    // Plain fetch on purpose: if a slow refresh succeeds on the server after we
-    // gave up, a rotated refresh token would be lost and the user signed out.
-    response = await fetch(`${API_URL}/auth/refresh`, {
+    // With a timeout: every request waiting on this refresh would otherwise
+    // hang with it. The refresh token stays the same, so giving up is safe.
+    response = await fetchWithTimeout(`${API_URL}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ refreshToken: current.refreshToken }),
@@ -180,13 +212,21 @@ async function refreshSession() {
   }
 
   if (response.status === 401) {
+    // The session is over (ended elsewhere, or expired): leave nothing of the
+    // account on this phone.
+    clearCurrentProfileCache();
     clearSession();
     return false;
   }
 
   if (!response.ok) return false;
 
-  writeSession((await response.json()) as AuthSession);
+  const next = (await response.json().catch(() => null)) as AuthSession | null;
+  if (!next?.accessToken || !next.refreshToken) return false;
+  // Signed out (or signed in as someone else) while this was on its way:
+  // don't bring the old session back.
+  if (readSession()?.refreshToken !== current.refreshToken) return false;
+  writeSession(next);
   return true;
 }
 
@@ -312,8 +352,12 @@ export async function unlinkGoogle() {
   return storeUser(await api.delete<AuthUser>("/auth/google"));
 }
 
-export async function setEmail(email: string) {
-  return storeUser(await api.post<AuthUser>("/auth/email", { email }));
+/** `proof`: needed to replace an email that is already verified. */
+export async function setEmail(
+  email: string,
+  proof: { password?: string; googleIdToken?: string } = {},
+) {
+  return storeUser(await api.post<AuthUser>("/auth/email", { email, ...proof }));
 }
 
 export async function resendEmailCode() {
@@ -336,10 +380,16 @@ export async function resetPassword(login: string, code: string, newPassword: st
 
 /** `currentPassword` is omitted when a Google-only account sets its first password. */
 /** Resolves true when the server ended every session (a changed password). */
-export async function changePassword(currentPassword: string | undefined, newPassword: string) {
+export async function changePassword(
+  currentPassword: string | undefined,
+  newPassword: string,
+  googleIdToken?: string,
+) {
   const result = await api.post<{ signedOut?: boolean } | undefined>("/auth/change-password", {
     currentPassword,
     newPassword,
+    // A first password is confirmed with a fresh Google sign-in instead.
+    ...(googleIdToken ? { googleIdToken } : {}),
   });
   // A first password on a Google-only account keeps this session.
   if (result?.signedOut === false) {
@@ -366,10 +416,17 @@ export async function deleteAccount(proof: { password?: string; googleIdToken?: 
   clearSession();
 }
 
-export async function signOut() {
+/** `pushToken`: this phone's notification device, removed along with the session. */
+export async function signOut(pushToken?: string | null) {
   const session = readSession();
   clearCurrentProfileCache();
   clearSession();
   if (!session) return;
-  await api.post("/auth/logout", { refreshToken: session.refreshToken }, false).catch(() => undefined);
+  await api
+    .post(
+      "/auth/logout",
+      { refreshToken: session.refreshToken, ...(pushToken ? { pushToken } : {}) },
+      false,
+    )
+    .catch(() => undefined);
 }

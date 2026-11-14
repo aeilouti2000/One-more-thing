@@ -1,16 +1,21 @@
 import type { ReactNode } from "react";
 import { Redirect } from "expo-router";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import { HomeLoadFailed } from "@/features/homes/components/home-load-failed";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { peekPostAuthRoute } from "@/features/auth/lib/post-auth-route";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 
 export function GuestOnly({ children }: { children: ReactNode }) {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { hasHousehold, isLoading: isHomeLoading } = useHousehold();
+  const { hasHousehold, loadFailed, isLoading: isHomeLoading } = useHousehold();
 
   if (isAuthLoading || (user && isHomeLoading)) {
     return <LoadingScreen />;
+  }
+
+  if (user && !hasHousehold && loadFailed) {
+    return <HomeLoadFailed />;
   }
 
   if (user) {

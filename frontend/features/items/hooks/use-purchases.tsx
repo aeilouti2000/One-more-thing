@@ -12,12 +12,16 @@ import { useFocusEffect } from "expo-router";
 import { Alert } from "react-native";
 import {
   addItem as insertItem,
+  trackUnsavedItem,
   deleteItems,
   moveItems,
   reorderItems,
   fetchHomeItems,
   markItemBought,
   markItemsBought,
+  setItemNotFound,
+  setItemsCategory,
+  setItemsUnit,
   setItemsUrgent,
   undoItemBought,
   updateItemCost,
@@ -33,7 +37,6 @@ import {
   type UpdateItemInput,
 } from "@/features/items/api/items";
 import { translate } from "@/constants/i18n";
-import { isOfflineMessage } from "@/lib/errors";
 import {
   emitListChanged,
   onListChanged,
@@ -42,7 +45,11 @@ import { useHousehold } from "@/features/homes/hooks/use-household";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 import { maybeAskForPush } from "@/features/notifications/api/push";
 import { readCachedItems, writeCachedItems } from "@/features/offline/profile-cache";
-import type { Purchase, PurchaseStatus } from "@/features/items/types/purchase";
+import type {
+  Purchase,
+  PurchaseCategory,
+  PurchaseStatus,
+} from "@/features/items/types/purchase";
 import { latestInvoiceThisMonth } from "@/features/items/utils/trips";
 
 type AddItemValues = Omit<NewItemInput, "homeId" | "userId"> & {
@@ -91,12 +98,18 @@ type UsePurchasesResult = {
     itemId: string,
     trip: { receiptId: string | null; itemIds: string[]; listId?: string | null },
   ) => Promise<{ error: string | null; receiptId: string | null }>;
+  /**
+   * takenBy: someone else bought it first (shopping together); their name.
+   * The item is theirs, so it is not part of this person's trip.
+   */
   markBought: (
     id: string,
     cost?: number | null,
     options?: BuyOptions,
-  ) => Promise<{ error: string | null }>;
-  undoBought: (id: string) => Promise<{ error: string | null }>;
+  ) => Promise<{ error: string | null; takenBy?: string | null }>;
+  undoBought: (id: string, options?: { onlyMine?: boolean }) => Promise<{ error: string | null }>;
+  /** "Couldn't find it" in this shop; false puts it back on the list. */
+  setNotFound: (id: string, notFound: boolean) => Promise<{ error: string | null }>;
   markManyBought: (
     entries: BoughtCostEntry[] | string[],
     options?: BuyOptions,
@@ -110,6 +123,12 @@ type UsePurchasesResult = {
     ids: string[],
     urgent: boolean,
   ) => Promise<{ error: string | null }>;
+  setManyCategory: (
+    ids: string[],
+    category: PurchaseCategory,
+  ) => Promise<{ error: string | null }>;
+  /** unit "" clears it (plain pieces). */
+  setManyUnit: (ids: string[], unit: string) => Promise<{ error: string | null }>;
   reorderNeeded: (ids: string[]) => Promise<{ error: string | null }>;
 };
 
@@ -139,6 +158,9 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   const wantedRef = useRef(0);
   const revision = useRef(0);
   const pendingWrites = useRef(0);
+  const refreshAfterWrites = useRef(false);
+  /** The last server answer put on screen, to recognise an identical one. */
+  const lastApplied = useRef<{ homeId: string; revision: number; payload: string } | null>(null);
   const homeId = household?.id ?? null;
   const homeIdRef = useRef(homeId);
   const purchasesRef = useRef(purchases);
@@ -179,6 +201,16 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  /** Changes rows on screen and in the offline copy, from the same new list. */
+  const applyAndRemember = useCallback(
+    (change: (item: Purchase) => Purchase) => {
+      setPurchases((current) => current.map(change));
+      // The ref still holds the list from before this update.
+      rememberItems(purchasesRef.current.map(change));
+    },
+    [rememberItems],
+  );
+
   const refresh = useCallback(() => {
     wantedRef.current += 1;
     if (inflightRef.current) return inflightRef.current;
@@ -200,21 +232,41 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
           } else {
             const { items, error: fetchError } =
               await fetchHomeItems(activeHome);
-            if (homeIdRef.current !== activeHome) continue;
+            if (homeIdRef.current !== activeHome) {
+              // Signed out or left the home meanwhile: nothing left to load.
+              if (!homeIdRef.current) break;
+              continue;
+            }
             if (pendingWrites.current > 0) {
+              // A write is still on its way; its result must not be overwritten.
+              // Run again once it lands, so a failed write is still rolled back.
+              refreshAfterWrites.current = true;
               setIsLoading(false);
               break;
             }
             if (revision.current !== seen || wantedRef.current !== ticket)
               continue;
-            if (fetchError && isOfflineMessage(fetchError)) {
-              const cached = readCachedItems(activeHome);
-              setPurchases(cached ?? []);
-              setError(cached ? null : fetchError);
-            } else {
-              setPurchases((current) => keepLocalPhotos(items, current));
+            if (fetchError) {
+              // Keep what is on screen: one failed request (a busy server, a
+              // dropped connection) must not look like an empty list.
               setError(fetchError);
-              if (!fetchError) writeCachedItems(activeHome, items);
+            } else {
+              // The trip screen asks every few seconds. When the server's
+              // answer is the one already on screen (and nothing changed here
+              // since), skip the re-render and the write to the phone's cache.
+              const payload = JSON.stringify(items);
+              const last = lastApplied.current;
+              const unchanged =
+                last !== null &&
+                last.homeId === activeHome &&
+                last.revision === revision.current &&
+                last.payload === payload;
+              if (!unchanged) {
+                setPurchases((current) => keepLocalPhotos(items, current));
+                writeCachedItems(activeHome, items);
+                lastApplied.current = { homeId: activeHome, revision: revision.current, payload };
+              }
+              setError(null);
             }
             setIsLoading(false);
           }
@@ -241,9 +293,15 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     return () => {
       if (closed) return;
       closed = true;
+      // A fetch that started before this write finished may predate it.
+      revision.current += 1;
       pendingWrites.current = Math.max(0, pendingWrites.current - 1);
+      if (pendingWrites.current === 0 && refreshAfterWrites.current) {
+        refreshAfterWrites.current = false;
+        void refresh();
+      }
     };
-  }, []);
+  }, [refresh]);
 
   const setItemPhoto = useCallback(
     async (id: string, photo: PickedPhoto | null) => {
@@ -325,11 +383,17 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       const { photo, ...fields } = values;
       let result: { item: Purchase | null; error: string | null };
       try {
-        result = await insertItem({
+        const saving = insertItem({
           ...fields,
           homeId: household.id,
           userId: user.id,
         });
+        // Anything done to the row before it is saved waits for its real id.
+        trackUnsavedItem(
+          tempId,
+          saving.then((saved) => saved.item?.id ?? null),
+        );
+        result = await saving;
       } finally {
         endLocalChange();
       }
@@ -399,18 +463,69 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
             : item,
         ),
       );
-      let result: { error: string | null };
+      let result: Awaited<ReturnType<typeof markItemBought>>;
       try {
         result = await markItemBought(id, cost, receiptId);
       } finally {
         endLocalChange();
       }
+      if (result.error) {
+        await refresh();
+        return { error: result.error };
+      }
+      const server = result.item;
+      // Someone else got there first: show their purchase (and price), not ours.
+      const takenBy =
+        server && server.boughtById && server.boughtById !== user.id
+          ? (server.boughtByName ?? translate("partner"))
+          : null;
+      if (takenBy && server) {
+        setPurchases((current) => current.map((item) => (item.id === id ? server : item)));
+      }
       // Joining an invoice changes its total and name on the server: reload.
-      if (result.error || receiptId) await refresh();
-      else rememberItems(purchasesRef.current);
-      return result;
+      if (receiptId || takenBy) await refresh();
+      else {
+        applyAndRemember((item) =>
+          item.id === id && server?.boughtById
+            ? { ...item, boughtById: server.boughtById }
+            : item,
+        );
+      }
+      return { error: null, takenBy };
     },
     [invoiceFor, noteLocalChange, refresh, rememberItems, user],
+  );
+
+  const setNotFound = useCallback(
+    async (id: string, notFound: boolean) => {
+      if (!user) return { error: translate("errorNeedLogin") };
+      const endLocalChange = noteLocalChange();
+      const notFoundAt = new Date().toISOString();
+      setPurchases((current) =>
+        current.map((item) =>
+          item.id === id && item.status === "needed"
+            ? notFound
+              ? { ...item, notFoundAt, notFoundById: user.id, notFoundByName: user.name ?? undefined }
+              : { ...item, notFoundAt: undefined, notFoundById: undefined, notFoundByName: undefined }
+            : item,
+        ),
+      );
+      let result: Awaited<ReturnType<typeof setItemNotFound>>;
+      try {
+        result = await setItemNotFound(id, notFound);
+      } finally {
+        endLocalChange();
+      }
+      if (result.error) {
+        await refresh();
+        return { error: result.error };
+      }
+      const server = result.item;
+      applyAndRemember((item) => (server && item.id === id ? server : item));
+      emitListChanged();
+      return { error: null };
+    },
+    [noteLocalChange, refresh, rememberItems, user],
   );
 
   const updateItem = useCallback(
@@ -497,14 +612,11 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       }
       const receipt = result.receipt;
       const ids = new Set(input.itemIds);
-      setPurchases((current) =>
-        current.map((item) =>
-          ids.has(item.id)
-            ? { ...item, receiptId: receipt.id, receiptTotal: Number(receipt.total) }
-            : item,
-        ),
+      applyAndRemember((item) =>
+        ids.has(item.id)
+          ? { ...item, receiptId: receipt.id, receiptTotal: Number(receipt.total) }
+          : item,
       );
-      rememberItems(purchasesRef.current);
       return { error: null };
     },
     [noteLocalChange, rememberItems, user],
@@ -606,7 +718,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   );
 
   const undoBought = useCallback(
-    async (id: string) => {
+    async (id: string, options?: { onlyMine?: boolean }) => {
       if (!user) return { error: translate("errorNeedLogin") };
       const onInvoice = Boolean(purchasesRef.current.find((item) => item.id === id)?.receiptId);
       const endLocalChange = noteLocalChange();
@@ -628,7 +740,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       );
       let result: { error: string | null };
       try {
-        result = await undoItemBought(id);
+        result = await undoItemBought(id, options);
       } finally {
         endLocalChange();
       }
@@ -754,6 +866,55 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     [noteLocalChange, refresh, rememberItems, user],
   );
 
+  /** Change one field on many needed items: shown at once, undone by a refresh if the save fails. */
+  const patchManyNeeded = useCallback(
+    async (
+      ids: string[],
+      patch: Partial<Purchase>,
+      save: () => Promise<{ error: string | null }>,
+    ) => {
+      if (!user) return { error: translate("errorNeedLogin") };
+      const endLocalChange = noteLocalChange();
+      const selected = new Set(ids);
+      setPurchases((current) =>
+        current.map((item) =>
+          selected.has(item.id) && item.status === "needed"
+            ? { ...item, ...patch }
+            : item,
+        ),
+      );
+      let result: { error: string | null };
+      try {
+        result = await save();
+      } finally {
+        endLocalChange();
+      }
+      if (result.error) await refresh();
+      else {
+        rememberItems(purchasesRef.current);
+        emitListChanged();
+      }
+      return result;
+    },
+    [noteLocalChange, refresh, rememberItems, user],
+  );
+
+  const setManyCategory = useCallback(
+    (ids: string[], category: PurchaseCategory) =>
+      patchManyNeeded(ids, { category }, () => setItemsCategory(ids, category)),
+    [patchManyNeeded],
+  );
+
+  const setManyUnit = useCallback(
+    (ids: string[], unit: string) => {
+      const value = unit.trim();
+      return patchManyNeeded(ids, { unit: value || undefined }, () =>
+        setItemsUnit(ids, value),
+      );
+    },
+    [patchManyNeeded],
+  );
+
   const reorderNeeded = useCallback(
     async (ids: string[]) => {
       if (!user) return { error: translate("errorNeedLogin") };
@@ -822,10 +983,13 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       moveToTrip,
       markBought,
       undoBought,
+      setNotFound,
       markManyBought,
       deleteMany,
       moveMany,
       setManyUrgent,
+      setManyCategory,
+      setManyUnit,
       reorderNeeded,
     }),
     [
@@ -847,10 +1011,13 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       moveToTrip,
       markBought,
       undoBought,
+      setNotFound,
       markManyBought,
       deleteMany,
       moveMany,
       setManyUrgent,
+      setManyCategory,
+      setManyUnit,
       reorderNeeded,
     ],
   );
@@ -860,6 +1027,15 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       {children}
     </PurchasesContext.Provider>
   );
+}
+
+/** The same data without refreshing on focus; for sheets and small helpers. */
+export function usePurchasesData(): UsePurchasesResult {
+  const value = useContext(PurchasesContext);
+  if (!value) {
+    throw new Error("usePurchasesData must be used within PurchasesProvider");
+  }
+  return value;
 }
 
 export function usePurchases(): UsePurchasesResult {
@@ -879,13 +1055,6 @@ export function usePurchases(): UsePurchasesResult {
   }
 
   return value;
-}
-
-export function filterPurchasesByStatus(
-  purchases: Purchase[],
-  status: PurchaseStatus,
-) {
-  return purchases.filter((item) => item.status === status);
 }
 
 /**

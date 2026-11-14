@@ -75,6 +75,7 @@ export function ConfirmModal({
           {alert ? (
             <Pressable
               onPress={onCancel}
+              accessibilityRole="button"
               className="mt-5 h-[52px] items-center justify-center px-4 active:opacity-80"
               style={{
                 backgroundColor: colors.accent,
@@ -90,6 +91,8 @@ export function ConfirmModal({
               <Pressable
                 disabled={loading}
                 onPress={onConfirm}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: loading, busy: loading }}
                 className="h-[52px] items-center justify-center px-4 active:opacity-80"
                 style={{ backgroundColor: danger, borderRadius: SHEET_BUTTON_RADIUS }}
               >
@@ -104,6 +107,8 @@ export function ConfirmModal({
               <Pressable
                 disabled={loading}
                 onPress={onCancel}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: loading }}
                 className="h-[52px] items-center justify-center px-4 active:opacity-70"
                 style={{
                   borderRadius: SHEET_BUTTON_RADIUS,

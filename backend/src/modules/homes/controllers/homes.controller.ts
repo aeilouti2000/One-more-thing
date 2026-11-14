@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { Throttle } from "@nestjs/throttler";
 import { CurrentUser } from "../../../common/current-user.decorator";
 import { DomainError } from "../../../common/domain.error";
 import { HttpStatus } from "@nestjs/common";
@@ -10,6 +11,7 @@ import {
   UpdateCostSettingsDto,
   UpdateHomeNameDto,
   UpdateNotificationSettingsDto,
+  UpdateTripSettingsDto,
 } from "../dto/homes.dto";
 import { HomesService } from "../services/homes.service";
 
@@ -42,6 +44,8 @@ export class HomesController {
     return this.homes.getOne(user.id, homeId);
   }
 
+  // Invite codes are short: slow down guessing.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post("join")
   join(@CurrentUser() user: User, @Body() body: JoinHomeDto) {
     return this.homes.join(user.id, body.code);
@@ -73,6 +77,15 @@ export class HomesController {
     @Body() body: UpdateCostSettingsDto,
   ) {
     return this.homes.updateCostSettings(user.id, homeId, body);
+  }
+
+  @Patch(":homeId/trip-settings")
+  updateTripSettings(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Body() body: UpdateTripSettingsDto,
+  ) {
+    return this.homes.updateTripSettings(user.id, homeId, body);
   }
 
   @Patch(":homeId/notification-settings")

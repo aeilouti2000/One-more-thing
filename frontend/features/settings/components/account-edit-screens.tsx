@@ -199,6 +199,8 @@ export function AccountPasswordScreen() {
       newPassword,
     );
     setSaving(false);
+    // Closed Google's picker: nothing was saved, nothing to report.
+    if (result.cancelled) return;
     if (result.error) {
       setError(result.error);
       return;
@@ -275,6 +277,10 @@ export function AccountEmailScreen() {
     !verified && current ? current : null,
   );
   const [address, setAddress] = useState("");
+  // Replacing a verified email is confirmed with the password (accounts
+  // without one confirm with Google when the code is requested).
+  const needsPassword = verified && user?.hasPassword !== false;
+  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -291,12 +297,14 @@ export function AccountEmailScreen() {
     setBusy(true);
     setError(null);
     setNotice(null);
-    const result = await setEmail(next);
+    const result = await setEmail(next, needsPassword ? password : undefined);
     setBusy(false);
+    if (result.cancelled) return;
     if (result.error) {
       setError(result.error);
       return;
     }
+    setPassword("");
     setPending(next.toLowerCase());
     setCode("");
     restart();
@@ -427,12 +435,27 @@ export function AccountEmailScreen() {
             autoCorrect={false}
             autoFocus={!current}
           />
+          {needsPassword ? (
+            <AppTextField
+              label={t("currentPassword")}
+              value={password}
+              onChangeText={(value) => {
+                setPassword(value);
+                setError(null);
+              }}
+              placeholder={t("currentPasswordPlaceholder")}
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="password"
+              maxLength={72}
+            />
+          ) : null}
           <FormMessage message={error} />
           <FormMessage message={notice} tone="success" />
           <AppButton
             label={t("sendCode")}
             icon="mail-outline"
-            disabled={!address.trim()}
+            disabled={!address.trim() || (needsPassword && !password)}
             loading={busy}
             onPress={() => void sendCode()}
           />

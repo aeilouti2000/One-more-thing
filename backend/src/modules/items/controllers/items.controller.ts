@@ -21,12 +21,16 @@ import {
   CreateItemDto,
   CreateListDto,
   CreateTripReceiptDto,
+  ClaimShopLockDto,
   ItemIdsDto,
+  UndoBoughtDto,
   MarkBoughtDto,
   MarkBoughtItemsDto,
   MoveToReceiptDto,
   UpdateTripReceiptDto,
   MoveItemsDto,
+  SetCategoryItemsDto,
+  SetUnitItemsDto,
   SetUrgentItemsDto,
   UpdateItemCostDto,
   UpdateItemDto,
@@ -98,8 +102,9 @@ export class ItemsController {
     @CurrentUser() user: User,
     @Param("homeId", ParseUUIDPipe) homeId: string,
     @Param("listId", ParseUUIDPipe) listId: string,
+    @Body() body: ClaimShopLockDto,
   ) {
-    return this.shopLocks.claim(user.id, homeId, listId);
+    return this.shopLocks.claim(user.id, homeId, listId, { newTrip: body?.newTrip === true });
   }
 
   @Post("homes/:homeId/lists/:listId/shop-lock/heartbeat")
@@ -228,8 +233,22 @@ export class ItemsController {
   }
 
   @Post("items/:itemId/needed")
-  undoBought(@CurrentUser() user: User, @Param("itemId", ParseUUIDPipe) itemId: string) {
-    return this.items.undoBought(user.id, itemId);
+  undoBought(
+    @CurrentUser() user: User,
+    @Param("itemId", ParseUUIDPipe) itemId: string,
+    @Body() body: UndoBoughtDto,
+  ) {
+    return this.items.undoBought(user.id, itemId, { onlyMine: body?.onlyMine === true });
+  }
+
+  @Post("items/:itemId/not-found")
+  markNotFound(@CurrentUser() user: User, @Param("itemId", ParseUUIDPipe) itemId: string) {
+    return this.items.markNotFound(user.id, itemId);
+  }
+
+  @Delete("items/:itemId/not-found")
+  clearNotFound(@CurrentUser() user: User, @Param("itemId", ParseUUIDPipe) itemId: string) {
+    return this.items.clearNotFound(user.id, itemId);
   }
 
   @Post("items/order")
@@ -255,5 +274,15 @@ export class ItemsController {
   @Post("items/urgent")
   setUrgent(@CurrentUser() user: User, @Body() body: SetUrgentItemsDto) {
     return this.items.setManyUrgent(user.id, body.ids, body.urgent);
+  }
+
+  @Post("items/category")
+  setCategory(@CurrentUser() user: User, @Body() body: SetCategoryItemsDto) {
+    return this.items.setManyCategory(user.id, body.ids, body.category);
+  }
+
+  @Post("items/unit")
+  setUnit(@CurrentUser() user: User, @Body() body: SetUnitItemsDto) {
+    return this.items.setManyUnit(user.id, body.ids, body.unit);
   }
 }

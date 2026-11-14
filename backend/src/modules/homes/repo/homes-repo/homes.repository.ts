@@ -1,4 +1,3 @@
-import type { User } from "../../../../users/user.entity";
 import type { Home, TripCostMode } from "../../entities/home.entity";
 import type { HomeMember, MemberRole } from "../../entities/home-member.entity";
 
@@ -20,6 +19,11 @@ export type Household = {
   askCostOnTripEnd: boolean;
   tripCostMode: TripCostMode;
   notificationsEnabled: boolean;
+  monthlyBudget: number | null;
+  tripAskName: boolean;
+  tripAutoEndHours: number | null;
+  tripSummary: boolean;
+  tripShopTogether: boolean;
   members: HouseholdMember[];
 };
 
@@ -42,7 +46,6 @@ export interface IHomesRepository {
   leave(userId: string, homeId: string): Promise<{ home: Household | null }>;
   deleteOwnedHome(userId: string, homeId: string): Promise<{ home: Household | null }>;
   deletePartner(homeId: string, memberId: string): Promise<number>;
-  findUser(userId: string): Promise<User | null>;
 }
 
 export const HOMES_REPOSITORY = Symbol("HOMES_REPOSITORY");

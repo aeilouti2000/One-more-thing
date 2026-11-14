@@ -69,6 +69,7 @@ export class HomesService {
       askCostOnBulkBuy?: boolean;
       askCostOnTripEnd?: boolean;
       tripCostMode?: TripCostMode;
+      monthlyBudget?: number | null;
     },
   ) {
     const membership = await this.requireMembership(userId, homeId);
@@ -90,9 +91,44 @@ export class HomesService {
       patch.tripCostMode = input.tripCostMode;
     }
 
+    if (input.monthlyBudget === null || typeof input.monthlyBudget === "number") {
+      patch.monthlyBudget = input.monthlyBudget;
+    }
+
     if (Object.keys(patch).length > 0) {
       await this.homes.updateHome(homeId, patch);
     }
+    return this.homes.loadHome(homeId);
+  }
+
+  async updateTripSettings(
+    userId: string,
+    homeId: string,
+    input: {
+      tripAskName?: boolean;
+      tripAutoEndHours?: number | null;
+      tripSummary?: boolean;
+      tripShopTogether?: boolean;
+    },
+  ) {
+    const membership = await this.requireMembership(userId, homeId);
+    if (membership.role !== "owner") {
+      throw new DomainError(
+        "ONLY_HOST_CAN_UPDATE_TRIPS",
+        "Only the host can change trip settings",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    const patch: Partial<Home> = {};
+    if (typeof input.tripAskName === "boolean") patch.tripAskName = input.tripAskName;
+    if (input.tripAutoEndHours === null || typeof input.tripAutoEndHours === "number") {
+      patch.tripAutoEndHours = input.tripAutoEndHours;
+    }
+    if (typeof input.tripSummary === "boolean") patch.tripSummary = input.tripSummary;
+    if (typeof input.tripShopTogether === "boolean") {
+      patch.tripShopTogether = input.tripShopTogether;
+    }
+    if (Object.keys(patch).length > 0) await this.homes.updateHome(homeId, patch);
     return this.homes.loadHome(homeId);
   }
 

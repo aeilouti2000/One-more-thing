@@ -1,3 +1,4 @@
+import { caretColors, caretGap } from "@/constants/text";
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -223,7 +224,7 @@ export function AuthField({
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        placeholder={caretGap(placeholder)}
         secureTextEntry={secureTextEntry}
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
@@ -237,8 +238,7 @@ export function AuthField({
         textAlignVertical="center"
         allowFontScaling={false}
         placeholderTextColor={withAlpha(colors.muted, 0.45)}
-        selectionColor={colors.accent}
-        cursorColor={colors.accent}
+        {...caretColors(colors.accent)}
         style={[
           preserveSpaces,
           singleLineInput,

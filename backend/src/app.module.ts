@@ -1,7 +1,8 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { UserThrottlerGuard } from "./common/user-throttler.guard";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RefreshToken } from "./modules/auth/entities/refresh-token.entity";
@@ -19,6 +20,10 @@ import { PinLists1740000000015 } from "./database/migrations/1740000000015-PinLi
 import { PinMonthDay1740000000016 } from "./database/migrations/1740000000016-PinMonthDay";
 import { HomeNotifications1740000000017 } from "./database/migrations/1740000000017-HomeNotifications";
 import { NamedInvoices1740000000018 } from "./database/migrations/1740000000018-NamedInvoices";
+import { PrefsBudgetTrips1740000000019 } from "./database/migrations/1740000000019-PrefsBudgetTrips";
+import { TripsTogether1740000000020 } from "./database/migrations/1740000000020-TripsTogether";
+import { OncePinsInterval1740000000021 } from "./database/migrations/1740000000021-OncePinsInterval";
+import { RotateRefreshTokens1740000000022 } from "./database/migrations/1740000000022-RotateRefreshTokens";
 import { EmailCode } from "./modules/auth/entities/email-code.entity";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
@@ -98,6 +103,10 @@ import { User } from "./users/user.entity";
             PinMonthDay1740000000016,
             HomeNotifications1740000000017,
             NamedInvoices1740000000018,
+            PrefsBudgetTrips1740000000019,
+            TripsTogether1740000000020,
+            OncePinsInterval1740000000021,
+            RotateRefreshTokens1740000000022,
           ],
           migrationsRun: true,
         };
@@ -109,6 +118,6 @@ import { User } from "./users/user.entity";
     NotificationsModule,
   ],
   controllers: [HealthController, AppReleaseController, LegalController],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [{ provide: APP_GUARD, useClass: UserThrottlerGuard }],
 })
 export class AppModule {}

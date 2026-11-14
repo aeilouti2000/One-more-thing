@@ -8,13 +8,17 @@ import {
   useFonts,
 } from "@expo-google-fonts/readex-pro";
 import { AppState, Modal, Platform } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { BlurScreen } from "@/components/ui/BlurBackdrop";
 import { DragOverlayProvider } from "@/components/ui/DragOverlay";
 import { TabBlurProvider } from "@/components/ui/TabBlurTarget";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
+import { ProblemScreen } from "@/components/ui/ProblemScreen";
+import { translate } from "@/constants/i18n";
+import { clearCurrentProfileCache } from "@/features/offline/profile-cache";
+import { logError } from "@/lib/errors";
 import {
   checkAppUpdate,
   dismissAppUpdate,
@@ -33,6 +37,11 @@ import { ThemeProvider, useTheme } from "@/providers/ThemeProvider";
 function ThemedNavigation() {
   const { colors, scheme } = useTheme();
 
+  const deeper = {
+    animation: Platform.OS === "android" ? "ios_from_right" : "slide_from_right",
+    fullScreenGestureShadowEnabled: false,
+  } as const;
+
   return (
     <>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
@@ -49,18 +58,10 @@ function ThemedNavigation() {
         <Stack.Screen name="create-home" />
         <Stack.Screen name="join-home" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="item" />
         <Stack.Screen name="trip" />
         <Stack.Screen name="pins" options={{ animation: "fade" }} />
-        <Stack.Screen
-          name="categories"
-          options={{
-            animation:
-              Platform.OS === "android" ? "ios_from_right" : "slide_from_right",
-            fullScreenGestureShadowEnabled: false,
-          }}
-        />
-        <Stack.Screen name="legal" />
+        {/* Going deeper slides in from the side; changing context fades. */}
+        <Stack.Screen name="legal" options={deeper} />
       </Stack>
     </>
   );
@@ -125,6 +126,31 @@ function UpdateGate() {
         {release ? <ForceUpdate downloadUrl={release.downloadUrl} onLater={later} /> : null}
       </Modal>
     </>
+  );
+}
+
+/**
+ * Shown instead of a blank app when rendering fails anywhere. The providers
+ * below are not available here, so it uses only what needs none.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    logError("render", error);
+  }, [error]);
+
+  return (
+    <ProblemScreen
+      title={translate("crashTitle")}
+      body={translate("crashBody")}
+      primaryLabel={translate("tryAgain")}
+      onPrimary={() => void retry()}
+      // Saved data from an older version can be what breaks the page.
+      secondaryLabel={translate("crashClearAndRetry")}
+      onSecondary={() => {
+        clearCurrentProfileCache();
+        void retry();
+      }}
+    />
   );
 }
 

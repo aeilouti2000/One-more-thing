@@ -11,31 +11,40 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.googlecode.tesseract.android.TessBaseAPI
 import expo.modules.kotlin.exception.Exceptions
+import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
 import kotlin.math.max
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ReceiptOcrModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ReceiptOcr")
 
-    AsyncFunction("extractText") { uri: String, preferArabic: Boolean ->
-      val bitmap = decodeBitmap(uri)
-      try {
-        if (preferArabic) {
-          val arabic = readWithTesseract(bitmap)
-          if (arabic.isNotEmpty()) arabic else readWithMlKit(bitmap)
-        } else {
-          val latin = readWithMlKit(bitmap)
-          if (priceCount(latin) >= 2) latin else {
+    // Reading a receipt takes seconds. As a coroutine on a background
+    // dispatcher it doesn't hold up the queue every other Expo module's calls
+    // (haptics, storage, the photo picker) wait on.
+    AsyncFunction("extractText") Coroutine { uri: String, preferArabic: Boolean ->
+      withContext(Dispatchers.Default) {
+        val bitmap = decodeBitmap(uri)
+        try {
+          if (preferArabic) {
             val arabic = readWithTesseract(bitmap)
-            if (priceCount(arabic) > priceCount(latin)) arabic else latin.ifEmpty { arabic }
+            if (arabic.isNotEmpty()) arabic else readWithMlKit(bitmap)
+          } else {
+            val latin = readWithMlKit(bitmap)
+            if (priceCount(latin) >= 2) latin else {
+              val arabic = readWithTesseract(bitmap)
+              if (priceCount(arabic) > priceCount(latin)) arabic else latin.ifEmpty { arabic }
+            }
           }
+        } finally {
+          bitmap.recycle()
         }
-      } finally {
-        bitmap.recycle()
       }
     }
   }
@@ -46,7 +55,13 @@ class ReceiptOcrModule : Module() {
     try {
       val decoded = decodeSampled(file.absolutePath)
         ?: throw IllegalArgumentException("Could not read the photo")
-      return upright(decoded, file.absolutePath)
+      return try {
+        upright(decoded, file.absolutePath)
+      } catch (error: Throwable) {
+        // Don't leave the full photo in memory when turning it upright fails.
+        if (!decoded.isRecycled) decoded.recycle()
+        throw error
+      }
     } finally {
       if (temporary) file.delete()
     }
@@ -63,8 +78,13 @@ class ReceiptOcrModule : Module() {
     val out = File(context.cacheDir, "receipt-ocr-${System.currentTimeMillis()}.img")
     val stream = context.contentResolver.openInputStream(parsed)
       ?: throw IllegalArgumentException("Could not read the photo")
-    stream.use { input ->
-      FileOutputStream(out).use { output -> input.copyTo(output) }
+    try {
+      stream.use { input ->
+        FileOutputStream(out).use { output -> input.copyTo(output) }
+      }
+    } catch (error: Throwable) {
+      out.delete()
+      throw error
     }
     if (!out.exists() || out.length() == 0L) {
       out.delete()
@@ -117,7 +137,7 @@ class ReceiptOcrModule : Module() {
     val image = InputImage.fromBitmap(bitmap, 0)
     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     return try {
-      val result = Tasks.await(recognizer.process(image))
+      val result = Tasks.await(recognizer.process(image), 30, TimeUnit.SECONDS)
       result.text.lines().map { it.trim() }.filter { it.isNotEmpty() }
     } catch (_: Throwable) {
       emptyList()
@@ -154,8 +174,15 @@ class ReceiptOcrModule : Module() {
       for (name in listOf("eng.traineddata", "ara.traineddata")) {
         val out = File(tess, name)
         if (out.exists() && out.length() > 0L) continue
+        // Copy beside it, then rename: a copy cut short (app closed mid-way)
+        // must never be mistaken for the finished file.
+        val partial = File(tess, "$name.tmp")
         context.assets.open("tessdata/$name").use { input ->
-          FileOutputStream(out).use { output -> input.copyTo(output) }
+          FileOutputStream(partial).use { output -> input.copyTo(output) }
+        }
+        if (!partial.renameTo(out)) {
+          partial.delete()
+          throw IllegalStateException("Could not prepare $name")
         }
       }
       return root.absolutePath + "/"

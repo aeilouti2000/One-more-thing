@@ -1,3 +1,5 @@
+import { InviteCodeField } from "@/features/homes/components/invite-code-field";
+import { fullInviteCode, isInviteComplete } from "@/features/homes/utils/invite-code";
 import { Ionicons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
 import { useEffect, useState } from "react";
@@ -162,11 +164,11 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
   }
 
   async function joinAnotherHome() {
-    const code = inviteCode.trim();
-    if (!code) {
+    if (!isInviteComplete(inviteCode)) {
       setJoinError(t("errorEnterInviteCode"));
       return;
     }
+    const code = fullInviteCode(inviteCode);
 
     setIsJoining(true);
     setJoinError(null);
@@ -185,7 +187,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
   }
 
   async function openHome(homeId: string) {
-    if (!household || homeId === household.id) return;
+    if (!household || homeId === household.id || switchingId) return;
     setSwitchingId(homeId);
     setFloatMessage(null);
     const result = await switchHome(homeId);
@@ -399,21 +401,18 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
             userText
           />
         ) : (
-          <AppTextField
+          <InviteCodeField
             key="join"
-            label={t("inviteCode")}
             value={inviteCode}
-            onChangeText={(value) => setInviteCode(value.toUpperCase())}
-            placeholder={t("inviteCodePlaceholder")}
-            autoCapitalize="characters"
-            autoCorrect={false}
+            onChange={setInviteCode}
+            onSubmit={() => void joinAnotherHome()}
           />
         )}
         <FormMessage message={creating ? createError : joinError} />
         <AppButton
           label={t(creating ? "createAnotherHome" : "joinThisHome")}
           icon={creating ? "add" : "enter-outline"}
-          disabled={creating ? !newHomeName.trim() : !inviteCode.trim()}
+          disabled={creating ? !newHomeName.trim() : !isInviteComplete(inviteCode)}
           loading={creating ? isCreating : isJoining}
           onPress={() => void (creating ? createAnotherHome() : joinAnotherHome())}
         />
@@ -524,7 +523,11 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
           <ScreenHeader
             showBack
             title={t("yourHomes")}
-            subtitle={t("homesCount", { count: homeCards.length })}
+            subtitle={
+              homeCards.length === 1
+                ? t("homesCountOne")
+                : t("homesCount", { count: homeCards.length })
+            }
           />
           <FormMessage message={error} />
           <View className="gap-3">
@@ -742,6 +745,8 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
           ) : selectedHome && household ? (
             <View className="pt-2">
               <HomeCard
+                // A rename in progress belongs to one home, not the next one picked.
+                key={selectedHome.id}
                 {...homeCardProps(selectedHome, true)}
                 variant="detail"
               />
@@ -861,7 +866,7 @@ function CurrentHomeCard({
               }}
             >
               <AppText className="text-xs font-bold" style={{ color: "#FFFFFF" }}>
-                {(member.id === currentUserId ? t("you") : member.name).trim().charAt(0).toUpperCase()}
+                {member.name.trim().charAt(0).toUpperCase()}
               </AppText>
             </View>
           ))}

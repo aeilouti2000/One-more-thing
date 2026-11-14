@@ -74,21 +74,3 @@ export async function interpretReceiptPhoto(options: {
     },
   };
 }
-
-export async function readReceiptPhoto(options: {
-  source: "camera" | "library";
-  preferArabic: boolean;
-  items: { id: string; name: string; quantity?: number }[];
-}): Promise<{ ok: true; scan: ReceiptScan } | { ok: false; error: ScanReceiptError | null }> {
-  try {
-    const picked = await pickReceiptPhoto(options.source);
-    if (!picked.ok) return picked;
-    return await interpretReceiptPhoto({
-      uri: picked.uri,
-      preferArabic: options.preferArabic,
-      items: options.items,
-    });
-  } catch {
-    return { ok: false, error: "scanReceiptFailed" };
-  }
-}

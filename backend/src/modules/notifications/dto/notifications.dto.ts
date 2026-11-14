@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, Matches } from "class-validator";
+import { IsBoolean, IsIn, IsOptional, IsString, Matches } from "class-validator";
 
 export class PushTokenDto {
   @IsString()
@@ -19,4 +19,19 @@ export class RemovePushTokenDto {
   @IsString()
   @Matches(/^Expo(nent)?PushToken\[[^\]]+\]$/)
   token: string;
+}
+
+/** Which kinds of list notification this person wants; omitted ones stay as they are. */
+export class NotificationPrefsDto {
+  @IsOptional()
+  @IsBoolean()
+  added?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  urgent?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  due?: boolean;
 }

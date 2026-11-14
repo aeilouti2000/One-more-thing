@@ -1,3 +1,4 @@
+import { caretColors, caretGap } from "@/constants/text";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useState, type ReactNode } from "react";
@@ -10,6 +11,8 @@ import { withAlpha } from "@/constants/theme";
 import type { PinInterval } from "@/features/items/api/pins";
 import { useCategories } from "@/features/items/providers/categories-provider";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
+import { parseDecimal } from "@/lib/numbers";
+import { MAX_QUANTITY } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -157,6 +160,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
   const [customUnitOpen, setCustomUnitOpen] = useState(
     () => unit !== "" && !(ITEM_UNITS as readonly string[]).includes(unit),
   );
+  const [customUnitTyped, setCustomUnitTyped] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const showNote = noteOpen || notes.trim().length > 0;
   const textAlign = isRTL ? "right" : "left";
@@ -164,9 +168,9 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
   const subtle = dark ? withAlpha(colors.white, 0.14) : withAlpha("#12141A", 0.14);
 
   function step(delta: number) {
-    const current = Number(quantity.replace(",", "."));
+    const current = parseDecimal(quantity);
     const base = Number.isFinite(current) && current > 0 ? current : 1;
-    const next = Math.max(1, Math.round((base + delta) * 100) / 100);
+    const next = Math.min(MAX_QUANTITY, Math.max(1, Math.round((base + delta) * 100) / 100));
     void Haptics.selectionAsync();
     onChangeQuantity(String(next));
   }
@@ -224,7 +228,9 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
       <TextInput
         value={name}
         onChangeText={onChangeName}
-        placeholder={t("itemSheetNamePlaceholder")}
+        maxLength={120}
+        placeholder={caretGap(t("itemSheetNamePlaceholder"))}
+        {...caretColors(colors.accent)}
         placeholderTextColor={withAlpha(colors.muted, 0.7)}
         autoFocus={autoFocusName}
         onFocus={() => setNameFocused(true)}
@@ -389,14 +395,23 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
               label={t("unitOther")}
               selected={customUnitOpen}
               compact
-              onPress={() => setCustomUnitOpen(true)}
+              onPress={() => {
+                setCustomUnitTyped(false);
+                setCustomUnitOpen(true);
+              }}
             />
           </View>
           {customUnitOpen ? (
             <TextInput
-              value={(ITEM_UNITS as readonly string[]).includes(unit) ? "" : unit}
-              onChangeText={(value) => onChangeUnit(value.slice(0, 20))}
-              placeholder={t("unitCustomPlaceholder")}
+              // Empty when "Other" was just opened over a built-in unit; once
+              // typed, the text shows as is ("pack" on the way to "packet").
+              value={!customUnitTyped && (ITEM_UNITS as readonly string[]).includes(unit) ? "" : unit}
+              onChangeText={(value) => {
+                setCustomUnitTyped(true);
+                onChangeUnit(value.slice(0, 20));
+              }}
+              placeholder={caretGap(t("unitCustomPlaceholder"))}
+              {...caretColors(colors.accent)}
               placeholderTextColor={withAlpha(colors.muted, 0.7)}
               autoFocus
               returnKeyType="done"
@@ -438,7 +453,9 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
         <TextInput
           value={notes}
           onChangeText={onChangeNotes}
-          placeholder={t("notesPlaceholder")}
+          maxLength={500}
+          placeholder={caretGap(t("notesPlaceholder"))}
+          {...caretColors(colors.accent)}
           placeholderTextColor={withAlpha(colors.muted, 0.7)}
           autoFocus={noteOpen && !notes}
           multiline

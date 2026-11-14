@@ -5,6 +5,7 @@ import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { useInSheet } from "@/components/ui/BottomSheet";
 import { floatedCardStyle, iconSize, withAlpha } from "@/constants/theme";
+import { useReverseRows } from "@/components/ui/InlinePane";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -73,6 +74,7 @@ export function FloatedCardHeader({
 }: FloatedCardHeaderProps) {
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
+  const reverseRows = useReverseRows();
   const danger = scheme === "dark" ? "#F07178" : "#C2414A";
   const iconColor =
     iconTone === "danger"
@@ -91,7 +93,7 @@ export function FloatedCardHeader({
     <View className={`mb-5 gap-3 ${className}`.trim()}>
       <View
         className="items-start gap-3"
-        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+        style={{ flexDirection: reverseRows ? "row-reverse" : "row" }}
       >
         {icon ? (
           <View
@@ -104,7 +106,7 @@ export function FloatedCardHeader({
         <View className="min-w-0 flex-1 gap-1">
           <View
             className="items-start gap-3"
-            style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+            style={{ flexDirection: reverseRows ? "row-reverse" : "row" }}
           >
             <AppText
               className="min-w-0 flex-1 text-lg font-semibold text-cove-ink"
@@ -171,33 +173,6 @@ export function FloatedCardSection({
   );
 }
 
-type FloatedCardMetaProps = {
-  lines: string[];
-};
-
-/** Compact trailing meta (added-by + date) for detail headers. */
-export function FloatedCardMeta({ lines }: FloatedCardMetaProps) {
-  const { colors, scheme } = useTheme();
-  const { isRTL } = useI18n();
-
-  return (
-    <View className="items-end gap-0.5" style={{ alignItems: isRTL ? "flex-start" : "flex-end" }}>
-      {lines.map((line) => (
-        <AppText
-          key={line}
-          numberOfLines={1}
-          className="text-[11px] font-medium"
-          style={{
-            color: scheme === "dark" ? withAlpha(colors.white, 0.72) : colors.muted,
-            textAlign: isRTL ? "left" : "right",
-          }}
-        >
-          {line}
-        </AppText>
-      ))}
-    </View>
-  );
-}
 
 type FloatedCardActionsProps = {
   children: ReactNode;
@@ -208,12 +183,12 @@ export function FloatedCardActions({
   children,
   className = "",
 }: FloatedCardActionsProps) {
-  const { isRTL } = useI18n();
+  const reverseRows = useReverseRows();
 
   return (
     <View
       className={`mt-6 gap-3 ${className}`.trim()}
-      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+      style={{ flexDirection: reverseRows ? "row-reverse" : "row" }}
     >
       {children}
     </View>

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Dimensions, Modal, Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { GlassFill } from "@/components/ui/BlurBackdrop";
@@ -12,9 +12,22 @@ type HistoryDateFieldProps = {
   value: Date | null;
   onChange: (date: Date | null) => void;
   leading?: ReactNode;
+  /** Shown at the end of the row (e.g. search). */
+  trailing?: ReactNode;
+  /** Hide the built-in "Pick a date" button; open the calendar with openSignal. */
+  hideButton?: boolean;
+  /** Each new number above zero opens the calendar. */
+  openSignal?: number;
 };
 
-export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldProps) {
+export function HistoryDateField({
+  value,
+  onChange,
+  leading,
+  trailing,
+  hideButton = false,
+  openSignal = 0,
+}: HistoryDateFieldProps) {
   const { t, locale } = useI18n();
   const { colors, scheme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -56,12 +69,35 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
     });
   }
 
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+  });
+  // Only a new signal opens the calendar; mounting again with an old one doesn't.
+  const handledSignal = useRef(openSignal);
+  useEffect(() => {
+    if (openSignal === handledSignal.current) return;
+    handledSignal.current = openSignal;
+    const show = (top: number) => {
+      setCursor(startOfMonth(valueRef.current ?? new Date()));
+      setAnchorTop(top);
+      setOpen(true);
+    };
+    const node = rowRef.current;
+    if (!node) {
+      const frame = requestAnimationFrame(() => show(0));
+      return () => cancelAnimationFrame(frame);
+    }
+    node.measureInWindow((_x, y, _width, height) => show(y + height + 8));
+  }, [openSignal]);
+
   const screenHeight = Dimensions.get("window").height;
 
   return (
     <View className="mb-5 gap-2">
       <View ref={rowRef} collapsable={false} className="flex-row flex-wrap items-center gap-2">
         {leading}
+        {hideButton ? null : (
         <Pressable
           onPress={toggleCalendar}
           accessibilityRole="button"
@@ -85,6 +121,8 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
             {label}
           </AppText>
         </Pressable>
+        )}
+        {trailing}
       </View>
       <Modal
         visible={open}
@@ -124,6 +162,7 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
             <Pressable
               onPress={() => setCursor(shiftMonth(cursor, -1))}
               accessibilityRole="button"
+              accessibilityLabel={t("previousMonth")}
               className="rounded-full px-3 py-2"
             >
               <Ionicons name="chevron-back" size={18} color={colors.ink} />
@@ -135,6 +174,7 @@ export function HistoryDateField({ value, onChange, leading }: HistoryDateFieldP
               onPress={() => setCursor(shiftMonth(cursor, 1))}
               disabled={isFutureMonth(cursor, today)}
               accessibilityRole="button"
+              accessibilityLabel={t("nextMonth")}
               className="rounded-full px-3 py-2"
             >
               <Ionicons

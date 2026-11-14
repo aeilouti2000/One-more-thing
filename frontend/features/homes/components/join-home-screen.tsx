@@ -5,7 +5,8 @@ import { RequireSession } from "@/features/auth/components/require-session";
 import { maybeAskForPush } from "@/features/notifications/api/push";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
-import { AppTextField } from "@/components/ui/AppTextField";
+import { InviteCodeField } from "@/features/homes/components/invite-code-field";
+import { fullInviteCode, isInviteComplete } from "@/features/homes/utils/invite-code";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
@@ -21,11 +22,11 @@ export default function JoinHomeScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function onSubmit() {
-    const inviteCode = code.trim();
-    if (!inviteCode) {
+    if (!isInviteComplete(code)) {
       setError(t("errorEnterInviteCode"));
       return;
     }
+    const inviteCode = fullInviteCode(code);
 
     setIsSubmitting(true);
     setError(null);
@@ -60,14 +61,7 @@ export default function JoinHomeScreen() {
         />
 
         <View className="gap-6">
-          <AppTextField
-            label={t("inviteCode")}
-            value={code}
-            onChangeText={(value) => setCode(value.toUpperCase())}
-            placeholder={t("inviteCodePlaceholder")}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
+          <InviteCodeField value={code} onChange={setCode} onSubmit={() => void onSubmit()} />
           <View className="rounded-3xl bg-cove-paper p-5">
             <AppText className="text-base leading-6 text-cove-muted">
               {t("joinHomeHint")}
@@ -76,7 +70,7 @@ export default function JoinHomeScreen() {
           <FormMessage message={error} />
           <AppButton
             label={t("joinThisHome")}
-            disabled={!code.trim()}
+            disabled={!isInviteComplete(code)}
             loading={isSubmitting}
             onPress={() => void onSubmit()}
           />

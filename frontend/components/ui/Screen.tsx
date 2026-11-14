@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   Dimensions,
@@ -39,7 +40,6 @@ const SWIPE_DISTANCE = 48;
 const SWIPE_VELOCITY = 650;
 const SWIPE_ACTIVE_X = 24;
 const SWIPE_FAIL_Y = 18;
-const SLIDE_OUT_MS = 160;
 const SLIDE_IN_MS = 220;
 const screenWidth = Dimensions.get("window").width;
 
@@ -47,7 +47,14 @@ type SwipeDirection = "next" | "previous";
 
 type ScreenSwipeContextValue = {
   translateX: SharedValue<number>;
+  /** Opacity of the sliding content; below 1 only during a tab-button switch. */
+  fade: SharedValue<number>;
 };
+
+/** A tab-button switch: the page drifts this far while it fades, not a full slide. */
+const SOFT_SHIFT = 44;
+const SOFT_OUT_MS = 130;
+const SOFT_IN_MS = 260;
 
 const ScreenSwipeContext = createContext<ScreenSwipeContextValue | null>(null);
 const ScreenSwipeGestureContext = createContext<PanGesture | null>(null);
@@ -70,6 +77,12 @@ type ScreenProps = {
   dockBeside?: boolean;
   onSwipe?: (direction: SwipeDirection) => void;
   canSwipe?: (direction: SwipeDirection) => boolean;
+  /**
+   * Filled with a function that plays the swipe (slide out, onSwipe, slide in)
+   * without a finger, e.g. from a tab button. It returns false when it can't
+   * run (already moving, or canSwipe says no), so the caller can switch plainly.
+   */
+  slideRef?: RefObject<((direction: SwipeDirection) => boolean) | null>;
 };
 
 export function useScreenSwipeGesture() {
@@ -77,8 +90,11 @@ export function useScreenSwipeGesture() {
 }
 
 export function SwipeSlideContent({ children }: { children: ReactNode }) {
-  const translateX = useContext(ScreenSwipeContext)?.translateX;
+  const swipe = useContext(ScreenSwipeContext);
+  const translateX = swipe?.translateX;
+  const fade = swipe?.fade;
   const slideStyle = useAnimatedStyle(() => ({
+    opacity: fade?.value ?? 1,
     transform: [{ translateX: translateX?.value ?? 0 }],
   }));
 
@@ -113,6 +129,7 @@ export function Screen({
   dockBeside = false,
   onSwipe,
   canSwipe,
+  slideRef,
 }: ScreenProps) {
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
@@ -123,9 +140,10 @@ export function Screen({
   const dockBesideTabBar = Boolean(dockBeside && dock);
   const swipeRef = useRef(onSwipe);
   const canSwipeRef = useRef(canSwipe);
-  const commitSwipeRef = useRef<(direction: SwipeDirection) => void>(() => {});
+  const commitSwipeRef = useRef<(direction: SwipeDirection, soft?: boolean) => void>(() => {});
   const rejectSwipeRef = useRef<() => void>(() => {});
   const translateX = useSharedValue(0);
+  const fade = useSharedValue(1);
   const isAnimating = useSharedValue(false);
   const canNext = useSharedValue(1);
   const canPrev = useSharedValue(1);
@@ -172,10 +190,12 @@ export function Screen({
     canPrev.set(canSwipe?.("previous") === false ? 0 : 1);
   }, [canNext, canPrev, canSwipe]);
 
-  const startEnter = useCallback(() => {
+  const startEnter = useCallback((soft = false) => {
+    const duration = soft ? SOFT_IN_MS : SLIDE_IN_MS;
+    fade.set(withTiming(1, { duration, easing: Easing.out(Easing.quad) }));
     translateX.set(
       withTiming(0, {
-        duration: SLIDE_IN_MS,
+        duration,
         easing: Easing.out(Easing.cubic),
       }, (finished) => {
         if (finished) {
@@ -183,18 +203,19 @@ export function Screen({
         }
       }),
     );
-  }, [isAnimating, translateX]);
+  }, [fade, isAnimating, translateX]);
 
   const commitSwipe = useCallback(
-    (direction: SwipeDirection) => {
-      const enterX = direction === "next" ? screenWidth : -screenWidth;
+    (direction: SwipeDirection, soft = false) => {
+      const distance = soft ? SOFT_SHIFT : screenWidth;
+      const enterX = direction === "next" ? distance : -distance;
       // Park off-screen opposite the exit, swap list content, then enter.
       translateX.set(enterX);
       swipeRef.current?.(direction);
       // Double rAF waits for React to commit/paint the new list while off-screen.
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          startEnter();
+          startEnter(soft);
         });
       });
     },
@@ -219,13 +240,45 @@ export function Screen({
     rejectSwipeRef.current = rejectSwipe;
   }, [commitSwipe, rejectSwipe]);
 
-  function callCommitSwipe(direction: SwipeDirection) {
-    commitSwipeRef.current(direction);
-  }
-
   function callRejectSwipe() {
     rejectSwipeRef.current();
   }
+
+  function callCommitSoft(direction: SwipeDirection) {
+    commitSwipeRef.current(direction, true);
+  }
+
+  useEffect(() => {
+    if (!slideRef) return;
+    slideRef.current = (direction) => {
+      if (!swipeRef.current || isAnimating.get()) return false;
+      if (canSwipeRef.current?.(direction) === false) return false;
+      isAnimating.set(true);
+      // Fade through with a short drift: the old view leaves, the new one
+      // arrives from the other side. Nothing crosses the whole screen, so it
+      // reads as one calm motion even while the new list is being drawn.
+      const exitX = direction === "next" ? -SOFT_SHIFT : SOFT_SHIFT;
+      fade.set(withTiming(0, { duration: SOFT_OUT_MS, easing: Easing.in(Easing.quad) }));
+      translateX.set(
+        withTiming(
+          exitX,
+          { duration: SOFT_OUT_MS, easing: Easing.in(Easing.quad) },
+          (finished) => {
+            if (!finished) {
+              fade.set(1);
+              isAnimating.set(false);
+              return;
+            }
+            runOnJS(callCommitSoft)(direction);
+          },
+        ),
+      );
+      return true;
+    };
+    return () => {
+      slideRef.current = null;
+    };
+  });
 
   const listPan = usePanGesture({
     enabled: Boolean(onSwipe),
@@ -265,20 +318,24 @@ export function Screen({
       }
 
       isAnimating.set(true);
-      const exitX = direction === "next" ? -screenWidth : screenWidth;
+      // Same ending as the tab button: from wherever the finger let go, the
+      // page drifts a little further and fades; the new one fades in.
+      const exitX = event.translationX + (direction === "next" ? -SOFT_SHIFT : SOFT_SHIFT);
+      fade.set(withTiming(0, { duration: SOFT_OUT_MS, easing: Easing.out(Easing.quad) }));
       translateX.set(
         withTiming(
           exitX,
           {
-            duration: SLIDE_OUT_MS,
-            easing: Easing.in(Easing.cubic),
+            duration: SOFT_OUT_MS,
+            easing: Easing.out(Easing.quad),
           },
           (finished) => {
             if (!finished) {
+              fade.set(1);
               isAnimating.set(false);
               return;
             }
-            runOnJS(callCommitSwipe)(direction);
+            runOnJS(callCommitSoft)(direction);
           },
         ),
       );
@@ -297,8 +354,8 @@ export function Screen({
 
   // Stable context identity — avoid re-renders from inline onSwipe props.
   const swipeContext = useMemo(
-    (): ScreenSwipeContextValue => ({ translateX }),
-    [translateX],
+    (): ScreenSwipeContextValue => ({ translateX, fade }),
+    [fade, translateX],
   );
 
   // Android 0.85+ defaults nested scrolling on, which can leave the refresh

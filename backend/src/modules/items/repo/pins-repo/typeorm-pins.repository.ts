@@ -30,6 +30,10 @@ export class TypeormPinsRepository implements IPinsRepository {
     return this.pins.findOne({ where: { id: pinId, homeId } });
   }
 
+  findById(pinId: string) {
+    return this.pins.findOne({ where: { id: pinId } });
+  }
+
   async deleteById(pinId: string) {
     await this.pins.delete({ id: pinId });
   }

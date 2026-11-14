@@ -89,6 +89,7 @@ export function ReorderableList({
   const committed = useRef(false);
   const pendingReset = useRef(false);
   const heights = useRef<number[]>([]);
+  const heightById = useRef(new Map<string, number>());
   const rowsRef = useRef(rows);
   const onReorderRef = useRef(onReorder);
   const onDragChangeRef = useRef(onDragChange);
@@ -140,9 +141,24 @@ export function ReorderableList({
       if (items.some((item, index) => item !== current[index])) setRows(items);
       return;
     }
-    heights.current = [];
+    // Rows that stay keep their measured height (they won't lay out again, so
+    // nothing would measure them a second time); only new rows start unknown.
+    const known = heightById.current;
+    heightById.current = new Map(
+      items.flatMap((item) => {
+        const height = known.get(item.id);
+        return height === undefined ? [] : [[item.id, height] as const];
+      }),
+    );
+    heights.current = items.map((item) => heightById.current.get(item.id) ?? 0);
     setRows(items);
   }, [items]);
+
+  // The drag maths needs the new row count and positions as soon as rows change.
+  useLayoutEffect(() => {
+    if (!dragging.current) publishMetrics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- publishMetrics only reads refs
+  }, [rows]);
 
   useLayoutEffect(() => {
     if (!pendingReset.current) return;
@@ -218,6 +234,7 @@ export function ReorderableList({
           heightsSV={heightsSV}
           rowRefs={rowRefs}
           onLayout={(height) => {
+            heightById.current.set(purchase.id, height);
             if (heights.current[index] === height) return;
             heights.current[index] = height;
             if (!dragging.current) publishMetrics();

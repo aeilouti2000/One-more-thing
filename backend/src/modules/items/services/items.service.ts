@@ -1,6 +1,6 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, Not, type Repository } from "typeorm";
+import { In, IsNull, Not, type Repository } from "typeorm";
 import { DomainError } from "../../../common/domain.error";
 import { HomesService } from "../../homes/services/homes.service";
 import { NotificationsService } from "../../notifications/services/notifications.service";
@@ -39,6 +39,10 @@ export type ItemView = {
   boughtByName: string | null;
   createdAt: Date;
   boughtAt: Date | null;
+  /** Marked "couldn't find it" on a trip, by whom and when. */
+  notFoundAt: Date | null;
+  notFoundBy: string | null;
+  notFoundByName: string | null;
 };
 
 @Injectable()
@@ -144,29 +148,59 @@ export class ItemsService {
 
   async markBought(userId: string, itemId: string, cost?: number | null, receiptId?: string) {
     const item = await this.requireItem(userId, itemId);
-    // Someone else already bought it (a stale list): keep their purchase as is.
-    if (item.status !== "needed") {
-      const [view] = await this.withNames([item]);
-      return view;
+    const boughtAt = new Date();
+    // One step, and only while it is still needed: when two people tap the same
+    // item at once, only the first one buys it. The other gets the item back
+    // with the real buyer (boughtBy), so the app can say who got it.
+    const changed =
+      item.status === "needed"
+        ? await this.items.markNeededBought(
+            item.id,
+            item.homeId,
+            userId,
+            boughtAt,
+            normalizeCost(cost),
+          )
+        : 0;
+    if (changed > 0 && receiptId) {
+      await this.joinReceipt(item.homeId, [item.id], receiptId, boughtAt);
     }
-    item.urgentBeforeBought = item.urgent;
-    item.status = "bought";
-    item.urgent = false;
-    item.boughtBy = userId;
-    item.boughtAt = new Date();
-    item.cost = normalizeCost(cost);
-    const saved = await this.items.save(item);
-    if (receiptId) await this.joinReceipt(saved.homeId, [saved.id], receiptId, item.boughtAt);
-    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: saved.id } })]);
+    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
     return view;
   }
 
-  async undoBought(userId: string, itemId: string) {
+  /** onlyMine: a trip's Undo may only take back what this person bought. */
+  /** Couldn't find it in this shop: it stays needed, with a mark everyone sees. */
+  async markNotFound(userId: string, itemId: string) {
+    const item = await this.requireItem(userId, itemId);
+    if (item.status !== "needed") {
+      throw new DomainError("ITEM_ALREADY_BOUGHT", "This item was already bought.", HttpStatus.CONFLICT);
+    }
+    await this.items.setNotFound(item.id, item.homeId, userId, new Date());
+    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
+    return view;
+  }
+
+  async clearNotFound(userId: string, itemId: string) {
+    const item = await this.requireItem(userId, itemId);
+    await this.items.setNotFound(item.id, item.homeId, null, null);
+    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
+    return view;
+  }
+
+  async undoBought(userId: string, itemId: string, options?: { onlyMine?: boolean }) {
     const item = await this.requireItem(userId, itemId);
     if (item.status !== "bought" || !item.boughtAt || !undoDeadline(item.boughtAt)) {
       throw new DomainError(
         "UNDO_EXPIRED",
         "That item can no longer be moved back.",
+        HttpStatus.CONFLICT,
+      );
+    }
+    if (options?.onlyMine && item.boughtBy !== userId) {
+      throw new DomainError(
+        "UNDO_NOT_YOURS",
+        "Someone else bought this item.",
         HttpStatus.CONFLICT,
       );
     }
@@ -287,7 +321,8 @@ export class ItemsService {
         ? await this.receipts.findOne({ where: { id: previousReceiptIds[0], homeId } })
         : null;
       if (existing) {
-        existing.total = total;
+        // "No total" from a phone that hasn't seen the invoice yet keeps the saved one.
+        if (total !== null) existing.total = total;
         existing.name = name;
         const saved = await this.receipts.save(existing);
         return {
@@ -442,7 +477,7 @@ export class ItemsService {
   }
 
   async reorder(userId: string, ids: string[]) {
-    const membership = await this.homes.requireMembership(userId);
+    const membership = { homeId: await this.homeOfItems(userId, ids) };
     const applied = await this.items.applyNeededOrder(membership.homeId, ids);
     if (!applied) {
       throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
@@ -460,7 +495,7 @@ export class ItemsService {
       unique.set(entry.id, entry.cost);
     }
     const uniqueIds = [...unique.keys()];
-    const membership = await this.homes.requireMembership(userId);
+    const membership = { homeId: await this.homeOfItems(userId, uniqueIds) };
     const owned = await this.items.countInHome(uniqueIds, membership.homeId);
     if (owned !== uniqueIds.length) {
       throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
@@ -479,18 +514,35 @@ export class ItemsService {
 
   async removeMany(userId: string, ids: string[]) {
     const uniqueIds = [...new Set(ids)];
-    const membership = await this.homes.requireMembership(userId);
+    const membership = { homeId: await this.homeOfItems(userId, uniqueIds) };
     const owned = await this.items.countInHome(uniqueIds, membership.homeId);
     if (owned !== uniqueIds.length) {
       throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
     }
-    await this.items.deleteInHome(uniqueIds, membership.homeId);
+    const invoiced = await this.itemRows.find({
+      where: { id: In(uniqueIds), homeId: membership.homeId, receiptId: Not(IsNull()) },
+    });
+    if (invoiced.length === 0) {
+      await this.items.deleteInHome(uniqueIds, membership.homeId);
+      return { deleted: uniqueIds.length };
+    }
+    // Their prices leave the invoice with them, and an invoice left empty goes too.
+    await this.receipts.manager.transaction(async (manager) => {
+      await manager.delete(Item, { id: In(uniqueIds), homeId: membership.homeId });
+      for (const item of invoiced) {
+        const cost = item.cost === null || item.cost === undefined ? 0 : Number(item.cost);
+        if (cost > 0) await this.adjustReceiptTotal(manager, item.receiptId as string, -cost);
+      }
+      for (const receiptId of new Set(invoiced.map((item) => item.receiptId as string))) {
+        await this.deleteIfEmpty(manager, receiptId);
+      }
+    });
     return { deleted: uniqueIds.length };
   }
 
   async setManyUrgent(userId: string, ids: string[], urgent: boolean) {
     const uniqueIds = [...new Set(ids)];
-    const membership = await this.homes.requireMembership(userId);
+    const membership = { homeId: await this.homeOfItems(userId, uniqueIds) };
     const rows = await this.items.findNeededByIds(uniqueIds, membership.homeId);
     if (rows.length !== uniqueIds.length) {
       throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
@@ -525,9 +577,43 @@ export class ItemsService {
     return { updated: uniqueIds.length };
   }
 
+  async setManyCategory(userId: string, ids: string[], category: ItemCategory) {
+    const rows = await this.neededInOneHome(userId, ids);
+    await this.categories.assertUsable(rows[0].homeId, category);
+    for (const item of rows) {
+      if (item.category === category) continue;
+      item.category = category;
+      await this.items.save(item);
+    }
+    return { updated: rows.length };
+  }
+
+  /** A blank unit clears it: the items go back to plain pieces. */
+  async setManyUnit(userId: string, ids: string[], unit: string) {
+    const rows = await this.neededInOneHome(userId, ids);
+    const next = blankToNull(unit);
+    for (const item of rows) {
+      if ((item.unit ?? null) === next) continue;
+      item.unit = next;
+      await this.items.save(item);
+    }
+    return { updated: rows.length };
+  }
+
+  /** The still-needed items behind these ids; every id must be one, in the caller's home. */
+  private async neededInOneHome(userId: string, ids: string[]) {
+    const uniqueIds = [...new Set(ids)];
+    const homeId = await this.homeOfItems(userId, uniqueIds);
+    const rows = await this.items.findNeededByIds(uniqueIds, homeId);
+    if (rows.length !== uniqueIds.length) {
+      throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
+    }
+    return rows;
+  }
+
   async moveMany(userId: string, ids: string[], listId: string) {
     const uniqueIds = [...new Set(ids)];
-    const membership = await this.homes.requireMembership(userId);
+    const membership = { homeId: await this.homeOfItems(userId, uniqueIds) };
     const list = await this.shoppingLists.findActiveById(listId, membership.homeId);
     if (!list) {
       throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
@@ -630,16 +716,45 @@ export class ItemsService {
   }
 
   async requireItem(userId: string, itemId: string) {
-    const membership = await this.homes.requireMembership(userId);
-    const item = await this.items.findInHome(itemId, membership.homeId);
+    const homeId = await this.homeOfItems(userId, [itemId]);
+    const item = await this.items.findInHome(itemId, homeId);
     if (!item) {
       throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
     }
     return item;
   }
 
+  /**
+   * The one home these items are in, if the user belongs to it. Taken from the
+   * items, not from the user's "active" home: another of their devices may be
+   * showing a different home.
+   */
+  private async homeOfItems(userId: string, ids: string[]) {
+    const notFound = () =>
+      new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
+    const unique = [...new Set(ids)];
+    const rows = await this.itemRows.find({
+      where: { id: In(unique) },
+      select: { id: true, homeId: true },
+    });
+    const homeIds = new Set(rows.map((row) => row.homeId));
+    if (rows.length !== unique.length || homeIds.size !== 1) throw notFound();
+    const [homeId] = homeIds;
+    // Someone else's home answers like a missing item.
+    await this.homes.requireMembership(userId, homeId).catch(() => {
+      throw notFound();
+    });
+    return homeId;
+  }
+
   private async withNames(rows: Item[]): Promise<ItemView[]> {
-    const ids = [...new Set(rows.flatMap((row) => [row.addedBy, row.boughtBy].filter((id): id is string => Boolean(id))))];
+    const ids = [
+      ...new Set(
+        rows.flatMap((row) =>
+          [row.addedBy, row.boughtBy, row.notFoundBy].filter((id): id is string => Boolean(id)),
+        ),
+      ),
+    ];
     const people = ids.length ? await this.items.findUserNames(ids) : [];
     const names = new Map(people.map((person) => [person.id, person.name]));
     const listIds = [...new Set(rows.map((row) => row.listId).filter(Boolean))];
@@ -674,6 +789,10 @@ export class ItemsService {
       boughtByName: row.boughtBy ? (names.get(row.boughtBy) ?? "Member") : null,
       createdAt: row.createdAt,
       boughtAt: row.boughtAt,
+      notFoundAt: row.status === "needed" ? (row.notFoundAt ?? null) : null,
+      notFoundBy: row.status === "needed" ? (row.notFoundBy ?? null) : null,
+      notFoundByName:
+        row.status === "needed" && row.notFoundBy ? (names.get(row.notFoundBy) ?? "Member") : null,
     }));
   }
 }

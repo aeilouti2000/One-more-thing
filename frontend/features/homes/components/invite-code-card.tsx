@@ -20,7 +20,12 @@ export function InviteCodeCard({ code, homeName, onCopied }: InviteCodeCardProps
   const dark = scheme === "dark";
 
   async function copyCode() {
-    await Clipboard.setStringAsync(code);
+    try {
+      await Clipboard.setStringAsync(code);
+    } catch {
+      // The clipboard can be unavailable; don't claim it was copied.
+      return;
+    }
     void Haptics.selectionAsync();
     onCopied?.();
   }
@@ -41,7 +46,6 @@ export function InviteCodeCard({ code, homeName, onCopied }: InviteCodeCardProps
     >
       <View
         className="flex-row items-center gap-3"
-        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
       >
         <View
           className="h-11 w-11 items-center justify-center rounded-2xl"
@@ -90,7 +94,6 @@ export function InviteCodeCard({ code, homeName, onCopied }: InviteCodeCardProps
         accessibilityLabel={t("inviteCode")}
         className="mt-3 flex-row items-center gap-3 rounded-2xl px-4 py-4 active:opacity-80"
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
           backgroundColor: dark ? withAlpha(colors.white, 0.06) : "#F4F5F7",
           borderWidth: 1,
           borderColor: dark ? withAlpha(colors.white, 0.1) : withAlpha("#12141A", 0.08),

@@ -54,6 +54,12 @@ export function PurchaseRow({
   const quantityLabel = purchase.unit
     ? `${purchase.quantity} ${purchase.unit}`
     : `${purchase.quantity}`;
+  // Someone couldn't find it on a trip: everyone sees it until it's bought.
+  const notFoundLabel =
+    purchase.status === "needed" && purchase.notFoundAt
+      ? t("notFoundTag", { name: purchase.notFoundByName ?? t("partner") })
+      : null;
+  const notFoundColor = scheme === "dark" ? "#F5B454" : "#B45309";
   const costLabel =
     household?.costsEnabled && purchase.status === "bought"
       ? formatMoney(purchase.cost, household.currency, t("noPrice"))
@@ -96,6 +102,7 @@ export function PurchaseRow({
         accessibilityLabel={[
           purchase.name,
           isUrgent ? t("urgent") : null,
+          notFoundLabel,
           purchase.notes?.trim() ? t("notes") : null,
           photoUri ? t("itemPhoto") : null,
         ]
@@ -228,12 +235,27 @@ export function PurchaseRow({
                 </View>
               )}
             </View>
-            {showCategory || purchase.status === "bought" ? (
+            {showCategory || purchase.status === "bought" || notFoundLabel ? (
             <View pointerEvents="none" className="flex-row items-center gap-1.5 overflow-hidden">
               {showCategory ? (
                 <View className="min-w-0 overflow-hidden rounded-full bg-cove-mist px-2.5 py-1">
                   <AppText numberOfLines={1} className="text-xs font-semibold text-cove-accent">
                     {categoryLabel}
+                  </AppText>
+                </View>
+              ) : null}
+              {notFoundLabel ? (
+                <View
+                  className="min-w-0 flex-row items-center gap-1 overflow-hidden rounded-full px-2.5 py-1"
+                  style={{ backgroundColor: `${notFoundColor}22` }}
+                >
+                  <Ionicons name="search-outline" size={12} color={notFoundColor} />
+                  <AppText
+                    numberOfLines={1}
+                    className="shrink text-xs font-semibold"
+                    style={{ color: notFoundColor }}
+                  >
+                    {notFoundLabel}
                   </AppText>
                 </View>
               ) : null}

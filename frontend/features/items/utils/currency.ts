@@ -1,3 +1,5 @@
+import { parseDecimal } from "@/lib/numbers";
+
 const CURRENCY_META: Record<string, { symbol: string; decimals: number }> = {
   JOD: { symbol: "JD", decimals: 3 },
   USD: { symbol: "$", decimals: 2 },
@@ -41,11 +43,11 @@ export function formatCostInput(amount: number, currency: string | undefined | n
     .replace(/\.$/, "");
 }
 
+/** null for an empty field, NaN for text that is not an amount. */
 export function parseCostInput(raw: string): number | null {
-  const trimmed = raw.trim().replace(",", ".");
-  if (!trimmed) return null;
-  const value = Number(trimmed);
-  if (!Number.isFinite(value) || value < 0) return NaN;
+  if (!raw.trim()) return null;
+  const value = parseDecimal(raw);
+  if (!Number.isFinite(value)) return NaN;
   return Math.round(value * 1000) / 1000;
 }
 

@@ -58,6 +58,7 @@ export class MailService {
         textContent: text,
         htmlContent: html,
       }),
+      signal: AbortSignal.timeout(10_000),
     }).catch((error: unknown) => {
       this.logger.error(`Brevo request failed: ${String(error)}`);
       return null;

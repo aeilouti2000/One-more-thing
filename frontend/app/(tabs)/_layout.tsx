@@ -6,6 +6,7 @@ import { GlassTabBar } from "@/components/ui/GlassTabBar";
 import { TabBarVisibility, useTabBarVisibility } from "@/components/ui/TabBarVisibility";
 import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useTheme } from "@/providers/ThemeProvider";
 
 export default function TabsLayout() {
   return (
@@ -27,6 +28,7 @@ function TabScreens() {
   const { hidden } = useTabBarVisibility();
   const settingsSectionOpen = useSettingsSectionOpen();
   const { t } = useI18n();
+  const { colors } = useTheme();
 
   return (
     <RequireSession requireHome>
@@ -34,7 +36,13 @@ function TabScreens() {
         tabBar={(props) => (
           <GlassTabBar {...props} hidden={hidden || settingsSectionOpen} />
         )}
-        screenOptions={{ headerShown: false }}
+        screenOptions={{
+          headerShown: false,
+          // A quick cross-fade between tabs instead of a hard cut.
+          animation: "fade",
+          transitionSpec: { animation: "timing", config: { duration: 160 } },
+          sceneStyle: { backgroundColor: colors.ice },
+        }}
       >
         <Tabs.Screen
           name="items"

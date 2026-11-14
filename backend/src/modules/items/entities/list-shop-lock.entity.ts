@@ -19,7 +19,8 @@ export class ListShopLock {
   @JoinColumn({ name: "home_id" })
   home: Home;
 
-  @Column({ name: "user_id", type: "uuid" })
+  /** One row per shopper: a home that shops together has several per list. */
+  @PrimaryColumn({ name: "user_id", type: "uuid" })
   userId: string;
 
   @ManyToOne(() => User, { onDelete: "CASCADE" })

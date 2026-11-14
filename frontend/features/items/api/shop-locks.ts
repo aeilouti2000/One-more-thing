@@ -7,10 +7,16 @@ export type ShopLock = {
   shopperId: string | null;
   shopperName: string | null;
   isMine: boolean;
+  /** The home lets several people shop one list at the same time. */
+  together?: boolean;
+  /** Everyone shopping this list now (missing on an older server). */
+  shoppers?: { id: string; name: string }[];
 };
 
 export const SHOP_LOCK_POLL_MS = 3000;
 export const SHOP_LOCK_HEARTBEAT_MS = 15_000;
+/** While someone else shops the same list, the trip checks for news this often. */
+export const SHOP_TOGETHER_REFRESH_MS = 3000;
 
 export async function fetchShopLock(homeId: string, listId: string) {
   try {
@@ -21,9 +27,17 @@ export async function fetchShopLock(homeId: string, listId: string) {
   }
 }
 
-export async function claimShopLock(homeId: string, listId: string) {
+/** newTrip: a fresh trip (clears old "not found" marks), not one resumed after the app closed. */
+export async function claimShopLock(
+  homeId: string,
+  listId: string,
+  options?: { newTrip?: boolean },
+) {
   try {
-    const lock = await api.post<ShopLock>(`/homes/${homeId}/lists/${listId}/shop-lock`);
+    const lock = await api.post<ShopLock>(
+      `/homes/${homeId}/lists/${listId}/shop-lock`,
+      options?.newTrip ? { newTrip: true } : undefined,
+    );
     return { lock, error: null as string | null };
   } catch (error) {
     const code =

@@ -17,7 +17,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 export default function LanguageSettingsScreen() {
   const { t } = useI18n();
   const { colors } = useTheme();
-  const showBack = useSettingsShowBack();
+  const showBack = useSettingsShowBack({ nested: true });
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
 

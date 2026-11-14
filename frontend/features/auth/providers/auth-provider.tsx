@@ -34,7 +34,7 @@ import {
   type GoogleTokenResult,
 } from "@/features/auth/lib/google-sign-in";
 import { formatAppError, logError } from "@/lib/errors";
-import { unregisterPushDevice } from "@/features/notifications/api/push";
+import { takePushToken } from "@/features/notifications/api/push";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -91,7 +91,11 @@ type AuthContextValue = {
   signInWithGoogle: () => Promise<GoogleResult>;
   linkGoogle: () => Promise<GoogleResult>;
   unlinkGoogle: () => Promise<AuthResult>;
-  setEmail: (email: string) => Promise<AuthResult>;
+  /**
+   * `password` confirms replacing an email that is already verified; an
+   * account without a password confirms with Google instead.
+   */
+  setEmail: (email: string, password?: string) => Promise<GoogleResult>;
   resendEmailCode: () => Promise<AuthResult>;
   verifyEmail: (code: string) => Promise<AuthResult>;
   requestPasswordReset: (login: string) => Promise<AuthResult>;
@@ -108,7 +112,7 @@ type AuthContextValue = {
   changePassword: (
     currentPassword: string | undefined,
     newPassword: string,
-  ) => Promise<AuthResult>;
+  ) => Promise<GoogleResult>;
   deleteAccount: (password: string) => Promise<AuthResult>;
   deleteAccountWithGoogle: () => Promise<GoogleResult>;
   signOut: () => Promise<AuthResult>;
@@ -177,9 +181,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
   const setEmail = useCallback(
-    (email: string) =>
-      attempt("set_email", () => setAccountEmail(email.trim())),
-    [],
+    async (email: string, password?: string): Promise<GoogleResult> => {
+      const replacingVerified = user?.emailVerified === true;
+      // No password on the account: Google confirms it is really them.
+      if (replacingVerified && !password && user?.hasPassword === false) {
+        return withGoogle("set_email", (idToken) =>
+          setAccountEmail(email.trim(), { googleIdToken: idToken }),
+        );
+      }
+      return attempt("set_email", () =>
+        setAccountEmail(email.trim(), password ? { password } : {}),
+      );
+    },
+    [user?.emailVerified, user?.hasPassword],
   );
   const resendEmailCode = useCallback(
     () => attempt("resend_code", resendCode),
@@ -223,9 +237,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        // Setting a first password keeps the session (and its push device).
-        if (currentPassword !== undefined) await unregisterPushDevice();
-        await changeAccountPassword(currentPassword, newPassword);
+        // A first password has no old one to check: Google confirms instead.
+        let googleIdToken: string | undefined;
+        if (currentPassword === undefined) {
+          const token = await getGoogleIdToken();
+          if (token.type !== "success") return googleError(token);
+          googleIdToken = token.idToken;
+        }
+        // A changed password ends every session, and the server removes their
+        // notification devices. A first password keeps this session.
+        const signedOut = await changeAccountPassword(currentPassword, newPassword, googleIdToken);
+        if (signedOut) takePushToken();
         return { error: null };
       } catch (error) {
         logError("change_password", error);
@@ -237,8 +259,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const deleteAccount = useCallback(async (password: string) => {
     try {
-      await unregisterPushDevice();
+      // The server deletes the account's devices with it.
       await removeAccount({ password });
+      takePushToken();
       return { error: null };
     } catch (error) {
       if (
@@ -256,15 +279,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = await getGoogleIdToken();
     if (token.type !== "success") return googleError(token);
     return attempt("delete_account", async () => {
-      await unregisterPushDevice();
       await removeAccount({ googleIdToken: token.idToken });
+      takePushToken();
     });
   }, []);
 
   const signOut = useCallback(async () => {
     try {
-      await unregisterPushDevice();
-      await endSession();
+      // Signs out on this phone at once; the server is told in the same request
+      // to stop this phone's notifications.
+      await endSession(takePushToken());
       return { error: null };
     } catch (error) {
       logError("sign_out", error);

@@ -2,7 +2,13 @@
   "expo": {
     "name": "One More Thing",
     "slug": "one-more-thing",
-    "version": "2.5.0",
+    "version": "2.6.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/032259aa-71eb-4c1b-84e6-99746722e0de"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "onemorething",
@@ -13,7 +19,7 @@
     "android": {
       "package": "com.onemorething.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 44,
+      "versionCode": 45,
       "adaptiveIcon": {
         "backgroundColor": "#071633",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -66,7 +72,9 @@
           "microphonePermission": false
         }
       ],
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-secure-store",
+      "./plugins/with-thin-text-cursor"
     ],
     "experiments": {
       "typedRoutes": true,

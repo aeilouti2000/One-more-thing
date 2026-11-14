@@ -291,7 +291,9 @@ function PinsBody() {
     const match = needed.find(
       (item) =>
         (!listId || item.listId === listId) &&
-        item.name.trim().toLowerCase() === pin.name.trim().toLowerCase(),
+        item.name.trim().toLowerCase() === pin.name.trim().toLowerCase() &&
+        // 2 l and 500 ml don't add up: different units stay separate items.
+        (item.unit ?? "") === (pin.unit ?? ""),
     );
     const nextQuantity = match ? match.quantity + pin.quantity : pin.quantity;
     const result = match

@@ -7,8 +7,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { AppState } from "react-native";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
 import { createCategory, deleteCategory, fetchCategories, type HomeCategory } from "@/features/items/api/categories";
+import { onListChanged } from "@/features/items/utils/list-sync";
 import { readCachedCategories, writeCachedCategories } from "@/features/offline/profile-cache";
 import { useHousehold } from "@/features/homes/providers/household-provider";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -42,12 +44,22 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!homeId) return;
     let cancelled = false;
-    void fetchCategories(homeId).then((result) => {
-      if (cancelled || result.error) return;
-      setCategories(result.categories);
+    const load = () => {
+      void fetchCategories(homeId).then((result) => {
+        if (cancelled || result.error) return;
+        setCategories(result.categories);
+      });
+    };
+    load();
+    // A partner may add or remove a category while this phone is open.
+    const stopListening = onListChanged(load);
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state === "active") load();
     });
     return () => {
       cancelled = true;
+      stopListening();
+      appState.remove();
     };
   }, [homeId]);
 
@@ -105,4 +117,18 @@ export function useCategoryLabel(category: string) {
   const match = categories.find((item) => item.id === category);
   if (match && !match.builtin && match.name) return match.name;
   return getCategoryLabel(category, locale);
+}
+
+/** Label for any category id; for lists, charts and exports. */
+export function useCategoryLabeler() {
+  const { locale } = useI18n();
+  const { categories } = useCategories();
+  return useCallback(
+    (category: string) => {
+      const match = categories.find((item) => item.id === category);
+      if (match && !match.builtin && match.name) return match.name;
+      return getCategoryLabel(category, locale);
+    },
+    [categories, locale],
+  );
 }

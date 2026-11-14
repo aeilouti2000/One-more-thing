@@ -33,6 +33,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { translate } from "@/constants/i18n";
 import { withAlpha } from "@/constants/theme";
 import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -247,8 +248,11 @@ export function BottomSheet({
               <GestureDetector gesture={pan}>
                 <View
                   style={styles.grabZone}
-                  accessibilityRole="adjustable"
-                  accessibilityLabel="Drag down to close"
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={translate("close")}
+                  accessibilityActions={[{ name: "activate" }]}
+                  onAccessibilityAction={requestClose}
                 >
                   <View
                     style={[

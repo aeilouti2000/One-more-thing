@@ -1,6 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { InlinePane } from "@/components/ui/InlinePane";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, ScrollView, View } from "react-native";
+import { Alert, Pressable, ScrollView, View } from "react-native";
 import { ItemSheetForm, ItemSheetToggle } from "@/features/items/components/item-sheet-form";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
 import {
@@ -136,10 +137,15 @@ export function ItemDetailCard({
     chooser.setError(null);
   }
 
+  const pinLoadFor = useRef<string | null>(null);
+
   async function loadPin(item: Purchase) {
+    pinLoadFor.current = item.id;
     if (!household || item.status !== "needed") return;
     const existing = await fetchPins(household.id);
     if (existing.error) return;
+    // Another item was opened meanwhile: this answer is about the old one.
+    if (pinLoadFor.current !== item.id) return;
     // Pins belong to a list now: only a pin for this item's list counts.
     const match = existing.pins.find(
       (pin) =>
@@ -230,7 +236,9 @@ export function ItemDetailCard({
 
     if (photoChanged && photoTarget) {
       // Upload in the background; the row shows a spinner until it lands.
-      void setItemPhoto(photoTarget, photoDraft ?? null);
+      void setItemPhoto(photoTarget, photoDraft ?? null).then((upload) => {
+        if (upload.error) Alert.alert(t("itemPhoto"), upload.error);
+      });
     }
     setPhotoDraft(undefined);
 
@@ -325,6 +333,7 @@ export function ItemDetailCard({
       />
     ) : (
       <EditItemForm
+        key={purchase?.id}
         purchase={purchase}
         name={name}
         quantity={quantity}
@@ -449,7 +458,8 @@ export function ItemDetailCard({
     if (!visible || !purchase) return null;
     const costOpen = costPromptOpen || editCostOpen;
     return (
-      <>
+      // Shown in the page, not in a sheet: rows already follow the language.
+      <InlinePane>
         <ScrollView
           className="flex-1"
           contentContainerClassName="px-4 pb-10 pt-2"
@@ -486,7 +496,7 @@ export function ItemDetailCard({
         </ScrollView>
         {deleteConfirm}
         {photoLayers}
-      </>
+      </InlinePane>
     );
   }
 

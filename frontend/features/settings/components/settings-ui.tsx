@@ -1,8 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, Switch, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { FloatMessage } from "@/components/ui/FloatMessage";
 import { iconSize, withAlpha } from "@/constants/theme";
 import {
   readSwipeActions,
@@ -28,9 +29,12 @@ export function SettingsSection({ children }: { children: ReactNode }) {
 
 export function SettingsCardIcon({
   icon,
+  communityIcon,
   colors,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
+  /** Drawn instead of `icon`, for symbols the app takes from the other icon set (the pin). */
+  communityIcon?: keyof typeof MaterialCommunityIcons.glyphMap;
   colors: { mist: string; accent: string };
 }) {
   return (
@@ -38,7 +42,11 @@ export function SettingsCardIcon({
       className="h-11 w-11 items-center justify-center rounded-2xl"
       style={{ backgroundColor: colors.mist }}
     >
-      <Ionicons name={icon} size={22} color={colors.accent} />
+      {communityIcon ? (
+        <MaterialCommunityIcons name={communityIcon} size={22} color={colors.accent} />
+      ) : (
+        <Ionicons name={icon} size={22} color={colors.accent} />
+      )}
     </View>
   );
 }
@@ -102,12 +110,14 @@ export function SettingsNavCard({
 
 export function SettingsLinkCard({
   icon,
+  communityIcon,
   title,
   body,
   onPress,
   colors,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
+  communityIcon?: keyof typeof MaterialCommunityIcons.glyphMap;
   title: string;
   body: string;
   onPress: () => void;
@@ -123,7 +133,7 @@ export function SettingsLinkCard({
         accessibilityLabel={title}
         className="flex-row items-center gap-3 active:opacity-80"
       >
-        <SettingsCardIcon icon={icon} colors={colors} />
+        <SettingsCardIcon icon={icon} communityIcon={communityIcon} colors={colors} />
         <SettingsCardCopy title={title} body={body} />
         <Ionicons
           name={isRTL ? "chevron-back" : "chevron-forward"}
@@ -132,6 +142,57 @@ export function SettingsLinkCard({
         />
       </Pressable>
     </CardBlock>
+  );
+}
+
+/**
+ * A short floating note for a member who taps a setting only the host can
+ * change, so a greyed-out control never looks like the app is stuck.
+ */
+export function useHostOnlyNotice() {
+  const { t } = useI18n();
+  const [message, setMessage] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  const show = useCallback(() => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+    setMessage(t("hostOnlyToast"));
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setMessage(null), 2500);
+  }, [t]);
+
+  const floating = message ? <FloatMessage message={message} /> : null;
+  return { show, floating };
+}
+
+/**
+ * Wraps a host-only control. For the host it's the control itself; for anyone
+ * else the control stays greyed out and a tap on it explains why.
+ */
+export function HostOnly({
+  locked,
+  onBlocked,
+  children,
+}: {
+  locked: boolean;
+  onBlocked: () => void;
+  children: ReactNode;
+}) {
+  const { t } = useI18n();
+  if (!locked) return <>{children}</>;
+  return (
+    <Pressable
+      onPress={onBlocked}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: true }}
+      accessibilityHint={t("hostOnlyToast")}
+    >
+      <View pointerEvents="none">{children}</View>
+    </Pressable>
   );
 }
 
@@ -166,7 +227,7 @@ export function CostAskToggle({
   );
 }
 
-function swipeActionLabel(
+export function swipeActionName(
   action: SwipeAction,
   t: (key: "markSelectedBought" | "pinSelected" | "moveSelected" | "markSelectedUrgent" | "delete") => string,
 ) {
@@ -252,7 +313,7 @@ export function SwipeActionSettings() {
   useEffect(() => subscribeSwipeActions(setPrefs), []);
 
   function label(action: SwipeAction) {
-    return swipeActionLabel(action, t);
+    return swipeActionName(action, t);
   }
 
   function choose(side: "left" | "right", action: SwipeAction) {

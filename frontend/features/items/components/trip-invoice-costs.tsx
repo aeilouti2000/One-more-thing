@@ -142,7 +142,6 @@ export function TripInvoiceCosts({
     <>
       <View
         className="mt-4 flex-row flex-wrap gap-2"
-        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
       >
         {canScan && !hasTotal ? (
           <ActionChip

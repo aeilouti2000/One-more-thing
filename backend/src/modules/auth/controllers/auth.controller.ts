@@ -10,6 +10,7 @@ import {
   ForgotPasswordDto,
   GoogleTokenDto,
   LoginDto,
+  LogoutDto,
   RefreshDto,
   ResetPasswordDto,
   SetEmailDto,
@@ -54,7 +55,10 @@ export class AuthController {
   @UseGuards(AuthGuard("jwt"))
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   setEmail(@CurrentUser() user: User, @Body() body: SetEmailDto) {
-    return this.auth.setEmail(user.id, body.email);
+    return this.auth.setEmail(user.id, body.email, {
+      password: body.password,
+      googleIdToken: body.googleIdToken,
+    });
   }
 
   @Post("email/resend")
@@ -87,8 +91,8 @@ export class AuthController {
   }
 
   @Post("logout")
-  logout(@Body() body: RefreshDto) {
-    return this.auth.logout(body.refreshToken);
+  logout(@Body() body: LogoutDto) {
+    return this.auth.logout(body.refreshToken, body.pushToken);
   }
 
   @Get("me")
@@ -109,7 +113,7 @@ export class AuthController {
   @Post("change-password")
   @UseGuards(AuthGuard("jwt"))
   changePassword(@CurrentUser() user: User, @Body() body: ChangePasswordDto) {
-    return this.auth.changePassword(user.id, body.currentPassword, body.newPassword);
+    return this.auth.changePassword(user.id, body.currentPassword, body.newPassword, body.googleIdToken);
   }
 
   @Delete("me")

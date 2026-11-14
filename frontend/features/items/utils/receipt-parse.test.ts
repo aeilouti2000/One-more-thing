@@ -64,3 +64,16 @@ test("formats money for the cost field", () => {
   assert.equal(formatCostInput(1.25, "JOD"), "1.25");
   assert.equal(formatCostInput(10, "USD"), "10");
 });
+
+test("the grand total wins over a later tax or count line", () => {
+  const parsed = parseReceiptText("Milk 1.250\nBread 0.800\nTotal 2.050\nTotal VAT 0.160");
+  assert.equal(parsed.total, 2.05);
+});
+
+test("reads prices printed in Arabic digits", () => {
+  const parsed = parseReceiptText("حليب ١٫٢٥٠\nخبز ٠٫٨٠٠");
+  assert.deepEqual(
+    parsed.lines.map((line) => line.amount),
+    [1.25, 0.8],
+  );
+});

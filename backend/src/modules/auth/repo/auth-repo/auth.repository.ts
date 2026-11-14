@@ -37,10 +37,19 @@ export interface IAuthRepository {
   saveUser(user: User): Promise<User>;
   findRefreshByHash(tokenHash: string): Promise<RefreshToken | null>;
   saveRefresh(input: NewRefreshInput): Promise<void>;
-  revokeByHash(tokenHash: string, revokedAt: Date): Promise<void>;
+  /**
+   * Replaces a refresh token with a new one. The old token stays usable only
+   * until its replacement is used (in case the answer never reached the phone).
+   */
+  rotateRefresh(current: RefreshToken, next: { tokenHash: string; expiresAt: Date }): Promise<void>;
+  /** True when a token issued in place of this one has itself been used. */
+  wasRefreshReplacementUsed(tokenId: string): Promise<boolean>;
+  /** Ends one session; `pushToken` also removes that phone's notification device. */
+  revokeByHash(tokenHash: string, revokedAt: Date, pushToken?: string): Promise<void>;
+  /** Ends every session of the user and removes their notification devices. */
   revokeActiveForUser(userId: string, revokedAt: Date): Promise<void>;
   saveNewEmailCode(input: NewEmailCodeInput): Promise<EmailCode>;
-  saveEmailCode(code: EmailCode): Promise<EmailCode>;
+  deleteEmailCode(codeId: string): Promise<void>;
   findLatestEmailCode(userId: string, purpose: EmailCodePurpose): Promise<EmailCode | null>;
   invalidateEmailCodes(userId: string, purpose: EmailCodePurpose, usedAt: Date): Promise<void>;
   /** Spend one try on a code, atomically. False when no tries are left. */

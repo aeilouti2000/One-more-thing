@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
@@ -16,10 +17,15 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { Trim } from "../../../common/trim.decorator";
 import type { ItemCategory } from "../entities/item.entity";
 import { PIN_INTERVALS, type PinInterval } from "../entities/pin.entity";
 
+/** Most ids one bulk request may carry. */
+const MAX_BULK_ITEMS = 500;
+
 export class CreateItemDto {
+  @Trim()
   @IsString()
   @MinLength(1)
   @MaxLength(120)
@@ -55,6 +61,7 @@ export class CreateItemDto {
 }
 
 export class UpdateItemDto {
+  @Trim()
   @IsString()
   @MinLength(1)
   @MaxLength(120)
@@ -83,6 +90,20 @@ export class UpdateItemDto {
   @IsString()
   @MaxLength(40)
   unit?: string;
+}
+
+export class UndoBoughtDto {
+  /** From a trip: only take back an item this person bought. */
+  @IsOptional()
+  @IsBoolean()
+  onlyMine?: boolean;
+}
+
+export class ClaimShopLockDto {
+  /** A fresh trip (not one resumed after the app closed). */
+  @IsOptional()
+  @IsBoolean()
+  newTrip?: boolean;
 }
 
 export class MarkBoughtDto {
@@ -114,6 +135,7 @@ export class MarkBoughtItemEntryDto {
 export class MarkBoughtItemsDto {
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_BULK_ITEMS)
   @ValidateNested({ each: true })
   @Type(() => MarkBoughtItemEntryDto)
   items: MarkBoughtItemEntryDto[];
@@ -148,6 +170,7 @@ export class CreateTripReceiptDto {
 
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_BULK_ITEMS)
   @IsUUID("all", { each: true })
   itemIds: string[];
 
@@ -200,6 +223,7 @@ export class CreatePinDto extends CreateItemDto {
 }
 
 export class UpdatePinDto {
+  @Trim()
   @IsString()
   @MinLength(1)
   @MaxLength(120)
@@ -251,6 +275,7 @@ export class UpdatePinDto {
 export class ItemIdsDto {
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_BULK_ITEMS)
   @IsUUID("all", { each: true })
   ids: string[];
 }
@@ -258,6 +283,7 @@ export class ItemIdsDto {
 export class SetUrgentItemsDto {
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_BULK_ITEMS)
   @IsUUID("all", { each: true })
   ids: string[];
 
@@ -265,9 +291,37 @@ export class SetUrgentItemsDto {
   urgent: boolean;
 }
 
+export class SetCategoryItemsDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_BULK_ITEMS)
+  @IsUUID("all", { each: true })
+  ids: string[];
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  category: ItemCategory;
+}
+
+export class SetUnitItemsDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_BULK_ITEMS)
+  @IsUUID("all", { each: true })
+  ids: string[];
+
+  /** "" clears the unit (plain pieces). */
+  @Trim()
+  @IsString()
+  @MaxLength(40)
+  unit: string;
+}
+
 export class MoveItemsDto {
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_BULK_ITEMS)
   @IsUUID("all", { each: true })
   ids: string[];
 
@@ -276,6 +330,7 @@ export class MoveItemsDto {
 }
 
 export class CreateCategoryDto {
+  @Trim()
   @IsString()
   @MinLength(1)
   @MaxLength(40)
@@ -283,6 +338,7 @@ export class CreateCategoryDto {
 }
 
 export class CreateListDto {
+  @Trim()
   @IsString()
   @MinLength(1)
   @MaxLength(80)

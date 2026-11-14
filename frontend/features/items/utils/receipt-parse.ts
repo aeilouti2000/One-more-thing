@@ -1,5 +1,4 @@
-const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
-const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+import { normalizeDigits } from "@/lib/numbers";
 
 const TOTAL =
   /(total|grand|amount due|balance due|net amount|المجموع|الاجمالي|الإجمالي|الاجمالى|الصافي|المطلوب)/i;
@@ -12,29 +11,6 @@ export type ReceiptLine = {
   amount: number;
   qty: number | null;
 };
-
-export function normalizeDigits(raw: string) {
-  let out = "";
-  for (const char of raw) {
-    const arabic = ARABIC_DIGITS.indexOf(char);
-    if (arabic >= 0) {
-      out += String(arabic);
-      continue;
-    }
-    const persian = PERSIAN_DIGITS.indexOf(char);
-    if (persian >= 0) {
-      out += String(persian);
-      continue;
-    }
-    if (char === "\u066B") {
-      out += ".";
-      continue;
-    }
-    if (char === "\u066C") continue;
-    out += char;
-  }
-  return out;
-}
 
 function parseAmount(token: string): number | null {
   const normalized = token.replace(",", ".");
@@ -126,7 +102,8 @@ export function parseReceiptText(text: string): { lines: ReceiptLine[]; total: n
   let total: number | null = null;
   const totals = drafts.filter((draft) => draft.kind === "total");
   if (totals.length > 0) {
-    total = totals[totals.length - 1]?.amount ?? null;
+    // The largest one: "Total VAT" or "Total items" lines are never above the grand total.
+    total = Math.max(...totals.map((draft) => draft.amount));
   } else {
     const subs = drafts.filter((draft) => draft.kind === "subtotal");
     if (subs.length > 0) total = subs[subs.length - 1]?.amount ?? null;

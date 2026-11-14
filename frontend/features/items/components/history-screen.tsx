@@ -1,3 +1,9 @@
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type ReactNode } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,13 +31,18 @@ import { Screen, SwipeSlideContent } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { useHousehold } from "@/features/homes/hooks/use-household";
-import { formatMoney, summarizeSpend } from "@/features/items/utils/currency";
+import { formatMoney, summarizeSpend, sumKnownCosts } from "@/features/items/utils/currency";
+import { SpendingSummary } from "@/features/items/components/spending-summary";
+import { useExportPurchases } from "@/features/items/hooks/use-export";
+import { matchRank } from "@/features/items/utils/insights";
 import {
   groupPurchasesIntoTrips,
   invoiceAnchors,
   moveTargets,
   type ShoppingTrip,
 } from "@/features/items/utils/trips";
+import { AppTextField } from "@/components/ui/AppTextField";
+import { SheetField } from "@/components/ui/SheetField";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeList } from "@/features/items/api/lists";
 import { readCachedHistoryLists, readCachedLists } from "@/features/offline/profile-cache";
@@ -53,7 +64,8 @@ type HistoryRange = "all" | "today" | "week" | "month";
 type HistoryMode = "list" | "invoice";
 type Anchor = { x: number; y: number; width: number; height: number };
 
-const HISTORY_RANGES: HistoryRange[] = ["all", "today", "week", "month"];
+const HISTORY_RANGES: HistoryRange[] = ["today", "week", "month", "all"];
+const PICK_DATE = "pick-date";
 
 export default function HistoryScreen() {
   const {
@@ -71,7 +83,6 @@ export default function HistoryScreen() {
   const { t, locale, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
   const wide = useWideLayout();
-  const invoiceAction = headerActionStyle(scheme, colors);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
   const [undoId, setUndoId] = useState<string | null>(null);
@@ -92,6 +103,13 @@ export default function HistoryScreen() {
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [openTripId, setOpenTripId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [isSearching, setIsSearching] = useState(false);
+  const [calendarSignal, setCalendarSignal] = useState(0);
+  const slideRef = useRef<((direction: "next" | "previous") => boolean) | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [exportError, setExportError] = useState<string | null>(null);
+  const { exportItems, isExporting } = useExportPurchases();
+  const query = isSearching ? searchText.trim() : "";
   const costsEnabled = household?.costsEnabled === true;
   const currency = household?.currency ?? "JOD";
   const hasUndo = bought.some((item) => canUndoBought(item.boughtAt, now));
@@ -118,7 +136,10 @@ export default function HistoryScreen() {
   const anchors = useMemo(() => invoiceAnchors(bought), [bought]);
   const visible = useMemo(
     () =>
-      bought.filter((item) => {
+      // Search looks through everything ever bought, whatever the filters say.
+      query
+        ? bought.filter((item) => matchRank(item.name, query) > 0)
+        : bought.filter((item) => {
         // An invoice is filtered by its first item, so it's never split.
         const at = (item.receiptId ? anchors.get(item.receiptId) : null) ?? item;
         const inList = listId === "all" || at.listId === listId;
@@ -127,8 +148,17 @@ export default function HistoryScreen() {
           : boughtInRange(at.boughtAt, range, now);
         return inList && inDate;
       }),
-    [anchors, bought, listId, now, pickedDate, range],
+    [anchors, bought, listId, now, pickedDate, query, range],
   );
+  // Each match counts its own price; a whole invoice total would mislead here.
+  const searchSpend = useMemo(() => sumKnownCosts(visible.map((item) => item.cost)), [visible]);
+  const isDefaultView = !query && range === "month" && !pickedDate && listId === "all";
+
+  async function exportVisible(name: string) {
+    setExportError(null);
+    const result = await exportItems(visible, name);
+    if (result.error) setExportError(result.error);
+  }
 
   const openItem = openItemId ? (bought.find((item) => item.id === openItemId) ?? null) : null;
   const spend = useMemo(
@@ -244,6 +274,8 @@ export default function HistoryScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // "Today" and "this month" follow the clock when the app comes back the next day.
+      setNow(Date.now());
       if (!homeId) return;
       let cancelled = false;
       void Promise.all([fetchLists(homeId), fetchHistoryLists(homeId)]).then(
@@ -267,11 +299,11 @@ export default function HistoryScreen() {
 
   const canSwipeMode = useCallback(
     (direction: "next" | "previous") => {
-      if (!costsEnabled) return false;
+      if (!costsEnabled || isSearching) return false;
       const toInvoice = direction === "next" ? !isRTL : isRTL;
       return toInvoice ? mode === "list" : mode === "invoice";
     },
-    [costsEnabled, isRTL, mode],
+    [costsEnabled, isRTL, isSearching, mode],
   );
 
   const onSwipeMode = useCallback(
@@ -365,6 +397,7 @@ export default function HistoryScreen() {
       onRefresh={() => void onRefresh()}
       onSwipe={costsEnabled ? onSwipeMode : undefined}
       canSwipe={costsEnabled ? canSwipeMode : undefined}
+      slideRef={slideRef}
     >
       <ScreenHeader
         title={mode === "invoice" ? t("invoiceTitle") : t("historyTitle")}
@@ -381,35 +414,83 @@ export default function HistoryScreen() {
             />
           </View>
         }
-        right={
-          costsEnabled ? (
-            <Pressable
-              onPress={() => {
-                setMode((current) => (current === "list" ? "invoice" : "list"));
+        footer={
+          costsEnabled && bought.length > 0 ? (
+            <HeaderSwitch
+              value={mode}
+              label={t("historyTitle")}
+              options={[
+                { id: "list", label: t("historyPurchasesTab"), icon: "list-outline" },
+                { id: "invoice", label: t("historyInvoicesTab"), icon: "receipt-outline" },
+              ]}
+              onChange={(next) => {
+                // Same slide as a finger swipe; it switches the view half-way.
+                const toInvoice = next === "invoice";
+                const direction = toInvoice === !isRTL ? "next" : "previous";
+                if (!isSearching && slideRef.current?.(direction)) return;
+                setMode(next);
                 setOpenTripId(null);
+                // Search only finds single purchases.
+                setIsSearching(false);
+                setSearchText("");
                 void Haptics.selectionAsync();
               }}
-              accessibilityRole="button"
-              accessibilityLabel={mode === "list" ? t("openInvoice") : t("backToHistoryList")}
-              className="rounded-full px-3 py-2 active:opacity-80"
-              style={{ backgroundColor: invoiceAction.backgroundColor }}
-            >
-              <AppText
-                className="text-sm font-semibold"
-                style={{ color: invoiceAction.color }}
-              >
-                {mode === "list" ? t("openInvoice") : t("backToHistoryList")}
-              </AppText>
-            </Pressable>
+            />
           ) : null
         }
       />
 
       <SwipeSlideContent>
-        {bought.length > 0 ? (
+        {isSearching ? (
+          <View className="mb-4 flex-row items-center gap-2">
+            <View className="min-w-0 flex-1">
+              <AppTextField
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholder={t("searchHistoryPlaceholder")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+                userText
+                compact
+              />
+            </View>
+            <Pressable
+              onPress={() => {
+                setIsSearching(false);
+                setSearchText("");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t("closeSearch")}
+              className="h-10 w-10 items-center justify-center rounded-full active:opacity-80"
+              style={{ backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line }}
+            >
+              <Ionicons name="close" size={18} color={colors.ink} />
+            </Pressable>
+          </View>
+        ) : bought.length > 0 ? (
           <HistoryDateField
             value={pickedDate}
             onChange={(date) => setPickedDate(date)}
+            hideButton
+            openSignal={calendarSignal}
+            trailing={
+              mode === "list" ? (
+                <Pressable
+                  onPress={() => {
+                    setIsSearching(true);
+                    setSearchText("");
+                    void Haptics.selectionAsync();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("searchHistory")}
+                  className="ms-auto h-10 w-10 items-center justify-center rounded-full active:opacity-80"
+                  style={{ backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line }}
+                >
+                  <Ionicons name="search" size={17} color={colors.accent} />
+                </Pressable>
+              ) : null
+            }
             leading={
               <>
                 <View ref={listButtonRef} collapsable={false} className="max-w-full">
@@ -430,7 +511,7 @@ export default function HistoryScreen() {
                 </View>
                 <View ref={rangeButtonRef} collapsable={false} className="max-w-full">
                   <ChoiceButton
-                    icon="time-outline"
+                    icon="calendar-outline"
                     selected={pickedDate !== null || range !== "month"}
                     label={pickedLabel ?? rangeLabel[range]}
                     onPress={() => openAnchored(rangeButtonRef, setRangeAnchor, setIsChoosingRange)}
@@ -441,18 +522,53 @@ export default function HistoryScreen() {
           />
         ) : null}
 
-        {costsEnabled && visible.length > 0 ? (
-          <View className="mb-4 rounded-3xl bg-cove-paper px-4 py-3">
-            <AppText className="text-sm font-semibold text-cove-ink">
-              {t("costSummary", {
-                priced: spend.priced,
-                count: spend.count,
-                total: formatMoney(spend.total, currency),
-              })}
+        {query ? (
+          visible.length > 0 ? (
+            <AppText className="mb-3 px-2 text-xs text-cove-muted">
+              {costsEnabled && searchSpend.priced > 0
+                ? t("searchResultsSpend", {
+                    count: visible.length,
+                    total: formatMoney(searchSpend.total, currency),
+                  })
+                : t("searchResults", { count: visible.length })}
             </AppText>
-            <AppText className="mt-1 text-xs text-cove-muted">{periodTitle}</AppText>
+          ) : null
+        ) : isSearching ? null : costsEnabled && isDefaultView && mode === "list" ? (
+          <SpendingSummary
+            purchases={bought}
+            currency={currency}
+            budget={household?.monthlyBudget ?? null}
+            now={now}
+            exporting={isExporting}
+            onExport={() => void exportVisible(periodTitle)}
+          />
+        ) : costsEnabled && visible.length > 0 ? (
+          <View className="mb-4 flex-row items-center gap-3 rounded-3xl bg-cove-paper px-4 py-3">
+            <View className="min-w-0 flex-1">
+              <AppText className="text-sm font-semibold text-cove-ink">
+                {t("costSummary", {
+                  priced: spend.priced,
+                  count: spend.count,
+                  total: formatMoney(spend.total, currency),
+                })}
+              </AppText>
+              <AppText className="mt-1 text-xs text-cove-muted">{periodTitle}</AppText>
+            </View>
+            <Pressable
+              onPress={() => void exportVisible(periodTitle)}
+              disabled={isExporting}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t("exportTitle")}
+              className="h-10 w-10 items-center justify-center rounded-full bg-cove-mist active:opacity-80"
+              style={{ opacity: isExporting ? 0.5 : 1 }}
+            >
+              <Ionicons name="share-outline" size={18} color={colors.accent} />
+            </Pressable>
           </View>
         ) : null}
+
+        <FormMessage message={exportError} />
 
         <FormMessage message={undoError ?? error} />
         <FormMessage
@@ -465,6 +581,15 @@ export default function HistoryScreen() {
           <EmptyState
             title={t("noPurchases")}
             message={t("noPurchasesBody")}
+          />
+        ) : isSearching && !query ? (
+          <AppText className="px-3 py-6 text-center text-sm text-cove-muted">
+            {t("searchHistoryHint")}
+          </AppText>
+        ) : query && visible.length === 0 ? (
+          <EmptyState
+            title={t("searchNoResults")}
+            message={t("searchNoResultsBody", { name: query })}
           />
         ) : visible.length === 0 ? (
           <EmptyState
@@ -482,7 +607,6 @@ export default function HistoryScreen() {
               accessibilityRole="button"
               accessibilityLabel={t("invoiceAllTrips")}
               className="flex-row items-center gap-1 self-start active:opacity-80"
-              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
             >
               <Ionicons
                 name={isRTL ? "chevron-forward" : "chevron-back"}
@@ -542,17 +666,14 @@ export default function HistoryScreen() {
         <View className="gap-4">
           <AppText className="text-xl font-semibold text-cove-ink">{t("renameTrip")}</AppText>
           <AppText className="text-sm text-cove-muted">{t("renameTripBody")}</AppText>
-          <TextInput
+          <SheetField
             value={tripName}
             onChangeText={setTripName}
             placeholder={t("tripNamePlaceholder")}
-            placeholderTextColor={colors.muted}
-            textAlign={isRTL ? "right" : "left"}
+            icon="storefront-outline"
             maxLength={80}
             autoFocus
-            returnKeyType="done"
             onSubmitEditing={() => void saveTripName()}
-            className="h-12 rounded-2xl border border-cove-line bg-cove-ice px-4 text-base text-cove-ink"
           />
           <FormMessage message={tripError} />
           <Pressable
@@ -630,9 +751,17 @@ export default function HistoryScreen() {
         visible={isChoosingRange}
         anchor={rangeAnchor}
         isRTL={isRTL}
-        options={HISTORY_RANGES.map((item) => ({ id: item, label: rangeLabel[item] }))}
-        selectedId={pickedDate ? "" : range}
+        options={[
+          ...HISTORY_RANGES.map((item) => ({ id: item as string, label: rangeLabel[item] })),
+          { id: PICK_DATE, label: pickedLabel ?? t("historyPickDateMore") },
+        ]}
+        selectedId={pickedDate ? PICK_DATE : range}
         onSelect={(id) => {
+          if (id === PICK_DATE) {
+            // The menu closes first; then the calendar opens under the filters.
+            setTimeout(() => setCalendarSignal((value) => value + 1), 250);
+            return;
+          }
           setPickedDate(null);
           setRange(id as HistoryRange);
         }}
@@ -654,7 +783,6 @@ export default function HistoryScreen() {
           accessibilityRole="button"
           accessibilityLabel={t("invoiceAllTrips")}
           className="flex-row items-center gap-1 self-start active:opacity-80"
-          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
         >
           <Ionicons
             name={isRTL ? "chevron-forward" : "chevron-back"}
@@ -682,7 +810,6 @@ export default function HistoryScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={t("back")}
                   className="mb-1 flex-row items-center gap-1 self-start px-4 pt-2 active:opacity-80"
-                  style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
                 >
                   <Ionicons
                     name={isRTL ? "chevron-forward" : "chevron-back"}
@@ -766,8 +893,7 @@ function TripInvoiceList({
           }}
         >
           <View
-            className="items-center justify-between gap-3"
-            style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+            className="flex-row items-center justify-between gap-3"
           >
             <View className="min-w-0 flex-1">
               <AppText
@@ -786,7 +912,7 @@ function TripInvoiceList({
                 {t("invoiceTripCount", { count: trip.count })}
               </AppText>
             </View>
-            <View className="items-center gap-1" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+            <View className="flex-row items-center gap-1">
               <AppText className="text-base font-semibold" style={{ color: colors.accent }}>
                 {formatMoney(trip.total, currency)}
               </AppText>
@@ -953,6 +1079,108 @@ function InvoiceView({
     </View>
   );
 }
+
+/**
+ * The Purchases / Invoices switch, drawn for the coloured header band. The
+ * pill moves at once on a tap, while the page slides to the other view.
+ */
+function HeaderSwitch({
+  value,
+  label,
+  options,
+  onChange,
+}: {
+  value: HistoryMode;
+  label: string;
+  options: { id: HistoryMode; label: string; icon: keyof typeof Ionicons.glyphMap }[];
+  onChange: (id: HistoryMode) => void;
+}) {
+  const { colors, scheme } = useTheme();
+  const { isRTL } = useI18n();
+  const chosen = headerActionStyle(scheme, colors);
+  const headerFg = scheme === "dark" ? colors.ink : colors.onAccent;
+  const [shown, setShown] = useState(value);
+  const [seenValue, setSeenValue] = useState(value);
+  if (value !== seenValue) {
+    setSeenValue(value);
+    setShown(value);
+  }
+
+  const index = Math.max(0, options.findIndex((option) => option.id === shown));
+  // The row is mirrored in Arabic, so the pill's slot is counted from the other end.
+  const slot = isRTL ? options.length - 1 - index : index;
+  const position = useSharedValue(slot);
+  const trackWidth = useSharedValue(0);
+  useEffect(() => {
+    position.set(withTiming(slot, { duration: 220, easing: Easing.out(Easing.cubic) }));
+  }, [position, slot]);
+  const count = options.length;
+  const pillStyle = useAnimatedStyle(() => {
+    const cell = Math.max(0, trackWidth.value - SWITCH_PAD * 2) / count;
+    return { width: cell, left: SWITCH_PAD + position.value * cell };
+  });
+
+  return (
+    <View
+      accessibilityRole="radiogroup"
+      accessibilityLabel={label}
+      onLayout={(event) => trackWidth.set(event.nativeEvent.layout.width)}
+      className="flex-row rounded-full"
+      style={{
+        padding: SWITCH_PAD,
+        backgroundColor:
+          scheme === "dark" ? withAlpha(colors.white, 0.08) : withAlpha("#000000", 0.16),
+      }}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: "absolute",
+            top: SWITCH_PAD,
+            bottom: SWITCH_PAD,
+            borderRadius: 999,
+            backgroundColor: chosen.backgroundColor,
+          },
+          pillStyle,
+        ]}
+      />
+      {options.map((option) => {
+        const selected = option.id === shown;
+        return (
+          <Pressable
+            key={option.id}
+            onPress={() => {
+              if (selected) return;
+              setShown(option.id);
+              onChange(option.id);
+            }}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            accessibilityLabel={option.label}
+            className="h-10 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded-full px-3"
+          >
+            <Ionicons
+              name={option.icon}
+              size={16}
+              color={selected ? chosen.color : headerFg}
+              style={{ opacity: selected ? 1 : 0.85 }}
+            />
+            <AppText
+              className="text-sm font-semibold"
+              numberOfLines={1}
+              style={{ color: selected ? chosen.color : headerFg, opacity: selected ? 1 : 0.85 }}
+            >
+              {option.label}
+            </AppText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const SWITCH_PAD = 4;
 
 function ChoiceButton({
   icon,

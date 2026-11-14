@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Patch, Post, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { CurrentUser } from "../../../common/current-user.decorator";
 import { User } from "../../../users/user.entity";
-import { PushTokenDto, RemovePushTokenDto } from "../dto/notifications.dto";
+import { NotificationPrefsDto, PushTokenDto, RemovePushTokenDto } from "../dto/notifications.dto";
 import { NotificationsService } from "../services/notifications.service";
 
 @Controller("notifications")
@@ -13,6 +13,16 @@ export class NotificationsController {
   @Post("devices")
   register(@CurrentUser() user: User, @Body() body: PushTokenDto) {
     return this.notifications.register(user.id, body.token, body.locale, body.previousToken);
+  }
+
+  @Get("preferences")
+  preferences(@CurrentUser() user: User) {
+    return this.notifications.preferences(user.id);
+  }
+
+  @Patch("preferences")
+  updatePreferences(@CurrentUser() user: User, @Body() body: NotificationPrefsDto) {
+    return this.notifications.updatePreferences(user.id, body);
   }
 
   @Delete("devices")

@@ -51,20 +51,69 @@ export class TypeormAuthRepository implements IAuthRepository {
     await this.refreshTokens.save(this.refreshTokens.create(input));
   }
 
-  async revokeByHash(tokenHash: string, revokedAt: Date) {
+  async rotateRefresh(current: RefreshToken, next: { tokenHash: string; expiresAt: Date }) {
+    await this.refreshTokens.manager.transaction(async (manager) => {
+      const tokens = manager.getRepository(RefreshToken);
+      const now = new Date();
+      // Asked again with the same token: the earlier replacement never arrived.
+      if (current.supersededAt) {
+        await tokens.update({ parentId: current.id, revokedAt: IsNull() }, { revokedAt: now });
+      }
+      // This token is in use, so the one it replaced is finished for good.
+      if (current.parentId) {
+        await tokens.update({ id: current.parentId, revokedAt: IsNull() }, { revokedAt: now });
+      }
+      await tokens.update({ id: current.id }, { supersededAt: now });
+      await tokens.save(
+        tokens.create({
+          userId: current.userId,
+          tokenHash: next.tokenHash,
+          expiresAt: next.expiresAt,
+          revokedAt: null,
+          parentId: current.id,
+          supersededAt: null,
+        }),
+      );
+      // Old rows are only kept long enough to recognise a reused token.
+      await manager.query(
+        `delete from refresh_tokens
+          where user_id = $1
+            and (expires_at < now() or revoked_at < now() - interval '14 days')`,
+        [current.userId],
+      );
+    });
+  }
+
+  wasRefreshReplacementUsed(tokenId: string) {
+    return this.refreshTokens.exist({ where: { parentId: tokenId, supersededAt: Not(IsNull()) } });
+  }
+
+  async revokeByHash(tokenHash: string, revokedAt: Date, pushToken?: string) {
     await this.refreshTokens.update({ tokenHash }, { revokedAt });
+    if (!pushToken) return;
+    // Signed out on this phone: it stops getting the home's notifications,
+    // even if the app could not remove its device itself.
+    await this.refreshTokens.query(
+      `delete from push_tokens p
+        using refresh_tokens r
+        where r.token_hash = $1 and p.user_id = r.user_id and p.token = $2`,
+      [tokenHash, pushToken],
+    );
   }
 
   async revokeActiveForUser(userId: string, revokedAt: Date) {
     await this.refreshTokens.update({ userId, revokedAt: IsNull() }, { revokedAt });
+    // Every session is over, so no phone should keep getting notifications
+    // for this account. A phone that signs in again registers again.
+    await this.refreshTokens.query(`delete from push_tokens where user_id = $1`, [userId]);
   }
 
   saveNewEmailCode(input: NewEmailCodeInput) {
     return this.emailCodes.save(this.emailCodes.create({ ...input, attempts: 0, usedAt: null }));
   }
 
-  saveEmailCode(code: EmailCode) {
-    return this.emailCodes.save(code);
+  async deleteEmailCode(codeId: string) {
+    await this.emailCodes.delete({ id: codeId });
   }
 
   findLatestEmailCode(userId: string, purpose: EmailCodePurpose) {

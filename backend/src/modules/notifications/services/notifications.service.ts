@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import {
   NOTIFICATIONS_REPOSITORY,
   type INotificationsRepository,
+  type NotificationPrefs,
 } from "../repo/notifications-repo/notifications.repository";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
@@ -107,6 +108,14 @@ export class NotificationsService implements OnModuleDestroy {
     return { removed: true };
   }
 
+  preferences(userId: string) {
+    return this.tokens.getPrefs(userId);
+  }
+
+  updatePreferences(userId: string, patch: Partial<NotificationPrefs>) {
+    return this.tokens.savePrefs(userId, patch);
+  }
+
   /** Queues the notice and returns at once; sending never blocks the request. */
   notifyItemAdded(input: {
     homeId: string;
@@ -198,18 +207,24 @@ export class NotificationsService implements OnModuleDestroy {
       const type =
         group.kind === "added" && anyUrgent && group.items.length === 1 ? "added_urgent" : group.kind;
 
-      const messages = recipients.map((recipient) => {
-        const copy = noticeCopy(recipient.locale, group.kind, group.actorName, group.items);
-        return {
-          to: recipient.token,
-          title: copy.title,
-          body: copy.body,
-          sound: "default",
-          priority: "high",
-          channelId: "list-updates",
-          data: { type, homeId: group.homeId, listId, count: group.items.length },
-        };
+      const messages = recipients.flatMap((recipient) => {
+        // Each person only hears about the kinds of change they asked for.
+        const items = wantedItems(recipient, group.kind, group.items);
+        if (items.length === 0) return [];
+        const copy = noticeCopy(recipient.locale, group.kind, group.actorName, items);
+        return [
+          {
+            to: recipient.token,
+            title: copy.title,
+            body: copy.body,
+            sound: "default",
+            priority: "high",
+            channelId: "list-updates",
+            data: { type, homeId: group.homeId, listId, count: items.length },
+          },
+        ];
       });
+      if (messages.length === 0) return;
 
       const sent: { id: string; token: string }[] = [];
       const expired: string[] = [];
@@ -326,6 +341,23 @@ export class NotificationsService implements OnModuleDestroy {
     }
     return { ok: true, data: (await response.json()) as T };
   }
+}
+
+/**
+ * The items of a notice this person wants to hear about. An urgent item that
+ * was just added counts as both "added" and "urgent".
+ */
+export function wantedItems<T extends { urgent: boolean }>(
+  recipient: Partial<NotificationPrefs>,
+  kind: NoticeKind,
+  items: T[],
+): T[] {
+  const added = recipient.added !== false;
+  const urgent = recipient.urgent !== false;
+  if (kind === "due") return recipient.due !== false ? items : [];
+  if (kind === "urgent") return urgent ? items : [];
+  if (added) return items;
+  return urgent ? items.filter((item) => item.urgent) : [];
 }
 
 const NAMES_SHOWN = 3;

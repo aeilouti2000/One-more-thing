@@ -10,6 +10,8 @@ import { HomeMember } from "./home-member.entity";
 export const TRIP_COST_MODES = ["items", "total"] as const;
 export type TripCostMode = (typeof TRIP_COST_MODES)[number];
 
+export const TRIP_AUTO_END_HOURS = [2, 4, 8] as const;
+
 @Entity("homes")
 export class Home {
   @PrimaryGeneratedColumn("uuid")
@@ -43,6 +45,36 @@ export class Home {
   /** Host-only switch: when off, nobody in this home gets list notifications. */
   @Column({ name: "notifications_enabled", type: "boolean", default: true })
   notificationsEnabled: boolean;
+
+  /** What the home plans to spend in a calendar month; null = no budget. */
+  @Column({
+    name: "monthly_budget",
+    type: "numeric",
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: {
+      to: (value: number | null) => value,
+      from: (value: string | number | null) => (value === null || value === undefined ? null : Number(value)),
+    },
+  })
+  monthlyBudget: number | null;
+
+  /** Ask for a name (e.g. the shop) when a shopping trip ends. */
+  @Column({ name: "trip_ask_name", type: "boolean", default: false })
+  tripAskName: boolean;
+
+  /** A trip left open ends by itself after this many hours; null = never. */
+  @Column({ name: "trip_auto_end_hours", type: "int", nullable: true })
+  tripAutoEndHours: number | null;
+
+  /** Show a short summary card when a shopping trip ends. */
+  @Column({ name: "trip_summary", type: "boolean", default: true })
+  tripSummary: boolean;
+
+  /** Let more than one person shop the same list at the same time. */
+  @Column({ name: "trip_shop_together", type: "boolean", default: false })
+  tripShopTogether: boolean;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;

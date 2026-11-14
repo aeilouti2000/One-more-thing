@@ -1,3 +1,4 @@
+import { caretColors, caretGap } from "@/constants/text";
 import { Ionicons } from "@expo/vector-icons";
 import { useRef, useState } from "react";
 import { Dimensions, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
@@ -124,7 +125,7 @@ export function CategoryFilter({
           className="h-14 flex-row items-center gap-2 overflow-hidden rounded-3xl border border-cove-line px-4 active:opacity-80"
         >
           <FrostedFill />
-          <Ionicons name="pricetag-outline" size={18} color={colors.muted} />
+          <Ionicons name="grid-outline" size={18} color={colors.muted} />
           <AppText numberOfLines={1} className="min-w-0 flex-1 text-base text-cove-ink">
             {filtered ? selectedLabel : t("categories")}
           </AppText>
@@ -253,12 +254,13 @@ export function CategoryFilter({
                       backgroundColor: withAlpha(colors.accent, dark ? 0.16 : 0.1),
                     }}
                   >
-                    <Ionicons name="pricetag-outline" size={15} color={colors.accent} />
+                    <Ionicons name="grid-outline" size={15} color={colors.accent} />
                   </View>
                   <TextInput
                     value={draft}
                     onChangeText={setDraft}
-                    placeholder={t("newCategoryPlaceholder")}
+                    placeholder={caretGap(t("newCategoryPlaceholder"))}
+                    {...caretColors(colors.accent)}
                     placeholderTextColor={
                       dark ? withAlpha(colors.muted, 0.55) : colors.line
                     }

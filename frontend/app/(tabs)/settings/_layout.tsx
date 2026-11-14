@@ -28,7 +28,11 @@ export default function SettingsLayout() {
     "account-username",
     "account-password",
     "account-email",
-    "app",
+    "home-settings",
+    "preferences",
+    "about",
+    "trips",
+    "home-alerts",
     "swipe-actions",
     "categories",
     "pins",
@@ -82,7 +86,8 @@ export default function SettingsLayout() {
       <View
         style={[
           styles.wideRow,
-          { flexDirection: isRTL ? "row-reverse" : "row" },
+          // The page's root already sets the direction, so this row mirrors by itself.
+          { flexDirection: "row" },
         ]}
       >
         <View style={[styles.master, { width: SETTINGS_MASTER_WIDTH }]}>

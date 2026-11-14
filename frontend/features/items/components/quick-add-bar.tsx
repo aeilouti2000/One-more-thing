@@ -1,3 +1,4 @@
+import { caretColors, caretGap } from "@/constants/text";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -178,9 +179,13 @@ export function QuickAddBar({
               ref={inputRef}
               value={value}
               onChangeText={onChangeText}
-              placeholder={showHint ? "" : t("quickAddPlaceholder")}
+              maxLength={120}
+              placeholder={caretGap(showHint ? "" : t("quickAddPlaceholder"))}
+              {...caretColors(colors.accent)}
               placeholderTextColor={colors.muted}
               onSubmitEditing={handleAdd}
+              // "Done" adds the item and leaves the keyboard up for the next one.
+              submitBehavior="submit"
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               returnKeyType="done"
@@ -192,6 +197,18 @@ export function QuickAddBar({
               className="h-12 min-w-0 flex-1 text-cove-ink"
             />
           </View>
+
+          {value && !busy ? (
+            <Pressable
+              onPress={() => onChangeText("")}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t("clearSearch")}
+              className="h-9 w-9 items-center justify-center active:opacity-70"
+            >
+              <Ionicons name="close-circle" size={20} color={colors.muted} />
+            </Pressable>
+          ) : null}
 
           <Pressable
             disabled={busy}

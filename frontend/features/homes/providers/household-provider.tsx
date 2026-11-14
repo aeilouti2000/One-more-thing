@@ -18,6 +18,8 @@ type HouseholdContextValue = {
   household: Household | null;
   homes: HomeSummary[];
   hasHousehold: boolean;
+  /** Loading failed and no home is saved on this phone: unknown, not "none". */
+  loadFailed: boolean;
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<Household | null>;
@@ -32,6 +34,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const [homes, setHomes] = useState<HomeSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const currentUserIdRef = useRef(user?.id ?? null);
   const requestSequenceRef = useRef(0);
   const userId = user?.id ?? null;
@@ -39,6 +42,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   if (!isAuthLoading && userId !== trackedUserId) {
     setTrackedUserId(userId);
+    setLoadFailed(false);
     if (!userId) {
       setHousehold(null);
       setHomes([]);
@@ -82,6 +86,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         return null;
       }
       setHousehold(next);
+      setLoadFailed(false);
       if (!next) {
         setHomes([]);
         writeCachedHousehold(null);
@@ -114,6 +119,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         return cached.household;
       }
       setError(formatAppError(error));
+      setLoadFailed(true);
       setIsLoading(false);
       return null;
     }
@@ -137,12 +143,13 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       household,
       homes,
       hasHousehold: household !== null,
+      loadFailed: loadFailed && household === null,
       isLoading: isAuthLoading || isLoading,
       error,
       refresh,
       adoptHome,
     }),
-    [adoptHome, error, homes, household, isAuthLoading, isLoading, refresh],
+    [adoptHome, error, homes, household, isAuthLoading, isLoading, loadFailed, refresh],
   );
 
   return (

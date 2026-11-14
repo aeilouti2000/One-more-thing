@@ -64,7 +64,8 @@ export function useShopLock(options: {
     };
   }, [enabled, homeId, listId, refresh]);
 
-  const blockedByOther = Boolean(lock?.active && !lock.isMine);
+  // A home that shops together never blocks: everyone can join the trip.
+  const blockedByOther = Boolean(lock?.active && !lock.isMine && !lock.together);
 
   return { lock, blockedByOther, refresh };
 }

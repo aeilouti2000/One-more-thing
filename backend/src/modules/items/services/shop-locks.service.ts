@@ -1,6 +1,6 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { In, LessThan, Repository, type EntityManager } from "typeorm";
 import { DomainError } from "../../../common/domain.error";
 import { User } from "../../../users/user.entity";
 import { HomesService } from "../../homes/services/homes.service";
@@ -12,10 +12,17 @@ export const SHOP_LOCK_TTL_MS = 45_000;
 
 export type ShopLockView = {
   listId: string;
+  /** Someone is shopping this list right now. */
   active: boolean;
+  /** Another shopper when there is one, otherwise the viewer. */
   shopperId: string | null;
   shopperName: string | null;
+  /** The viewer is one of the shoppers. */
   isMine: boolean;
+  /** The home lets several people shop one list at the same time. */
+  together: boolean;
+  /** Everyone shopping this list now, first one first. */
+  shoppers: { id: string; name: string }[];
 };
 
 @Injectable()
@@ -28,101 +35,142 @@ export class ShopLocksService {
   ) {}
 
   async status(userId: string, homeId: string, listId: string): Promise<ShopLockView> {
-    await this.homes.requireMembership(userId, homeId);
+    const home = await this.homes.getOne(userId, homeId);
     await this.requireList(homeId, listId);
-    return this.viewFor(userId, homeId, listId);
+    const together = home.tripShopTogether === true;
+    await this.locks.delete({ listId, heartbeatAt: LessThan(this.cutoff()) });
+    const rows = await this.locks.find({ where: { listId, homeId }, order: { startedAt: "ASC" } });
+    return this.toView(userId, listId, rows, together);
   }
 
-  async claim(userId: string, homeId: string, listId: string): Promise<ShopLockView> {
-    await this.homes.requireMembership(userId, homeId);
+  /**
+   * Start (or keep) shopping a list. newTrip: a fresh trip, not one coming
+   * back after the app closed; earlier "not found" marks on the list are
+   * cleared, unless someone else is shopping it right now.
+   */
+  async claim(
+    userId: string,
+    homeId: string,
+    listId: string,
+    options?: { newTrip?: boolean },
+  ): Promise<ShopLockView> {
+    const home = await this.homes.getOne(userId, homeId);
     await this.requireList(homeId, listId);
+    const together = home.tripShopTogether === true;
+    const solo = home.members.length <= 1;
 
-    const household = await this.homes.getOne(userId, homeId);
-    if (household.members.length <= 1) {
-      return { listId, active: false, shopperId: null, shopperName: null, isMine: false };
-    }
+    return this.locks.manager.transaction(async (manager) => {
+      // One claim per list at a time, so two people can't both take a free list.
+      await manager.query("select pg_advisory_xact_lock(hashtext($1))", [`shop-lock:${listId}`]);
+      const now = new Date();
+      await manager.delete(ListShopLock, { listId, heartbeatAt: LessThan(this.cutoff(now)) });
+      const rows = await manager.find(ListShopLock, {
+        where: { listId, homeId },
+        order: { startedAt: "ASC" },
+      });
+      const mine = rows.find((row) => row.userId === userId);
+      const others = rows.filter((row) => row.userId !== userId);
 
-    const existing = await this.locks.findOne({ where: { listId } });
-    const now = new Date();
-
-    if (existing && !this.isStale(existing, now)) {
-      if (existing.userId === userId) {
-        existing.heartbeatAt = now;
-        await this.locks.save(existing);
-        return this.toView(userId, existing, await this.nameOf(userId));
+      if (options?.newTrip && others.length === 0) {
+        await this.clearNotFound(manager, homeId, listId);
       }
-      const name = await this.nameOf(existing.userId);
-      throw new DomainError(
-        "LIST_SHOPPING_LOCKED",
-        `${name} is shopping this list`,
-        HttpStatus.CONFLICT,
-      );
-    }
 
-    if (existing) {
-      existing.userId = userId;
-      existing.homeId = homeId;
-      existing.startedAt = now;
-      existing.heartbeatAt = now;
-      await this.locks.save(existing);
-      return this.toView(userId, existing, await this.nameOf(userId));
-    }
+      if (solo) return this.toView(userId, listId, [], together);
 
-    const created = this.locks.create({
-      listId,
-      homeId,
-      userId,
-      startedAt: now,
-      heartbeatAt: now,
+      if (!mine && others.length > 0 && !together) {
+        const name = await this.nameOf(others[0].userId);
+        throw new DomainError(
+          "LIST_SHOPPING_LOCKED",
+          `${name} is shopping this list`,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      if (mine) {
+        mine.heartbeatAt = now;
+        await manager.save(mine);
+      } else {
+        const created = manager.create(ListShopLock, {
+          listId,
+          homeId,
+          userId,
+          startedAt: now,
+          heartbeatAt: now,
+        });
+        await manager.save(created);
+        rows.push(created);
+      }
+      return this.toView(userId, listId, rows, together);
     });
-    await this.locks.save(created);
-    return this.toView(userId, created, await this.nameOf(userId));
   }
 
   async heartbeat(userId: string, homeId: string, listId: string): Promise<ShopLockView> {
-    await this.homes.requireMembership(userId, homeId);
+    const home = await this.homes.getOne(userId, homeId);
     await this.requireList(homeId, listId);
-
-    const existing = await this.locks.findOne({ where: { listId, homeId } });
-    if (!existing || existing.userId !== userId || this.isStale(existing)) {
+    const mine = await this.locks.findOne({ where: { listId, homeId, userId } });
+    if (!mine || this.isStale(mine)) {
       throw new DomainError(
         "SHOP_LOCK_GONE",
         "This shopping trip is no longer locked",
         HttpStatus.CONFLICT,
       );
     }
-
-    existing.heartbeatAt = new Date();
-    await this.locks.save(existing);
-    return this.toView(userId, existing, await this.nameOf(userId));
+    mine.heartbeatAt = new Date();
+    await this.locks.save(mine);
+    const rows = await this.locks.find({ where: { listId, homeId }, order: { startedAt: "ASC" } });
+    const live = rows.filter((row) => !this.isStale(row));
+    return this.toView(userId, listId, live, home.tripShopTogether === true);
   }
 
   async release(userId: string, homeId: string, listId: string): Promise<{ released: boolean }> {
     await this.homes.requireMembership(userId, homeId);
-    const existing = await this.locks.findOne({ where: { listId, homeId } });
-    if (!existing) return { released: false };
-    if (existing.userId !== userId) return { released: false };
-    await this.locks.delete({ listId });
-    return { released: true };
+    const result = await this.locks.delete({ listId, homeId, userId });
+    return { released: (result.affected ?? 0) > 0 };
   }
 
-  private async viewFor(userId: string, homeId: string, listId: string): Promise<ShopLockView> {
-    const existing = await this.locks.findOne({ where: { listId, homeId } });
-    if (!existing || this.isStale(existing)) {
-      if (existing) await this.locks.delete({ listId });
-      return { listId, active: false, shopperId: null, shopperName: null, isMine: false };
+  private async clearNotFound(manager: EntityManager, homeId: string, listId: string) {
+    await manager.query(
+      `update items
+          set not_found_at = null, not_found_by = null
+        where home_id = $1 and list_id = $2
+          and status = 'needed' and not_found_at is not null`,
+      [homeId, listId],
+    );
+  }
+
+  private async toView(
+    viewerId: string,
+    listId: string,
+    rows: ListShopLock[],
+    together: boolean,
+  ): Promise<ShopLockView> {
+    if (rows.length === 0) {
+      return {
+        listId,
+        active: false,
+        shopperId: null,
+        shopperName: null,
+        isMine: false,
+        together,
+        shoppers: [],
+      };
     }
-    return this.toView(userId, existing, await this.nameOf(existing.userId));
+    const names = await this.namesOf(rows.map((row) => row.userId));
+    const shoppers = rows.map((row) => ({ id: row.userId, name: names.get(row.userId) ?? "Member" }));
+    const shown = shoppers.find((shopper) => shopper.id !== viewerId) ?? shoppers[0];
+    return {
+      listId,
+      active: true,
+      shopperId: shown.id,
+      shopperName: shown.name,
+      isMine: shoppers.some((shopper) => shopper.id === viewerId),
+      together,
+      shoppers,
+    };
   }
 
-  private toView(viewerId: string, lock: ListShopLock, shopperName: string): ShopLockView {
-    return {
-      listId: lock.listId,
-      active: true,
-      shopperId: lock.userId,
-      shopperName,
-      isMine: lock.userId === viewerId,
-    };
+  private cutoff(now = new Date()) {
+    return new Date(now.getTime() - SHOP_LOCK_TTL_MS);
   }
 
   private isStale(lock: ListShopLock, now = new Date()) {
@@ -130,8 +178,15 @@ export class ShopLocksService {
   }
 
   private async nameOf(userId: string) {
-    const user = await this.users.findOne({ where: { id: userId }, select: { id: true, name: true } });
-    return user?.name?.trim() || "Member";
+    return (await this.namesOf([userId])).get(userId) ?? "Member";
+  }
+
+  private async namesOf(userIds: string[]) {
+    const ids = [...new Set(userIds)];
+    const users = ids.length
+      ? await this.users.find({ where: { id: In(ids) }, select: { id: true, name: true } })
+      : [];
+    return new Map(users.map((user) => [user.id, user.name?.trim() || "Member"]));
   }
 
   private async requireList(homeId: string, listId: string) {

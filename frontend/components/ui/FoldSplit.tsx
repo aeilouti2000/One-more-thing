@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { LIST_MASTER_WIDTH } from "@/lib/layout";
-import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 /** Side-by-side panes for unfolded fold; phone callers should not render this. */
@@ -17,7 +16,6 @@ export function FoldSplit({
   masterWidth?: number;
 }) {
   const { colors } = useTheme();
-  const { isRTL } = useI18n();
 
   return (
     <View
@@ -25,7 +23,8 @@ export function FoldSplit({
         styles.root,
         {
           backgroundColor: colors.ice,
-          flexDirection: isRTL ? "row-reverse" : "row",
+          // The page's root already sets the direction, so this row mirrors by itself.
+          flexDirection: "row",
         },
       ]}
     >

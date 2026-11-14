@@ -43,9 +43,17 @@ export function formatAppError(
       ? String(error.code)
       : "";
 
+  const status =
+    typeof error === "object" && error !== null && "status" in error
+      ? Number(error.status)
+      : 0;
+
   const lower = message.toLowerCase();
 
-  if (code === "email_exists" || code === "user_already_exists" || code === "EMAIL_TAKEN") {
+  if (code === "NETWORK") {
+    return translate("errorNetwork");
+  }
+  if (code === "EMAIL_TAKEN") {
     return translate("errorEmailTaken");
   }
   const codeKeys: Record<string, Parameters<typeof translate>[0]> = {
@@ -56,6 +64,7 @@ export function formatAppError(
     CODE_COOLDOWN: "errorTryAgainSoon",
     GOOGLE_IN_USE: "errorGoogleInUse",
     GOOGLE_MISMATCH: "errorGoogleMismatch",
+    GOOGLE_ALREADY_LINKED: "errorGoogleAlreadyLinked",
     GOOGLE_TOKEN_INVALID: "errorGoogleFailed",
     GOOGLE_UNAVAILABLE: "googleUnavailable",
     LAST_SIGN_IN_METHOD: "googleNeedsPassword",
@@ -109,6 +118,12 @@ export function formatAppError(
   if (code === "UNDO_EXPIRED") {
     return translate("errorUndoExpired");
   }
+  if (code === "UNDO_NOT_YOURS") {
+    return translate("errorUndoNotYours");
+  }
+  if (code === "ITEM_ALREADY_BOUGHT") {
+    return translate("errorAlreadyBought");
+  }
   if (code === "PIN_LIMIT") {
     return translate("errorPinLimit");
   }
@@ -130,11 +145,13 @@ export function formatAppError(
   if (code === "CATEGORY_OTHER") {
     return translate("errorCategoryOther");
   }
-  if (code === "over_email_send_rate_limit" || lower.includes("rate limit") || lower.includes("for security purposes")) {
+  // Too many requests in a short time (the server's rate limit).
+  if (status === 429 || lower.includes("too many requests")) {
     return translate("errorTryAgainSoon");
   }
-  if (code === "weak_password") {
-    return translate("errorPasswordTooShort");
+  // A server fault, or a host error page: never show its technical text.
+  if (status >= 500 || code === "INTERNAL_ERROR") {
+    return fallback;
   }
   if (lower.includes("invalid login")) {
     return translate("errorWrongEmailOrPassword");
@@ -172,22 +189,5 @@ export function formatAppError(
   if (lower.includes("network") || lower.includes("fetch")) {
     return translate("errorNetwork");
   }
-  if (
-    lower.includes("schema cache") ||
-    lower.includes("could not find the function") ||
-    lower.includes("could not find the table") ||
-    lower.includes("row-level security") ||
-    lower.includes("permission denied") ||
-    lower.includes("violates row-level security")
-  ) {
-    return translate("errorRepairSql");
-  }
-  if (
-    (lower.includes("duplicate key") && lower.includes("home_members")) ||
-    lower.includes("home_members_one_home_per_user")
-  ) {
-    return translate("errorAlreadyHasHome");
-  }
-
   return message || fallback;
 }

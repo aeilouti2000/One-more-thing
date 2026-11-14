@@ -18,9 +18,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { RequireSession } from "@/features/auth/components/require-session";
+import { useAuth } from "@/features/auth/providers/auth-provider";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
 import { ItemPhotoThumb, ItemPhotoViewer, itemPhotoUri } from "@/features/items/components/item-photo";
 import { ReceiptSourceModal } from "@/features/items/components/receipt-source-modal";
+import { AppButton } from "@/components/ui/AppButton";
+import { SheetField } from "@/components/ui/SheetField";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { AppText } from "@/components/ui/AppText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -36,13 +40,39 @@ import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { listLabel } from "@/features/items/api/lists";
 import {
   claimShopLock,
+  fetchShopLock,
   firstName,
   heartbeatShopLock,
   releaseShopLock,
   SHOP_LOCK_HEARTBEAT_MS,
+  SHOP_TOGETHER_REFRESH_MS,
+  type ShopLock,
 } from "@/features/items/api/shop-locks";
+import { FloatMessage } from "@/components/ui/FloatMessage";
+import { formatMoney } from "@/features/items/utils/currency";
+import {
+  formatTripMinutes,
+  formatTripShare,
+  lastPrices,
+  priceOf,
+  savedShopNames,
+  summarizeTrip,
+  tripDoneItems,
+  tripProgress,
+  type TripSummary,
+} from "@/features/items/utils/trip-helpers";
+import {
+  clearStoredTrip,
+  holdTipSeen,
+  markHoldTipSeen,
+  readStoredTrip,
+  setTripPageOpen,
+  writeStoredTrip,
+  type StoredTrip,
+} from "@/features/items/utils/trip-session";
 import { canUndoBought, formatNeededShare, shareNeededText } from "@/features/items/utils/share-list";
 import { pickReceiptPhoto, interpretReceiptPhoto, type ReceiptScan } from "@/features/items/utils/scan-receipt";
+import { translate } from "@/constants/i18n";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -53,6 +83,11 @@ const CHECK_SIZE = iconSize.md;
 const LEAVE_DELAY = 140;
 const LEAVE_MS = 380;
 const TRIP_REFRESH_MS = 5000;
+
+/** How long a "Sara got Bread" note stays up. */
+const NOTE_MS = 2600;
+/** Two sheets can't swap in one frame: let the first one close. */
+const SHEET_SWAP_MS = 350;
 
 /** How long the floating Undo toast stays up after a check. */
 const UNDO_TOAST_MS = 5000;
@@ -78,15 +113,29 @@ function TripBody() {
     undoBought,
     updateCosts,
     saveTripTotal,
+    renameTrip,
+    setNotFound,
   } =
     usePurchases();
   const { household } = useHousehold();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const { t, locale } = useI18n();
+  // Leaves the trip (the page uses the stack's normal animation).
+  const closePage = useCallback(() => router.back(), []);
   const { categories } = useCategories();
   const { colors, scheme } = useTheme();
   const headerAction = headerActionStyle(scheme, colors);
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
-  const params = useLocalSearchParams<{ listId?: string; listName?: string; category?: string }>();
+  const params = useLocalSearchParams<{
+    listId?: string;
+    listName?: string;
+    category?: string;
+    /** "1": continue the trip kept on the phone (the app closed mid-trip). */
+    resume?: string;
+    /** "1": with resume, go straight to the end-of-trip steps. */
+    end?: string;
+  }>();
   const listId = typeof params.listId === "string" && params.listId.length > 0 ? params.listId : null;
   const category =
     typeof params.category === "string" && params.category.length > 0 ? params.category : null;
@@ -94,10 +143,22 @@ function TripBody() {
     typeof params.listName === "string" && params.listName.length > 0
       ? listLabel(params.listName, t("defaultList"))
       : null;
+  const homeId = household?.id ?? null;
+  // A trip kept on the phone, when this page continues one.
+  const [resumed] = useState<StoredTrip | null>(() => {
+    if (params.resume !== "1" || !homeId || !listId) return null;
+    const trip = readStoredTrip(homeId);
+    return trip && trip.listId === listId ? trip : null;
+  });
+  const endRequested = resumed !== null && params.end === "1";
+  const [startedAt] = useState(() => resumed?.startedAt ?? Date.now());
+  const lastActivityRef = useRef(resumed?.lastActivityAt ?? Date.now());
   const [actionError, setActionError] = useState<string | null>(null);
   const [undoId, setUndoId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [sessionBoughtIds, setSessionBoughtIds] = useState<string[]>([]);
+  const [sessionBoughtIds, setSessionBoughtIds] = useState<string[]>(
+    () => resumed?.boughtIds ?? [],
+  );
   const [tripCostOpen, setTripCostOpen] = useState(false);
   const [singleCostItem, setSingleCostItem] = useState<Purchase | null>(null);
   const [isSavingCosts, setIsSavingCosts] = useState(false);
@@ -108,14 +169,22 @@ function TripBody() {
   const [frozenTripCostItems, setFrozenTripCostItems] = useState<
     { id: string; name: string; quantity?: number; initialCost?: number | null }[] | null
   >(null);
-  const [sessionNames, setSessionNames] = useState(() => new Map<string, string>());
+  const [sessionNames, setSessionNames] = useState(
+    () => new Map<string, string>(resumed?.names ?? []),
+  );
+  // People seen shopping this list during the trip (for the summary).
+  const [partners, setPartners] = useState<string[]>(() => resumed?.partners ?? []);
+  const [lockView, setLockView] = useState<ShopLock | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notedIds = useRef(new Set<string>());
+  const finishedRef = useRef(false);
   const singleCostResolver = useRef<((value: number | null | undefined) => void) | null>(null);
   const inflightChecks = useRef(0);
   const undoing = useRef(false);
   const allowLeaveRef = useRef(false);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tripCostOpenRef = useRef(false);
-  const askTripCostsRef = useRef(false);
 
   const tripItems = useMemo(
     () =>
@@ -127,18 +196,49 @@ function TripBody() {
     [category, listId, needed],
   );
 
+  // "Couldn't find it" items drop to their own group at the bottom.
+  const activeItems = useMemo(() => tripItems.filter((item) => !item.notFoundAt), [tripItems]);
+  const notFoundItems = useMemo(() => tripItems.filter((item) => item.notFoundAt), [tripItems]);
+
   const recent = bought.find((item) => item.id === undoId && canUndoBought(item.boughtAt, now));
-  const urgent = useMemo(() => tripItems.filter((item) => item.urgent), [tripItems]);
-  const groups = useMemo(
-    () =>
-      categories
-        .map((entry) => ({
-          id: entry.id,
-          title: entry.builtin ? getCategoryLabel(entry.id, locale) : (entry.name ?? entry.id),
-          items: tripItems.filter((item) => !item.urgent && item.category === entry.id),
-        }))
-        .filter((group) => group.items.length > 0),
-    [categories, locale, tripItems],
+  const urgent = useMemo(() => activeItems.filter((item) => item.urgent), [activeItems]);
+  const groups = useMemo(() => {
+    const known = new Set(categories.map((entry) => entry.id));
+    // A category this phone hasn't loaded yet (a partner just made it): its
+    // items still have to be shoppable, so they go under "Other".
+    const unknown = activeItems.filter((item) => !item.urgent && !known.has(item.category));
+    const built = categories.map((entry) => ({
+      id: entry.id,
+      title: entry.builtin ? getCategoryLabel(entry.id, locale) : (entry.name ?? entry.id),
+      items: activeItems.filter((item) => !item.urgent && item.category === entry.id),
+    }));
+    if (unknown.length > 0) {
+      const other = built.find((group) => group.id === "other");
+      if (other) other.items = [...other.items, ...unknown];
+      else built.push({ id: "other", title: getCategoryLabel("other", locale), items: unknown });
+    }
+    return built.filter((group) => group.items.length > 0);
+  }, [activeItems, categories, locale]);
+
+  const costsEnabled = household?.costsEnabled === true;
+  const currency = household?.currency ?? "JOD";
+  const prices = useMemo(() => lastPrices(bought), [bought]);
+  const lastPriceLabel = useCallback(
+    (item: Purchase) => {
+      if (!costsEnabled) return null;
+      const price = priceOf(prices, item.name);
+      return price === null ? null : t("lastTimePrice", { price: formatMoney(price, currency) });
+    },
+    [costsEnabled, currency, prices, t],
+  );
+  // Everything bought on this list since the trip started, by anyone.
+  const doneItems = useMemo(
+    () => tripDoneItems(bought, { listId, category, startedAt }),
+    [bought, category, listId, startedAt],
+  );
+  const progress = useMemo(
+    () => tripProgress(doneItems, tripItems.length, prices),
+    [doneItems, prices, tripItems.length],
   );
 
   const askCostOnCheck =
@@ -190,10 +290,6 @@ function TripBody() {
   }, [tripCostOpen]);
 
   useEffect(() => {
-    askTripCostsRef.current = askTripCosts;
-  }, [askTripCosts]);
-
-  useEffect(() => {
     if (!undoId) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     const hide = setTimeout(() => setUndoId(null), UNDO_TOAST_MS);
@@ -204,31 +300,212 @@ function TripBody() {
   }, [undoId]);
 
   const multiMemberHome = (household?.members.length ?? 0) > 1;
-  const homeId = household?.id ?? null;
+  const shopTogether = multiMemberHome && household?.tripShopTogether === true;
   const lockHeldRef = useRef(false);
+  const newTripClaimedRef = useRef(false);
+  // Others shopping this list right now (shopping together).
+  const partnersNow = useMemo(
+    () =>
+      (lockView?.shoppers ?? [])
+        .filter((shopper) => shopper.id !== userId)
+        .map((shopper) => firstName(shopper.name) || t("partner")),
+    [lockView, t, userId],
+  );
 
-  function exitTrip() {
+  // A fresh lock view; also remembers who shopped with us, for the summary.
+  const adoptLock = useCallback(
+    (lock: ShopLock) => {
+      setLockView(lock);
+      const others = (lock.shoppers ?? [])
+        .filter((shopper) => shopper.id !== userId)
+        .map((shopper) => firstName(shopper.name) || translate("partner"));
+      if (others.length === 0) return;
+      setPartners((current) => {
+        const missing = others.filter((name) => !current.includes(name));
+        return missing.length > 0 ? [...current, ...missing] : current;
+      });
+    },
+    [userId],
+  );
+
+  const showNote = useCallback((message: string) => {
+    setNote(message);
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => setNote(null), NOTE_MS);
+  }, []);
+
+  useEffect(() => {
+    setTripPageOpen(true);
+    return () => {
+      setTripPageOpen(false);
+      if (noteTimer.current) clearTimeout(noteTimer.current);
+    };
+  }, []);
+
+  // A continued trip: keep only what is still bought, and bought by me.
+  const resumeCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!resumed || isLoading || resumeCheckedRef.current) return;
+    resumeCheckedRef.current = true;
+    setSessionBoughtIds((ids) =>
+      ids.filter((id) => {
+        const item = bought.find((row) => row.id === id);
+        return Boolean(item) && (!item?.boughtById || item.boughtById === userId);
+      }),
+    );
+  }, [bought, isLoading, resumed, userId]);
+
+  // An item that left the list because someone else bought it.
+  const seenTripIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (isLoading) return;
+    const ids = new Set(tripItems.map((item) => item.id));
+    const before = seenTripIds.current;
+    seenTripIds.current = ids;
+    if (!before) return;
+    for (const id of before) {
+      if (ids.has(id) || notedIds.current.has(id)) continue;
+      const item = bought.find((row) => row.id === id);
+      if (!item?.boughtById || item.boughtById === userId) continue;
+      notedIds.current.add(id);
+      showNote(
+        t("tripPartnerGot", {
+          name: firstName(item.boughtByName) || t("partner"),
+          item: item.name,
+        }),
+      );
+    }
+  }, [bought, isLoading, showNote, t, tripItems, userId]);
+  // Home option: ask what to call the trip (e.g. the shop) before leaving.
+  const [nameOpen, setNameOpen] = useState(false);
+  const [tripName, setTripName] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const nameAskedRef = useRef(false);
+  const nameOpenRef = useRef(false);
+  useEffect(() => {
+    nameOpenRef.current = nameOpen;
+  }, [nameOpen]);
+
+  // Home option: a summary card at the very end.
+  const [summary, setSummary] = useState<TripSummary | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const summaryShownRef = useRef(false);
+  const savedNameRef = useRef<string | null>(null);
+  const wantsName = household?.tripAskName === true && sessionBoughtIds.length > 0;
+  const wantsSummary = household?.tripSummary !== false && sessionBoughtIds.length > 0;
+  // Read when the summary opens, after prices and the name were saved.
+  const summaryInputs = useRef({ doneItems, left: tripItems.length, notFoundItems, partners });
+  useLayoutEffect(() => {
+    summaryInputs.current = { doneItems, left: tripItems.length, notFoundItems, partners };
+  });
+
+  // Keep the trip on the phone, so it can be continued if the app closes.
+  // Only this trip's own copy is ever cleared: opening a trip and leaving
+  // without checking anything off keeps an older unfinished trip.
+  const ownsStoredRef = useRef(resumed !== null);
+  useEffect(() => {
+    if (!homeId || !listId || finishedRef.current) return;
+    if (sessionBoughtIds.length === 0) {
+      // Everything undone (or nothing left of a continued trip): nothing to keep.
+      if (ownsStoredRef.current && (!resumed || resumeCheckedRef.current)) {
+        clearStoredTrip(homeId);
+      }
+      return;
+    }
+    ownsStoredRef.current = true;
+    writeStoredTrip({
+      homeId,
+      listId,
+      listName: typeof params.listName === "string" ? params.listName : "",
+      category,
+      startedAt,
+      lastActivityAt: lastActivityRef.current,
+      boughtIds: sessionBoughtIds,
+      names: [...sessionNames.entries()],
+      partners,
+    });
+  }, [category, homeId, listId, params.listName, partners, resumed, sessionBoughtIds, sessionNames, startedAt]);
+
+  /** The trip is over: forget it on the phone, free the list, close the page. */
+  function finishTrip() {
+    // A second tap on "Done" must not close another page.
+    if (finishedRef.current && allowLeaveRef.current) return;
     allowLeaveRef.current = true;
+    finishedRef.current = true;
+    if (homeId && ownsStoredRef.current) clearStoredTrip(homeId);
     if (lockHeldRef.current && homeId && listId) {
       lockHeldRef.current = false;
       void releaseShopLock(homeId, listId);
     }
-    router.back();
+    closePage();
+  }
+
+  const finishTripRef = useRef(finishTrip);
+  useLayoutEffect(() => {
+    finishTripRef.current = finishTrip;
+  });
+
+  function exitTrip(options?: { skipName?: boolean }) {
+    if (!options?.skipName && wantsName && !nameAskedRef.current) {
+      nameAskedRef.current = true;
+      setNameError(null);
+      setTripName("");
+      // Let a closing costs sheet finish first; two sheets can't swap in one frame.
+      setTimeout(() => setNameOpen(true), tripCostOpenRef.current ? SHEET_SWAP_MS : 0);
+      return;
+    }
+    if (wantsSummary && !summaryShownRef.current) {
+      summaryShownRef.current = true;
+      const delay = tripCostOpenRef.current || nameOpenRef.current ? SHEET_SWAP_MS : 0;
+      setTimeout(() => {
+        const inputs = summaryInputs.current;
+        const built = summarizeTrip({
+          done: inputs.doneItems,
+          left: inputs.left,
+          notFound: inputs.notFoundItems.map((item) => item.name),
+          startedAt,
+          endedAt: Date.now(),
+          partners: inputs.partners,
+        });
+        setSummary({ ...built, shopName: savedNameRef.current ?? built.shopName });
+        setSummaryOpen(true);
+      }, delay);
+      return;
+    }
+    finishTrip();
   }
 
   useFocusEffect(
     useCallback(() => {
-      if (!multiMemberHome || !homeId || !listId) return;
+      if (!homeId || !listId) return;
 
       let cancelled = false;
       lockHeldRef.current = false;
+      // Only the first claim of a fresh trip clears old "not found" marks.
+      const newTrip = !newTripClaimedRef.current && !resumed;
+      newTripClaimedRef.current = true;
+
+      if (!multiMemberHome) {
+        // No lock to hold alone, but a new trip still starts fresh.
+        if (newTrip) {
+          void claimShopLock(homeId, listId, { newTrip: true }).then(() => {
+            if (!cancelled) void refresh();
+          });
+        }
+        return () => {
+          cancelled = true;
+        };
+      }
 
       void (async () => {
-        const claimed = await claimShopLock(homeId, listId);
+        const claimed = await claimShopLock(homeId, listId, { newTrip });
         if (cancelled) {
           if (claimed.lock?.isMine) void releaseShopLock(homeId, listId);
           return;
         }
+        if (claimed.lock) adoptLock(claimed.lock);
+        if (newTrip) void refresh();
         if (claimed.lock?.active && !claimed.lock.isMine) {
           setActionError(
             t("shopLockedToast", {
@@ -236,7 +513,7 @@ function TripBody() {
             }),
           );
           allowLeaveRef.current = true;
-          router.back();
+          closePage();
           return;
         }
         if (claimed.lock?.isMine) {
@@ -247,13 +524,25 @@ function TripBody() {
         lockHeldRef.current = true;
       })();
 
-      const timer = setInterval(() => {
+      const beat = () => {
         if (AppState.currentState !== "active") return;
         if (!lockHeldRef.current) return;
         void heartbeatShopLock(homeId, listId).then(async (result) => {
-          if (result.lock?.isMine) return;
+          // The trip ended while this was on its way: don't take the list back.
+          if (cancelled || !lockHeldRef.current) return;
+          if (result.lock?.isMine) {
+            adoptLock(result.lock);
+            return;
+          }
           const retry = await claimShopLock(homeId, listId);
-          if (retry.lock?.isMine) return;
+          if (cancelled || !lockHeldRef.current) {
+            if (retry.lock?.isMine) void releaseShopLock(homeId, listId);
+            return;
+          }
+          if (retry.lock?.isMine) {
+            adoptLock(retry.lock);
+            return;
+          }
           if (retry.lock?.active && !retry.lock.isMine) {
             lockHeldRef.current = false;
             setActionError(
@@ -262,21 +551,82 @@ function TripBody() {
               }),
             );
             allowLeaveRef.current = true;
-            router.back();
+            closePage();
           }
         });
-      }, SHOP_LOCK_HEARTBEAT_MS);
+      };
+      const timer = setInterval(beat, SHOP_LOCK_HEARTBEAT_MS);
+      // Back from a locked phone: renew at once, before the lock runs out.
+      const appState = AppState.addEventListener("change", (state) => {
+        if (state === "active") beat();
+      });
 
       return () => {
         cancelled = true;
         clearInterval(timer);
+        appState.remove();
         if (lockHeldRef.current) {
           lockHeldRef.current = false;
           void releaseShopLock(homeId, listId);
         }
       };
-    }, [homeId, listId, multiMemberHome, t]),
+    }, [adoptLock, closePage, homeId, listId, multiMemberHome, refresh, resumed, t]),
   );
+
+  async function saveNameAndExit() {
+    if (isSavingName) return;
+    const name = tripName.trim();
+    if (!name) {
+      setNameOpen(false);
+      exitTrip({ skipName: true });
+      return;
+    }
+    setIsSavingName(true);
+    setNameError(null);
+    // The trip's invoice, when the total step just made one.
+    const receiptId =
+      sessionBoughtIds
+        .map((id) => bought.find((item) => item.id === id)?.receiptId)
+        .find((id): id is string => Boolean(id)) ?? null;
+    const result = await renameTrip(
+      { receiptId, itemIds: sessionBoughtIds, listId: listId || null },
+      name,
+    );
+    setIsSavingName(false);
+    if (result.error) {
+      setNameError(result.error);
+      return;
+    }
+    savedNameRef.current = name;
+    setNameOpen(false);
+    exitTrip({ skipName: true });
+  }
+
+  function skipName() {
+    if (isSavingName) return;
+    setNameOpen(false);
+    exitTrip({ skipName: true });
+  }
+
+  // Home option: a trip left open ends by itself. Counted from the last
+  // check-off, so a long shop that's still going isn't cut short.
+  const autoEndMs = household?.tripAutoEndHours ? household.tripAutoEndHours * 3_600_000 : null;
+  useEffect(() => {
+    if (!autoEndMs) return;
+    const check = () => {
+      if (AppState.currentState !== "active") return;
+      if (Date.now() - lastActivityRef.current < autoEndMs) return;
+      if (inflightChecks.current > 0 || allowLeaveRef.current) return;
+      // Everything checked so far is already saved; prices can be added in History.
+      finishTripRef.current();
+    };
+    const timer = setInterval(check, 60_000);
+    const subscription = AppState.addEventListener("change", check);
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [autoEndMs, homeId, listId]);
 
   async function askCostForItem(item: Purchase): Promise<number | null | undefined> {
     if (!askCostOnCheck) return null;
@@ -317,10 +667,22 @@ function TripBody() {
         return next;
       });
     }
+    lastActivityRef.current = Date.now();
     const result = await markBought(id, cost);
     if (result.error) {
       setActionError(result.error);
       return false;
+    }
+    if (result.takenBy) {
+      // Someone shopping with us got it first: it's theirs, not part of our trip.
+      notedIds.current.add(id);
+      showNote(
+        t("tripPartnerGot", {
+          name: firstName(result.takenBy) || t("partner"),
+          item: item?.name ?? "",
+        }),
+      );
+      return true;
     }
     setSessionBoughtIds((current) => (current.includes(id) ? current : [...current, id]));
     // The last item finishes the trip right away, so it gets no Undo.
@@ -334,7 +696,7 @@ function TripBody() {
     if (!recent || undoing.current) return;
     undoing.current = true;
     setActionError(null);
-    const result = await undoBought(recent.id);
+    const result = await undoBought(recent.id, { onlyMine: true });
     undoing.current = false;
     if (result.error) {
       setActionError(result.error);
@@ -360,8 +722,87 @@ function TripBody() {
 
   const scanning = scanPhase !== null;
 
+  function closeSummary() {
+    setSummaryOpen(false);
+    finishTrip();
+  }
+
+  async function shareSummary() {
+    if (!summary) return;
+    const time = formatTripMinutes(summary.minutes, {
+      minutes: (minutes) => t("tripMinutes", { minutes }),
+      hours: (hours, minutes) => t("tripHoursMinutes", { hours, minutes }),
+    });
+    const message = formatTripShare(summary, {
+      title: listName ? `${t("tripSummaryTitle")} · ${listName}` : t("tripSummaryTitle"),
+      bought: t("tripShareBought", { count: summary.bought }),
+      left: t("tripShareLeft", { count: summary.left }),
+      total:
+        costsEnabled && summary.priced > 0
+          ? t("tripShareTotal", { amount: formatMoney(summary.total, currency) })
+          : null,
+      time: t("tripShareTime", { time }),
+      notFound:
+        summary.notFound.length > 0
+          ? t("tripSummaryNotFound", { names: summary.notFound.join(", ") })
+          : null,
+    });
+    try {
+      await shareNeededText(message);
+    } catch {
+      // Closed the share sheet: nothing to do.
+    }
+  }
+
+  // Hold an item: "Couldn't find it here" / "Put back on the list" / "Bought it".
+  const [holdItem, setHoldItem] = useState<Purchase | null>(null);
+  const [tipVisible, setTipVisible] = useState(() => !holdTipSeen());
+  const buyers = useRef(new Map<string, () => void>());
+  const registerBuyer = useCallback((id: string, buy: (() => void) | null) => {
+    if (buy) buyers.current.set(id, buy);
+    else buyers.current.delete(id);
+  }, []);
+
+  const openHold = useCallback((item: Purchase) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTipVisible(false);
+    markHoldTipSeen();
+    setHoldItem(item);
+  }, []);
+
+  function dismissTip() {
+    setTipVisible(false);
+    markHoldTipSeen();
+  }
+
+  async function toggleNotFound(item: Purchase) {
+    setHoldItem(null);
+    setActionError(null);
+    lastActivityRef.current = Date.now();
+    const result = await setNotFound(item.id, !item.notFoundAt);
+    if (result.error) setActionError(result.error);
+  }
+
+  function buyFromHold(item: Purchase) {
+    setHoldItem(null);
+    // The row plays its own check animation (and may ask for a price).
+    setTimeout(() => buyers.current.get(item.id)?.(), SHEET_SWAP_MS);
+  }
+
   function leaveTrip() {
+    if (summaryOpen) {
+      closeSummary();
+      return;
+    }
+    if (holdItem) {
+      setHoldItem(null);
+      return;
+    }
     if (isSavingCosts || scanning || receiptCover) return;
+    if (nameOpen) {
+      skipName();
+      return;
+    }
     if (singleCostResolver.current) {
       resolveSingleCost(undefined);
       return;
@@ -394,6 +835,10 @@ function TripBody() {
     };
   }, []);
 
+  // Faster while someone else shops the same list, so nobody buys twice.
+  const refreshMs =
+    shopTogether && partnersNow.length > 0 ? SHOP_TOGETHER_REFRESH_MS : TRIP_REFRESH_MS;
+
   useFocusEffect(
     useCallback(() => {
       const onHardwareBack = () => {
@@ -404,13 +849,29 @@ function TripBody() {
       const timer = setInterval(() => {
         if (AppState.currentState !== "active") return;
         void refresh();
-      }, TRIP_REFRESH_MS);
+        // Shopping together: see who else is on this list.
+        if (shopTogether && homeId && listId && lockHeldRef.current) {
+          void fetchShopLock(homeId, listId).then((result) => {
+            if (result.lock) adoptLock(result.lock);
+          });
+        }
+      }, refreshMs);
       return () => {
         sub.remove();
         clearInterval(timer);
       };
-    }, [refresh]),
+    }, [adoptLock, homeId, listId, refresh, refreshMs, shopTogether]),
   );
+
+  // End steps still to show (prices, name, summary): leaving runs them first.
+  const endStepsRef = useRef(false);
+  useLayoutEffect(() => {
+    endStepsRef.current =
+      askTripCosts ||
+      summaryOpen ||
+      (wantsName && !nameAskedRef.current) ||
+      (wantsSummary && !summaryShownRef.current);
+  });
 
   useEffect(() => {
     const unsub = navigation.addListener("beforeRemove", (event) => {
@@ -419,14 +880,36 @@ function TripBody() {
         inflightChecks.current > 0 ||
         singleCostResolver.current ||
         tripCostOpenRef.current ||
-        askTripCostsRef.current
+        nameOpenRef.current ||
+        endStepsRef.current
       ) {
         event.preventDefault();
         leaveTripRef.current();
+        return;
       }
+      // Left with nothing more to ask: the trip is over.
+      finishedRef.current = true;
+      if (homeId && ownsStoredRef.current) clearStoredTrip(homeId);
     });
     return unsub;
-  }, [navigation]);
+  }, [homeId, navigation]);
+
+  // "End trip" from the Continue sheet: straight to the end steps.
+  const endHandledRef = useRef(false);
+  const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!endRequested || isLoading || endHandledRef.current) return;
+    if (!resumeCheckedRef.current) return;
+    endHandledRef.current = true;
+    // Let the page finish rising first; leaveTripRef has the latest state by then.
+    endTimerRef.current = setTimeout(() => leaveTripRef.current(), 450);
+  }, [endRequested, isLoading, sessionBoughtIds]);
+  useEffect(
+    () => () => {
+      if (endTimerRef.current) clearTimeout(endTimerRef.current);
+    },
+    [],
+  );
 
   // Last item checked: finish the trip automatically. leaveTrip() opens the
   // trip-costs sheet when costs are enabled, otherwise goes back to Items.
@@ -549,8 +1032,20 @@ function TripBody() {
     return <LoadingScreen />;
   }
 
+  const shopChoices = household?.tripAskName ? savedShopNames(bought, tripName) : [];
+  const rowProps = {
+    onAskCost: askCostForItem,
+    onCheck: checkOff,
+    onInflight: noteInflight,
+    onHold: openHold,
+    registerBuyer,
+    priceLabel: lastPriceLabel,
+    userId,
+  };
+
   return (
     <Screen
+      floating={note ? <FloatMessage message={note} tone="success" /> : null}
       fab={
         recent && !tripCleared ? (
           <UndoToast
@@ -582,31 +1077,142 @@ function TripBody() {
 
       <FormMessage message={actionError ?? error} />
 
+      {partnersNow.length > 0 ? (
+        <View className="mb-3 flex-row">
+          <View className="flex-row items-center gap-2 rounded-full bg-cove-paper px-3 py-2">
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#22C55E" }} />
+            <AppText className="text-sm font-semibold text-cove-ink">
+              {t("tripAlsoShopping", { name: partnersNow.join(", ") })}
+            </AppText>
+          </View>
+        </View>
+      ) : null}
+
+      {tripItems.length > 0 && progress.total > 0 ? (
+        <TripProgressCard
+          done={progress.done}
+          total={progress.total}
+          estimate={
+            costsEnabled && progress.estimated > 0
+              ? t("tripEstimate", { amount: formatMoney(progress.estimate, currency) })
+              : null
+          }
+        />
+      ) : null}
+
+      {tipVisible && activeItems.length > 0 ? (
+        <View className="mb-4 flex-row items-center gap-3 rounded-3xl bg-cove-mist px-4 py-3">
+          <Ionicons name="hand-left-outline" size={18} color={colors.accent} />
+          <AppText className="min-w-0 flex-1 text-sm text-cove-ink">{t("tripHoldTip")}</AppText>
+          <Pressable
+            onPress={dismissTip}
+            accessibilityRole="button"
+            accessibilityLabel={t("close")}
+            hitSlop={8}
+            className="active:opacity-70"
+          >
+            <Ionicons name="close" size={18} color={colors.muted} />
+          </Pressable>
+        </View>
+      ) : null}
+
       {tripItems.length === 0 ? (
         <EmptyState title={t("tripEmpty")} message={t("tripEmptyBody")} />
       ) : (
         <View className="gap-6">
           {urgent.length > 0 ? (
-            <TripGroup
-              title={t("urgentSection")}
-              items={urgent}
-              onAskCost={askCostForItem}
-              onCheck={checkOff}
-              onInflight={noteInflight}
-            />
+            <TripGroup title={t("urgentSection")} items={urgent} {...rowProps} />
           ) : null}
           {groups.map((group) => (
             <TripGroup
               key={`${group.id}-${locale}`}
               title={group.title}
               items={group.items}
-              onAskCost={askCostForItem}
-              onCheck={checkOff}
-              onInflight={noteInflight}
+              {...rowProps}
             />
           ))}
+          {notFoundItems.length > 0 ? (
+            <TripGroup title={t("notFoundSection")} items={notFoundItems} {...rowProps} />
+          ) : null}
         </View>
       )}
+
+      <BottomSheet visible={holdItem !== null} onClose={() => setHoldItem(null)}>
+        {holdItem ? (
+          <View className="gap-3">
+            <AppText className="text-xl font-semibold text-cove-ink" numberOfLines={2}>
+              {holdItem.name}
+            </AppText>
+            <HoldOption
+              icon={holdItem.notFoundAt ? "arrow-undo-outline" : "search-outline"}
+              label={holdItem.notFoundAt ? t("notFoundPutBack") : t("notFoundHere")}
+              onPress={() => void toggleNotFound(holdItem)}
+            />
+            <HoldOption
+              icon="checkmark-circle-outline"
+              label={t("boughtIt")}
+              onPress={() => buyFromHold(holdItem)}
+            />
+          </View>
+        ) : null}
+      </BottomSheet>
+
+      <BottomSheet visible={nameOpen} locked={isSavingName} onClose={skipName}>
+        <View className="gap-4">
+          <AppText className="text-xl font-semibold text-cove-ink">{t("renameTrip")}</AppText>
+          <AppText className="text-sm text-cove-muted">{t("renameTripBody")}</AppText>
+          <SheetField
+            value={tripName}
+            onChangeText={setTripName}
+            placeholder={t("tripNamePlaceholder")}
+            icon="storefront-outline"
+            maxLength={80}
+            autoFocus
+            onSubmitEditing={() => void saveNameAndExit()}
+          />
+          {shopChoices.length > 0 ? (
+            <View className="gap-2">
+              <AppText className="text-sm text-cove-muted">{t("savedShopNames")}</AppText>
+              <View className="flex-row flex-wrap gap-2">
+                {shopChoices.map((name) => (
+                  <Pressable
+                    key={name}
+                    onPress={() => {
+                      void Haptics.selectionAsync();
+                      setTripName(name);
+                    }}
+                    disabled={isSavingName}
+                    accessibilityRole="button"
+                    accessibilityLabel={name}
+                    className="rounded-full border border-cove-line bg-cove-mist px-4 py-2 active:opacity-80"
+                  >
+                    <AppText className="text-sm font-semibold text-cove-ink">{name}</AppText>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+          <FormMessage message={nameError} />
+          <AppButton
+            label={tripName.trim() ? t("saveChanges") : t("skipTripName")}
+            variant={tripName.trim() ? "primary" : "secondary"}
+            loading={isSavingName}
+            disabled={isSavingName}
+            onPress={() => void saveNameAndExit()}
+          />
+        </View>
+      </BottomSheet>
+
+      <BottomSheet visible={summaryOpen} onClose={closeSummary}>
+        {summary ? (
+          <TripSummaryCard
+            summary={summary}
+            total={costsEnabled && summary.priced > 0 ? formatMoney(summary.total, currency) : null}
+            onDone={closeSummary}
+            onShare={() => void shareSummary()}
+          />
+        ) : null}
+      </BottomSheet>
 
       <CostEntrySheet
         visible={singleCostItem !== null}
@@ -663,18 +1269,24 @@ function TripBody() {
   );
 }
 
-function TripGroup({
-  title,
-  items,
-  onAskCost,
-  onCheck,
-  onInflight,
-}: {
-  title: string;
-  items: Purchase[];
+type RowActions = {
   onAskCost: (item: Purchase) => Promise<number | null | undefined>;
   onCheck: (id: string, cost: number | null) => Promise<boolean>;
   onInflight: (delta: number) => void;
+  onHold: (item: Purchase) => void;
+  /** Lets the hold sheet's "Bought it" play the row's own check. */
+  registerBuyer: (id: string, buy: (() => void) | null) => void;
+  priceLabel: (item: Purchase) => string | null;
+  userId: string | null;
+};
+
+function TripGroup({
+  title,
+  items,
+  ...actions
+}: RowActions & {
+  title: string;
+  items: Purchase[];
 }) {
   return (
     <View>
@@ -685,9 +1297,19 @@ function TripGroup({
             key={item.id}
             item={item}
             gap={index < items.length - 1 ? ROW_GAP : 0}
-            onAskCost={() => onAskCost(item)}
-            onCheck={(cost) => onCheck(item.id, cost)}
-            onInflight={onInflight}
+            onAskCost={() => actions.onAskCost(item)}
+            onCheck={(cost) => actions.onCheck(item.id, cost)}
+            onInflight={actions.onInflight}
+            onHold={() => actions.onHold(item)}
+            registerBuyer={actions.registerBuyer}
+            priceLabel={actions.priceLabel(item)}
+            notFoundLabel={
+              item.notFoundAt
+                ? item.notFoundById && item.notFoundById === actions.userId
+                  ? "you"
+                  : (item.notFoundByName ?? "")
+                : null
+            }
           />
         ))}
       </View>
@@ -701,16 +1323,33 @@ function TripCheckRow({
   onAskCost,
   onCheck,
   onInflight,
+  onHold,
+  registerBuyer,
+  priceLabel,
+  notFoundLabel,
 }: {
   item: Purchase;
   gap: number;
   onAskCost: () => Promise<number | null | undefined>;
   onCheck: (cost: number | null) => Promise<boolean>;
   onInflight: (delta: number) => void;
+  onHold: () => void;
+  registerBuyer: (id: string, buy: (() => void) | null) => void;
+  /** "last time JD 1.200", when known. */
+  priceLabel: string | null;
+  /** Not found: "you", a name, or "" (unknown). Null when it was found. */
+  notFoundLabel: string | null;
 }) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const { t, isRTL } = useI18n();
   const quantity = item.unit ? `${item.quantity} ${item.unit}` : `x${item.quantity}`;
+  const notFoundColor = scheme === "dark" ? "#F5B454" : "#B45309";
+  const notFoundText =
+    notFoundLabel === null
+      ? null
+      : notFoundLabel === "you"
+        ? t("notFoundByYou")
+        : t("notFoundBy", { name: firstName(notFoundLabel) || t("partner") });
   const photoUri = itemPhotoUri(item);
   const [viewingPhoto, setViewingPhoto] = useState(false);
   const locked = useRef(false);
@@ -796,6 +1435,15 @@ function TripCheckRow({
     startExit();
   }
 
+  const playExitRef = useRef(playExit);
+  useLayoutEffect(() => {
+    playExitRef.current = playExit;
+  });
+  useEffect(() => {
+    registerBuyer(item.id, () => void playExitRef.current());
+    return () => registerBuyer(item.id, null);
+  }, [item.id, registerBuyer]);
+
   const shellStyle = useAnimatedStyle(() => {
     const close = interpolate(leave.value, [0.45, 1], [0, 1], Extrapolation.CLAMP);
     const measured = contentHeight.value;
@@ -845,9 +1493,16 @@ function TripCheckRow({
         <View onLayout={onContentLayout} collapsable={false}>
           <Pressable
             onPress={playExit}
+            onLongPress={onHold}
+            delayLongPress={400}
             disabled={leaving}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: leaving }}
+            accessibilityHint={t("tripSubtitle")}
+            accessibilityActions={[{ name: "longpress", label: t("notFoundHere") }]}
+            onAccessibilityAction={(event) => {
+              if (event.nativeEvent.actionName === "longpress") onHold();
+            }}
           >
             <View
               style={{
@@ -919,12 +1574,22 @@ function TripCheckRow({
                   <Ionicons name="checkmark" size={17} color={colors.onAccent} />
                 </Animated.View>
               </View>
-              <View className="min-w-0 flex-1">
+              <View className="min-w-0 flex-1" style={notFoundText ? { opacity: 0.8 } : undefined}>
                 <AppText className="text-base font-semibold text-cove-ink">{item.name}</AppText>
                 {item.notes ? (
                   <AppText className="mt-1 text-sm text-cove-muted">{item.notes}</AppText>
                 ) : null}
-                <AppText className="mt-1 text-sm text-cove-muted">{quantity}</AppText>
+                <AppText className="mt-1 text-sm text-cove-muted">
+                  {priceLabel ? `${quantity} · ${priceLabel}` : quantity}
+                </AppText>
+                {notFoundText ? (
+                  <View className="mt-1 flex-row items-center gap-1">
+                    <Ionicons name="search-outline" size={13} color={notFoundColor} />
+                    <AppText className="text-sm font-semibold" style={{ color: notFoundColor }}>
+                      {notFoundText}
+                    </AppText>
+                  </View>
+                ) : null}
               </View>
               {photoUri ? (
                 // Its own press target: look at the photo without checking the item off.
@@ -949,6 +1614,127 @@ function TripCheckRow({
         onClose={() => setViewingPhoto(false)}
       />
     </Animated.View>
+  );
+}
+
+function TripProgressCard({
+  done,
+  total,
+  estimate,
+}: {
+  done: number;
+  total: number;
+  estimate: string | null;
+}) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  const share = total > 0 ? Math.min(1, done / total) : 0;
+  const fill = useSharedValue(share);
+  useEffect(() => {
+    fill.value = withTiming(share, { duration: 420, easing: Easing.out(Easing.cubic) });
+  }, [fill, share]);
+  const fillStyle = useAnimatedStyle(() => ({ width: `${fill.value * 100}%` }));
+  return (
+    <View
+      className="mb-5 rounded-3xl bg-cove-paper px-4 py-4"
+      accessible
+      accessibilityLabel={[t("tripProgress", { done, total }), estimate].filter(Boolean).join(", ")}
+    >
+      <AppText className="text-base font-semibold text-cove-ink">
+        {t("tripProgress", { done, total })}
+      </AppText>
+      {estimate ? <AppText className="mt-1 text-sm text-cove-muted">{estimate}</AppText> : null}
+      <View className="mt-3 h-2 overflow-hidden rounded-full bg-cove-mist">
+        <Animated.View
+          style={[{ height: "100%", borderRadius: 999, backgroundColor: colors.accent }, fillStyle]}
+        />
+      </View>
+    </View>
+  );
+}
+
+function HoldOption({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className="flex-row items-center gap-3 rounded-2xl bg-cove-mist px-4 py-4 active:opacity-80"
+    >
+      <Ionicons name={icon} size={iconSize.sm} color={colors.accent} />
+      <AppText className="text-base font-semibold text-cove-ink">{label}</AppText>
+    </Pressable>
+  );
+}
+
+function TripSummaryCard({
+  summary,
+  total,
+  onDone,
+  onShare,
+}: {
+  summary: TripSummary;
+  total: string | null;
+  onDone: () => void;
+  onShare: () => void;
+}) {
+  const { t } = useI18n();
+  const time = formatTripMinutes(summary.minutes, {
+    minutes: (minutes) => t("tripMinutes", { minutes }),
+    hours: (hours, minutes) => t("tripHoursMinutes", { hours, minutes }),
+  });
+  const subtitle = [
+    summary.shopName,
+    summary.partners.length > 0 ? t("tripSummaryWith", { names: summary.partners.join(", ") }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const stats: { label: string; value: string }[] = [
+    { label: t("tripSummaryBought"), value: String(summary.bought) },
+    { label: t("tripSummaryLeft"), value: String(summary.left) },
+    ...(total ? [{ label: t("tripSummaryTotal"), value: total }] : []),
+    { label: t("tripSummaryTime"), value: time },
+  ];
+  return (
+    <View className="gap-4">
+      <View>
+        <AppText className="text-xl font-semibold text-cove-ink">{t("tripSummaryTitle")}</AppText>
+        {subtitle ? <AppText className="mt-1 text-sm text-cove-muted">{subtitle}</AppText> : null}
+      </View>
+      <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+        {stats.map((stat) => (
+          <View
+            key={stat.label}
+            className="rounded-2xl bg-cove-mist px-4 py-3"
+            style={{ flexBasis: "47%", flexGrow: 1 }}
+          >
+            <AppText className="text-lg font-semibold text-cove-ink">{stat.value}</AppText>
+            <AppText className="text-sm text-cove-muted">{stat.label}</AppText>
+          </View>
+        ))}
+      </View>
+      {summary.notFound.length > 0 ? (
+        <AppText className="text-sm text-cove-muted">
+          {t("tripSummaryNotFound", { names: summary.notFound.join(", ") })}
+        </AppText>
+      ) : null}
+      <AppButton label={t("tripSummaryDone")} onPress={onDone} />
+      <AppButton
+        label={t("tripSummaryShare")}
+        variant="secondary"
+        icon="share-outline"
+        onPress={onShare}
+      />
+    </View>
   );
 }
 

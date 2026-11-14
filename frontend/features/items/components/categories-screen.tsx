@@ -1,3 +1,4 @@
+import { caretColors, caretGap } from "@/constants/text";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
@@ -103,12 +104,13 @@ function CategoriesBody() {
             className="h-9 w-9 items-center justify-center rounded-2xl"
             style={{ backgroundColor: withAlpha(colors.accent, dark ? 0.22 : 0.14) }}
           >
-            <Ionicons name="pricetag-outline" size={17} color={colors.accent} />
+            <Ionicons name="grid-outline" size={17} color={colors.accent} />
           </View>
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder={t("newCategoryPlaceholder")}
+            placeholder={caretGap(t("newCategoryPlaceholder"))}
+            {...caretColors(colors.accent)}
             placeholderTextColor={colors.muted}
             onSubmitEditing={() => void add()}
             onFocus={() => setFocused(true)}
@@ -207,7 +209,6 @@ function CategoryRow({
         elevation: 2,
       }}
     >
-      <Ionicons name="pricetag-outline" size={18} color={accent} />
       <AppText numberOfLines={1} className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
         {name}
       </AppText>

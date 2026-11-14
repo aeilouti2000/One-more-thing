@@ -109,15 +109,8 @@ export class PinsService {
       listId?: string;
     },
   ) {
-    const membership = await this.homes.requireMembership(userId);
-    const pin = await this.pins.findInHome(pinId, membership.homeId);
-    if (!pin) {
-      throw new DomainError(
-        "PIN_NOT_FOUND",
-        "Pinned item not found",
-        HttpStatus.NOT_FOUND,
-      );
-    }
+    const pin = await this.requirePin(userId, pinId);
+    const membership = { homeId: pin.homeId };
     await this.categories.assertUsable(membership.homeId, input.category);
     if (input.listId && input.listId !== pin.listId) {
       const list = await this.resolveList(membership.homeId, input.listId);
@@ -146,16 +139,23 @@ export class PinsService {
     return toView(await this.pins.save(pin));
   }
 
+  /**
+   * A pin in any home the user belongs to (not only their "active" one:
+   * another of their devices may be showing a different home).
+   */
+  private async requirePin(userId: string, pinId: string) {
+    const notFound = () =>
+      new DomainError("PIN_NOT_FOUND", "Pinned item not found", HttpStatus.NOT_FOUND);
+    const pin = await this.pins.findById(pinId);
+    if (!pin) throw notFound();
+    await this.homes.requireMembership(userId, pin.homeId).catch(() => {
+      throw notFound();
+    });
+    return pin;
+  }
+
   async remove(userId: string, pinId: string) {
-    const membership = await this.homes.requireMembership(userId);
-    const pin = await this.pins.findInHome(pinId, membership.homeId);
-    if (!pin) {
-      throw new DomainError(
-        "PIN_NOT_FOUND",
-        "Pinned item not found",
-        HttpStatus.NOT_FOUND,
-      );
-    }
+    const pin = await this.requirePin(userId, pinId);
     await this.pins.deleteById(pin.id);
     return { deleted: true };
   }

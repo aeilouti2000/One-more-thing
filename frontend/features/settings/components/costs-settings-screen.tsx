@@ -2,7 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, Switch, View } from "react-native";
+import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { SheetField } from "@/components/ui/SheetField";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
@@ -11,7 +14,22 @@ import { updateCostSettings } from "@/features/homes/api/homes";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { HOME_CURRENCIES, type CostSettings, type HomeCurrency } from "@/features/homes/types/household";
 import { useAuth } from "@/features/auth/providers/auth-provider";
-import { CardBlock, CostAskToggle, SettingsSection } from "@/features/settings/components/settings-ui";
+import { useExportPurchases } from "@/features/items/hooks/use-export";
+import { usePurchases } from "@/features/items/hooks/use-purchases";
+import {
+  currencySymbol,
+  formatCostInput,
+  formatMoney,
+  parseCostInput,
+} from "@/features/items/utils/currency";
+import { boughtInMonth, currentMonth, previousMonth } from "@/features/items/utils/insights";
+import {
+  CardBlock,
+  CostAskToggle,
+  HostOnly,
+  SettingsSection,
+  useHostOnlyNotice,
+} from "@/features/settings/components/settings-ui";
 import {
   useSettingsShowBack,
   useSettingsSplitJoin,
@@ -20,17 +38,25 @@ import {
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
+/** Largest monthly budget the server accepts. */
+const MAX_BUDGET = 999_999_999;
+
 export default function CostsSettingsScreen() {
   const { user } = useAuth();
   const { household, adoptHome } = useHousehold();
   const { colors } = useTheme();
   const { t } = useI18n();
-  const showBack = useSettingsShowBack();
+  const showBack = useSettingsShowBack({ nested: true });
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
   const [costError, setCostError] = useState<string | null>(null);
   const [isSavingCosts, setIsSavingCosts] = useState(false);
   const [isChoosingCurrency, setIsChoosingCurrency] = useState(false);
+  const hostOnly = useHostOnlyNotice();
+  const { purchases } = usePurchases();
+  const { exportItems, isExporting } = useExportPurchases();
+  const [budgetText, setBudgetText] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const isHost =
     household?.members.some((member) => member.id === user?.id && member.role === "owner") ===
     true;
@@ -42,7 +68,7 @@ export default function CostsSettingsScreen() {
   if (!household) return null;
 
   async function saveCostSettings(patch: Partial<CostSettings>) {
-    if (!household || !isHost) return;
+    if (!household || !isHost) return false;
     const previous = household;
     // Apply immediately so Items / History / Trip pick up the change without a restart.
     adoptHome({ ...household, ...patch });
@@ -53,15 +79,46 @@ export default function CostsSettingsScreen() {
     if (result.error || !result.home) {
       adoptHome(previous);
       setCostError(result.error ?? t("errorGeneric"));
-      return;
+      return false;
     }
     adoptHome(result.home);
+    return true;
   }
 
+  const savedBudget = household.monthlyBudget;
+  const parsedBudget = parseCostInput(budgetText ?? "");
+  const budgetInvalid =
+    Number.isNaN(parsedBudget) || (parsedBudget !== null && parsedBudget > MAX_BUDGET);
+  const nextBudget = parsedBudget && parsedBudget > 0 ? parsedBudget : null;
+
+  function openBudget() {
+    setCostError(null);
+    setBudgetText(savedBudget ? formatCostInput(savedBudget, household?.currency) : "");
+  }
+
+  async function saveBudget(value: number | null) {
+    if (isSavingCosts) return;
+    if (value !== savedBudget) {
+      const saved = await saveCostSettings({ monthlyBudget: value });
+      // Not saved: the sheet stays open and shows why.
+      if (!saved) return;
+    }
+    // Closing the sheet also puts the keyboard away.
+    setBudgetText(null);
+  }
+
+  async function onExport(month: string) {
+    setExportError(null);
+    const result = await exportItems(boughtInMonth(purchases, month), month);
+    if (result.error) setExportError(result.error);
+  }
+
+  const thisMonth = currentMonth();
+
   return (
-    <Screen tabBarInset={tabBarInset}>
+    <Screen tabBarInset={tabBarInset} floating={hostOnly.floating}>
       <ScreenHeader
-        title={t("costsSection")}
+        title={t("costsAndBudget")}
         subtitle={household.costsEnabled ? t("trackCosts") : t("costsSectionBody")}
         showBack={showBack}
         splitJoin={splitJoin}
@@ -77,13 +134,15 @@ export default function CostsSettingsScreen() {
               </AppText>
               <AppText className="mt-2 text-sm text-cove-muted">{t("trackCostsBody")}</AppText>
             </View>
-            <Switch
-              value={household.costsEnabled}
-              disabled={!isHost || isSavingCosts}
-              onValueChange={(enabled) => void saveCostSettings({ costsEnabled: enabled })}
-              trackColor={{ false: colors.mist, true: colors.accent }}
-              thumbColor={colors.white}
-            />
+            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+              <Switch
+                value={household.costsEnabled}
+                disabled={!isHost || isSavingCosts}
+                onValueChange={(enabled) => void saveCostSettings({ costsEnabled: enabled })}
+                trackColor={{ false: colors.mist, true: colors.accent }}
+                thumbColor={colors.white}
+              />
+            </HostOnly>
           </View>
           {!isHost ? (
             <AppText className="mt-3 text-xs text-cove-muted">{t("costsHostOnly")}</AppText>
@@ -97,23 +156,25 @@ export default function CostsSettingsScreen() {
               <AppText className="text-sm font-medium text-cove-muted">
                 {t("currencyLabel")}
               </AppText>
-              <Pressable
-                disabled={!isHost || isSavingCosts}
-                onPress={() => setIsChoosingCurrency((open) => !open)}
-                className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3 active:opacity-80"
-              >
-                <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
-                  {t(
-                    (HOME_CURRENCIES.find((item) => item.code === household.currency)
-                      ?.labelKey ?? "currencyJOD") as "currencyJOD",
-                  )}
-                </AppText>
-                <Ionicons
-                  name={isChoosingCurrency ? "chevron-up" : "chevron-down"}
-                  size={iconSize.sm}
-                  color={colors.ink}
-                />
-              </Pressable>
+              <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+                <Pressable
+                  disabled={!isHost || isSavingCosts}
+                  onPress={() => setIsChoosingCurrency((open) => !open)}
+                  className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3 active:opacity-80"
+                >
+                  <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+                    {t(
+                      (HOME_CURRENCIES.find((item) => item.code === household.currency)
+                        ?.labelKey ?? "currencyJOD") as "currencyJOD",
+                    )}
+                  </AppText>
+                  <Ionicons
+                    name={isChoosingCurrency ? "chevron-up" : "chevron-down"}
+                    size={iconSize.sm}
+                    color={colors.ink}
+                  />
+                </Pressable>
+              </HostOnly>
               {isChoosingCurrency ? (
                 <View className="mt-3 gap-2">
                   {HOME_CURRENCIES.map((option) => {
@@ -147,55 +208,158 @@ export default function CostsSettingsScreen() {
               ) : null}
             </CardBlock>
 
-            <CostAskToggle
-              title={t("askCostSingle")}
-              body={t("askCostSingleBody")}
-              value={household.askCostOnSingleBuy}
-              disabled={!isHost || isSavingCosts}
-              onChange={(value) => void saveCostSettings({ askCostOnSingleBuy: value })}
-              colors={colors}
-            />
-            <CostAskToggle
-              title={t("askCostBulk")}
-              body={t("askCostBulkBody")}
-              value={household.askCostOnBulkBuy}
-              disabled={!isHost || isSavingCosts}
-              onChange={(value) => void saveCostSettings({ askCostOnBulkBuy: value })}
-              colors={colors}
-            />
+            <CardBlock>
+              <AppText className="text-base font-semibold text-cove-ink">
+                {t("monthlyBudget")}
+              </AppText>
+              <AppText className="mt-1 text-sm text-cove-muted">{t("monthlyBudgetBody")}</AppText>
+              <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+                <Pressable
+                  disabled={!isHost || isSavingCosts}
+                  onPress={openBudget}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("monthlyBudget")}
+                  className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3 active:opacity-80"
+                  style={{ opacity: isHost ? 1 : 0.7 }}
+                >
+                  <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+                    {savedBudget ? formatMoney(savedBudget, household.currency) : t("noBudgetSet")}
+                  </AppText>
+                  <Ionicons name="pencil" size={iconSize.sm} color={colors.ink} />
+                </Pressable>
+              </HostOnly>
+            </CardBlock>
+
+            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+              <CostAskToggle
+                title={t("askCostSingle")}
+                body={t("askCostSingleBody")}
+                value={household.askCostOnSingleBuy}
+                disabled={!isHost || isSavingCosts}
+                onChange={(value) => void saveCostSettings({ askCostOnSingleBuy: value })}
+                colors={colors}
+              />
+            </HostOnly>
+            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+              <CostAskToggle
+                title={t("askCostBulk")}
+                body={t("askCostBulkBody")}
+                value={household.askCostOnBulkBuy}
+                disabled={!isHost || isSavingCosts}
+                onChange={(value) => void saveCostSettings({ askCostOnBulkBuy: value })}
+                colors={colors}
+              />
+            </HostOnly>
             {/* Two independent end-of-trip prompts; only one can run, so turning
                 one on turns the other off. */}
-            <CostAskToggle
-              title={t("askCostTrip")}
-              body={t("askCostTripBody")}
-              value={household.askCostOnTripEnd && household.tripCostMode !== "total"}
-              disabled={!isHost || isSavingCosts}
-              onChange={(value) =>
-                void saveCostSettings(
-                  value
-                    ? { askCostOnTripEnd: true, tripCostMode: "items" }
-                    : { askCostOnTripEnd: false },
-                )
-              }
-              colors={colors}
-            />
-            <CostAskToggle
-              title={t("askCostTripTotal")}
-              body={t("askCostTripTotalBody")}
-              value={household.tripCostMode === "total"}
-              disabled={!isHost || isSavingCosts}
-              onChange={(value) =>
-                void saveCostSettings(
-                  value
-                    ? { tripCostMode: "total" }
-                    : { tripCostMode: "items", askCostOnTripEnd: false },
-                )
-              }
-              colors={colors}
-            />
+            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+              <CostAskToggle
+                title={t("askCostTrip")}
+                body={t("askCostTripBody")}
+                value={household.askCostOnTripEnd && household.tripCostMode !== "total"}
+                disabled={!isHost || isSavingCosts}
+                onChange={(value) =>
+                  void saveCostSettings(
+                    value
+                      ? { askCostOnTripEnd: true, tripCostMode: "items" }
+                      : { askCostOnTripEnd: false },
+                  )
+                }
+                colors={colors}
+              />
+            </HostOnly>
+            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+              <CostAskToggle
+                title={t("askCostTripTotal")}
+                body={t("askCostTripTotalBody")}
+                value={household.tripCostMode === "total"}
+                disabled={!isHost || isSavingCosts}
+                onChange={(value) =>
+                  void saveCostSettings(
+                    value
+                      ? { tripCostMode: "total" }
+                      : { tripCostMode: "items", askCostOnTripEnd: false },
+                  )
+                }
+                colors={colors}
+              />
+            </HostOnly>
+
+            <CardBlock>
+              <AppText className="text-base font-semibold text-cove-ink">{t("exportTitle")}</AppText>
+              <AppText className="mt-1 text-sm text-cove-muted">{t("exportBody")}</AppText>
+              <View className="mt-3 flex-row gap-3">
+                <View className="min-w-0 flex-1">
+                  <AppButton
+                    label={t("exportThisMonth")}
+                    variant="secondary"
+                    icon="share-outline"
+                    disabled={isExporting}
+                    onPress={() => void onExport(thisMonth)}
+                    compact
+                  />
+                </View>
+                <View className="min-w-0 flex-1">
+                  <AppButton
+                    label={t("exportLastMonth")}
+                    variant="secondary"
+                    disabled={isExporting}
+                    onPress={() => void onExport(previousMonth(thisMonth))}
+                    compact
+                  />
+                </View>
+              </View>
+              <FormMessage message={exportError} />
+            </CardBlock>
           </>
         ) : null}
       </SettingsSection>
+
+      <BottomSheet
+        visible={budgetText !== null}
+        locked={isSavingCosts}
+        onClose={() => setBudgetText(null)}
+      >
+        <View className="gap-4">
+          <AppText className="text-xl font-semibold text-cove-ink">{t("monthlyBudget")}</AppText>
+          <AppText className="text-sm text-cove-muted">{t("monthlyBudgetBody")}</AppText>
+          <SheetField
+            value={budgetText ?? ""}
+            onChangeText={setBudgetText}
+            placeholder={formatCostInput(0, household.currency) || "0"}
+            chip={currencySymbol(household.currency)}
+            keyboardType="decimal-pad"
+            autoCapitalize="none"
+            maxLength={12}
+            autoFocus
+            onSubmitEditing={() => {
+              // The keyboard's Done saves an amount; removing a budget is its own button.
+              if (!budgetInvalid && nextBudget !== null) void saveBudget(nextBudget);
+            }}
+          />
+          <FormMessage message={budgetInvalid ? t("errorInvalidCost") : costError} />
+          <View className="flex-row gap-3">
+            {savedBudget ? (
+              <View className="min-w-0 flex-1">
+                <AppButton
+                  label={t("removeBudget")}
+                  variant="secondary"
+                  disabled={isSavingCosts}
+                  onPress={() => void saveBudget(null)}
+                />
+              </View>
+            ) : null}
+            <View className="min-w-0 flex-1">
+              <AppButton
+                label={t("saveChanges")}
+                loading={isSavingCosts}
+                disabled={isSavingCosts || budgetInvalid || nextBudget === null}
+                onPress={() => void saveBudget(nextBudget)}
+              />
+            </View>
+          </View>
+        </View>
+      </BottomSheet>
     </Screen>
   );
 }

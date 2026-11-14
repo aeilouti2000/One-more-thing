@@ -1,4 +1,5 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { caretColors, caretGap } from "@/constants/text";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import {
@@ -46,6 +47,7 @@ import { ReorderableList } from "@/features/items/components/reorderable-list";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ItemsFab } from "@/features/items/components/items-fab";
 import { SwipeableItem } from "@/features/items/components/swipeable-item";
+import { TripResumeSheet } from "@/features/items/components/trip-resume-sheet";
 import { useWideLayout } from "@/hooks/use-wide-layout";
 import { firstName } from "@/features/items/api/shop-locks";
 import { useShopLock } from "@/features/items/hooks/use-shop-lock";
@@ -56,7 +58,6 @@ import {
   type SwipeActionPrefs,
 } from "@/features/items/utils/swipe-actions";
 import { AppText } from "@/components/ui/AppText";
-import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
@@ -96,7 +97,19 @@ import { useHousehold } from "@/features/homes/hooks/use-household";
 import { onFocusList } from "@/features/items/utils/list-sync";
 import { CategoryFilter } from "@/features/items/components/category-filter";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
-import { useCategoryLabel } from "@/features/items/providers/categories-provider";
+import { ItemSuggestions } from "@/features/items/components/item-suggestions";
+import { matchRank, suggestItems, type ItemSuggestion } from "@/features/items/utils/insights";
+import {
+  useCategories,
+  useCategoryLabel,
+} from "@/features/items/providers/categories-provider";
+import {
+  SelectionBar,
+  type SelectionAction,
+} from "@/features/items/components/selection-bar";
+import { useUnitLabel } from "@/features/items/components/item-sheet-form";
+import { allSelected, sharedValue } from "@/features/items/utils/selection";
+import { getCategoryLabel } from "@/constants/categories";
 import type { Purchase, PurchaseCategory } from "@/features/items/types/purchase";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -114,6 +127,8 @@ export default function ItemsScreen() {
     deleteMany,
     moveMany,
     setManyUrgent,
+    setManyCategory,
+    setManyUnit,
     updateItem,
     reorderNeeded,
     addItem,
@@ -121,6 +136,8 @@ export default function ItemsScreen() {
   const { colors, scheme } = useTheme();
   const { setHidden: setTabBarHidden } = useTabBarVisibility();
   const { t, isRTL } = useI18n();
+  const { categories } = useCategories();
+  const unitLabel = useUnitLabel();
   const wide = useWideLayout();
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -131,9 +148,7 @@ export default function ItemsScreen() {
   };
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [busyAction, setBusyAction] = useState<
-    "pin" | "bought" | "delete" | "urgent" | "move" | null
-  >(null);
+  const [busyAction, setBusyAction] = useState<SelectionAction | null>(null);
   const isApplyingAction = busyAction !== null;
   const [actionError, setActionError] = useState<string | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -212,6 +227,17 @@ export default function ItemsScreen() {
         : listItems.filter((item) => item.category === quickCategory),
     [listItems, quickCategory],
   );
+  // Typing in the add bar also searches: the list narrows to matching items
+  // (in any category) and past purchases are offered below the bar.
+  const typed = quickName.trim();
+  const shownItems = useMemo(
+    () => (typed ? listItems.filter((item) => matchRank(item.name, typed) > 0) : visibleItems),
+    [listItems, typed, visibleItems],
+  );
+  const suggestions = useMemo(
+    () => suggestItems(purchases, typed, { exclude: listItems.map((item) => item.name) }),
+    [listItems, purchases, typed],
+  );
   const headerButton = {
     backgroundColor: scheme === "dark" ? colors.accent : colors.white,
     icon: scheme === "dark" ? colors.onAccent : colors.accent,
@@ -231,6 +257,8 @@ export default function ItemsScreen() {
   );
   const allSelectedUrgent =
     selectedItems.length > 0 && selectedItems.every((item) => item.urgent);
+  const selectedCategory = sharedValue(selectedItems, (item) => item.category);
+  const selectedUnit = sharedValue(selectedItems, (item) => item.unit ?? "");
 
   function rememberList(homeId: string, listId: string) {
     writeStoredListId(homeId, listId);
@@ -476,6 +504,48 @@ export default function ItemsScreen() {
     setIsConfirmingDelete(false);
   }
 
+  async function setCategoryForIds(ids: string[], category: PurchaseCategory) {
+    if (busyAction || ids.length === 0) return;
+    setBusyAction("category");
+    setActionError(null);
+    const result = await setManyCategory(ids, category);
+    setBusyAction(null);
+    if (result.error) {
+      setActionError(result.error);
+      return;
+    }
+    // Rows don't show their category, so the change is confirmed in words.
+    const entry = categories.find((item) => item.id === category);
+    const name = entry?.builtin === false ? (entry.name ?? category) : getCategoryLabel(category);
+    setSelectedIds(new Set());
+    setIsConfirmingDelete(false);
+    setFloatTone("success");
+    setFloatMessage(t("categorySetNotice", { name }));
+  }
+
+  async function setUnitForIds(ids: string[], unit: string) {
+    if (busyAction || ids.length === 0) return;
+    setBusyAction("unit");
+    setActionError(null);
+    const result = await setManyUnit(ids, unit);
+    setBusyAction(null);
+    if (result.error) {
+      setActionError(result.error);
+      return;
+    }
+    setSelectedIds(new Set());
+    setIsConfirmingDelete(false);
+    setFloatTone("success");
+    setFloatMessage(t("unitSetNotice", { name: unitLabel(unit) }));
+  }
+
+  /** Everything on screen: the current list, narrowed by the category filter or search. */
+  function selectAllShown() {
+    void Haptics.selectionAsync();
+    setSelectedIds(new Set(shownItems.map((item) => item.id)));
+    setActionError(null);
+  }
+
   function changeQuantity(id: string, delta: number) {
     const item = itemsRef.current.find((purchase) => purchase.id === id);
     if (!item) return;
@@ -557,6 +627,13 @@ export default function ItemsScreen() {
   const [listsHomeId, setListsHomeId] = useState<string | null | undefined>(undefined);
   if (homeId !== listsHomeId) {
     setListsHomeId(homeId);
+    // What was open or filtered belongs to the previous home (its categories
+    // and items don't exist in this one).
+    if (listsHomeId !== undefined) {
+      setQuickCategory("all");
+      setOpenItemId(null);
+      setBulkCostIds(null);
+    }
     if (!homeId) {
       setLists([]);
       setSelectedListId(null);
@@ -705,6 +782,23 @@ export default function ItemsScreen() {
     return () => clearTimeout(timer);
   }, [arrivingListId, isLoading, selectedListId]);
 
+  async function addSuggestion(suggestion: ItemSuggestion) {
+    if (isQuickAdding || !selectedListId) return;
+    setIsQuickAdding(true);
+    setActionError(null);
+    setQuickName("");
+    const result = await addItem({
+      name: suggestion.name,
+      quantity: 1,
+      unit: suggestion.unit,
+      category: suggestion.category,
+      urgent: false,
+      listId: selectedListId ?? undefined,
+    });
+    setIsQuickAdding(false);
+    if (result.error) setActionError(result.error);
+  }
+
   async function quickAdd() {
     const name = quickName.trim();
     if (!name || isQuickAdding || !selectedListId) return;
@@ -719,7 +813,11 @@ export default function ItemsScreen() {
       listId: selectedListId ?? undefined,
     });
     setIsQuickAdding(false);
-    if (result.error) setActionError(result.error);
+    if (result.error) {
+      setActionError(result.error);
+      // Not added: give the text back instead of making them type it again.
+      setQuickName((current) => current || name);
+    }
   }
 
   function closeListForm() {
@@ -1005,6 +1103,17 @@ export default function ItemsScreen() {
       onUrgent={() => void markUrgentIds([...selectedIds])}
       onMove={() => askMove([...selectedIds])}
       onDelete={() => askDelete([...selectedIds])}
+      allSelected={allSelected(
+        shownItems.map((item) => item.id),
+        selectedIds,
+      )}
+      category={selectedCategory}
+      unit={selectedUnit}
+      onSelectAll={selectAllShown}
+      onSetCategory={(category) =>
+        void setCategoryForIds([...selectedIds], category)
+      }
+      onSetUnit={(unit) => void setUnitForIds([...selectedIds], unit)}
     />
   ) : null;
 
@@ -1049,6 +1158,17 @@ export default function ItemsScreen() {
             onSubmit={() => void quickAdd()}
             busy={isQuickAdding}
             inputStyle={quickInputStyle}
+            footer={
+              suggestions.length > 0 ? (
+                <ItemSuggestions
+                  suggestions={suggestions}
+                  currency={household?.currency ?? "JOD"}
+                  showPrices={household?.costsEnabled === true}
+                  disabled={isQuickAdding}
+                  onPick={(suggestion) => void addSuggestion(suggestion)}
+                />
+              ) : null
+            }
           />
           <CategoryFilter
             layout="none"
@@ -1075,18 +1195,25 @@ export default function ItemsScreen() {
       <View style={{ paddingTop: 4, paddingBottom: 10 , marginHorizontal: 2}}>
         {showListSkeleton ? (
           <ListSkeleton />
-        ) : visibleItems.length === 0 ? (
+        ) : shownItems.length === 0 ? (
+          typed ? (
+            <AppText className="px-3 py-4 text-center text-sm text-cove-muted">
+              {t("searchNotOnList", { name: typed })}
+            </AppText>
+          ) : (
           <Animated.View entering={FadeIn.duration(240)}>
             <EmptyState
               title={t("nothingToBuy")}
               message={t("nothingToBuyBody")}
             />
           </Animated.View>
+          )
         ) : (
           <Animated.View entering={FadeIn.duration(280)}>
           <ReorderableList
-            items={visibleItems}
-            enabled={!isSelecting}
+            items={shownItems}
+            // A filtered list would save a partial order.
+            enabled={!isSelecting && !typed}
             onDragChange={setIsDragging}
             onItemLongPress={longPressRow}
             onReorder={(ids) => void reorderNeeded(ids)}
@@ -1288,7 +1415,8 @@ export default function ItemsScreen() {
             <TextInput
               value={listName}
               onChangeText={setListName}
-              placeholder={t("listNamePlaceholder")}
+              placeholder={caretGap(t("listNamePlaceholder"))}
+              {...caretColors(colors.accent)}
               placeholderTextColor={colors.muted}
               textAlign={isRTL ? "right" : "left"}
               textAlignVertical="center"
@@ -1476,6 +1604,13 @@ export default function ItemsScreen() {
           ) : null}
         </View>
       </Modal>
+      {household ? (
+        <TripResumeSheet
+          key={household.id}
+          homeId={household.id}
+          autoEndHours={household.tripAutoEndHours}
+        />
+      ) : null}
     </Screen>
   );
 
@@ -1743,207 +1878,3 @@ function shoppingRowPropsEqual(prev: ShoppingRowProps, next: ShoppingRowProps) {
     prev.onChangeQuantity === next.onChangeQuantity
   );
 }
-
-function SelectionBar({
-  busyAction,
-  disabled,
-  clearUrgent,
-  canMove,
-  onBought,
-  onPin,
-  onUrgent,
-  onMove,
-  onDelete,
-}: {
-  busyAction: "pin" | "bought" | "delete" | "urgent" | "move" | null;
-  disabled: boolean;
-  clearUrgent: boolean;
-  canMove: boolean;
-  onBought: () => void;
-  onPin: () => void;
-  onUrgent: () => void;
-  onMove: () => void;
-  onDelete: () => void;
-}) {
-  const { colors, scheme, shadow } = useTheme();
-  const { t, isRTL } = useI18n();
-  const dark = scheme === "dark";
-  const danger = "#F87171";
-  const actionColor = colors.ink;
-
-  function actionButton(
-    label: string,
-    busy: boolean,
-    onPress: () => void,
-    icon: ReactNode,
-    color: string,
-    locked = false,
-  ) {
-    const inactive = disabled || locked;
-    return (
-      <Pressable
-        disabled={inactive}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled: inactive }}
-        style={[selectionStyles.cell, { opacity: inactive ? 0.5 : 1 }]}
-      >
-        {busy ? (
-          <ActivityIndicator color={color} />
-        ) : (
-          <>
-            <View style={selectionStyles.iconSlot}>{icon}</View>
-            <AppText
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-              style={[selectionStyles.label, { color }]}
-            >
-              {label}
-            </AppText>
-          </>
-        )}
-      </Pressable>
-    );
-  }
-
-  return (
-    <View
-      style={{
-        shadowColor: shadow.color,
-        shadowOffset: shadow.offset,
-        shadowOpacity: dark ? 0.42 : 0.16,
-        shadowRadius: 24,
-        elevation: shadow.elevation,
-      }}
-    >
-      <View
-        style={[
-          selectionStyles.shell,
-          {
-            borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
-            backgroundColor: withAlpha(
-              dark ? colors.deep : colors.mist,
-              dark ? 0.55 : 0.72,
-            ),
-          },
-        ]}
-      >
-        <GlassFill soft screenBlur />
-        <View style={selectionStyles.row}>
-          {actionButton(
-            t("markSelectedBought"),
-            busyAction === "bought",
-            onBought,
-            <MaterialCommunityIcons
-              name="cart-check"
-              size={20}
-              color={actionColor}
-            />,
-            actionColor,
-          )}
-          {actionButton(
-            t("pinSelected"),
-            busyAction === "pin",
-            onPin,
-            <View
-              style={{ transform: [{ rotate: isRTL ? "28deg" : "-28deg" }] }}
-            >
-              <MaterialCommunityIcons
-                name="pin"
-                size={18}
-                color={actionColor}
-              />
-            </View>,
-            actionColor,
-          )}
-          {actionButton(
-            t("moveSelected"),
-            busyAction === "move",
-            onMove,
-            <Ionicons name="swap-horizontal" size={18} color={actionColor} />,
-            actionColor,
-            !canMove,
-          )}
-          {actionButton(
-            clearUrgent ? t("clearSelectedUrgent") : t("markSelectedUrgent"),
-            busyAction === "urgent",
-            onUrgent,
-            clearUrgent ? (
-              <View style={selectionStyles.iconSlot}>
-                <Ionicons
-                  name="flash"
-                  size={18}
-                  color={danger}
-                  style={{ opacity: 0.45 }}
-                />
-                <View
-                  pointerEvents="none"
-                  style={[selectionStyles.strike, { backgroundColor: danger }]}
-                />
-              </View>
-            ) : (
-              <Ionicons name="flash" size={18} color={danger} />
-            ),
-            danger,
-          )}
-          {actionButton(
-            t("delete"),
-            busyAction === "delete",
-            onDelete,
-            <Ionicons name="trash-outline" size={18} color={danger} />,
-            danger,
-          )}
-        </View>
-      </View>
-    </View>
-  );
-}
-
-const selectionStyles = StyleSheet.create({
-  shell: {
-    height: tabBar.height,
-    borderRadius: tabBar.radius,
-    borderWidth: tabBar.borderWidth,
-    overflow: "hidden",
-  },
-  row: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: 6,
-    padding: 6,
-  },
-  cell: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-  },
-  iconSlot: {
-    height: 22,
-    width: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  label: {
-    fontSize: tabBar.labelSize,
-    fontWeight: "600",
-    textAlign: "center",
-    lineHeight: tabBar.labelSize + 2,
-    width: "100%",
-  },
-  strike: {
-    position: "absolute",
-    width: 20,
-    height: 2.5,
-    borderRadius: 2,
-    transform: [{ rotate: "-38deg" }],
-  },
-});

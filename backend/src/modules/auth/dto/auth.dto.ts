@@ -11,10 +11,9 @@ export class SignUpDto {
   name: string;
 
   @IsString()
-  @Matches(loginNamePattern, {
+  @Matches(usernamePattern, {
     message: "Use 3–32 letters, numbers, dots, or underscores.",
   })
-  @MaxLength(64)
   email: string;
 
   @IsString()
@@ -67,6 +66,19 @@ export class SetEmailDto {
   @IsEmail({}, { message: "Enter a valid email address." })
   @MaxLength(254)
   email: string;
+
+  /** Changing a verified email is confirmed with the password… */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(72)
+  password?: string;
+
+  /** …or, on an account without one, a fresh Google sign-in. */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  googleIdToken?: string;
 }
 
 export class VerifyEmailDto {
@@ -104,6 +116,14 @@ export class RefreshDto {
   refreshToken: string;
 }
 
+export class LogoutDto extends RefreshDto {
+  /** This phone's Expo push token, so it stops getting notifications. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^Expo(nent)?PushToken\[[^\]]+\]$/)
+  pushToken?: string;
+}
+
 export class ChangePasswordDto {
   /** Omitted when setting a first password on a Google-only account. */
   @IsOptional()
@@ -116,6 +136,12 @@ export class ChangePasswordDto {
   @MinLength(6)
   @MaxLength(72)
   newPassword: string;
+
+  /** Setting a first password (Google-only account): a fresh Google sign-in. */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  googleIdToken?: string;
 }
 
 export class UpdateProfileDto {

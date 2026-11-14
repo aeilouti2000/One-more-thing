@@ -53,7 +53,21 @@ export class TypeormItemsRepository implements IItemsRepository {
         boughtBy: userId,
         boughtAt,
         cost,
+        notFoundAt: null,
+        notFoundBy: null,
       })
+      .where("id = :id", { id })
+      .andWhere("home_id = :homeId", { homeId })
+      .andWhere("status = :status", { status: "needed" })
+      .execute();
+    return result.affected ?? 0;
+  }
+
+  async setNotFound(id: string, homeId: string, userId: string | null, at: Date | null) {
+    const result = await this.items
+      .createQueryBuilder()
+      .update(Item)
+      .set({ notFoundAt: at, notFoundBy: userId })
       .where("id = :id", { id })
       .andWhere("home_id = :homeId", { homeId })
       .andWhere("status = :status", { status: "needed" })
@@ -85,7 +99,9 @@ export class TypeormItemsRepository implements IItemsRepository {
            urgent = false,
            bought_by = $${userParam}::uuid,
            bought_at = $${timeParam},
-           cost = CASE id ${cases} ELSE cost END
+           cost = CASE id ${cases} ELSE cost END,
+           not_found_at = NULL,
+           not_found_by = NULL
        WHERE home_id = $${homeParam}::uuid
          AND status = 'needed'
          AND id IN (${inList})`,

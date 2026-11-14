@@ -67,21 +67,51 @@ async function fetchRelease(): Promise<AppRelease | null> {
   return null;
 }
 
+/**
+ * What Settings shows about updates. "unknown" until the server has answered
+ * once; "current" when this is the newest version.
+ */
+export type UpdateState =
+  | { status: "unknown" }
+  | { status: "current" }
+  | { status: "available"; version: string; downloadUrl: string };
+
+let updateState: UpdateState = { status: "unknown" };
+const updateListeners = new Set<() => void>();
+
+export function readUpdateState() {
+  return updateState;
+}
+
+export function subscribeUpdateState(listener: () => void) {
+  updateListeners.add(listener);
+  return () => {
+    updateListeners.delete(listener);
+  };
+}
+
+function setUpdateState(next: UpdateState) {
+  updateState = next;
+  updateListeners.forEach((listener) => listener());
+}
+
 export async function checkAppUpdate(): Promise<AppUpdate | null> {
   if (Platform.OS === "web") return null;
   const release = await fetchRelease();
   if (!release) return null;
   const installed = installedAppVersion();
+  const newer =
+    release.latestVersion && release.downloadUrl && isOlderVersion(installed, release.latestVersion)
+      ? { version: release.latestVersion, downloadUrl: release.downloadUrl }
+      : null;
+  // Settings keeps showing the update after "Later" hides the prompt.
+  setUpdateState(newer ? { status: "available", ...newer } : { status: "current" });
+
   if (release.minVersion && isOlderVersion(installed, release.minVersion)) {
     return { required: true, version: release.minVersion, downloadUrl: release.downloadUrl };
   }
-  if (
-    release.latestVersion &&
-    release.downloadUrl &&
-    isOlderVersion(installed, release.latestVersion) &&
-    !dismissed.has(release.latestVersion)
-  ) {
-    return { required: false, version: release.latestVersion, downloadUrl: release.downloadUrl };
+  if (newer && !dismissed.has(newer.version)) {
+    return { required: false, ...newer };
   }
   return null;
 }

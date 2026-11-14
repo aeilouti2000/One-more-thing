@@ -120,6 +120,13 @@ export class Item {
   @Column({ name: "receipt_id", type: "uuid", nullable: true })
   receiptId: string | null;
 
+  /** Marked "couldn't find it" during a trip; cleared when bought or at the next trip. */
+  @Column({ name: "not_found_at", type: "timestamptz", nullable: true })
+  notFoundAt: Date | null;
+
+  @Column({ name: "not_found_by", type: "uuid", nullable: true })
+  notFoundBy: string | null;
+
   /** Current photo (item_images row). A new id on every replace. */
   @Column({ name: "image_id", type: "uuid", nullable: true })
   imageId: string | null;

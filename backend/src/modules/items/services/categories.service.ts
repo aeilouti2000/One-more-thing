@@ -69,7 +69,9 @@ export class CategoriesService {
     if (builtin) {
       await this.categories.hide(homeId, categoryId);
     } else {
-      const row = await this.categories.findCustomInHome(categoryId, homeId);
+      const row = UUID_RE.test(categoryId)
+        ? await this.categories.findCustomInHome(categoryId, homeId)
+        : null;
       if (!row) {
         throw new DomainError("CATEGORY_NOT_FOUND", "That category was not found.", HttpStatus.NOT_FOUND);
       }

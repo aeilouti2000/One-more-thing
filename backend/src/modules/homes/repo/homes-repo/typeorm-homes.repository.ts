@@ -232,12 +232,18 @@ export class TypeormHomesRepository implements IHomesRepository {
   }
 
   async deletePartner(homeId: string, memberId: string) {
-    const result = await this.members.delete({ homeId, userId: memberId, role: "partner" });
-    return result.affected ?? 0;
-  }
-
-  findUser(userId: string) {
-    return this.dataSource.getRepository(User).findOne({ where: { id: userId } });
+    return this.dataSource.transaction(async (manager) => {
+      const result = await manager
+        .getRepository(HomeMember)
+        .delete({ homeId, userId: memberId, role: "partner" });
+      const affected = result.affected ?? 0;
+      if (affected > 0) {
+        // The removed person knows the old code: a new one keeps them out.
+        const homes = manager.getRepository(Home);
+        await homes.update({ id: homeId }, { inviteCode: await uniqueInviteCode(homes) });
+      }
+      return affected;
+    });
   }
 
   private async resolveActiveMembership(userId: string, manager = this.dataSource.manager) {
@@ -288,6 +294,11 @@ export class TypeormHomesRepository implements IHomesRepository {
       askCostOnTripEnd: home.askCostOnTripEnd,
       tripCostMode: home.tripCostMode === "total" ? "total" : "items",
       notificationsEnabled: home.notificationsEnabled !== false,
+      monthlyBudget: home.monthlyBudget ?? null,
+      tripAskName: home.tripAskName === true,
+      tripAutoEndHours: home.tripAutoEndHours ?? null,
+      tripSummary: home.tripSummary !== false,
+      tripShopTogether: home.tripShopTogether === true,
       members: rows.map((row) => ({
         id: row.id,
         role: row.role,

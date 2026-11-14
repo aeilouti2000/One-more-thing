@@ -146,11 +146,30 @@ export async function syncPushRegistration(
   }
 }
 
+/**
+ * Stops notifications to this phone. False when the server could not be
+ * reached: the token is kept, so the caller can say so and try again.
+ */
 export async function unregisterPushDevice() {
   const token = readStoredToken();
+  if (!token) return true;
+  try {
+    await api.delete("/notifications/devices", { token });
+  } catch {
+    return false;
+  }
   writeStoredToken(null);
-  if (!token) return;
-  await api.delete("/notifications/devices", { token }).catch(() => undefined);
+  return true;
+}
+
+/**
+ * This phone's token, forgotten here. For signing out: the token goes along
+ * with the request and the server removes the device.
+ */
+export function takePushToken() {
+  const token = readStoredToken();
+  writeStoredToken(null);
+  return token;
 }
 
 let asking = false;

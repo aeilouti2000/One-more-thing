@@ -107,6 +107,39 @@ describe("NotificationsService", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("sends each person only the kinds of notification they chose", async () => {
+    repo.findRecipients.mockResolvedValue([
+      { token: "ExponentPushToken[all]", locale: "en" },
+      { token: "ExponentPushToken[urgent-only]", locale: "en", added: false, urgent: true, due: true },
+      { token: "ExponentPushToken[none]", locale: "en", added: false, urgent: false, due: false },
+    ] as never);
+    service.notifyItemAdded({ homeId: "h1", actorId: "u1", actorName: "Alex", itemName: "Milk", urgent: false });
+    service.notifyItemAdded({ homeId: "h1", actorId: "u1", actorName: "Alex", itemName: "Tea", urgent: true });
+
+    await service.flushPending();
+
+    const messages = sentMessages();
+    expect(messages.map((message) => message.to)).toEqual([
+      "ExponentPushToken[all]",
+      "ExponentPushToken[urgent-only]",
+    ]);
+    expect(messages[0].body).toBe("Alex added 2 items: Milk, Tea");
+    // Only the urgent item reaches the person who turned "new items" off.
+    expect(messages[1].body).toBe("Alex added Tea and marked it urgent");
+    expect(messages[1].data.count).toBe(1);
+  });
+
+  it("sends nothing when nobody wants that kind", async () => {
+    repo.findRecipients.mockResolvedValue([
+      { token: "ExponentPushToken[a]", locale: "en", due: false },
+    ] as never);
+    service.notifyPinDue({ homeId: "h1", itemName: "Milk" });
+
+    await service.flushPending();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("drops tokens Expo reports as unregistered, in tickets and in receipts", async () => {
     fetchMock.mockResolvedValueOnce(
       ok({

@@ -1,5 +1,16 @@
-import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
-import { TRIP_COST_MODES, type TripCostMode } from "../entities/home.entity";
+import {
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateIf,
+} from "class-validator";
+import { TRIP_AUTO_END_HOURS, TRIP_COST_MODES, type TripCostMode } from "../entities/home.entity";
 
 export const HOME_CURRENCIES = ["JOD", "USD", "EUR", "ILS", "SAR", "AED", "EGP", "GBP"] as const;
 export type HomeCurrency = (typeof HOME_CURRENCIES)[number];
@@ -55,6 +66,32 @@ export class UpdateCostSettingsDto {
   @IsOptional()
   @IsIn(TRIP_COST_MODES)
   tripCostMode?: TripCostMode;
+
+  /** Null clears the budget. */
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0.001)
+  @Max(999_999_999)
+  monthlyBudget?: number | null;
+}
+
+export class UpdateTripSettingsDto {
+  @IsOptional()
+  @IsBoolean()
+  tripAskName?: boolean;
+
+  /** Null turns auto-end off. */
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsIn(TRIP_AUTO_END_HOURS)
+  tripAutoEndHours?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  tripSummary?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  tripShopTogether?: boolean;
 }
 
 export class UpdateNotificationSettingsDto {

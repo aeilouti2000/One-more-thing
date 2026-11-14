@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Redirect } from "expo-router";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import { HomeLoadFailed } from "@/features/homes/components/home-load-failed";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 
@@ -16,7 +17,7 @@ export function RequireSession({
   redirectIfHome = false,
 }: RequireSessionProps) {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { hasHousehold, isLoading: isHomeLoading } = useHousehold();
+  const { hasHousehold, loadFailed, isLoading: isHomeLoading } = useHousehold();
 
   if (isAuthLoading || (user && isHomeLoading)) {
     return <LoadingScreen />;
@@ -24,6 +25,10 @@ export function RequireSession({
 
   if (!user) {
     return <Redirect href="/welcome" />;
+  }
+
+  if (!hasHousehold && loadFailed) {
+    return <HomeLoadFailed />;
   }
 
   if (requireHome && !hasHousehold) {

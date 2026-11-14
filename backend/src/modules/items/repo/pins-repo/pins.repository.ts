@@ -23,6 +23,7 @@ export interface IPinsRepository {
   moveList(homeId: string, fromListId: string, toListId: string | null): Promise<void>;
   insert(input: NewPinInput): Promise<Pin>;
   findInHome(pinId: string, homeId: string): Promise<Pin | null>;
+  findById(pinId: string): Promise<Pin | null>;
   deleteById(pinId: string): Promise<void>;
   findDue(homeId: string): Promise<Pin[]>;
   findDueHomeIds(): Promise<string[]>;

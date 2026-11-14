@@ -19,7 +19,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 export default function AppearanceSettingsScreen() {
   const { t } = useI18n();
   const { scheme, preference, setPreference } = useTheme();
-  const showBack = useSettingsShowBack();
+  const showBack = useSettingsShowBack({ nested: true });
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
 

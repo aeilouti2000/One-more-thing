@@ -37,6 +37,16 @@ export class User {
   @Column({ name: "active_home_id", type: "uuid", nullable: true })
   activeHomeId: string | null;
 
+  /** Which kinds of list notification this person wants. */
+  @Column({ name: "notify_added", type: "boolean", default: true })
+  notifyAdded: boolean;
+
+  @Column({ name: "notify_urgent", type: "boolean", default: true })
+  notifyUrgent: boolean;
+
+  @Column({ name: "notify_due", type: "boolean", default: true })
+  notifyDue: boolean;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
 

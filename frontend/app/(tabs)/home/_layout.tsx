@@ -6,8 +6,8 @@ import { useTheme } from "@/providers/ThemeProvider";
 const SCREENS = ["index", "homes", "add"];
 
 /**
- * Home hub + sub-pages (Your homes, Add a home). Pages cross-fade instead of
- * sliding. Android uses the JS stack so push and pop animate the same way
+ * Home hub + sub-pages (Your homes, Add a home). Going deeper slides in from
+ * the side, like Settings. Android uses the JS stack so push and pop animate the same way
  * (see the settings layout for why the native stack is avoided there).
  */
 export default function HomeLayout() {
@@ -18,7 +18,7 @@ export default function HomeLayout() {
       <JsStack
         screenOptions={{
           headerShown: false,
-          animation: "fade",
+          animation: "slide_from_right",
           cardStyle: { backgroundColor: colors.ice },
         }}
       >
@@ -30,7 +30,7 @@ export default function HomeLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          animation: "fade",
+          animation: "slide_from_right",
           contentStyle: { backgroundColor: colors.ice },
         }}
       >

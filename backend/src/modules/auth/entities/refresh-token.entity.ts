@@ -29,6 +29,14 @@ export class RefreshToken {
   @Column({ name: "revoked_at", type: "timestamptz", nullable: true })
   revokedAt: Date | null;
 
+  /** The token this one replaced. */
+  @Column({ name: "parent_id", type: "uuid", nullable: true })
+  parentId: string | null;
+
+  /** When a replacement was issued for this token. */
+  @Column({ name: "superseded_at", type: "timestamptz", nullable: true })
+  supersededAt: Date | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
 }

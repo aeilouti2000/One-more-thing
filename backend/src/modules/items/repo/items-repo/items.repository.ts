@@ -35,6 +35,9 @@ export interface IItemsRepository {
     boughtAt: Date,
     entries: { id: string; cost: number | null }[],
   ): Promise<number>;
+  /** Sets or clears the "not found" mark on a needed item. Returns rows changed. */
+  setNotFound(id: string, homeId: string, userId: string | null, at: Date | null): Promise<number>;
+  /** A new trip on this list: earlier "not found" marks no longer apply. */
   deleteInHome(ids: string[], homeId: string): Promise<void>;
   findNeededByIds(ids: string[], homeId: string): Promise<Item[]>;
   deleteNeededOnList(homeId: string, listId: string): Promise<void>;

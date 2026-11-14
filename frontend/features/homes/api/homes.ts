@@ -5,7 +5,7 @@ import {
   writeCachedHomes,
   writeCachedHousehold,
 } from "@/features/offline/profile-cache";
-import type { CostSettings, HomeSummary, Household } from "@/features/homes/types/household";
+import type { CostSettings, HomeSummary, Household, TripSettings } from "@/features/homes/types/household";
 
 export function alreadyHasHome(message: string | null | undefined) {
   const value = (message ?? "").toLowerCase();
@@ -22,6 +22,13 @@ function withCostDefaults(home: Household): Household {
     askCostOnTripEnd: home.askCostOnTripEnd !== false,
     tripCostMode: home.tripCostMode === "total" ? "total" : "items",
     notificationsEnabled: home.notificationsEnabled !== false,
+    // Missing on an older server: no budget, no trip options.
+    monthlyBudget:
+      typeof home.monthlyBudget === "number" && home.monthlyBudget > 0 ? home.monthlyBudget : null,
+    tripAskName: home.tripAskName === true,
+    tripAutoEndHours: typeof home.tripAutoEndHours === "number" ? home.tripAutoEndHours : null,
+    tripSummary: home.tripSummary !== false,
+    tripShopTogether: home.tripShopTogether === true,
   };
 }
 
@@ -91,6 +98,18 @@ export async function updateCostSettings(homeId: string, settings: Partial<CostS
   try {
     const home = withCostDefaults(
       await api.patch<Household>(`/homes/${homeId}/cost-settings`, settings),
+    );
+    writeCachedHousehold(home);
+    return { home, error: null };
+  } catch (error) {
+    return { home: null, error: formatAppError(error) };
+  }
+}
+
+export async function updateTripSettings(homeId: string, settings: Partial<TripSettings>) {
+  try {
+    const home = withCostDefaults(
+      await api.patch<Household>(`/homes/${homeId}/trip-settings`, settings),
     );
     writeCachedHousehold(home);
     return { home, error: null };

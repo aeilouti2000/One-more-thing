@@ -1,4 +1,4 @@
-import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import bcrypt from "bcrypt";
@@ -44,6 +44,8 @@ export type AuthSession = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(AUTH_REPOSITORY) private readonly auth: IAuthRepository,
     private readonly jwt: JwtService,
@@ -137,6 +139,14 @@ export class AuthService {
     if (owner && owner.id !== userId) {
       throw new DomainError("GOOGLE_IN_USE", "That Google account is linked to another account", HttpStatus.CONFLICT);
     }
+    // Never swap one Google account for another silently: disconnect first.
+    if (user.googleSub && user.googleSub !== identity.sub) {
+      throw new DomainError(
+        "GOOGLE_ALREADY_LINKED",
+        "Disconnect the current Google account first",
+        HttpStatus.CONFLICT,
+      );
+    }
     user.googleSub = identity.sub;
     user.googleEmail = identity.email;
 
@@ -174,12 +184,19 @@ export class AuthService {
   }
 
   /** Set or change the account email; a code goes to the new address. */
-  async setEmail(userId: string, email: string) {
+  async setEmail(
+    userId: string,
+    email: string,
+    proof: { password?: string; googleIdToken?: string } = {},
+  ) {
     const user = await this.requireUser(userId);
     const address = normalizeAddress(email);
     if (user.emailVerifiedAt && user.contactEmail === address) {
       return this.toPublicUser(user);
     }
+    // The verified email can reset the password, so replacing it needs the
+    // password (or Google) again: a borrowed, unlocked phone is not enough.
+    if (user.emailVerifiedAt) await this.assertProof(user, proof);
     const other = await this.auth.findUserByVerifiedEmail(address);
     if (other && other.id !== userId) {
       throw new DomainError("EMAIL_IN_USE", "That email belongs to another account", HttpStatus.CONFLICT);
@@ -261,6 +278,12 @@ export class AuthService {
       throw new DomainError("INVALID_TOKEN", "Refresh token is invalid", HttpStatus.UNAUTHORIZED);
     }
     if (stored.revokedAt) {
+      // A token that was replaced, and whose replacement was already used, is
+      // being shown again: someone else has a copy. End every session.
+      if (stored.supersededAt && (await this.auth.wasRefreshReplacementUsed(stored.id))) {
+        this.logger.warn(`Reused refresh token for user ${stored.userId}; ending all sessions`);
+        await this.auth.revokeActiveForUser(stored.userId, new Date());
+      }
       throw new DomainError("INVALID_TOKEN", "Refresh token is invalid", HttpStatus.UNAUTHORIZED);
     }
     if (stored.expiresAt.getTime() < Date.now()) {
@@ -272,17 +295,32 @@ export class AuthService {
       throw new DomainError("INVALID_TOKEN", "Refresh token is invalid", HttpStatus.UNAUTHORIZED);
     }
 
+    // A new refresh token each time, valid for a full period from now: an
+    // active phone stays signed in, and a copied token stops working.
+    const nextToken = randomToken(48);
+    await this.auth.rotateRefresh(stored, {
+      tokenHash: sha256(nextToken),
+      expiresAt: this.refreshExpiry(),
+    });
     const accessToken = await this.signAccessToken(user);
-    return { accessToken, refreshToken, user: this.toPublicUser(user) };
+    return { accessToken, refreshToken: nextToken, user: this.toPublicUser(user) };
   }
 
-  async logout(refreshToken: string) {
-    await this.auth.revokeByHash(sha256(refreshToken), new Date());
+  async logout(refreshToken: string, pushToken?: string) {
+    await this.auth.revokeByHash(sha256(refreshToken), new Date(), pushToken);
     return { signedOut: true };
   }
 
-  /** Change the password, or set a first one on a Google-only account. */
-  async changePassword(userId: string, currentPassword: string | undefined, newPassword: string) {
+  /**
+   * Change the password, or set a first one on a Google-only account (which
+   * is confirmed with a fresh Google sign-in instead of the old password).
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string | undefined,
+    newPassword: string,
+    googleIdToken?: string,
+  ) {
     if (currentPassword === newPassword) {
       throw new DomainError("PASSWORD_UNCHANGED", "New password must be different", HttpStatus.BAD_REQUEST);
     }
@@ -296,6 +334,8 @@ export class AuthService {
       if (!matches) {
         throw new DomainError("CURRENT_PASSWORD_WRONG", "Current password is wrong", HttpStatus.UNAUTHORIZED);
       }
+    } else {
+      await this.assertProof(user, { googleIdToken });
     }
     user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     await this.auth.saveUser(user);
@@ -348,21 +388,26 @@ export class AuthService {
     return this.toPublicUser(user);
   }
 
-  /** Confirmed with the password, or a fresh Google sign-in for the linked account. */
-  async deleteAccount(userId: string, proof: { password?: string; googleIdToken?: string }) {
-    const user = await this.requireUser(userId);
+  /** The person at the phone is the account's owner: its password, or a fresh sign-in with its Google account. */
+  private async assertProof(user: User, proof: { password?: string; googleIdToken?: string }) {
     if (proof.googleIdToken) {
       const identity = await this.google.verify(proof.googleIdToken);
       if (!user.googleSub || identity.sub !== user.googleSub) {
         throw new DomainError("GOOGLE_MISMATCH", "Use the Google account linked to this account", HttpStatus.UNAUTHORIZED);
       }
-    } else {
-      const matches =
-        proof.password && user.passwordHash ? await bcrypt.compare(proof.password, user.passwordHash) : false;
-      if (!matches) {
-        throw new DomainError("CURRENT_PASSWORD_WRONG", "Current password is wrong", HttpStatus.UNAUTHORIZED);
-      }
+      return;
     }
+    const matches =
+      proof.password && user.passwordHash ? await bcrypt.compare(proof.password, user.passwordHash) : false;
+    if (!matches) {
+      throw new DomainError("CURRENT_PASSWORD_WRONG", "Current password is wrong", HttpStatus.UNAUTHORIZED);
+    }
+  }
+
+  /** Confirmed with the password, or a fresh Google sign-in for the linked account. */
+  async deleteAccount(userId: string, proof: { password?: string; googleIdToken?: string }) {
+    const user = await this.requireUser(userId);
+    await this.assertProof(user, proof);
 
     await this.dataSource.transaction(async (manager) => {
       const members = manager.getRepository(HomeMember);
@@ -470,14 +515,21 @@ export class AuthService {
     }
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
     await this.auth.invalidateEmailCodes(userId, purpose, now);
-    await this.auth.saveNewEmailCode({
+    const saved = await this.auth.saveNewEmailCode({
       userId,
       email,
       purpose,
       codeHash: hashCode(userId, code),
       expiresAt: new Date(now.getTime() + CODE_TTL_MINUTES * 60_000),
     });
-    await this.mail.sendCode(email, code, purpose, CODE_TTL_MINUTES);
+    try {
+      await this.mail.sendCode(email, code, purpose, CODE_TTL_MINUTES);
+    } catch (error) {
+      // Nothing was sent: don't make the person wait out a cooldown or spend
+      // one of today's codes on it.
+      await this.auth.deleteEmailCode(saved.id).catch(() => undefined);
+      throw error;
+    }
   }
 
   private async consumeCode(userId: string, purpose: EmailCodePurpose, code: string) {
@@ -542,14 +594,18 @@ export class AuthService {
   private async createSession(user: User): Promise<AuthSession> {
     const accessToken = await this.signAccessToken(user);
     const refreshToken = randomToken(48);
-    const days = this.config.get("JWT_REFRESH_TTL_DAYS", { infer: true });
     await this.auth.saveRefresh({
       userId: user.id,
       tokenHash: sha256(refreshToken),
-      expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+      expiresAt: this.refreshExpiry(),
       revokedAt: null,
     });
     return { accessToken, refreshToken, user: this.toPublicUser(user) };
+  }
+
+  private refreshExpiry() {
+    const days = this.config.get("JWT_REFRESH_TTL_DAYS", { infer: true });
+    return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   }
 }
 
