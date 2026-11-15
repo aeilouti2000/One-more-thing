@@ -37,8 +37,8 @@ const FADE_MS = 220;
 // The pill's two ends ride separate springs: whichever end faces the new tab
 // follows the fast one and the other follows the slow one, so the pill
 // stretches toward its target and then settles.
-const LEAD_SPRING = { mass: 1, stiffness: 520, damping: 36 };
-const TRAIL_SPRING = { mass: 1, stiffness: 170, damping: 24 };
+const LEAD_SPRING = { mass: 1, stiffness: 720, damping: 42 };
+const TRAIL_SPRING = { mass: 1, stiffness: 235, damping: 28 };
 // Tighter springs while a finger drags the pill, so it keeps up with the hand.
 const DRAG_LEAD_SPRING = { mass: 1, stiffness: 900, damping: 46 };
 const DRAG_TRAIL_SPRING = { mass: 1, stiffness: 330, damping: 30 };
