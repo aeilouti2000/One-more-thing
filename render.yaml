@@ -22,11 +22,11 @@ services:
       - key: CORS_ORIGINS
         value: ""
       - key: APP_MIN_VERSION
-        value: "2.5.0"
-      - key: APP_LATEST_VERSION
         value: "2.6.0"
+      - key: APP_LATEST_VERSION
+        value: "2.7.0"
       - key: APP_DOWNLOAD_URL
-        value: "https://expo.dev/artifacts/eas/e7s3MUCqRWUVwM5BjcMaWkFeKLtALjj7SUYgM8U4QpY.apk"
+        value: "https://expo.dev/artifacts/eas/jH13OkVoaAYj22rM4m7KpMtd2b5BkwIv6-M4QggYpCw.apk"
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: BREVO_API_KEY
