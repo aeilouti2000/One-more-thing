@@ -77,3 +77,39 @@ test("reads prices printed in Arabic digits", () => {
     [1.25, 0.8],
   );
 });
+
+test("reads a grouped amount, and ignores dates, phones and receipt numbers", () => {
+  const parsed = parseReceiptText(`
+    CARREFOUR
+    12/05/2026 14:32
+    Tel: 06 5551234
+    Invoice 00123
+    TV 1,234.50
+    Cable 12.00
+    Change 3.25
+    Total items 2
+    Total 1,246.50
+  `);
+  assert.deepEqual(
+    parsed.lines.map((line) => [line.name, line.amount]),
+    [
+      ["TV", 1234.5],
+      ["Cable", 12],
+    ],
+  );
+  assert.equal(parsed.total, 1246.5);
+});
+
+test("a comma without a decimal point after it stays a decimal mark", () => {
+  const parsed = parseReceiptText("Rice 1,250\nTotal 1,250");
+  assert.equal(parsed.lines[0]?.amount, 1.25);
+  assert.equal(parsed.total, 1.25);
+});
+
+test("matches an Arabic name with and without the article", () => {
+  const matches = matchReceiptLines(
+    [{ id: "milk", name: "حليب", quantity: 1 }],
+    [{ id: "r0", name: "الحليب", qty: null }],
+  );
+  assert.deepEqual(matches, [{ itemId: "milk", lineId: "r0" }]);
+});

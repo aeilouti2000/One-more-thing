@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppTextField } from "@/components/ui/AppTextField";
@@ -27,6 +27,7 @@ import { withAlpha } from "@/constants/theme";
 import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { normalizeDigits } from "@/lib/numbers";
 
 function goBack() {
   if (router.canGoBack()) router.back();
@@ -93,6 +94,7 @@ export function AccountNameScreen() {
   return (
     <AccountSubPage title={t("name")} subtitle={t("nameHint")}>
       <AppTextField
+        maxLength={80}
         label={t("name")}
         value={name}
         onChangeText={(value) => {
@@ -143,6 +145,7 @@ export function AccountUsernameScreen() {
   return (
     <AccountSubPage title={t("username")} subtitle={t("usernameHint")}>
       <AppTextField
+        maxLength={32}
         label={t("username")}
         value={username}
         onChangeText={(value) => {
@@ -220,6 +223,7 @@ export function AccountPasswordScreen() {
     >
       {settingFirst ? null : (
         <AppTextField
+          maxLength={72}
           label={t("currentPassword")}
           value={currentPassword}
           onChangeText={setCurrentPassword}
@@ -230,6 +234,7 @@ export function AccountPasswordScreen() {
         />
       )}
       <AppTextField
+        maxLength={72}
         label={t("newPassword")}
         value={newPassword}
         onChangeText={setNewPassword}
@@ -239,6 +244,7 @@ export function AccountPasswordScreen() {
         autoComplete="new-password"
       />
       <AppTextField
+        maxLength={72}
         label={t("confirmNewPassword")}
         value={confirmPassword}
         onChangeText={setConfirmPassword}
@@ -287,6 +293,7 @@ export function AccountEmailScreen() {
   const [busy, setBusy] = useState(false);
   // Arriving with an unverified email: a code was sent at sign-up, allow resend now.
   const { seconds, restart } = useResendCountdown(0);
+  const resending = useRef(false);
 
   async function sendCode() {
     const next = address.trim();
@@ -331,9 +338,12 @@ export function AccountEmailScreen() {
   }
 
   async function resend() {
+    if (resending.current) return;
+    resending.current = true;
     setError(null);
     setNotice(null);
     const result = await resendEmailCode();
+    resending.current = false;
     if (result.error) {
       setError(result.error);
       return;
@@ -380,7 +390,7 @@ export function AccountEmailScreen() {
             label={t("verificationCode")}
             value={code}
             onChangeText={(value) => {
-              setCode(value.replace(/\D/g, "").slice(0, 6));
+              setCode(normalizeDigits(value).replace(/\D/g, "").slice(0, 6));
               setError(null);
             }}
             placeholder={t("codePlaceholder")}
@@ -422,6 +432,7 @@ export function AccountEmailScreen() {
       ) : (
         <>
           <AppTextField
+            maxLength={254}
             label={current ? t("newEmail") : t("email")}
             value={address}
             onChangeText={(value) => {

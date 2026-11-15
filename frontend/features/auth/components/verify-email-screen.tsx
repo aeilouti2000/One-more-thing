@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
 import { View } from "react-native";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -15,6 +15,7 @@ import { setPostAuthRoute } from "@/features/auth/lib/post-auth-route";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 import { useResendCountdown } from "@/hooks/use-resend-countdown";
 import { useI18n } from "@/providers/LanguageProvider";
+import { normalizeDigits } from "@/lib/numbers";
 
 /** Shown right after sign-up: enter the code we emailed, or skip for now. */
 export default function VerifyEmailScreen() {
@@ -34,6 +35,7 @@ function VerifyEmailContent() {
   const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { seconds, restart } = useResendCountdown();
+  const resending = useRef(false);
 
   useEffect(() => {
     setPostAuthRoute(null);
@@ -61,9 +63,12 @@ function VerifyEmailContent() {
   }
 
   async function onResend() {
+    if (resending.current) return;
+    resending.current = true;
     setError(null);
     setNotice(null);
     const result = await resendEmailCode();
+    resending.current = false;
     if (result.error) {
       setError(result.error);
       return;
@@ -85,7 +90,7 @@ function VerifyEmailContent() {
           placeholder={t("codePlaceholder")}
           value={code}
           onChangeText={(value) => {
-            setCode(value.replace(/\D/g, "").slice(0, 6));
+            setCode(normalizeDigits(value).replace(/\D/g, "").slice(0, 6));
             setFieldError(undefined);
           }}
           keyboardType="number-pad"

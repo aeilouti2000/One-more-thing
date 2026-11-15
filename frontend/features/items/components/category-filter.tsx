@@ -257,6 +257,7 @@ export function CategoryFilter({
                     <Ionicons name="grid-outline" size={15} color={colors.accent} />
                   </View>
                   <TextInput
+                    maxLength={40}
                     value={draft}
                     onChangeText={setDraft}
                     placeholder={caretGap(t("newCategoryPlaceholder"))}

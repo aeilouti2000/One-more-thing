@@ -24,7 +24,7 @@ export class UserThrottlerGuard extends ThrottlerGuard {
 
   protected async getTracker(req: ThrottledRequest): Promise<string> {
     const ip = req.ip ?? "unknown";
-    if (req.path?.startsWith("/api/auth")) return ip;
+    if (req.path?.toLowerCase().startsWith("/api/auth")) return ip;
     const header = req.headers?.authorization;
     const token = typeof header === "string" && header.startsWith("Bearer ") ? header.slice(7) : "";
     const userId = token ? this.verifiedUserId(token) : null;

@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
 import * as Updates from "expo-updates";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Linking, Platform, View } from "react-native";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppLogo } from "@/components/ui/AppLogo";
 import { AppText } from "@/components/ui/AppText";
+import { FloatMessage } from "@/components/ui/FloatMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { APP_NAME } from "@/constants/app";
@@ -20,7 +21,7 @@ import {
   useSettingsSplitJoin,
   useSettingsTabBarInset,
 } from "@/features/settings/hooks/use-settings-chrome";
-import { checkAppUpdate, installedAppVersion } from "@/lib/app-release";
+import { checkAppUpdate, installedAppVersion, readUpdateState } from "@/lib/app-release";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -45,13 +46,22 @@ export default function AboutScreen() {
   const [isChecking, setIsChecking] = useState(false);
   const [checkFailed, setCheckFailed] = useState(false);
   const [fixReady, setFixReady] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const version = installedAppVersion();
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   async function onCheck() {
     setIsChecking(true);
     setCheckFailed(false);
+    setToast(null);
+    let fixFound = false;
     // The result lands in the shared update state this page reads.
-    await checkAppUpdate();
+    await checkAppUpdate({ patient: false });
     // Small fixes arrive without a new install; fetch one now if it's waiting.
     if (Updates.isEnabled) {
       try {
@@ -59,6 +69,7 @@ export default function AboutScreen() {
         if (found.isAvailable) {
           await Updates.fetchUpdateAsync();
           setFixReady(true);
+          fixFound = true;
         }
       } catch {
         // Not available in development; the next app start checks again.
@@ -66,6 +77,8 @@ export default function AboutScreen() {
     }
     setIsChecking(false);
     setCheckFailed(true);
+    // Nothing newer anywhere: say so, since the button otherwise just stops.
+    if (!fixFound && readUpdateState().status === "current") setToast(t("upToDate"));
   }
 
   // Set only when the app runs a fix downloaded after it was installed.
@@ -92,7 +105,12 @@ export default function AboutScreen() {
           : null;
 
   return (
-    <Screen tabBarInset={tabBarInset}>
+    <Screen
+      tabBarInset={tabBarInset}
+      floating={toast ? <FloatMessage message={toast} tone="success" wide /> : null}
+      // On phones the tab bar is hidden here, so the toast can rest at the bottom.
+      floatingLow={!tabBarInset}
+    >
       <ScreenHeader
         title={t("aboutHelp")}
         subtitle={t("aboutHelpSummary")}

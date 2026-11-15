@@ -7,7 +7,7 @@ import { NotificationsService } from "../../notifications/services/notifications
 import type { ItemCategory } from "../entities/item.entity";
 import { Item } from "../entities/item.entity";
 import { TripReceipt } from "../entities/trip-receipt.entity";
-import { ITEMS_REPOSITORY, type IItemsRepository } from "../repo/items-repo/items.repository";
+import { ITEMS_REPOSITORY, type IItemsRepository, type ItemPatch } from "../repo/items-repo/items.repository";
 import { LISTS_REPOSITORY, type IListsRepository } from "../repo/lists-repo/lists.repository";
 import { undoDeadline } from "../utils/shopping";
 import { CategoriesService } from "./categories.service";
@@ -60,7 +60,8 @@ export class ItemsService {
 
   async list(userId: string, homeId: string) {
     await this.homes.requireMembership(userId, homeId);
-    await this.pins.materializeDue(homeId);
+    // Due pins are a bonus here (the timer adds them too): never fail the read.
+    await this.pins.materializeDue(homeId).catch(() => undefined);
     const rows = await this.items.findByHome(homeId);
     return this.withNames(rows);
   }
@@ -117,18 +118,19 @@ export class ItemsService {
   ) {
     const item = await this.requireItem(userId, itemId);
     await this.categories.assertUsable(item.homeId, input.category);
-    const becameUrgent = !item.urgent && input.urgent && item.status === "needed";
-    item.name = input.name.trim();
-    item.quantity = input.quantity;
-    item.category = input.category;
-    item.urgent = input.urgent;
-    if (input.notes !== undefined) {
-      item.notes = blankToNull(input.notes);
-    }
-    if (input.unit !== undefined) {
-      item.unit = blankToNull(input.unit);
-    }
-    const saved = await this.items.save(item);
+    const needed = item.status === "needed";
+    const becameUrgent = !item.urgent && input.urgent && needed;
+    const changes: ItemPatch = {
+      name: input.name.trim(),
+      quantity: input.quantity,
+      category: input.category,
+    };
+    // A bought item keeps no urgent mark (it comes back with the one it had).
+    if (needed) changes.urgent = input.urgent;
+    if (input.notes !== undefined) changes.notes = blankToNull(input.notes);
+    if (input.unit !== undefined) changes.unit = blankToNull(input.unit);
+    await this.items.patch(item.id, item.homeId, changes);
+    const saved = await this.reload(item);
     if (becameUrgent) {
       await this.items.placeNeeded(saved.homeId, saved.id, "top", saved.listId);
     }
@@ -165,11 +167,10 @@ export class ItemsService {
     if (changed > 0 && receiptId) {
       await this.joinReceipt(item.homeId, [item.id], receiptId, boughtAt);
     }
-    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
+    const [view] = await this.withNames([await this.reload(item)]);
     return view;
   }
 
-  /** onlyMine: a trip's Undo may only take back what this person bought. */
   /** Couldn't find it in this shop: it stays needed, with a mark everyone sees. */
   async markNotFound(userId: string, itemId: string) {
     const item = await this.requireItem(userId, itemId);
@@ -177,17 +178,18 @@ export class ItemsService {
       throw new DomainError("ITEM_ALREADY_BOUGHT", "This item was already bought.", HttpStatus.CONFLICT);
     }
     await this.items.setNotFound(item.id, item.homeId, userId, new Date());
-    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
+    const [view] = await this.withNames([await this.reload(item)]);
     return view;
   }
 
   async clearNotFound(userId: string, itemId: string) {
     const item = await this.requireItem(userId, itemId);
     await this.items.setNotFound(item.id, item.homeId, null, null);
-    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
+    const [view] = await this.withNames([await this.reload(item)]);
     return view;
   }
 
+  /** onlyMine: a trip's Undo may only take back what this person bought. */
   async undoBought(userId: string, itemId: string, options?: { onlyMine?: boolean }) {
     const item = await this.requireItem(userId, itemId);
     if (item.status !== "bought" || !item.boughtAt || !undoDeadline(item.boughtAt)) {
@@ -243,7 +245,7 @@ export class ItemsService {
       if (cost !== null) await this.adjustReceiptTotal(manager, receiptId, -cost);
       await this.deleteIfEmpty(manager, receiptId);
     });
-    const saved = await this.itemRows.findOneOrFail({ where: { id: item.id } });
+    const saved = await this.reload(item);
     await this.items.placeNeeded(
       saved.homeId,
       saved.id,
@@ -273,11 +275,11 @@ export class ItemsService {
         await manager.update(Item, { id: item.id }, { cost: item.cost });
         await this.adjustReceiptTotal(manager, receiptId, next - previous);
       });
-      const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
+      const [view] = await this.withNames([await this.reload(item)]);
       return view;
     }
-    const saved = await this.items.save(item);
-    const [view] = await this.withNames([saved]);
+    await this.items.patch(item.id, item.homeId, { cost: item.cost });
+    const [view] = await this.withNames([await this.reload(item)]);
     return view;
   }
 
@@ -417,7 +419,7 @@ export class ItemsService {
       if (source) await this.deleteIfEmpty(manager, source);
     });
 
-    const [view] = await this.withNames([await this.itemRows.findOneOrFail({ where: { id: item.id } })]);
+    const [view] = await this.withNames([await this.reload(item)]);
     return view;
   }
 
@@ -548,13 +550,13 @@ export class ItemsService {
       throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
     }
 
-    const became: Item[] = [];
-    for (const item of rows) {
-      if (item.urgent === urgent) continue;
-      item.urgent = urgent;
-      const saved = await this.items.save(item);
-      if (urgent) became.push(saved);
-    }
+    const changing = rows.filter((item) => item.urgent !== urgent);
+    await this.items.patchNeeded(
+      changing.map((item) => item.id),
+      membership.homeId,
+      { urgent },
+    );
+    const became = urgent ? changing : [];
 
     for (const item of became) {
       await this.items.placeNeeded(item.homeId, item.id, "top", item.listId);
@@ -580,11 +582,12 @@ export class ItemsService {
   async setManyCategory(userId: string, ids: string[], category: ItemCategory) {
     const rows = await this.neededInOneHome(userId, ids);
     await this.categories.assertUsable(rows[0].homeId, category);
-    for (const item of rows) {
-      if (item.category === category) continue;
-      item.category = category;
-      await this.items.save(item);
-    }
+    const changing = rows.filter((item) => item.category !== category);
+    await this.items.patchNeeded(
+      changing.map((item) => item.id),
+      rows[0].homeId,
+      { category },
+    );
     return { updated: rows.length };
   }
 
@@ -592,11 +595,12 @@ export class ItemsService {
   async setManyUnit(userId: string, ids: string[], unit: string) {
     const rows = await this.neededInOneHome(userId, ids);
     const next = blankToNull(unit);
-    for (const item of rows) {
-      if ((item.unit ?? null) === next) continue;
-      item.unit = next;
-      await this.items.save(item);
-    }
+    const changing = rows.filter((item) => (item.unit ?? null) !== next);
+    await this.items.patchNeeded(
+      changing.map((item) => item.id),
+      rows[0].homeId,
+      { unit: next },
+    );
     return { updated: rows.length };
   }
 
@@ -624,11 +628,14 @@ export class ItemsService {
       throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
     }
 
+    const moving = rows.filter((item) => item.listId !== list.id);
+    await this.items.patchNeeded(
+      moving.map((item) => item.id),
+      membership.homeId,
+      { listId: list.id },
+    );
     let moved = 0;
-    for (const item of rows) {
-      if (item.listId === list.id) continue;
-      item.listId = list.id;
-      await this.items.save(item);
+    for (const item of moving) {
       await this.items.placeNeeded(
         membership.homeId,
         item.id,
@@ -722,6 +729,15 @@ export class ItemsService {
       throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
     }
     return item;
+  }
+
+  /** The row as it is now, after a write. Gone meanwhile reads as a missing item. */
+  private async reload(item: Pick<Item, "id" | "homeId">) {
+    const row = await this.items.findInHome(item.id, item.homeId);
+    if (!row) {
+      throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
+    }
+    return row;
   }
 
   /**

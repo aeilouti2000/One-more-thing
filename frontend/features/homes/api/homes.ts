@@ -38,10 +38,7 @@ export async function fetchMyHousehold(): Promise<Household | null> {
     // result, so an in-flight GET cannot overwrite a newer adoptHome write.
     return withCostDefaults(await api.get<Household>("/homes/mine"));
   } catch (error) {
-    if (error instanceof ApiError && error.code === "NO_HOME") {
-      writeCachedHousehold(null);
-      return null;
-    }
+    if (error instanceof ApiError && error.code === "NO_HOME") return null;
     if (isOfflineError(error)) {
       const cached = readCachedHousehold();
       if (cached?.household) return cached.household;
@@ -134,13 +131,15 @@ export async function fetchMyHomes() {
   try {
     const homes = await api.get<HomeSummary[]>("/homes");
     writeCachedHomes(homes);
-    return { homes, error: null };
+    return { homes, error: null, offline: false };
   } catch (error) {
-    if (isOfflineError(error)) {
+    // offline: no answer from the server (no connection, or it is still waking).
+    const offline = isOfflineError(error);
+    if (offline) {
       const cached = readCachedHousehold();
-      if (cached) return { homes: cached.homes, error: null };
+      if (cached) return { homes: cached.homes, error: null, offline };
     }
-    return { homes: [] as HomeSummary[], error: formatAppError(error) };
+    return { homes: [] as HomeSummary[], error: formatAppError(error), offline };
   }
 }
 

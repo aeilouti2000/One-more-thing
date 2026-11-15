@@ -16,10 +16,21 @@ export type NewItemInput = {
   boughtAt: Date | null;
 };
 
+export type ItemPatch = Partial<
+  Pick<Item, "name" | "quantity" | "category" | "urgent" | "notes" | "unit" | "cost" | "listId">
+>;
+
 export interface IItemsRepository {
   findByHome(homeId: string): Promise<Item[]>;
   insert(input: NewItemInput): Promise<Item>;
-  save(item: Item): Promise<Item>;
+  /**
+   * Writes only these columns. Never save a whole loaded item: a copy read a
+   * moment ago would put back whatever someone else changed since (a "bought"
+   * from the other phone, a new order).
+   */
+  patch(id: string, homeId: string, changes: ItemPatch): Promise<number>;
+  /** The same for many items, and only those still needed. Returns rows changed. */
+  patchNeeded(ids: string[], homeId: string, changes: ItemPatch): Promise<number>;
   findInHome(itemId: string, homeId: string): Promise<Item | null>;
   countInHome(ids: string[], homeId: string): Promise<number>;
   markNeededBought(
@@ -37,7 +48,6 @@ export interface IItemsRepository {
   ): Promise<number>;
   /** Sets or clears the "not found" mark on a needed item. Returns rows changed. */
   setNotFound(id: string, homeId: string, userId: string | null, at: Date | null): Promise<number>;
-  /** A new trip on this list: earlier "not found" marks no longer apply. */
   deleteInHome(ids: string[], homeId: string): Promise<void>;
   findNeededByIds(ids: string[], homeId: string): Promise<Item[]>;
   deleteNeededOnList(homeId: string, listId: string): Promise<void>;

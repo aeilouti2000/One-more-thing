@@ -26,9 +26,12 @@ type Sheet = "items" | "total";
 export function TripInvoiceCosts({
   items,
   currency,
+  onInvoice,
 }: {
   items: Purchase[];
   currency: string;
+  /** The trip now has this invoice (a trip without one just got it). */
+  onInvoice?: (receiptId: string) => void;
 }) {
   const { t, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
@@ -132,6 +135,7 @@ export function TripInvoiceCosts({
       setError(result.error);
       return;
     }
+    if (result.receiptId) onInvoice?.(result.receiptId);
     setSheet(null);
     scanner.reset();
   }

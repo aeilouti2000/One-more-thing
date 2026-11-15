@@ -72,6 +72,26 @@ export function formatAppError(
     EMAIL_UNAVAILABLE: "errorEmailSend",
     IMAGE_INVALID: "errorPhotoInvalid",
     IMAGE_REQUIRED: "errorPhotoInvalid",
+    // Someone else changed it first (deleted, bought, removed) on another phone.
+    ITEM_NOT_FOUND: "errorItemGone",
+    ITEM_NOT_BOUGHT: "errorItemGone",
+    LIST_NOT_FOUND: "errorListGone",
+    CATEGORY_NOT_FOUND: "errorCategoryGone",
+    RECEIPT_NOT_FOUND: "errorInvoiceGone",
+    RECEIPT_OTHER_MONTH: "errorMoveOtherMonth",
+    PIN_NOT_FOUND: "errorPinGone",
+    NOT_HOME_MEMBER: "errorNotHomeMember",
+    HOME_NOT_FOUND: "errorNotHomeMember",
+    MEMBER_NOT_FOUND: "errorMemberGone",
+    ONLY_HOST_CAN_REMOVE: "hostOnlyToast",
+    ONLY_HOST_CAN_UPDATE_COSTS: "hostOnlyToast",
+    ONLY_HOST_CAN_UPDATE_TRIPS: "hostOnlyToast",
+    ONLY_HOST_CAN_UPDATE_NOTIFICATIONS: "hostOnlyToast",
+    INVALID_COST: "errorInvalidCost",
+    INVITE_CODE_FAILED: "errorInviteCodeBusy",
+    NAME_REQUIRED: "errorEnterName",
+    USERNAME_REQUIRED: "errorEnterUsername",
+    USERNAME_UNAVAILABLE: "errorEmailTaken",
   };
   if (codeKeys[code]) {
     return translate(codeKeys[code]);

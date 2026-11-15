@@ -1,7 +1,8 @@
-import { IsBoolean, IsIn, IsOptional, IsString, Matches } from "class-validator";
+import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength } from "class-validator";
 
 export class PushTokenDto {
   @IsString()
+  @MaxLength(200)
   @Matches(/^Expo(nent)?PushToken\[[^\]]+\]$/)
   token: string;
 
@@ -11,12 +12,14 @@ export class PushTokenDto {
   /** The token this phone had before; removed when it rotates. */
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   @Matches(/^Expo(nent)?PushToken\[[^\]]+\]$/)
   previousToken?: string;
 }
 
 export class RemovePushTokenDto {
   @IsString()
+  @MaxLength(200)
   @Matches(/^Expo(nent)?PushToken\[[^\]]+\]$/)
   token: string;
 }

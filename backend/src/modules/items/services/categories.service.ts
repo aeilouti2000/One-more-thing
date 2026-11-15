@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { isUniqueViolation } from "../../../common/db-errors";
 import { DomainError } from "../../../common/domain.error";
 import { HomesService } from "../../homes/services/homes.service";
 import { ITEM_CATEGORIES } from "../entities/item.entity";
@@ -55,8 +56,16 @@ export class CategoriesService {
     if (existing) {
       throw new DomainError("CATEGORY_EXISTS", "That category already exists.", HttpStatus.CONFLICT);
     }
-    const saved = await this.categories.insert(homeId, trimmed);
-    return { id: saved.id, name: saved.name, builtin: false };
+    try {
+      const saved = await this.categories.insert(homeId, trimmed);
+      return { id: saved.id, name: saved.name, builtin: false };
+    } catch (error) {
+      // Two phones adding the same name at once: the second one loses politely.
+      if (isUniqueViolation(error)) {
+        throw new DomainError("CATEGORY_EXISTS", "That category already exists.", HttpStatus.CONFLICT);
+      }
+      throw error;
+    }
   }
 
   async remove(userId: string, homeId: string, categoryId: string) {

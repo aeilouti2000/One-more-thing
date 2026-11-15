@@ -28,15 +28,24 @@ export function useShopLock(options: {
   const currentKey = enabled && homeId && listId ? `${homeId}:${listId}` : null;
   const lock = currentKey && stored?.key === currentKey ? stored.lock : null;
 
+  /** Same answer as last time: keep the old object, so nothing re-renders. */
+  const store = useCallback((key: string, next: ShopLock) => {
+    setStored((current) =>
+      current && current.key === key && JSON.stringify(current.lock) === JSON.stringify(next)
+        ? current
+        : { key, lock: next },
+    );
+  }, []);
+
   const refresh = useCallback(async () => {
     const home = homeIdRef.current;
     const list = listIdRef.current;
     if (!home || !list) return null;
     const result = await fetchShopLock(home, list);
     if (homeIdRef.current !== home || listIdRef.current !== list) return null;
-    if (result.lock) setStored({ key: `${home}:${list}`, lock: result.lock });
+    if (result.lock) store(`${home}:${list}`, result.lock);
     return result.lock;
-  }, []);
+  }, [store]);
 
   useEffect(() => {
     if (!enabled || !homeId || !listId) return;
@@ -45,7 +54,7 @@ export function useShopLock(options: {
     void (async () => {
       const result = await fetchShopLock(homeId, listId);
       if (cancelled) return;
-      if (result.lock) setStored({ key: `${homeId}:${listId}`, lock: result.lock });
+      if (result.lock) store(`${homeId}:${listId}`, result.lock);
     })();
 
     const timer = setInterval(() => {
@@ -62,7 +71,7 @@ export function useShopLock(options: {
       clearInterval(timer);
       appSub.remove();
     };
-  }, [enabled, homeId, listId, refresh]);
+  }, [enabled, homeId, listId, refresh, store]);
 
   // A home that shops together never blocks: everyone can join the trip.
   const blockedByOther = Boolean(lock?.active && !lock.isMine && !lock.together);

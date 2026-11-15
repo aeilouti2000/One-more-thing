@@ -393,6 +393,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
 
         {creating ? (
           <AppTextField
+            maxLength={80}
             key="create"
             label={t("homeName")}
             value={newHomeName}

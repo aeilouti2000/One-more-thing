@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { isUniqueViolation } from "../../../common/db-errors";
 import { DomainError } from "../../../common/domain.error";
 import type { Home, TripCostMode } from "../entities/home.entity";
 import {
@@ -38,8 +39,16 @@ export class HomesService {
     return this.homes.createWithOwner(userId, homeName, defaultListName);
   }
 
-  join(userId: string, code: string) {
-    return this.homes.joinByCode(userId, code.trim().toUpperCase());
+  async join(userId: string, code: string) {
+    try {
+      return await this.homes.joinByCode(userId, code.trim().toUpperCase());
+    } catch (error) {
+      // A double tap: the first request joined while this one was checking.
+      if (isUniqueViolation(error)) {
+        throw new DomainError("ALREADY_HOME_MEMBER", "You are already in this home.", HttpStatus.CONFLICT);
+      }
+      throw error;
+    }
   }
 
   async updateName(userId: string, homeId: string, name: string) {

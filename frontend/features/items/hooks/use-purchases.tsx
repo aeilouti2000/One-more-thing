@@ -37,6 +37,7 @@ import {
   type UpdateItemInput,
 } from "@/features/items/api/items";
 import { translate } from "@/constants/i18n";
+import { createWakeRetry } from "@/lib/wake-retry";
 import {
   emitListChanged,
   onListChanged,
@@ -87,7 +88,7 @@ type UsePurchasesResult = {
     total: number;
     itemIds: string[];
     listId?: string | null;
-  }) => Promise<{ error: string | null }>;
+  }) => Promise<{ error: string | null; receiptId: string | null }>;
   /** Name a trip's invoice; a trip without one gets an invoice (no total yet). */
   renameTrip: (
     trip: { receiptId: string | null; itemIds: string[]; listId?: string | null },
@@ -161,6 +162,8 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   const refreshAfterWrites = useRef(false);
   /** The last server answer put on screen, to recognise an identical one. */
   const lastApplied = useRef<{ homeId: string; revision: number; payload: string } | null>(null);
+  const refreshRef = useRef<() => unknown>(() => undefined);
+  const [wakeRetry] = useState(createWakeRetry);
   const homeId = household?.id ?? null;
   const homeIdRef = useRef(homeId);
   const purchasesRef = useRef(purchases);
@@ -230,7 +233,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
             setError(null);
             setIsLoading(false);
           } else {
-            const { items, error: fetchError } =
+            const { items, error: fetchError, offline } =
               await fetchHomeItems(activeHome);
             if (homeIdRef.current !== activeHome) {
               // Signed out or left the home meanwhile: nothing left to load.
@@ -246,6 +249,9 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
             }
             if (revision.current !== seen || wantedRef.current !== ticket)
               continue;
+            // Showing the saved copy: keep asking until the server has woken.
+            if (offline) wakeRetry.stale();
+            else wakeRetry.fresh();
             if (fetchError) {
               // Keep what is on screen: one failed request (a busy server, a
               // dropped connection) must not look like an empty list.
@@ -285,6 +291,13 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   }, [homeId]);
 
   useEffect(() => onListChanged(() => void refresh()), [refresh]);
+
+  useEffect(() => {
+    refreshRef.current = refresh;
+    wakeRetry.setRun(refresh);
+  }, [refresh, wakeRetry]);
+  // Another home, signed out, or the provider is gone: nothing to ask again for.
+  useEffect(() => () => wakeRetry.cancel(), [homeId, wakeRetry]);
 
   const noteLocalChange = useCallback(() => {
     revision.current += 1;
@@ -599,7 +612,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   const saveTripTotal = useCallback(
     async (input: { total: number; itemIds: string[]; listId?: string | null }) => {
       const currentHomeId = homeIdRef.current;
-      if (!user || !currentHomeId) return { error: translate("errorNeedLogin") };
+      if (!user || !currentHomeId) return { error: translate("errorNeedLogin"), receiptId: null };
       const endLocalChange = noteLocalChange();
       let result: Awaited<ReturnType<typeof createTripReceipt>>;
       try {
@@ -608,7 +621,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         endLocalChange();
       }
       if (result.error || !result.receipt) {
-        return { error: result.error ?? translate("errorGeneric") };
+        return { error: result.error ?? translate("errorGeneric"), receiptId: null };
       }
       const receipt = result.receipt;
       const ids = new Set(input.itemIds);
@@ -617,7 +630,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
           ? { ...item, receiptId: receipt.id, receiptTotal: Number(receipt.total) }
           : item,
       );
-      return { error: null };
+      return { error: null, receiptId: receipt.id };
     },
     [noteLocalChange, rememberItems, user],
   );
@@ -729,6 +742,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
                 ...item,
                 status: "needed",
                 boughtAt: undefined,
+                boughtById: undefined,
                 boughtByName: undefined,
                 cost: null,
                 receiptId: null,
@@ -1081,10 +1095,13 @@ function placeNeededLocally(purchases: Purchase[], item: Purchase): Purchase[] {
   const needed = purchases.filter((row) => row.status === "needed");
   const bought = purchases.filter((row) => row.status === "bought");
   if (item.urgent) return [item, ...needed, ...bought];
-  const index = needed.findIndex((row) => !row.urgent);
-  const nextNeeded =
-    index === -1
-      ? [...needed, item]
-      : [...needed.slice(0, index), item, ...needed.slice(index)];
+  // Below the urgent rows of its own list (the server orders each list by itself).
+  const sameList = (row: Purchase) => !item.listId || row.listId === item.listId;
+  let index = needed.findIndex((row) => sameList(row) && !row.urgent);
+  if (index === -1) {
+    const lastOfList = needed.findLastIndex(sameList);
+    index = lastOfList === -1 ? needed.length : lastOfList + 1;
+  }
+  const nextNeeded = [...needed.slice(0, index), item, ...needed.slice(index)];
   return [...nextNeeded, ...bought];
 }

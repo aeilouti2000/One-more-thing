@@ -35,6 +35,7 @@ import {
 } from "@/features/auth/lib/google-sign-in";
 import { formatAppError, logError } from "@/lib/errors";
 import { takePushToken } from "@/features/notifications/api/push";
+import { setPostAuthRoute } from "@/features/auth/lib/post-auth-route";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -289,6 +290,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Signs out on this phone at once; the server is told in the same request
       // to stop this phone's notifications.
       await endSession(takePushToken());
+      // A "verify your email next" left over from signing up belongs to that account.
+      setPostAuthRoute(null);
       return { error: null };
     } catch (error) {
       logError("sign_out", error);

@@ -148,6 +148,7 @@ export function HomeCard({
       {isHost && isEditing ? (
         <View className="mt-4 gap-3">
           <AppTextField
+            maxLength={80}
             label={t("homeName")}
             value={draft}
             onChangeText={setDraft}

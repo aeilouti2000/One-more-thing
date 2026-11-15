@@ -112,10 +112,17 @@ export function BottomSheet({
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const lockedRef = useRef(locked);
   const onCloseRef = useRef(onClose);
+  const visibleRef = useRef(visible);
   useEffect(() => {
     lockedRef.current = locked;
     onCloseRef.current = onClose;
+    visibleRef.current = visible;
   });
+  // The close animation can report "finished" just after the sheet was asked
+  // to open again; unmounting then would leave it open but invisible.
+  const unmountIfClosed = useCallback(() => {
+    if (!visibleRef.current) setMounted(false);
+  }, []);
 
   useEffect(() => {
     if (!mounted) return;
@@ -131,11 +138,11 @@ export function BottomSheet({
         0,
         { duration: CLOSE_MS, easing: Easing.in(Easing.cubic) },
         (finished) => {
-          if (finished) runOnJS(setMounted)(false);
+          if (finished) runOnJS(unmountIfClosed)();
         },
       ),
     );
-  }, [drag, mounted, progress, visible]);
+  }, [drag, mounted, progress, unmountIfClosed, visible]);
 
   useEffect(() => {
     if (!visible) return;

@@ -75,6 +75,7 @@ export default function LoginScreen() {
       <AuthSheetHeading title={t("loginTitle")} subtitle={t("loginSubtitle")} />
       <View style={{ gap: 16 }}>
         <AuthField
+          maxLength={254}
           label={t("usernameOrEmail")}
           placeholder={t("usernameOrEmailPlaceholder")}
           value={username}
@@ -88,6 +89,7 @@ export default function LoginScreen() {
           error={fieldErrors.username}
         />
         <AuthField
+          maxLength={72}
           label={t("password")}
           placeholder={t("passwordPlaceholder")}
           value={password}

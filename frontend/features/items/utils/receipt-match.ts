@@ -15,7 +15,13 @@ export function normalizeItemName(raw: string) {
 }
 
 function tokens(value: string) {
-  return value.split(" ").filter((token) => token.length > 1);
+  return (
+    value
+      .split(" ")
+      // "الحليب" and "حليب" are the same word with and without "the".
+      .map((token) => (token.length > 3 && token.startsWith("ال") ? token.slice(2) : token))
+      .filter((token) => token.length > 1)
+  );
 }
 
 export function nameScore(listName: string, receiptName: string) {

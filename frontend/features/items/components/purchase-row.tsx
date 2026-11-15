@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
+  FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -22,6 +23,8 @@ export const CARD_RADIUS = 22;
 const SELECTION_BORDER = 2;
 const URGENT_COLOR = "#EF4444";
 const URGENT_DOT = 6;
+/** How long the − / + stay open after the last tap before folding away. */
+const STEPPER_IDLE_MS = 2500;
 
 type PurchaseRowProps = {
   purchase: Purchase;
@@ -57,6 +60,29 @@ export function PurchaseRow({
   const photoUri = itemPhotoUri(purchase);
   const showsStepper = !selected && Boolean(onChangeQuantity) && purchase.status === "needed";
   const isUrgent = purchase.urgent && purchase.status !== "bought";
+  // The row shows only a small quantity chip; tapping it opens the − / +
+  // in place, and they fold away again once left alone.
+  // Remembered per item, because a row can be reused for a different one.
+  const [openFor, setOpenFor] = useState<string | null>(null);
+  const stepperOpen = openFor === purchase.id;
+  const stepperTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function keepStepperOpen() {
+    if (stepperTimer.current) clearTimeout(stepperTimer.current);
+    stepperTimer.current = setTimeout(() => setOpenFor(null), STEPPER_IDLE_MS);
+  }
+
+  function openStepper() {
+    setOpenFor(purchase.id);
+    keepStepperOpen();
+  }
+
+  useEffect(
+    () => () => {
+      if (stepperTimer.current) clearTimeout(stepperTimer.current);
+    },
+    [],
+  );
   const quantityLabel = purchase.unit
     ? `${purchase.quantity} ${purchase.unit}`
     : `${purchase.quantity}`;
@@ -159,10 +185,30 @@ export function PurchaseRow({
                 <View pointerEvents="none">
                   <Ionicons name="checkmark-circle" size={26} color={colors.accent} />
                 </View>
+              ) : showsStepper && onChangeQuantity && !stepperOpen ? (
+                <Pressable
+                  onPress={openStepper}
+                  onLongPress={onLongPress}
+                  delayLongPress={350}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t("quantity")}: ${quantityLabel}`}
+                  className="h-7 min-w-9 items-center justify-center rounded-full border border-cove-line px-2.5 active:opacity-80"
+                  style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.paper }}
+                >
+                  <AppText className="text-sm font-semibold text-cove-ink">
+                    {quantityLabel}
+                  </AppText>
+                </Pressable>
               ) : showsStepper && onChangeQuantity ? (
-                <View pointerEvents="box-none" className="flex-row items-center gap-1.5">
+                <Animated.View
+                  entering={FadeIn.duration(140)}
+                  pointerEvents="box-none"
+                  className="flex-row items-center gap-1.5"
+                >
                   <Pressable
                     onPress={() => {
+                      keepStepperOpen();
                       if (quantityBusy || purchase.quantity <= 1) return;
                       onChangeQuantity(-1);
                     }}
@@ -184,6 +230,7 @@ export function PurchaseRow({
                   </View>
                   <Pressable
                     onPress={() => {
+                      keepStepperOpen();
                       if (quantityBusy || purchase.quantity >= 9999) return;
                       onChangeQuantity(1);
                     }}
@@ -197,7 +244,7 @@ export function PurchaseRow({
                   >
                     <Ionicons name="add" size={16} color={colors.onAccent} />
                   </Pressable>
-                </View>
+                </Animated.View>
               ) : (
                 <View pointerEvents="box-none" className="flex-row items-center gap-1.5">
                   {onUndo ? (

@@ -10,7 +10,7 @@ import {
 import { AppState } from "react-native";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
 import { createCategory, deleteCategory, fetchCategories, type HomeCategory } from "@/features/items/api/categories";
-import { onListChanged } from "@/features/items/utils/list-sync";
+import { emitListChanged, onListChanged } from "@/features/items/utils/list-sync";
 import { readCachedCategories, writeCachedCategories } from "@/features/offline/profile-cache";
 import { useHousehold } from "@/features/homes/providers/household-provider";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -89,6 +89,8 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
           writeCachedCategories(homeId, next);
           return next;
         });
+        // The server moved its items to "Other": show them there right away.
+        emitListChanged();
       }
       return result.error;
     },

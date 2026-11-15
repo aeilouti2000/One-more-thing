@@ -1,6 +1,6 @@
 import { caretColors, caretGap } from "@/constants/text";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useIsFocused } from "expo-router";
 import {
   memo,
   useCallback,
@@ -91,7 +91,7 @@ import {
   withAlpha,
 } from "@/constants/theme";
 import { useHousehold } from "@/features/homes/hooks/use-household";
-import { onFocusList } from "@/features/items/utils/list-sync";
+import { onFocusList, onListChanged } from "@/features/items/utils/list-sync";
 import { CategoryFilter } from "@/features/items/components/category-filter";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { ItemSuggestions } from "@/features/items/components/item-suggestions";
@@ -188,6 +188,11 @@ export default function ItemsScreen() {
   const [quickCategory, setQuickCategory] = useState<PurchaseCategory | "all">(
     "all",
   );
+  // The filtered category was removed (here or on another phone): back to all,
+  // instead of an empty list and adds that fail.
+  if (quickCategory !== "all" && !categories.some((entry) => entry.id === quickCategory)) {
+    setQuickCategory("all");
+  }
   const [isChoosingCategory, setIsChoosingCategory] = useState(false);
   const [categoryAnchor, setCategoryAnchor] = useState<{
     x: number;
@@ -200,6 +205,7 @@ export default function ItemsScreen() {
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [bulkCostIds, setBulkCostIds] = useState<string[] | null>(null);
   const multiMemberHome = (household?.members.length ?? 0) > 1;
+  const isFocused = useIsFocused();
   const {
     lock: shopLock,
     blockedByOther: shopBlocked,
@@ -207,7 +213,8 @@ export default function ItemsScreen() {
   } = useShopLock({
     homeId: household?.id,
     listId: selectedListId,
-    enabled: multiMemberHome,
+    // Only while this tab is showing: no requests from behind another page.
+    enabled: multiMemberHome && isFocused,
   });
 
   const openItem = openItemId
@@ -283,10 +290,10 @@ export default function ItemsScreen() {
           if (next) writeStoredListId(homeId, next);
           return next;
         });
-        return;
+        return cached;
       }
       setActionError(result.error);
-      return;
+      return null;
     }
     setLists(result.lists);
     setSelectedListId((current) => {
@@ -297,7 +304,13 @@ export default function ItemsScreen() {
       if (next) writeStoredListId(homeId, next);
       return next;
     });
+    return result.lists;
   }
+
+  const loadListsRef = useRef(loadLists);
+  useLayoutEffect(() => {
+    loadListsRef.current = loadLists;
+  });
 
   async function onRefresh() {
     setIsRefreshing(true);
@@ -667,10 +680,24 @@ export default function ItemsScreen() {
     () =>
       onFocusList((focusHomeId, listId) => {
         if (focusHomeId !== homeId) return;
-        if (lists.some((list) => list.id === listId)) setSelectedListId(listId);
+        if (lists.some((list) => list.id === listId)) {
+          setSelectedListId(listId);
+          return;
+        }
+        // A list this phone hasn't seen yet (someone just made it): fetch, then show it.
+        void loadListsRef.current(focusHomeId).then((loaded) => {
+          if (loaded?.some((list) => list.id === listId)) setSelectedListId(listId);
+        });
       }),
     [homeId, lists],
   );
+
+  // Lists change on other phones too (a new one, a rename, a delete): reload
+  // them whenever the items are reloaded (back in the app, a notification).
+  useEffect(() => {
+    if (!homeId) return;
+    return onListChanged(() => void loadListsRef.current(homeId));
+  }, [homeId]);
 
   useLayoutEffect(() => {
     setTabBarHidden(isSelecting);
@@ -1420,6 +1447,7 @@ export default function ItemsScreen() {
               {editingListId ? t("editList") : t("newList")}
             </AppText>
             <TextInput
+              maxLength={80}
               value={listName}
               onChangeText={setListName}
               placeholder={caretGap(t("listNamePlaceholder"))}

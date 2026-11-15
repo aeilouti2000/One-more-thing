@@ -1,4 +1,4 @@
-import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
 import { DomainError } from "../../../common/domain.error";
 import { HomesService } from "../../homes/services/homes.service";
 import { NotificationsService } from "../../notifications/services/notifications.service";
@@ -36,6 +36,8 @@ export type PinView = {
 
 @Injectable()
 export class PinsService {
+  private readonly logger = new Logger(PinsService.name);
+
   constructor(
     @Inject(PINS_REPOSITORY) private readonly pins: IPinsRepository,
     @Inject(ITEMS_REPOSITORY) private readonly items: IItemsRepository,
@@ -190,7 +192,14 @@ export class PinsService {
   async materializeDueHomes() {
     const homeIds = await this.pins.findDueHomeIds();
     for (const homeId of homeIds) {
-      await this.materializeDue(homeId);
+      // One home's failure must not hold back everyone else's due pins.
+      try {
+        await this.materializeDue(homeId);
+      } catch (error) {
+        this.logger.warn(
+          `Could not add due pins for a home: ${error instanceof Error ? error.message : "unknown"}`,
+        );
+      }
     }
   }
 

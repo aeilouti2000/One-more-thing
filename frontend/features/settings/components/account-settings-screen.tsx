@@ -358,6 +358,7 @@ export default function AccountSettingsScreen() {
       >
         {hasPassword ? (
           <AppTextField
+            maxLength={72}
             compact
             glass
             label={t("password")}

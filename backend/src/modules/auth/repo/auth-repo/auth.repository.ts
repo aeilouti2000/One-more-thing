@@ -44,6 +44,8 @@ export interface IAuthRepository {
   rotateRefresh(current: RefreshToken, next: { tokenHash: string; expiresAt: Date }): Promise<void>;
   /** True when a token issued in place of this one has itself been used. */
   wasRefreshReplacementUsed(tokenId: string): Promise<boolean>;
+  /** True when the token before this one was replaced a second time. */
+  wasRefreshReplacedBySibling(token: RefreshToken): Promise<boolean>;
   /** Ends one session; `pushToken` also removes that phone's notification device. */
   revokeByHash(tokenHash: string, revokedAt: Date, pushToken?: string): Promise<void>;
   /** Ends every session of the user and removes their notification devices. */

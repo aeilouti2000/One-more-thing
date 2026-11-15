@@ -97,7 +97,11 @@ class ReceiptOcrModule : Module() {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(path, bounds)
     var sample = 1
-    while (bounds.outWidth / sample > 1800 || bounds.outHeight / sample > 1800) {
+    // Halve only while the result stays at least 1800 px on its long side;
+    // upright() does the exact scale down. Going one step further (4000 px
+    // down to 1000) left the text too small to read.
+    val longSide = max(bounds.outWidth, bounds.outHeight)
+    while (longSide / (sample * 2) >= 1800) {
       sample *= 2
     }
     val opts = BitmapFactory.Options().apply {

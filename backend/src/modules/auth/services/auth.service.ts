@@ -2,7 +2,8 @@ import { HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import bcrypt from "bcrypt";
-import { DataSource, QueryFailedError } from "typeorm";
+import { DataSource } from "typeorm";
+import { isUniqueViolation } from "../../../common/db-errors";
 import { Home } from "../../homes/entities/home.entity";
 import { HomeMember } from "../../homes/entities/home-member.entity";
 import type { AppConfig } from "../../../config/env";
@@ -89,8 +90,10 @@ export class AuthService {
 
   async login(login: string, password: string): Promise<AuthSession> {
     const user = await this.findByLogin(login);
-    const matches = user?.passwordHash ? await bcrypt.compare(password, user.passwordHash) : false;
-    if (!user || !matches) {
+    // Always one password check, so the answer takes as long for a name that
+    // doesn't exist as for a wrong password.
+    const matches = await bcrypt.compare(password, user?.passwordHash ?? (await decoyHash()));
+    if (!user?.passwordHash || !matches) {
       throw new DomainError("INVALID_CREDENTIALS", "Wrong username or password", HttpStatus.UNAUTHORIZED);
     }
     return this.createSession(user);
@@ -280,7 +283,12 @@ export class AuthService {
     if (stored.revokedAt) {
       // A token that was replaced, and whose replacement was already used, is
       // being shown again: someone else has a copy. End every session.
-      if (stored.supersededAt && (await this.auth.wasRefreshReplacementUsed(stored.id))) {
+      // The same goes for a token that lost its place to a second replacement
+      // of the token before it: two phones are holding the same session.
+      const reused = stored.supersededAt
+        ? await this.auth.wasRefreshReplacementUsed(stored.id)
+        : await this.auth.wasRefreshReplacedBySibling(stored);
+      if (reused) {
         this.logger.warn(`Reused refresh token for user ${stored.userId}; ending all sessions`);
         await this.auth.revokeActiveForUser(stored.userId, new Date());
       }
@@ -628,6 +636,9 @@ function usernameBase(source: string) {
   return cleaned.length >= 3 ? cleaned : `member${cleaned}`.slice(0, 20);
 }
 
-function isUniqueViolation(error: unknown) {
-  return error instanceof QueryFailedError && (error.driverError as { code?: string } | undefined)?.code === "23505";
+let decoy: Promise<string> | null = null;
+/** A hash of nothing in particular, to compare against when there is no account. */
+function decoyHash() {
+  decoy ??= bcrypt.hash(randomToken(16), BCRYPT_ROUNDS);
+  return decoy;
 }

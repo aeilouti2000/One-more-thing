@@ -22,10 +22,13 @@ describe("Bulk edits: category and unit for many items", () => {
         .filter((row) => ids.includes(row.id) && row.homeId === homeId && row.status === "needed")
         .map((row) => ({ ...row })),
     ),
-    save: jest.fn(async (item: ItemRow) => {
-      const index = rows.findIndex((row) => row.id === item.id);
-      rows[index] = { ...item };
-      return item;
+    // Like the real one: only the named columns, only items still needed.
+    patchNeeded: jest.fn(async (ids: string[], homeId: string, changes: Partial<ItemRow>) => {
+      const targets = rows.filter(
+        (row) => ids.includes(row.id) && row.homeId === homeId && row.status === "needed",
+      );
+      for (const target of targets) Object.assign(target, changes);
+      return targets.length;
     }),
   };
   const homes = {
@@ -83,14 +86,13 @@ describe("Bulk edits: category and unit for many items", () => {
 
     it("writes only the items that actually change", async () => {
       await service.setManyCategory("u1", ["tomato", "cucumber"], "vegetables");
-      expect(itemsRepo.save).toHaveBeenCalledTimes(1);
-      expect(itemsRepo.save).toHaveBeenCalledWith(expect.objectContaining({ id: "tomato" }));
+      expect(itemsRepo.patchNeeded).toHaveBeenCalledWith(["tomato"], "h1", { category: "vegetables" });
     });
 
     it("counts a repeated id once", async () => {
       const result = await service.setManyCategory("u1", ["tomato", "tomato"], "meat");
       expect(result).toEqual({ updated: 1 });
-      expect(itemsRepo.save).toHaveBeenCalledTimes(1);
+      expect(itemsRepo.patchNeeded).toHaveBeenCalledWith(["tomato"], "h1", { category: "meat" });
     });
 
     it("refuses a category the home cannot use, and changes nothing", async () => {
@@ -98,7 +100,7 @@ describe("Bulk edits: category and unit for many items", () => {
         response: { code: "CATEGORY_NOT_FOUND" },
       });
       expect(row("tomato").category).toBe("other");
-      expect(itemsRepo.save).not.toHaveBeenCalled();
+      expect(itemsRepo.patchNeeded).not.toHaveBeenCalled();
     });
 
     it("refuses when one of the items is already bought, and changes nothing", async () => {
@@ -112,7 +114,7 @@ describe("Bulk edits: category and unit for many items", () => {
       await expect(service.setManyCategory("u1", ["tomato", "stranger"], "meat")).rejects.toMatchObject({
         response: { code: "ITEM_NOT_FOUND" },
       });
-      expect(itemsRepo.save).not.toHaveBeenCalled();
+      expect(itemsRepo.patchNeeded).not.toHaveBeenCalled();
     });
 
     it("answers like a missing item for someone outside the home", async () => {
@@ -130,6 +132,18 @@ describe("Bulk edits: category and unit for many items", () => {
     });
   });
 
+  it("leaves every other column alone, so a purchase made meanwhile is not undone", async () => {
+    // The other phone buys the tomato after this request has read it as needed.
+    itemsRepo.findNeededByIds.mockImplementationOnce(async () => {
+      const stale = rows.filter((entry) => entry.id === "tomato").map((entry) => ({ ...entry }));
+      row("tomato").status = "bought";
+      return stale;
+    });
+    await service.setManyCategory("u1", ["tomato"], "meat");
+    expect(row("tomato").status).toBe("bought");
+    expect(row("tomato").category).toBe("other");
+  });
+
   describe("unit", () => {
     it("gives every selected item the unit", async () => {
       const result = await service.setManyUnit("u1", ["tomato", "cucumber"], "kg");
@@ -137,7 +151,7 @@ describe("Bulk edits: category and unit for many items", () => {
       expect(row("tomato").unit).toBe("kg");
       expect(row("cucumber").unit).toBe("kg");
       // The cucumber was already in kg.
-      expect(itemsRepo.save).toHaveBeenCalledTimes(1);
+      expect(itemsRepo.patchNeeded).toHaveBeenCalledWith(["tomato"], "h1", { unit: "kg" });
     });
 
     it("clears the unit with a blank value", async () => {
@@ -145,7 +159,7 @@ describe("Bulk edits: category and unit for many items", () => {
       expect(row("tomato").unit).toBeNull();
       expect(row("cucumber").unit).toBeNull();
       // The tomato had no unit to clear.
-      expect(itemsRepo.save).toHaveBeenCalledTimes(1);
+      expect(itemsRepo.patchNeeded).toHaveBeenCalledWith(["cucumber"], "h1", { unit: null });
     });
 
     it("trims the unit before saving", async () => {

@@ -24,6 +24,7 @@ import { PrefsBudgetTrips1740000000019 } from "./database/migrations/17400000000
 import { TripsTogether1740000000020 } from "./database/migrations/1740000000020-TripsTogether";
 import { OncePinsInterval1740000000021 } from "./database/migrations/1740000000021-OncePinsInterval";
 import { RotateRefreshTokens1740000000022 } from "./database/migrations/1740000000022-RotateRefreshTokens";
+import { MemberAndListIndexes1740000000023 } from "./database/migrations/1740000000023-MemberAndListIndexes";
 import { EmailCode } from "./modules/auth/entities/email-code.entity";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
@@ -107,6 +108,7 @@ import { User } from "./users/user.entity";
             TripsTogether1740000000020,
             OncePinsInterval1740000000021,
             RotateRefreshTokens1740000000022,
+            MemberAndListIndexes1740000000023,
           ],
           migrationsRun: true,
         };

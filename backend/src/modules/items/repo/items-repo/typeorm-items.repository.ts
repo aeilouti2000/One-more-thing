@@ -4,7 +4,7 @@ import { In, Repository } from "typeorm";
 import { User } from "../../../../users/user.entity";
 import { Item } from "../../entities/item.entity";
 import { applyNeededOrder, placeNeededItem } from "../../utils/item-order";
-import { IItemsRepository, type NewItemInput } from "./items.repository";
+import { IItemsRepository, type ItemPatch, type NewItemInput } from "./items.repository";
 
 @Injectable()
 export class TypeormItemsRepository implements IItemsRepository {
@@ -24,8 +24,16 @@ export class TypeormItemsRepository implements IItemsRepository {
     return this.items.save(this.items.create(input));
   }
 
-  save(item: Item) {
-    return this.items.save(item);
+  async patch(id: string, homeId: string, changes: ItemPatch) {
+    if (Object.keys(changes).length === 0) return 0;
+    const result = await this.items.update({ id, homeId }, changes);
+    return result.affected ?? 0;
+  }
+
+  async patchNeeded(ids: string[], homeId: string, changes: ItemPatch) {
+    if (ids.length === 0 || Object.keys(changes).length === 0) return 0;
+    const result = await this.items.update({ id: In(ids), homeId, status: "needed" }, changes);
+    return result.affected ?? 0;
   }
 
   findInHome(itemId: string, homeId: string) {

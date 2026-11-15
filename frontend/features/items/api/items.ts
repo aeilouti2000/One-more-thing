@@ -131,13 +131,15 @@ async function savedItemIds(ids: string[]) {
 export async function fetchHomeItems(homeId: string) {
   try {
     const items = (await api.get<ItemResponse[]>(`/homes/${homeId}/items`)).map(toPurchase);
-    return { items, error: null };
+    return { items, error: null, offline: false };
   } catch (error) {
-    if (isOfflineError(error)) {
+    // offline: no answer from the server (no connection, or it is still waking).
+    const offline = isOfflineError(error);
+    if (offline) {
       const cached = readCachedItems(homeId);
-      if (cached) return { items: cached, error: null };
+      if (cached) return { items: cached, error: null, offline };
     }
-    return { items: [] as Purchase[], error: formatAppError(error) };
+    return { items: [] as Purchase[], error: formatAppError(error), offline };
   }
 }
 

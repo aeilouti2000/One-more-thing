@@ -4,7 +4,9 @@
 //
 // Sets APP_LATEST_VERSION (from app.json) and APP_DOWNLOAD_URL in render.yaml.
 // With --required, APP_MIN_VERSION is raised too, so older installs can't skip it.
-// Commit and push afterwards so Render redeploys with the new values.
+// render.yaml is only the record: the live service does not read it, and a push
+// does not deploy. After committing, set the same APP_* values on the Render
+// service (dashboard or API) and trigger a deploy there.
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,7 +28,8 @@ let yaml = readFileSync(renderPath, "utf8");
 function setVar(key, value) {
   const pattern = new RegExp(`(- key: ${key}\\n\\s+value: )"[^"]*"`);
   if (!pattern.test(yaml)) throw new Error(`${key} not found in render.yaml`);
-  yaml = yaml.replace(pattern, `$1"${value}"`);
+  // A function, so a "$" in the URL is not read as a replacement pattern.
+  yaml = yaml.replace(pattern, (_, prefix) => `${prefix}"${value}"`);
 }
 
 setVar("APP_LATEST_VERSION", version);

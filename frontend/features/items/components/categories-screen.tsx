@@ -107,6 +107,7 @@ function CategoriesBody() {
             <Ionicons name="grid-outline" size={17} color={colors.accent} />
           </View>
           <TextInput
+            maxLength={40}
             value={draft}
             onChangeText={setDraft}
             placeholder={caretGap(t("newCategoryPlaceholder"))}

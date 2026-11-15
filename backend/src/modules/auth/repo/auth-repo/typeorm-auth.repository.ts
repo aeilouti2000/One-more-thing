@@ -88,8 +88,23 @@ export class TypeormAuthRepository implements IAuthRepository {
     return this.refreshTokens.exist({ where: { parentId: tokenId, supersededAt: Not(IsNull()) } });
   }
 
+  async wasRefreshReplacedBySibling(token: RefreshToken) {
+    if (!token.parentId) return false;
+    return this.refreshTokens.exist({ where: { parentId: token.parentId, id: Not(token.id) } });
+  }
+
   async revokeByHash(tokenHash: string, revokedAt: Date, pushToken?: string) {
-    await this.refreshTokens.update({ tokenHash }, { revokedAt });
+    // The token itself, plus the one it replaced (kept alive for a lost answer)
+    // and any replacement of it: signing out ends this phone's whole session.
+    await this.refreshTokens.query(
+      `update refresh_tokens t
+          set revoked_at = $2
+         from refresh_tokens mine
+        where mine.token_hash = $1
+          and t.revoked_at is null
+          and (t.id = mine.id or t.id = mine.parent_id or t.parent_id = mine.id)`,
+      [tokenHash, revokedAt],
+    );
     if (!pushToken) return;
     // Signed out on this phone: it stops getting the home's notifications,
     // even if the app could not remove its device itself.

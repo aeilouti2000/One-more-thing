@@ -84,6 +84,7 @@ export default function CreateHomeScreen() {
 
         <View className="gap-6">
           <AppTextField
+            maxLength={80}
             label={t("homeName")}
             value={name}
             onChangeText={setName}

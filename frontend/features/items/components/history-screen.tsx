@@ -238,7 +238,16 @@ export default function HistoryScreen() {
           setTripError(null);
           setMovingItem(purchase);
         }}
-        actions={<TripInvoiceCosts items={trip.items} currency={currency} />}
+        actions={
+          <TripInvoiceCosts
+            items={trip.items}
+            currency={currency}
+            // A trip without an invoice got one: its id is now the invoice id.
+            onInvoice={(receiptId) => {
+              if (openTripId === trip.id) setOpenTripId(receiptId);
+            }}
+          />
+        }
       />
     );
   }

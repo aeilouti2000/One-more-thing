@@ -1,3 +1,4 @@
+import { singleLineInput } from "@/constants/font";
 import { caretColors, caretGap } from "@/constants/text";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -403,6 +404,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
           </View>
           {customUnitOpen ? (
             <TextInput
+              maxLength={40}
               // Empty when "Other" was just opened over a built-in unit; once
               // typed, the text shows as is ("pack" on the way to "packet").
               value={!customUnitTyped && (ITEM_UNITS as readonly string[]).includes(unit) ? "" : unit}
@@ -418,8 +420,12 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
               onSubmitEditing={() => setUnitOpen(false)}
               textAlign={textAlign}
               allowFontScaling={false}
+              textAlignVertical="center"
               className="mt-2 h-10 rounded-xl px-3 text-cove-ink"
-              style={{ backgroundColor: chipBg, fontFamily: "ReadexPro_400Regular", fontSize: 14, color: colors.ink }}
+              // The shared single-line style drops Android's built-in vertical
+              // padding, which pushed the text up and clipped it in this
+              // 40dp-tall field.
+              style={[singleLineInput, { backgroundColor: chipBg, fontSize: 14, color: colors.ink }]}
             />
           ) : null}
         </View>

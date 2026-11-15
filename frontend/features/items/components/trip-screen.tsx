@@ -152,7 +152,9 @@ function TripBody() {
   });
   const endRequested = resumed !== null && params.end === "1";
   const [startedAt] = useState(() => resumed?.startedAt ?? Date.now());
-  const lastActivityRef = useRef(resumed?.lastActivityAt ?? Date.now());
+  // Opening the trip (again) is activity too: a continued trip must not end
+  // itself a few minutes after it was picked back up.
+  const lastActivityRef = useRef(Date.now());
   const [actionError, setActionError] = useState<string | null>(null);
   const [undoId, setUndoId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -668,13 +670,26 @@ function TripBody() {
       });
     }
     lastActivityRef.current = Date.now();
-    const result = await markBought(id, cost);
+    // Part of this trip from the tap, and "still saving" until the answer is
+    // in: the row leaves the page at once, and the item that empties the list
+    // must still be counted when the trip finishes itself.
+    const forget = () => setSessionBoughtIds((current) => current.filter((entry) => entry !== id));
+    setSessionBoughtIds((current) => (current.includes(id) ? current : [...current, id]));
+    noteInflight(1);
+    let result: Awaited<ReturnType<typeof markBought>>;
+    try {
+      result = await markBought(id, cost);
+    } finally {
+      noteInflight(-1);
+    }
     if (result.error) {
+      forget();
       setActionError(result.error);
       return false;
     }
     if (result.takenBy) {
       // Someone shopping with us got it first: it's theirs, not part of our trip.
+      forget();
       notedIds.current.add(id);
       showNote(
         t("tripPartnerGot", {
@@ -684,7 +699,6 @@ function TripBody() {
       );
       return true;
     }
-    setSessionBoughtIds((current) => (current.includes(id) ? current : [...current, id]));
     // The last item finishes the trip right away, so it gets no Undo.
     const isLast = tripItems.length === 0 || tripItems.every((row) => row.id === id);
     setUndoId(isLast ? null : id);

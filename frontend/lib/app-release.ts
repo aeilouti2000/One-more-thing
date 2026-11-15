@@ -55,16 +55,17 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * The API runs on a host that sleeps when idle and can take close to a minute
  * to wake, so keep retrying for a while instead of giving up after one try.
  */
-async function fetchRelease(): Promise<AppRelease | null> {
-  const deadline = Date.now() + 90_000;
-  for (let attempt = 0; Date.now() < deadline; attempt += 1) {
+async function fetchRelease(patient: boolean): Promise<AppRelease | null> {
+  // A check someone asked for by hand answers within one try's time.
+  const deadline = Date.now() + (patient ? 90_000 : 0);
+  for (let attempt = 0; ; attempt += 1) {
     try {
       return await withTimeout(api.get<AppRelease>("/app/release", false), 30_000);
     } catch {
+      if (Date.now() >= deadline) return null;
       await sleep(Math.min(2000 * 2 ** attempt, 10_000));
     }
   }
-  return null;
 }
 
 /**
@@ -95,9 +96,9 @@ function setUpdateState(next: UpdateState) {
   updateListeners.forEach((listener) => listener());
 }
 
-export async function checkAppUpdate(): Promise<AppUpdate | null> {
+export async function checkAppUpdate(options?: { patient?: boolean }): Promise<AppUpdate | null> {
   if (Platform.OS === "web") return null;
-  const release = await fetchRelease();
+  const release = await fetchRelease(options?.patient !== false);
   if (!release) return null;
   const installed = installedAppVersion();
   const newer =

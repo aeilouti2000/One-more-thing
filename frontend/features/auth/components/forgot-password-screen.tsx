@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -15,6 +15,7 @@ import { useAuth } from "@/features/auth/providers/auth-provider";
 import { useResendCountdown } from "@/hooks/use-resend-countdown";
 import { isValidLoginName } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
+import { normalizeDigits } from "@/lib/numbers";
 
 type Step = "request" | "reset";
 
@@ -38,6 +39,7 @@ export default function ForgotPasswordScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { seconds, restart } = useResendCountdown();
+  const sending = useRef(false);
 
   async function sendCode(isResend: boolean) {
     if (!login.trim()) {
@@ -48,11 +50,15 @@ export default function ForgotPasswordScreen() {
       setFieldErrors({ login: t("errorInvalidLogin") });
       return;
     }
-    setIsSubmitting(!isResend);
+    if (sending.current) return;
+    sending.current = true;
+    // A resend leaves the Reset button's own spinner alone.
+    if (!isResend) setIsSubmitting(true);
     setError(null);
     setNotice(null);
     const result = await requestPasswordReset(login);
-    setIsSubmitting(false);
+    sending.current = false;
+    if (!isResend) setIsSubmitting(false);
     if (result.error) {
       setError(result.error);
       return;
@@ -93,6 +99,7 @@ export default function ForgotPasswordScreen() {
           />
           <View style={{ gap: 16 }}>
             <AuthField
+              maxLength={254}
               label={t("usernameOrEmail")}
               placeholder={t("usernameOrEmailPlaceholder")}
               value={login}
@@ -135,7 +142,7 @@ export default function ForgotPasswordScreen() {
               placeholder={t("codePlaceholder")}
               value={code}
               onChangeText={(value) => {
-                setCode(value.replace(/\D/g, "").slice(0, 6));
+                setCode(normalizeDigits(value).replace(/\D/g, "").slice(0, 6));
                 setFieldErrors((current) => ({
                   ...current,
                   code: undefined,
@@ -149,6 +156,7 @@ export default function ForgotPasswordScreen() {
               error={fieldErrors.code}
             />
             <AuthField
+              maxLength={72}
               label={t("newPassword")}
               placeholder={t("passwordMinPlaceholder")}
               value={password}

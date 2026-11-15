@@ -8,7 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { AppState } from "react-native";
 import { formatAppError, isOfflineError, isOfflineMessage } from "@/lib/errors";
+import { createWakeRetry } from "@/lib/wake-retry";
 import { fetchMyHomes, fetchMyHousehold } from "@/features/homes/api/homes";
 import { readCachedHousehold, writeCachedHousehold } from "@/features/offline/profile-cache";
 import { useAuth } from "@/features/auth/providers/auth-provider";
@@ -26,6 +28,9 @@ type HouseholdContextValue = {
   adoptHome: (next: Household) => void;
 };
 
+/** Coming back to the app reloads the home, but not more often than this. */
+const FOREGROUND_REFRESH_MS = 60_000;
+
 const HouseholdContext = createContext<HouseholdContextValue | null>(null);
 
 export function HouseholdProvider({ children }: { children: ReactNode }) {
@@ -38,6 +43,9 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const currentUserIdRef = useRef(user?.id ?? null);
   const requestSequenceRef = useRef(0);
   const userId = user?.id ?? null;
+  const lastLoadRef = useRef(0);
+  const refreshRef = useRef<() => unknown>(() => undefined);
+  const [wakeRetry] = useState(createWakeRetry);
   const [trackedUserId, setTrackedUserId] = useState<string | null | undefined>(undefined);
 
   if (!isAuthLoading && userId !== trackedUserId) {
@@ -85,6 +93,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       ) {
         return null;
       }
+      lastLoadRef.current = Date.now();
+      // The saved copy answered instead of the server: ask again shortly.
+      if (listed.offline) wakeRetry.stale();
+      else wakeRetry.fresh();
       setHousehold(next);
       setLoadFailed(false);
       if (!next) {
@@ -110,7 +122,9 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       ) {
         return null;
       }
-      const cached = isOfflineError(error) ? readCachedHousehold() : null;
+      const offline = isOfflineError(error);
+      if (offline) wakeRetry.stale();
+      const cached = offline ? readCachedHousehold() : null;
       if (cached?.household) {
         setHousehold(cached.household);
         setHomes(cached.homes);
@@ -123,12 +137,30 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       return null;
     }
-  }, [userId]);
+  }, [userId, wakeRetry]);
+
+  useEffect(() => {
+    refreshRef.current = refresh;
+    wakeRetry.setRun(refresh);
+  }, [refresh, wakeRetry]);
 
   useEffect(() => {
     currentUserIdRef.current = user?.id ?? null;
     requestSequenceRef.current += 1;
-  }, [user?.id]);
+    return () => wakeRetry.cancel();
+  }, [user?.id, wakeRetry]);
+
+  // Back in the app after a while: the home may have changed on another phone
+  // (renamed, a member added or removed, the host changed its options).
+  useEffect(() => {
+    if (!userId) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      if (Date.now() - lastLoadRef.current < FOREGROUND_REFRESH_MS) return;
+      void refreshRef.current();
+    });
+    return () => subscription.remove();
+  }, [userId]);
 
   useEffect(() => {
     if (isAuthLoading) return;

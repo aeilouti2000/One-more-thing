@@ -104,6 +104,8 @@ export default function PermissionsSettingsScreen() {
       } else {
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       }
+    } catch {
+      // The row below shows whatever the phone ended up granting.
     } finally {
       setBusy(null);
       await reload();

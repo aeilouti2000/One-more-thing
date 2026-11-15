@@ -106,6 +106,7 @@ export default function SignupScreen() {
       />
       <View style={{ gap: 14 }}>
         <AuthField
+          maxLength={80}
           label={t("yourName")}
           placeholder={t("namePlaceholder")}
           value={name}
@@ -117,6 +118,7 @@ export default function SignupScreen() {
           error={fieldErrors.name}
         />
         <AuthField
+          maxLength={32}
           label={t("username")}
           placeholder={t("usernamePlaceholder")}
           value={username}
@@ -130,6 +132,7 @@ export default function SignupScreen() {
           error={fieldErrors.username}
         />
         <AuthField
+          maxLength={254}
           label={t("email")}
           placeholder={t("emailPlaceholder")}
           value={email}
@@ -146,6 +149,7 @@ export default function SignupScreen() {
           hint={t("emailHint")}
         />
         <AuthField
+          maxLength={72}
           label={t("password")}
           placeholder={t("passwordMinPlaceholder")}
           value={password}

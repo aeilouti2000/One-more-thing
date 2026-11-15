@@ -13,6 +13,8 @@ const JPEG_QUALITY = 78;
 /** Refuse decompression bombs: ~50 MP is far above any phone camera. */
 const MAX_INPUT_PIXELS = 50_000_000;
 
+const PHOTO_FORMATS = new Set(["jpeg", "png", "webp", "heif", "avif"]);
+
 export type UploadedPhoto = { buffer: Buffer; mimetype: string; size: number };
 
 @Injectable()
@@ -36,7 +38,11 @@ export class ItemImagesService {
     try {
       // rotate() applies the camera's EXIF orientation; the JPEG we write
       // carries no metadata, so location and device details are dropped.
-      output = await sharp(file.buffer, { limitInputPixels: MAX_INPUT_PIXELS })
+      const source = sharp(file.buffer, { limitInputPixels: MAX_INPUT_PIXELS });
+      const { format } = await source.metadata();
+      // Photos only: no SVG (it can pull in fonts and huge canvases), GIF or PDF.
+      if (!format || !PHOTO_FORMATS.has(format)) throw new Error("not a photo");
+      output = await source
         .rotate()
         .resize({ width: MAX_SIDE, height: MAX_SIDE, fit: "inside", withoutEnlargement: true })
         .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
