@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import Animated, { Easing, FadeInDown } from "react-native-reanimated";
 import { useFocusEffect } from "expo-router";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -18,9 +19,9 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
+import { ShimmerBlock } from "@/components/ui/ShimmerBlock";
 import { getCategoryLabel } from "@/constants/categories";
 import { tabBar, withAlpha } from "@/constants/theme";
 import { useCategories } from "@/features/items/providers/categories-provider";
@@ -28,7 +29,7 @@ import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { resolvePreferredListId } from "@/features/items/utils/list-storage";
 import { fetchLists, listLabel, type HomeList } from "@/features/items/api/lists";
-import { readCachedPins } from "@/features/offline/profile-cache";
+import { readCachedLists, readCachedPins } from "@/features/offline/profile-cache";
 import { pinnedNotice } from "@/features/items/utils/pin-notice";
 import {
   createPin,
@@ -108,6 +109,8 @@ function PinsBody() {
   const [floatMessage, setFloatMessage] = useState<string | null>(null);
   const [lists, setLists] = useState<HomeList[]>([]);
   const [pinListId, setPinListId] = useState<string | null>(null);
+  // Cards that replace the skeleton rise in; cached cards just appear.
+  const [revealing, setRevealing] = useState(false);
   const showLists = lists.length > 1;
 
   function listName(id: string | null | undefined) {
@@ -126,6 +129,10 @@ function PinsBody() {
       setIsLoading(false);
       return;
     }
+    // Seed lists from cache alongside cached pins so the first paint already
+    // has the list chip; otherwise rows grow taller when the fetch resolves.
+    const cachedLists = readCachedLists<HomeList>(household.id);
+    if (cachedLists) setLists(cachedLists);
     void fetchLists(household.id).then((result) => {
       if (!result.error) setLists(result.lists);
     });
@@ -150,6 +157,15 @@ function PinsBody() {
       void load();
     }, [load]),
   );
+
+  const waitingForPins = isLoading && pins.length === 0 && !error;
+  if (waitingForPins && !revealing) setRevealing(true);
+  useEffect(() => {
+    if (waitingForPins || !revealing) return;
+    // Once the first cards have mounted, pins added later don't animate.
+    const timer = setTimeout(() => setRevealing(false), 600);
+    return () => clearTimeout(timer);
+  }, [waitingForPins, revealing]);
 
   async function onSave() {
     if (!household) return;
@@ -225,7 +241,7 @@ function PinsBody() {
 
   useEffect(() => {
     if (!floatMessage) return;
-    const timer = setTimeout(() => setFloatMessage(null), 2500);
+    const timer = setTimeout(() => setFloatMessage(null), 5000);
     return () => clearTimeout(timer);
   }, [floatMessage]);
 
@@ -340,9 +356,8 @@ function PinsBody() {
     await load();
   }
 
-  if (isLoading && pins.length === 0 && !error) {
-    return <LoadingScreen />;
-  }
+  // Nothing saved on the phone yet: pin-shaped placeholders until the server answers.
+  const showSkeleton = isLoading && pins.length === 0 && !error;
 
   const visiblePins =
     categoryFilter === "all"
@@ -465,7 +480,9 @@ function PinsBody() {
         </View>
       ) : null}
 
-      {pins.length === 0 ? (
+      {showSkeleton ? (
+        <PinsSkeleton />
+      ) : pins.length === 0 ? (
         <EmptyState title={t("pinsEmpty")} message={t("pinsEmptyBody")} />
       ) : visiblePins.length === 0 ? (
         <View className="mb-8">
@@ -473,7 +490,7 @@ function PinsBody() {
         </View>
       ) : (
         <View className="mb-6 gap-3">
-          {visiblePins.map((pin) => {
+          {visiblePins.map((pin, index) => {
             const once = pin.intervalDays === 0;
             const due = once
               ? null
@@ -486,8 +503,17 @@ function PinsBody() {
             const busy = isAddingThis || isRemovingThis;
 
             return (
-              <Pressable
+              <Animated.View
                 key={pin.id}
+                entering={
+                  revealing
+                    ? FadeInDown.delay(Math.min(index, 8) * 30)
+                        .duration(420)
+                        .easing(Easing.out(Easing.cubic))
+                    : undefined
+                }
+              >
+              <Pressable
                 onPress={() => openEdit(pin)}
                 accessibilityRole="button"
                 className="rounded-3xl bg-cove-paper px-3.5 py-3 active:opacity-80"
@@ -502,16 +528,34 @@ function PinsBody() {
                 <View className="flex-row items-center gap-3">
                   <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
                   <View className="min-w-0 flex-1 gap-1.5">
-                    <AppText numberOfLines={1} className="text-base font-semibold text-cove-ink">
-                      {pin.name}
-                    </AppText>
-                    <View className="flex-row flex-wrap items-center gap-1.5">
-                      <MetaChip label={categoryName(pin.category)} />
+                    <View className="flex-row items-center gap-2">
+                      <AppText
+                        numberOfLines={1}
+                        className="min-w-0 flex-1 text-base font-semibold text-cove-ink"
+                      >
+                        {pin.name}
+                      </AppText>
+                      {due ? (
+                        <View className="flex-row items-center gap-1">
+                          <Ionicons name="calendar-outline" size={12} color={colors.accent} />
+                          <AppText
+                            numberOfLines={1}
+                            className="text-xs font-semibold"
+                            style={{ color: colors.accent }}
+                          >
+                            {due}
+                          </AppText>
+                        </View>
+                      ) : null}
+                    </View>
+                    {/* One line only, so every card is the same height; long names get "…". */}
+                    <View className="flex-row items-center gap-1.5 overflow-hidden">
+                      <MetaChip label={categoryName(pin.category)} shrink />
                       <MetaChip label={t(intervalKeys[pin.intervalDays])} />
-                      {showLists ? <MetaChip label={listName(pinList(pin))} /> : null}
-                      {due ? <MetaChip label={due} /> : null}
+                      {showLists ? <MetaChip label={listName(pinList(pin))} shrink /> : null}
                       {listPresence[pin.id] ? (
                         <MetaChip
+                          shrink
                           label={t("pinnedOnList", {
                             name: listPresence[pin.id].listName,
                             count: listPresence[pin.id].count,
@@ -559,6 +603,7 @@ function PinsBody() {
                   </View>
                 </View>
               </Pressable>
+              </Animated.View>
             );
           })}
         </View>
@@ -660,13 +705,24 @@ function PinsBody() {
   );
 }
 
-function MetaChip({ label, accent = false }: { label: string; accent?: boolean }) {
+function MetaChip({
+  label,
+  accent = false,
+  shrink = false,
+}: {
+  label: string;
+  accent?: boolean;
+  /** May be cut with "…" when the row runs out of room. */
+  shrink?: boolean;
+}) {
   const { colors, scheme } = useTheme();
 
   return (
     <View
       className="rounded-full px-2 py-0.5"
       style={{
+        flexShrink: shrink ? 1 : 0,
+        minWidth: shrink ? 0 : undefined,
         backgroundColor: accent
           ? withAlpha(colors.accent, scheme === "dark" ? 0.22 : 0.14)
           : scheme === "dark"
@@ -675,11 +731,42 @@ function MetaChip({ label, accent = false }: { label: string; accent?: boolean }
       }}
     >
       <AppText
+        numberOfLines={1}
         className="text-xs font-medium"
         style={{ color: accent ? colors.accent : colors.muted }}
       >
         {label}
       </AppText>
+    </View>
+  );
+}
+
+/** Placeholder cards shaped like pin cards: pin, name, chips, add and delete. */
+function PinsSkeleton() {
+  const { colors, scheme } = useTheme();
+  const tone = scheme === "dark" ? colors.mist : "#E7EBF0";
+
+  return (
+    <View className="mb-6 gap-3">
+      {[0, 1, 2, 3, 4].map((index) => (
+        <View
+          key={index}
+          className="flex-row items-center gap-3 rounded-3xl px-3.5 py-3"
+          style={{ backgroundColor: colors.paper }}
+        >
+          <ShimmerBlock width={14} height={14} tone={tone} />
+          <View className="min-w-0 flex-1 gap-2">
+            <ShimmerBlock width={index % 2 === 0 ? 96 : 72} height={13} tone={tone} />
+            <View className="flex-row gap-1.5">
+              <ShimmerBlock width={index % 2 === 0 ? 58 : 76} height={16} tone={tone} />
+              <ShimmerBlock width={66} height={16} tone={tone} />
+              <ShimmerBlock width={44} height={16} tone={tone} />
+            </View>
+          </View>
+          <ShimmerBlock width={34} height={34} tone={tone} />
+          <ShimmerBlock width={18} height={18} tone={tone} />
+        </View>
+      ))}
     </View>
   );
 }

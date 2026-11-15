@@ -26,9 +26,10 @@ import { boughtInMonth, currentMonth, previousMonth } from "@/features/items/uti
 import {
   CardBlock,
   CostAskToggle,
+  HostLockField,
+  HostLockPill,
   HostOnly,
   SettingsSection,
-  useHostOnlyNotice,
 } from "@/features/settings/components/settings-ui";
 import {
   useSettingsShowBack,
@@ -52,7 +53,6 @@ export default function CostsSettingsScreen() {
   const [costError, setCostError] = useState<string | null>(null);
   const [isSavingCosts, setIsSavingCosts] = useState(false);
   const [isChoosingCurrency, setIsChoosingCurrency] = useState(false);
-  const hostOnly = useHostOnlyNotice();
   const { purchases } = usePurchases();
   const { exportItems, isExporting } = useExportPurchases();
   const [budgetText, setBudgetText] = useState<string | null>(null);
@@ -86,6 +86,13 @@ export default function CostsSettingsScreen() {
   }
 
   const savedBudget = household.monthlyBudget;
+  const budgetLabel = savedBudget
+    ? formatMoney(savedBudget, household.currency)
+    : t("noBudgetSet");
+  const currencyName = t(
+    (HOME_CURRENCIES.find((item) => item.code === household.currency)?.labelKey ??
+      "currencyJOD") as "currencyJOD",
+  );
   const parsedBudget = parseCostInput(budgetText ?? "");
   const budgetInvalid =
     Number.isNaN(parsedBudget) || (parsedBudget !== null && parsedBudget > MAX_BUDGET);
@@ -116,7 +123,7 @@ export default function CostsSettingsScreen() {
   const thisMonth = currentMonth();
 
   return (
-    <Screen tabBarInset={tabBarInset} floating={hostOnly.floating}>
+    <Screen tabBarInset={tabBarInset}>
       <ScreenHeader
         title={t("costsAndBudget")}
         subtitle={household.costsEnabled ? t("trackCosts") : t("costsSectionBody")}
@@ -125,139 +132,150 @@ export default function CostsSettingsScreen() {
       />
 
       <SettingsSection>
-        <CardBlock>
-          <AppText className="mb-3 text-sm text-cove-muted">{t("costsSectionBody")}</AppText>
-          <View className="flex-row items-center justify-between gap-3">
-            <View className="min-w-0 flex-1">
-              <AppText className="text-base font-semibold text-cove-ink">
-                {t("trackCosts")}
-              </AppText>
-              <AppText className="mt-2 text-sm text-cove-muted">{t("trackCostsBody")}</AppText>
+        <HostOnly locked={!isHost}>
+          <CardBlock>
+            <AppText className="mb-3 text-sm text-cove-muted">{t("costsSectionBody")}</AppText>
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="min-w-0 flex-1">
+                <AppText className="text-base font-semibold text-cove-ink">
+                  {t("trackCosts")}
+                </AppText>
+                <AppText className="mt-2 text-sm text-cove-muted">{t("trackCostsBody")}</AppText>
+              </View>
+              {isHost ? (
+                <Switch
+                  value={household.costsEnabled}
+                  disabled={isSavingCosts}
+                  onValueChange={(enabled) => void saveCostSettings({ costsEnabled: enabled })}
+                  trackColor={{ false: colors.mist, true: colors.accent }}
+                  thumbColor={colors.white}
+                />
+              ) : (
+                <HostLockPill
+                  label={household.costsEnabled ? t("settingOn") : t("settingOff")}
+                  active={household.costsEnabled}
+                />
+              )}
             </View>
-            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
-              <Switch
-                value={household.costsEnabled}
-                disabled={!isHost || isSavingCosts}
-                onValueChange={(enabled) => void saveCostSettings({ costsEnabled: enabled })}
-                trackColor={{ false: colors.mist, true: colors.accent }}
-                thumbColor={colors.white}
-              />
-            </HostOnly>
-          </View>
-          {!isHost ? (
-            <AppText className="mt-3 text-xs text-cove-muted">{t("costsHostOnly")}</AppText>
-          ) : null}
-          <FormMessage message={costError} />
-        </CardBlock>
+            <FormMessage message={costError} />
+          </CardBlock>
+        </HostOnly>
 
         {household.costsEnabled ? (
           <>
-            <CardBlock>
-              <AppText className="text-sm font-medium text-cove-muted">
-                {t("currencyLabel")}
-              </AppText>
-              <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
-                <Pressable
-                  disabled={!isHost || isSavingCosts}
-                  onPress={() => setIsChoosingCurrency((open) => !open)}
-                  className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3 active:opacity-80"
-                >
-                  <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
-                    {t(
-                      (HOME_CURRENCIES.find((item) => item.code === household.currency)
-                        ?.labelKey ?? "currencyJOD") as "currencyJOD",
-                    )}
-                  </AppText>
-                  <Ionicons
-                    name={isChoosingCurrency ? "chevron-up" : "chevron-down"}
-                    size={iconSize.sm}
-                    color={colors.ink}
-                  />
-                </Pressable>
-              </HostOnly>
-              {isChoosingCurrency ? (
-                <View className="mt-3 gap-2">
-                  {HOME_CURRENCIES.map((option) => {
-                    const selected = household.currency === option.code;
-                    return (
-                      <Pressable
-                        key={option.code}
-                        disabled={!isHost || isSavingCosts}
-                        onPress={() => {
-                          setIsChoosingCurrency(false);
-                          if (option.code !== household.currency) {
-                            void saveCostSettings({ currency: option.code as HomeCurrency });
-                          }
-                        }}
-                        className={`rounded-2xl px-4 py-3 ${
-                          selected ? "bg-cove-accent" : "bg-cove-mist"
-                        }`}
-                      >
-                        <AppText
-                          className={`text-base font-semibold ${
-                            selected ? "" : "text-cove-ink"
+            <HostOnly locked={!isHost}>
+              <CardBlock>
+                <AppText className="text-sm font-medium text-cove-muted">
+                  {t("currencyLabel")}
+                </AppText>
+                {isHost ? (
+                  <Pressable
+                    disabled={!isHost || isSavingCosts}
+                    onPress={() => setIsChoosingCurrency((open) => !open)}
+                    className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3 active:opacity-80"
+                  >
+                    <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+                      {currencyName}
+                    </AppText>
+                    <Ionicons
+                      name={isChoosingCurrency ? "chevron-up" : "chevron-down"}
+                      size={iconSize.sm}
+                      color={colors.ink}
+                    />
+                  </Pressable>
+                ) : (
+                  <HostLockField label={currencyName} />
+                )}
+                {isChoosingCurrency ? (
+                  <View className="mt-3 gap-2">
+                    {HOME_CURRENCIES.map((option) => {
+                      const selected = household.currency === option.code;
+                      return (
+                        <Pressable
+                          key={option.code}
+                          disabled={!isHost || isSavingCosts}
+                          onPress={() => {
+                            setIsChoosingCurrency(false);
+                            if (option.code !== household.currency) {
+                              void saveCostSettings({ currency: option.code as HomeCurrency });
+                            }
+                          }}
+                          className={`rounded-2xl px-4 py-3 ${
+                            selected ? "bg-cove-accent" : "bg-cove-mist"
                           }`}
-                          style={selected ? { color: colors.onAccent } : undefined}
                         >
-                          {t(option.labelKey as "currencyJOD")}
-                        </AppText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </CardBlock>
+                          <AppText
+                            className={`text-base font-semibold ${
+                              selected ? "" : "text-cove-ink"
+                            }`}
+                            style={selected ? { color: colors.onAccent } : undefined}
+                          >
+                            {t(option.labelKey as "currencyJOD")}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </CardBlock>
+            </HostOnly>
 
-            <CardBlock>
-              <AppText className="text-base font-semibold text-cove-ink">
-                {t("monthlyBudget")}
-              </AppText>
-              <AppText className="mt-1 text-sm text-cove-muted">{t("monthlyBudgetBody")}</AppText>
-              <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
-                <Pressable
-                  disabled={!isHost || isSavingCosts}
-                  onPress={openBudget}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("monthlyBudget")}
-                  className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3 active:opacity-80"
-                  style={{ opacity: isHost ? 1 : 0.7 }}
-                >
-                  <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
-                    {savedBudget ? formatMoney(savedBudget, household.currency) : t("noBudgetSet")}
-                  </AppText>
-                  <Ionicons name="pencil" size={iconSize.sm} color={colors.ink} />
-                </Pressable>
-              </HostOnly>
-            </CardBlock>
+            <HostOnly locked={!isHost}>
+              <CardBlock>
+                <AppText className="text-base font-semibold text-cove-ink">
+                  {t("monthlyBudget")}
+                </AppText>
+                <AppText className="mt-1 text-sm text-cove-muted">{t("monthlyBudgetBody")}</AppText>
+                {isHost ? (
+                  <Pressable
+                    disabled={isSavingCosts}
+                    onPress={openBudget}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("monthlyBudget")}
+                    className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3 active:opacity-80"
+                  >
+                    <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+                      {budgetLabel}
+                    </AppText>
+                    <Ionicons name="pencil" size={iconSize.sm} color={colors.ink} />
+                  </Pressable>
+                ) : (
+                  <HostLockField label={budgetLabel} />
+                )}
+              </CardBlock>
+            </HostOnly>
 
-            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+            <HostOnly locked={!isHost}>
               <CostAskToggle
                 title={t("askCostSingle")}
                 body={t("askCostSingleBody")}
                 value={household.askCostOnSingleBuy}
                 disabled={!isHost || isSavingCosts}
+                locked={!isHost}
                 onChange={(value) => void saveCostSettings({ askCostOnSingleBuy: value })}
                 colors={colors}
               />
             </HostOnly>
-            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+            <HostOnly locked={!isHost}>
               <CostAskToggle
                 title={t("askCostBulk")}
                 body={t("askCostBulkBody")}
                 value={household.askCostOnBulkBuy}
                 disabled={!isHost || isSavingCosts}
+                locked={!isHost}
                 onChange={(value) => void saveCostSettings({ askCostOnBulkBuy: value })}
                 colors={colors}
               />
             </HostOnly>
             {/* Two independent end-of-trip prompts; only one can run, so turning
                 one on turns the other off. */}
-            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+            <HostOnly locked={!isHost}>
               <CostAskToggle
                 title={t("askCostTrip")}
                 body={t("askCostTripBody")}
                 value={household.askCostOnTripEnd && household.tripCostMode !== "total"}
                 disabled={!isHost || isSavingCosts}
+                locked={!isHost}
                 onChange={(value) =>
                   void saveCostSettings(
                     value
@@ -268,12 +286,13 @@ export default function CostsSettingsScreen() {
                 colors={colors}
               />
             </HostOnly>
-            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+            <HostOnly locked={!isHost}>
               <CostAskToggle
                 title={t("askCostTripTotal")}
                 body={t("askCostTripTotalBody")}
                 value={household.tripCostMode === "total"}
                 disabled={!isHost || isSavingCosts}
+                locked={!isHost}
                 onChange={(value) =>
                   void saveCostSettings(
                     value

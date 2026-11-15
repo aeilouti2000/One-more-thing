@@ -1,6 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { formatMoney } from "@/features/items/utils/currency";
@@ -13,9 +20,8 @@ import { StatusBadge } from "./status-badge";
 
 export const CARD_RADIUS = 22;
 const SELECTION_BORDER = 2;
-const URGENT_COLOR = "#F43F5E";
-const URGENT_FLAG = 48;
-const URGENT_BAND = 20;
+const URGENT_COLOR = "#EF4444";
+const URGENT_DOT = 6;
 
 type PurchaseRowProps = {
   purchase: Purchase;
@@ -44,7 +50,7 @@ export function PurchaseRow({
   leading,
   showCategory = true,
 }: PurchaseRowProps) {
-  const { t, isRTL } = useI18n();
+  const { t } = useI18n();
   const { household } = useHousehold();
   const categoryLabel = useCategoryLabel(purchase.category);
   const { colors, scheme } = useTheme();
@@ -93,7 +99,6 @@ export function PurchaseRow({
           backgroundColor: selected ? colors.mist : colors.paper,
         }}
       >
-      {isUrgent ? <UrgentCornerFlag isRTL={isRTL} label={t("urgent")} /> : null}
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
@@ -117,7 +122,7 @@ export function PurchaseRow({
           paddingTop: 16,
           paddingBottom: 16,
           paddingStart: 18,
-          paddingEnd: isUrgent ? 20 : 18,
+          paddingEnd: 18,
         }}
       >
         <View pointerEvents="box-none" className="flex-row items-center gap-3">
@@ -140,6 +145,7 @@ export function PurchaseRow({
                 >
                   {purchase.name}
                 </AppText>
+                {isUrgent ? <UrgentChip label={t("urgent")} /> : null}
                 {purchase.notes?.trim() ? (
                   <Ionicons
                     name="document-text-outline"
@@ -288,42 +294,47 @@ export function PurchaseRow({
   );
 }
 
-function UrgentCornerFlag({ isRTL, label }: { isRTL: boolean; label: string }) {
+/** "Urgent" next to the name, with a small red dot that slowly breathes. */
+function UrgentChip({ label }: { label: string }) {
+  const { scheme } = useTheme();
+  const dark = scheme === "dark";
+  const breath = useSharedValue(0);
+
+  useEffect(() => {
+    breath.set(withRepeat(withTiming(1, { duration: 1800, easing: Easing.out(Easing.quad) }), -1));
+  }, [breath]);
+
+  const ring = useAnimatedStyle(() => ({
+    opacity: 0.75 * (1 - breath.value),
+    transform: [{ scale: 1 + 2 * breath.value }],
+  }));
+
   return (
     <View
-      pointerEvents="none"
-      accessibilityLabel={label}
-      style={{
-        position: "absolute",
-        top: 0,
-        width: URGENT_FLAG,
-        height: URGENT_FLAG,
-        overflow: "hidden",
-        zIndex: 2,
-        ...(isRTL ? { left: 0 } : { right: 0 }),
-      }}
+      className="shrink-0 flex-row items-center gap-1.5 rounded-full py-0.5 ps-2 pe-2.5"
+      style={{ backgroundColor: dark ? "rgba(239,68,68,0.16)" : "rgba(239,68,68,0.12)" }}
     >
-      <View
-        style={{
-          position: "absolute",
-          top: -1,
-          width: URGENT_FLAG * 1.5,
-          height: URGENT_BAND,
-          backgroundColor: URGENT_COLOR,
-          alignItems: "center",
-          justifyContent: "center",
-          ...(isRTL
-            ? { left: -26, transform: [{ rotate: "-45deg" }] }
-            : { right: -26, transform: [{ rotate: "45deg" }] }),
-        }}
-      >
-        <Ionicons
-          name="flame"
-          size={12}
-          color="#FFFFFF"
-          style={{ transform: [{ rotate: isRTL ? "45deg" : "-45deg" }] }}
+      <View style={{ width: URGENT_DOT, height: URGENT_DOT }}>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { borderRadius: URGENT_DOT / 2, backgroundColor: URGENT_COLOR },
+            ring,
+          ]}
+        />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { borderRadius: URGENT_DOT / 2, backgroundColor: URGENT_COLOR },
+          ]}
         />
       </View>
+      <AppText
+        className="text-xs font-bold"
+        style={{ color: dark ? "#FCA5A5" : "#B91C1C" }}
+      >
+        {label}
+      </AppText>
     </View>
   );
 }

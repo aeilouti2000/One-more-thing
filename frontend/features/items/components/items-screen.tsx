@@ -1,6 +1,5 @@
 import { caretColors, caretGap } from "@/constants/text";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import {
   memo,
@@ -27,14 +26,11 @@ import {
 import Animated, {
   Easing,
   FadeIn,
+  FadeInLeft,
+  FadeInRight,
   FadeOut,
-  interpolate,
   SlideInUp,
   SlideOutUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FoldPaneEmpty, FoldSplit } from "@/components/ui/FoldSplit";
@@ -64,6 +60,7 @@ import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { ListsHeaderIcon } from "@/components/ui/ListsHeaderIcon";
 import { Screen, SwipeSlideContent } from "@/components/ui/Screen";
+import { ShimmerBlock } from "@/components/ui/ShimmerBlock";
 import { useTabBarVisibility } from "@/components/ui/TabBarVisibility";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import {
@@ -171,7 +168,11 @@ export default function ItemsScreen() {
   const [isQuickAdding, setIsQuickAdding] = useState(false);
   const [lists, setLists] = useState<HomeList[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
-  const [arrivingListId, setArrivingListId] = useState<string | null>(null);
+  // The list just swiped to and the side it slid in from; its rows stagger in.
+  const [arrival, setArrival] = useState<{
+    listId: string;
+    from: "left" | "right";
+  } | null>(null);
   const [isChoosingList, setIsChoosingList] = useState(false);
   const [listMenuMounted, setListMenuMounted] = useState(false);
   const listsLoadSeq = useRef(0);
@@ -767,7 +768,8 @@ export default function ItemsScreen() {
       const next = lists[listIndex + (forward ? 1 : -1)];
       if (!next) return;
       writeStoredListId(household.id, next.id);
-      setArrivingListId(next.id);
+      // Screen slides "next" in from the right (physical), "previous" from the left.
+      setArrival({ listId: next.id, from: direction === "next" ? "right" : "left" });
       setSelectedListId(next.id);
       setSelectedIds(new Set());
       setOpenSwipeId(null);
@@ -777,10 +779,11 @@ export default function ItemsScreen() {
   );
 
   useEffect(() => {
-    if (!arrivingListId || arrivingListId !== selectedListId || isLoading) return;
-    const timer = setTimeout(() => setArrivingListId(null), 420);
+    if (!arrival) return;
+    // Long enough for the staggered rows to mount; later rows (new items) don't animate.
+    const timer = setTimeout(() => setArrival(null), 600);
     return () => clearTimeout(timer);
-  }, [arrivingListId, isLoading, selectedListId]);
+  }, [arrival]);
 
   async function addSuggestion(suggestion: ItemSuggestion) {
     if (isQuickAdding || !selectedListId) return;
@@ -914,9 +917,11 @@ export default function ItemsScreen() {
   }
 
   const currentList = lists.find((list) => list.id === selectedListId) ?? null;
-  const listArriving = arrivingListId !== null && arrivingListId === selectedListId;
   const awaitingItems = isLoading && needed.length === 0 && !error;
-  const showListSkeleton = awaitingItems || listArriving;
+  // Only a true first load (nothing saved on the phone yet) shows the skeleton.
+  const showListSkeleton = awaitingItems;
+  const arrivalFrom =
+    arrival && arrival.listId === selectedListId ? arrival.from : null;
 
   const shopDisabled =
     showListSkeleton || visibleItems.length === 0 || !selectedListId;
@@ -1235,6 +1240,7 @@ export default function ItemsScreen() {
                   }
                 />
               ) : (
+              <RowEntrance index={index} from={arrivalFrom}>
               <ShoppingRow
                 purchase={purchase}
                 index={index}
@@ -1255,6 +1261,7 @@ export default function ItemsScreen() {
                 onLongPress={longPressRow}
                 onChangeQuantity={changeRowQuantity}
               />
+              </RowEntrance>
               )
             }
           />
@@ -1701,63 +1708,6 @@ export default function ItemsScreen() {
   );
 }
 
-function ShimmerBlock({
-  width,
-  height,
-  tone,
-  highlight = "rgba(255,255,255,0.72)",
-}: {
-  width: number;
-  height: number;
-  tone: string;
-  highlight?: string;
-}) {
-  const travel = useSharedValue(0);
-  useEffect(() => {
-    travel.value = withRepeat(
-      withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.cubic) }),
-      -1,
-      false,
-    );
-  }, [travel]);
-  const sheen = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: interpolate(travel.value, [0, 1], [-width * 0.7, width]) },
-    ],
-  }));
-
-  return (
-    <View
-      style={{
-        width,
-        height,
-        borderRadius: height / 2,
-        overflow: "hidden",
-        backgroundColor: tone,
-      }}
-    >
-      <Animated.View
-        style={[
-          {
-            position: "absolute",
-            top: 0,
-            bottom: 0,
-            width: Math.max(36, width * 0.62),
-          },
-          sheen,
-        ]}
-      >
-        <LinearGradient
-          colors={["transparent", highlight, "transparent"]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-    </View>
-  );
-}
-
 function HeaderInfoShimmer({ color }: { color: string }) {
   const tone = withAlpha(color, 0.2);
   const highlight = withAlpha(color, 0.78);
@@ -1776,6 +1726,31 @@ function HeaderInfoShimmer({ color }: { color: string }) {
       <ShimmerBlock width={52} height={11} tone={tone} highlight={highlight} />
     </View>
   );
+}
+
+/** Rows of a list just swiped to glide in from that side, one after another. */
+const ENTRANCE_STAGGER_MS = 35;
+const ENTRANCE_MAX_STAGGERED = 8;
+
+function RowEntrance({
+  index,
+  from,
+  children,
+}: {
+  index: number;
+  from: "left" | "right" | null;
+  children: ReactNode;
+}) {
+  // Read once at mount: rows added later in the same list don't re-animate.
+  const [entering] = useState(() => {
+    if (!from) return undefined;
+    const base = from === "right" ? FadeInRight : FadeInLeft;
+    return base
+      .delay(Math.min(index, ENTRANCE_MAX_STAGGERED) * ENTRANCE_STAGGER_MS)
+      .duration(380)
+      .easing(Easing.out(Easing.cubic));
+  });
+  return <Animated.View entering={entering}>{children}</Animated.View>;
 }
 
 function ListSkeleton() {

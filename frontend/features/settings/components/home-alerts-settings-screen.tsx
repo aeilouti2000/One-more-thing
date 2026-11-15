@@ -1,7 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Switch, View } from "react-native";
-import { AppText } from "@/components/ui/AppText";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
@@ -10,11 +9,11 @@ import { updateNotificationSettings } from "@/features/homes/api/homes";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import {
   CardBlock,
+  HostLockPill,
   HostOnly,
   SettingsCardCopy,
   SettingsCardIcon,
   SettingsSection,
-  useHostOnlyNotice,
 } from "@/features/settings/components/settings-ui";
 import {
   useSettingsShowBack,
@@ -33,7 +32,6 @@ export default function HomeAlertsSettingsScreen() {
   const showBack = useSettingsShowBack({ nested: true });
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
-  const hostOnly = useHostOnlyNotice();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +61,7 @@ export default function HomeAlertsSettingsScreen() {
   }
 
   return (
-    <Screen tabBarInset={tabBarInset} floating={hostOnly.floating}>
+    <Screen tabBarInset={tabBarInset}>
       <ScreenHeader
         title={t("homeAlertsTitle")}
         subtitle={`${household.name} · ${t("sharedByEveryone")}`}
@@ -72,31 +70,35 @@ export default function HomeAlertsSettingsScreen() {
       />
 
       <SettingsSection>
-        <CardBlock>
-          <View className="flex-row items-center justify-between gap-3">
-            <View className="min-w-0 flex-1 flex-row items-center gap-3">
-              <SettingsCardIcon icon="home-outline" colors={colors} />
-              <SettingsCardCopy
-                title={t("homeAlerts", { home: household.name })}
-                body={t("homeAlertsBody")}
-              />
+        <HostOnly locked={!isHost}>
+          <CardBlock>
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="min-w-0 flex-1 flex-row items-center gap-3">
+                <SettingsCardIcon icon="home-outline" colors={colors} />
+                <SettingsCardCopy
+                  title={t("homeAlerts", { home: household.name })}
+                  body={t("homeAlertsBody")}
+                />
+              </View>
+              {isHost ? (
+                <Switch
+                  value={household.notificationsEnabled}
+                  disabled={isSaving}
+                  onValueChange={(enabled) => void onToggle(enabled)}
+                  trackColor={{ false: colors.mist, true: colors.accent }}
+                  thumbColor={colors.white}
+                  accessibilityLabel={t("homeAlerts", { home: household.name })}
+                />
+              ) : (
+                <HostLockPill
+                  label={household.notificationsEnabled ? t("settingOn") : t("settingOff")}
+                  active={household.notificationsEnabled}
+                />
+              )}
             </View>
-            <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
-              <Switch
-                value={household.notificationsEnabled}
-                disabled={!isHost || isSaving}
-                onValueChange={(enabled) => void onToggle(enabled)}
-                trackColor={{ false: colors.mist, true: colors.accent }}
-                thumbColor={colors.white}
-                accessibilityLabel={t("homeAlerts", { home: household.name })}
-              />
-            </HostOnly>
-          </View>
-          {!isHost ? (
-            <AppText className="mt-3 text-xs text-cove-muted">{t("homeAlertsHostOnly")}</AppText>
-          ) : null}
-          <FormMessage message={error} />
-        </CardBlock>
+            <FormMessage message={error} />
+          </CardBlock>
+        </HostOnly>
       </SettingsSection>
     </Screen>
   );

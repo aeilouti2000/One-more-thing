@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ViewHandle } from "@/lib/native-refs";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useDragOverlay } from "@/components/ui/DragOverlay";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -20,6 +20,8 @@ import type { Purchase } from "@/features/items/types/purchase";
 const GAP = 12;
 const SHIFT_MS = 160;
 const SETTLE_MS = 150;
+/** Used until a row has been measured; replaced by the last real height seen. */
+const FIRST_HEIGHT_GUESS = 48;
 
 type ReorderableListProps = {
   items: Purchase[];
@@ -35,45 +37,72 @@ type ReorderableListProps = {
   ) => ReactNode;
 };
 
-function rowHeight(heights: number[], index: number) {
+/**
+ * Where every row sits, in the order shown. Rows are absolutely positioned and
+ * placed only from this value, so a reorder never depends on a React layout
+ * pass landing in the same frame as an animation update.
+ */
+type ListLayout = {
+  ids: string[];
+  heights: number[];
+  tops: number[];
+  index: Record<string, number>;
+  total: number;
+};
+
+const EMPTY_LAYOUT: ListLayout = { ids: [], heights: [], tops: [], index: {}, total: 0 };
+
+function buildLayout(ids: string[], heights: number[]): ListLayout {
   "worklet";
-  const height = heights[index] ?? 0;
-  return height > 0 ? height : 88;
+  const tops: number[] = [];
+  const index: Record<string, number> = {};
+  let y = 0;
+  for (let position = 0; position < ids.length; position += 1) {
+    tops.push(y);
+    index[ids[position]] = position;
+    y += (heights[position] ?? 0) + GAP;
+  }
+  return { ids, heights, tops, index, total: Math.max(0, y - GAP) };
 }
 
-function computeTarget(from: number, dy: number, tops: number[], heights: number[]) {
+function moveInLayout(layout: ListLayout, from: number, to: number): ListLayout {
   "worklet";
-  if (from < 0 || tops.length === 0) return Math.max(0, from);
-  const movingMid = (tops[from] ?? 0) + dy + rowHeight(heights, from) / 2;
+  if (from === to || from < 0 || from >= layout.ids.length) return layout;
+  const ids = layout.ids.slice();
+  const heights = layout.heights.slice();
+  const [id] = ids.splice(from, 1);
+  const [height] = heights.splice(from, 1);
+  ids.splice(to, 0, id);
+  heights.splice(to, 0, height);
+  return buildLayout(ids, heights);
+}
+
+function computeTarget(from: number, dy: number, layout: ListLayout) {
+  "worklet";
+  const { tops, heights } = layout;
+  if (from < 0 || from >= tops.length) return Math.max(0, from);
+  const movingMid = tops[from] + dy + heights[from] / 2;
   let to = from;
   if (dy > 0) {
     for (let index = from + 1; index < tops.length; index += 1) {
-      const mid = (tops[index] ?? 0) + rowHeight(heights, index) / 2;
-      if (movingMid > mid) to = index;
+      if (movingMid > tops[index] + heights[index] / 2) to = index;
       else break;
     }
   } else if (dy < 0) {
     for (let index = from - 1; index >= 0; index -= 1) {
-      const mid = (tops[index] ?? 0) + rowHeight(heights, index) / 2;
-      if (movingMid < mid) to = index;
+      if (movingMid < tops[index] + heights[index] / 2) to = index;
       else break;
     }
   }
   return to;
 }
 
-function settleOffset(from: number, to: number, tops: number[], heights: number[]) {
+function settleOffset(from: number, to: number, layout: ListLayout) {
   "worklet";
-  if (from < 0 || to === from || tops.length === 0) return 0;
-  if (to > from) {
-    return (
-      (tops[to] ?? 0) +
-      rowHeight(heights, to) -
-      (tops[from] ?? 0) -
-      rowHeight(heights, from)
-    );
-  }
-  return (tops[to] ?? 0) - (tops[from] ?? 0);
+  const { tops, heights } = layout;
+  if (from < 0 || to === from || from >= tops.length) return 0;
+  if (to > from) return tops[to] + heights[to] - tops[from] - heights[from];
+  return tops[to] - tops[from];
 }
 
 export function ReorderableList({
@@ -87,9 +116,9 @@ export function ReorderableList({
   const [rows, setRows] = useState(items);
   const dragging = useRef(false);
   const committed = useRef(false);
-  const pendingReset = useRef(false);
-  const heights = useRef<number[]>([]);
+  const publishQueued = useRef(false);
   const heightById = useRef(new Map<string, number>());
+  const heightGuess = useRef(FIRST_HEIGHT_GUESS);
   const rowsRef = useRef(rows);
   const onReorderRef = useRef(onReorder);
   const onDragChangeRef = useRef(onDragChange);
@@ -102,8 +131,9 @@ export function ReorderableList({
   const activeIndex = useSharedValue(-1);
   const targetIndex = useSharedValue(-1);
   const settling = useSharedValue(false);
-  const heightsSV = useSharedValue<number[]>([]);
-  const topsSV = useSharedValue<number[]>([]);
+  /** The row hidden under the floating copy while it is dragged. */
+  const hiddenId = useSharedValue("");
+  const layout = useSharedValue<ListLayout>(EMPTY_LAYOUT);
 
   useLayoutEffect(() => {
     rowsRef.current = rows;
@@ -115,22 +145,28 @@ export function ReorderableList({
 
   useEffect(() => () => overlay.dismiss(), [overlay]);
 
-  function publishMetrics() {
-    const count = rowsRef.current.length;
-    const measured = heights.current.slice(0, count);
-    while (measured.length < count) measured.push(0);
-    const tops: number[] = [];
-    let y = 0;
-    for (let index = 0; index < count; index += 1) {
-      tops.push(y);
-      y += rowHeight(measured, index) + GAP;
-    }
-    heightsSV.set(measured);
-    topsSV.set(tops);
+  function measuredLayout(list: Purchase[]) {
+    return buildLayout(
+      list.map((item) => item.id),
+      list.map((item) => heightById.current.get(item.id) ?? heightGuess.current),
+    );
+  }
+
+  function publishLayout() {
+    layout.set(measuredLayout(rowsRef.current));
+  }
+
+  // Rows measure one by one; publish once for the whole batch.
+  function queuePublish() {
+    if (publishQueued.current) return;
+    publishQueued.current = true;
+    queueMicrotask(() => {
+      publishQueued.current = false;
+      if (!dragging.current) publishLayout();
+    });
   }
 
   // Sync before paint so list switches don't flash the previous rows for a frame.
-  // Same ids keep their measured heights; only a real order change clears them.
   useLayoutEffect(() => {
     if (dragging.current) return;
     const current = rowsRef.current;
@@ -150,45 +186,33 @@ export function ReorderableList({
         return height === undefined ? [] : [[item.id, height] as const];
       }),
     );
-    heights.current = items.map((item) => heightById.current.get(item.id) ?? 0);
     setRows(items);
   }, [items]);
 
-  // The drag maths needs the new row count and positions as soon as rows change.
+  // The drag maths needs the new rows and positions as soon as rows change.
   useLayoutEffect(() => {
-    if (!dragging.current) publishMetrics();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- publishMetrics only reads refs
+    if (!dragging.current) publishLayout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- publishLayout only reads refs
   }, [rows]);
-
-  useLayoutEffect(() => {
-    if (!pendingReset.current) return;
-    pendingReset.current = false;
-    overlay.dismiss();
-    activeIndex.set(-1);
-    targetIndex.set(-1);
-    dragX.set(0);
-    dragY.set(0);
-    settling.set(false);
-    publishMetrics();
-  });
 
   function hold(active: boolean) {
     if (active) onDragChangeRef.current?.(true);
     else if (!dragging.current) onDragChangeRef.current?.(false);
   }
 
-  function beginDrag(index: number) {
+  function beginDrag(id: string) {
     committed.current = false;
     dragging.current = true;
     onDragChangeRef.current?.(true);
+    const index = rowsRef.current.findIndex((item) => item.id === id);
     const purchase = rowsRef.current[index];
-    const node = purchase ? rowRefs.current.get(purchase.id) : null;
+    const node = rowRefs.current.get(id);
     if (!purchase || !node) return;
     const preview = renderRowRef.current(purchase, <StaticHandle />, index, true);
     node.measureInWindow((x, y, width, height) => {
       if (!dragging.current) return;
-      // The row may already be translated, and that shift is inside this
-      // measurement. The overlay adds the same shift again, so remove it here.
+      // The row may already be translated by the drag, and that shift is inside
+      // this measurement. The overlay adds the same shift again, so remove it here.
       overlay.present(preview, {
         x: x - dragX.value,
         y: y - dragY.value,
@@ -198,6 +222,10 @@ export function ReorderableList({
     });
   }
 
+  /**
+   * Runs after the drop is already on screen: the UI thread has put every row
+   * in its new place. This only brings React's order in line and reports it.
+   */
   function commit(from: number, to: number) {
     if (committed.current) return;
     committed.current = true;
@@ -208,52 +236,58 @@ export function ReorderableList({
     if (fromIndex !== toIndex && next[fromIndex]) {
       const [moved] = next.splice(fromIndex, 1);
       if (moved) next.splice(toIndex, 0, moved);
-      const measured = heights.current.slice();
-      const [height] = measured.splice(fromIndex, 1);
-      if (height !== undefined) measured.splice(toIndex, 0, height);
-      heights.current = measured;
       onReorderRef.current(next.map((item) => item.id));
     }
     dragging.current = false;
-    pendingReset.current = true;
+    rowsRef.current = next;
     onDragChangeRef.current?.(false);
     setRows(next);
+    overlay.dismiss();
+    dragX.set(0);
+    dragY.set(0);
+    settling.set(false);
   }
 
+  // Each row's place for its first frame, before the UI thread takes over.
+  // eslint-disable-next-line react-hooks/refs -- measured heights only seed a new row's starting position; later moves come from the shared layout
+  const firstLayout = measuredLayout(rows);
+  const containerStyle = useAnimatedStyle(() => ({ height: layout.value.total }));
+
   return (
-    <View style={{ gap: GAP }}>
+    <Animated.View style={[{ height: firstLayout.total }, containerStyle]}>
       {rows.map((purchase, index) => (
         <ReorderRow
           key={purchase.id}
           id={purchase.id}
-          index={index}
+          firstTop={firstLayout.tops[index] ?? 0}
           dragY={dragY}
           shown={overlay.shown}
+          hiddenId={hiddenId}
           activeIndex={activeIndex}
           targetIndex={targetIndex}
-          heightsSV={heightsSV}
+          layout={layout}
           rowRefs={rowRefs}
           onLayout={(height) => {
+            heightGuess.current = height;
+            if (heightById.current.get(purchase.id) === height) return;
             heightById.current.set(purchase.id, height);
-            if (heights.current[index] === height) return;
-            heights.current[index] = height;
-            if (!dragging.current) publishMetrics();
+            queuePublish();
           }}
         >
           {renderRow(
             purchase,
             enabled ? (
               <DragHandle
-                index={index}
+                id={purchase.id}
                 dragX={dragX}
                 dragY={dragY}
                 activeIndex={activeIndex}
                 targetIndex={targetIndex}
                 settling={settling}
-                topsSV={topsSV}
-                heightsSV={heightsSV}
+                hiddenId={hiddenId}
+                layout={layout}
                 onHold={hold}
-                onBegin={() => beginDrag(index)}
+                onBegin={() => beginDrag(purchase.id)}
                 onCommit={commit}
                 onLongPress={
                   onItemLongPress ? () => onLongPressRef.current?.(purchase.id) : undefined
@@ -264,75 +298,79 @@ export function ReorderableList({
           )}
         </ReorderRow>
       ))}
-    </View>
+    </Animated.View>
   );
 }
 
 function ReorderRow({
   id,
-  index,
+  firstTop,
   dragY,
   shown,
+  hiddenId,
   activeIndex,
   targetIndex,
-  heightsSV,
+  layout,
   rowRefs,
   onLayout,
   children,
 }: {
   id: string;
-  index: number;
+  firstTop: number;
   dragY: SharedValue<number>;
   shown: SharedValue<number>;
+  hiddenId: SharedValue<string>;
   activeIndex: SharedValue<number>;
   targetIndex: SharedValue<number>;
-  heightsSV: SharedValue<number[]>;
+  layout: SharedValue<ListLayout>;
   rowRefs: { current: Map<string, ViewHandle> };
   onLayout: (height: number) => void;
   children: ReactNode;
 }) {
-  const indexSV = useSharedValue(index);
-  const shift = useSharedValue(0);
+  const top = useSharedValue(firstTop);
 
-  useLayoutEffect(() => {
-    indexSV.set(index);
-  }, [index, indexSV]);
-
+  // Where this row should rest: its slot, moved aside while another row is
+  // dragged across it. -1 until the layout knows this row.
   useAnimatedReaction(
     () => {
+      const current = layout.value;
+      const row = current.index[id];
+      if (row === undefined) return -1;
+      const slot = current.tops[row] ?? 0;
       const from = activeIndex.value;
-      const row = indexSV.value;
-      if (from < 0 || row === from) return 0;
+      if (from < 0 || row === from) return slot;
       const to = targetIndex.value;
-      const span = rowHeight(heightsSV.value, from) + GAP;
-      if (from < to && row > from && row <= to) return -span;
-      if (from > to && row < from && row >= to) return span;
-      return 0;
+      const span = (current.heights[from] ?? 0) + GAP;
+      if (from < to && row > from && row <= to) return slot - span;
+      if (from > to && row < from && row >= to) return slot + span;
+      return slot;
     },
-    (next) => {
-      if (activeIndex.value < 0) {
-        shift.set(0);
+    (next, previous) => {
+      if (next < 0) return;
+      if (previous === null || previous < 0) {
+        top.set(next);
         return;
       }
-      shift.set(withTiming(next, {
-        duration: SHIFT_MS,
-        easing: Easing.out(Easing.cubic),
-      }));
+      if (activeIndex.value >= 0) {
+        top.set(withTiming(next, { duration: SHIFT_MS, easing: Easing.out(Easing.cubic) }));
+        return;
+      }
+      // A drop hands the same position over as the row's new slot: leave any
+      // running slide alone instead of cutting it short.
+      if (Math.abs(next - previous) < 0.5) return;
+      top.set(next);
     },
   );
 
   const style = useAnimatedStyle(() => {
-    const draggingThis = activeIndex.value === indexSV.value;
+    const draggingThis =
+      activeIndex.value >= 0 && layout.value.index[id] === activeIndex.value;
+    const hidden = hiddenId.value === id && shown.value > 0;
     return {
-      transform: [
-        {
-          translateY:
-            activeIndex.value < 0 ? 0 : draggingThis ? dragY.value : shift.value,
-        },
-      ],
+      transform: [{ translateY: draggingThis ? top.value + dragY.value : top.value }],
       zIndex: draggingThis ? 20 : 0,
-      elevation: draggingThis && shown.value > 0 ? 0 : draggingThis ? 12 : 0,
-      opacity: draggingThis && shown.value > 0 ? 0 : 1,
+      elevation: draggingThis && !hidden ? 12 : 0,
+      opacity: hidden ? 0 : 1,
     };
   });
 
@@ -343,7 +381,7 @@ function ReorderRow({
         else rowRefs.current.delete(id);
       }}
       collapsable={false}
-      style={style}
+      style={[rowStyles.row, style]}
       onLayout={(event) => onLayout(event.nativeEvent.layout.height)}
     >
       {children}
@@ -351,28 +389,32 @@ function ReorderRow({
   );
 }
 
+const rowStyles = StyleSheet.create({
+  row: { position: "absolute", top: 0, left: 0, right: 0 },
+});
+
 function DragHandle({
-  index,
+  id,
   dragX,
   dragY,
   activeIndex,
   targetIndex,
   settling,
-  topsSV,
-  heightsSV,
+  hiddenId,
+  layout,
   onHold,
   onBegin,
   onCommit,
   onLongPress,
 }: {
-  index: number;
+  id: string;
   dragX: SharedValue<number>;
   dragY: SharedValue<number>;
   activeIndex: SharedValue<number>;
   targetIndex: SharedValue<number>;
   settling: SharedValue<boolean>;
-  topsSV: SharedValue<number[]>;
-  heightsSV: SharedValue<number[]>;
+  hiddenId: SharedValue<string>;
+  layout: SharedValue<ListLayout>;
   onHold: (active: boolean) => void;
   onBegin: () => void;
   onCommit: (from: number, to: number) => void;
@@ -380,11 +422,9 @@ function DragHandle({
 }) {
   const { colors } = useTheme();
   const { t } = useI18n();
-  const indexSV = useSharedValue(index);
   const callbacks = useRef({ onHold, onBegin, onCommit, onLongPress });
 
   useLayoutEffect(() => {
-    indexSV.set(index);
     callbacks.current = { onHold, onBegin, onCommit, onLongPress };
   });
 
@@ -401,10 +441,13 @@ function DragHandle({
         .onStart(() => {
           "worklet";
           if (settling.value) return;
+          const row = layout.value.index[id];
+          if (row === undefined) return;
           dragX.set(0);
           dragY.set(0);
-          activeIndex.set(indexSV.value);
-          targetIndex.set(indexSV.value);
+          hiddenId.set(id);
+          activeIndex.set(row);
+          targetIndex.set(row);
           runOnJS(begin)();
         })
         .onUpdate((event) => {
@@ -412,12 +455,7 @@ function DragHandle({
           if (settling.value || activeIndex.value < 0) return;
           dragX.set(event.translationX);
           dragY.set(event.translationY);
-          const next = computeTarget(
-            activeIndex.value,
-            event.translationY,
-            topsSV.value,
-            heightsSV.value,
-          );
+          const next = computeTarget(activeIndex.value, event.translationY, layout.value);
           if (next !== targetIndex.value) targetIndex.set(next);
         })
         .onFinalize((event, success) => {
@@ -425,11 +463,9 @@ function DragHandle({
           if (activeIndex.value < 0 || settling.value) return;
           settling.set(true);
           const from = activeIndex.value;
-          const to = success
-            ? computeTarget(from, event.translationY, topsSV.value, heightsSV.value)
-            : from;
+          const to = success ? computeTarget(from, event.translationY, layout.value) : from;
           targetIndex.set(to);
-          const dest = settleOffset(from, to, topsSV.value, heightsSV.value);
+          const dest = settleOffset(from, to, layout.value);
           dragX.set(withTiming(0, {
             duration: SETTLE_MS,
             easing: Easing.out(Easing.cubic),
@@ -439,7 +475,24 @@ function DragHandle({
             { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) },
             () => {
               "worklet";
-              runOnJS(commitDrag)(from, to);
+              // The whole drop happens here, in one frame on the UI thread:
+              // every row's slot changes together with the end of the drag.
+              layout.set(moveInLayout(layout.value, from, to));
+              activeIndex.set(-1);
+              targetIndex.set(-1);
+              // Then show the real row, and only once it has been drawn let
+              // React remove the floating copy that covers it.
+              requestAnimationFrame(() => {
+                "worklet";
+                hiddenId.set("");
+                requestAnimationFrame(() => {
+                  "worklet";
+                  requestAnimationFrame(() => {
+                    "worklet";
+                    runOnJS(commitDrag)(from, to);
+                  });
+                });
+              });
             },
           ));
         }),
@@ -452,7 +505,7 @@ function DragHandle({
         }),
     );
     // Shared values are stable. JS callbacks are read through the ref at call time.
-  }, [activeIndex, dragX, dragY, heightsSV, indexSV, settling, targetIndex, topsSV]);
+  }, [activeIndex, dragX, dragY, hiddenId, id, layout, settling, targetIndex]);
   /* eslint-enable react-hooks/refs */
 
   return (

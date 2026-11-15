@@ -1,9 +1,25 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import Animated, {
+  FadeInDown,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+  type SharedValue,
+} from "react-native-reanimated";
 import { Pressable, Switch, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { FloatMessage } from "@/components/ui/FloatMessage";
 import { iconSize, withAlpha } from "@/constants/theme";
 import {
   readSwipeActions,
@@ -145,54 +161,141 @@ export function SettingsLinkCard({
   );
 }
 
+type HostLock = { shake: SharedValue<number> };
+const HostLockContext = createContext<HostLock | null>(null);
+const HOST_TIP_MS = 2000;
+
 /**
- * A short floating note for a member who taps a setting only the host can
- * change, so a greyed-out control never looks like the app is stuck.
+ * Wraps a host-only card. For the host it's the card itself. For anyone else
+ * the card is view-only: a tap anywhere shakes its lock pill and shows a small
+ * note just above it, so it never looks like the app is stuck.
  */
-export function useHostOnlyNotice() {
-  const { t } = useI18n();
-  const [message, setMessage] = useState<string | null>(null);
+export function HostOnly({
+  locked,
+  children,
+}: {
+  locked: boolean;
+  children: ReactNode;
+}) {
+  const { t, isRTL } = useI18n();
+  const { colors, scheme } = useTheme();
+  const shake = useSharedValue(0);
+  const [tipShown, setTipShown] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lock = useMemo(() => ({ shake }), [shake]);
 
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
-  const show = useCallback(() => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
-    setMessage(t("hostOnlyToast"));
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setMessage(null), 2500);
-  }, [t]);
+  if (!locked) return <>{children}</>;
 
-  const floating = message ? <FloatMessage message={message} /> : null;
-  return { show, floating };
+  function blocked() {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+    shake.set(
+      withSequence(
+        withTiming(-5, { duration: 50 }),
+        withTiming(5, { duration: 70 }),
+        withTiming(-4, { duration: 70 }),
+        withTiming(3, { duration: 60 }),
+        withTiming(0, { duration: 60 }),
+      ),
+    );
+    setTipShown(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setTipShown(false), HOST_TIP_MS);
+  }
+
+  return (
+    <HostLockContext.Provider value={lock}>
+      <View style={{ zIndex: tipShown ? 10 : 0, elevation: tipShown ? 10 : 0 }}>
+        {/* No accessibilityState.disabled here: on Android it calls setEnabled(false),
+            which stops the view receiving touches, so the tap would never reach us. */}
+        <Pressable
+          onPress={blocked}
+          accessibilityRole="button"
+          accessibilityHint={t("hostOnlyToast")}
+        >
+          <View pointerEvents="none">{children}</View>
+        </Pressable>
+        {tipShown ? (
+          <Animated.View
+            entering={FadeInDown.duration(160)}
+            exiting={FadeOut.duration(160)}
+            pointerEvents="none"
+            className="absolute flex-row items-center gap-1.5 rounded-xl px-3 py-1.5"
+            style={{
+              bottom: "100%",
+              marginBottom: 6,
+              [isRTL ? "left" : "right"]: 12,
+              backgroundColor: scheme === "dark" ? colors.mist : colors.ink,
+              shadowColor: "#000000",
+              shadowOpacity: 0.3,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: 12,
+            }}
+          >
+            <Ionicons name="lock-closed" size={12} color={HOST_LOCK_TINT} />
+            <AppText
+              className="text-xs font-semibold"
+              style={{ color: scheme === "dark" ? colors.ink : colors.white }}
+            >
+              {t("hostOnlyToast")}
+            </AppText>
+          </Animated.View>
+        ) : null}
+      </View>
+    </HostLockContext.Provider>
+  );
 }
 
-/**
- * Wraps a host-only control. For the host it's the control itself; for anyone
- * else the control stays greyed out and a tap on it explains why.
- */
-export function HostOnly({
-  locked,
-  onBlocked,
-  children,
-}: {
-  locked: boolean;
-  onBlocked: () => void;
-  children: ReactNode;
-}) {
-  const { t } = useI18n();
-  if (!locked) return <>{children}</>;
+const HOST_LOCK_TINT = "#F0B04A";
+
+/** Shakes when its HostOnly card is tapped by someone who isn't the host. */
+function HostShake({ children }: { children: ReactNode }) {
+  const lock = useContext(HostLockContext);
+  const fallback = useSharedValue(0);
+  const shake = lock?.shake ?? fallback;
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: shake.value }] }));
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
+/** A read-only value with a lock, shown to members in place of a control. */
+export function HostLockPill({ label, active = false }: { label: string; active?: boolean }) {
+  const { colors, scheme } = useTheme();
+  const color = active ? colors.accent : colors.ink;
   return (
-    <Pressable
-      onPress={onBlocked}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: true }}
-      accessibilityHint={t("hostOnlyToast")}
-    >
-      <View pointerEvents="none">{children}</View>
-    </Pressable>
+    <HostShake>
+      <View
+        className="flex-row items-center gap-1.5 self-start rounded-xl px-2.5 py-1"
+        style={{
+          backgroundColor: active
+            ? withAlpha(colors.accent, scheme === "dark" ? 0.2 : 0.14)
+            : colors.mist,
+        }}
+      >
+        <Ionicons name="lock-closed" size={12} color={color} />
+        <AppText className="text-sm font-semibold" style={{ color }}>
+          {label}
+        </AppText>
+      </View>
+    </HostShake>
+  );
+}
+
+/** A read-only value field with a lock where the chevron or pencil would be. */
+export function HostLockField({ label }: { label: string }) {
+  const { colors } = useTheme();
+  return (
+    <HostShake>
+      <View className="mt-3 flex-row items-center justify-between gap-3 rounded-2xl bg-cove-mist px-4 py-3">
+        <AppText className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
+          {label}
+        </AppText>
+        <Ionicons name="lock-closed" size={iconSize.sm} color={colors.muted} />
+      </View>
+    </HostShake>
   );
 }
 
@@ -203,6 +306,7 @@ export function CostAskToggle({
   disabled,
   onChange,
   colors,
+  locked = false,
 }: {
   title: string;
   body: string;
@@ -210,18 +314,25 @@ export function CostAskToggle({
   disabled: boolean;
   onChange: (value: boolean) => void;
   colors: { mist: string; accent: string; white: string };
+  /** View-only (not the host): the value as a lock pill instead of a switch. */
+  locked?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <CardBlock>
       <View className="flex-row items-center justify-between gap-3">
         <SettingsCardCopy title={title} body={body} />
-        <Switch
-          value={value}
-          disabled={disabled}
-          onValueChange={onChange}
-          trackColor={{ false: colors.mist, true: colors.accent }}
-          thumbColor={colors.white}
-        />
+        {locked ? (
+          <HostLockPill label={value ? t("settingOn") : t("settingOff")} active={value} />
+        ) : (
+          <Switch
+            value={value}
+            disabled={disabled}
+            onValueChange={onChange}
+            trackColor={{ false: colors.mist, true: colors.accent }}
+            thumbColor={colors.white}
+          />
+        )}
       </View>
     </CardBlock>
   );

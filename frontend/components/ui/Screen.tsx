@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -138,6 +139,12 @@ export function Screen({
   // Same bottom as GlassTabBar. On fold settings the dock sits beside the bar.
   const dockBottom = Math.max(insets.bottom, spacing.md) + spacing.sm;
   const dockBesideTabBar = Boolean(dockBeside && dock);
+  // A bottom-docked card (not beside the tab bar) pushes floating toasts above it.
+  const [dockHeight, setDockHeight] = useState(0);
+  const floatingAboveDock =
+    dock && !dockBesideTabBar && dockHeight > 0
+      ? { bottom: dockBottom + dockHeight + spacing.md }
+      : null;
   const swipeRef = useRef(onSwipe);
   const canSwipeRef = useRef(canSwipe);
   const commitSwipeRef = useRef<(direction: SwipeDirection, soft?: boolean) => void>(() => {});
@@ -455,6 +462,7 @@ export function Screen({
         <View
           pointerEvents="box-none"
           className={`absolute inset-x-0 ${fab ? "bottom-40" : "bottom-28"} items-center px-4`}
+          style={floatingAboveDock}
         >
           {floating}
         </View>
@@ -464,6 +472,7 @@ export function Screen({
         <View
           pointerEvents="box-none"
           className={dockBesideTabBar ? "absolute" : "absolute inset-x-4"}
+          onLayout={(event) => setDockHeight(event.nativeEvent.layout.height)}
           style={[
             { bottom: dockBottom, zIndex: 30 },
             dockBesideStyle,

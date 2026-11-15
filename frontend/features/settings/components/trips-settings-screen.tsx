@@ -12,10 +12,10 @@ import { TRIP_AUTO_END_HOURS, type TripSettings } from "@/features/homes/types/h
 import {
   CardBlock,
   CostAskToggle,
+  HostLockPill,
   HostOnly,
   SettingsCardCopy,
   SettingsSection,
-  useHostOnlyNotice,
 } from "@/features/settings/components/settings-ui";
 import {
   useSettingsShowBack,
@@ -34,7 +34,6 @@ export default function TripsSettingsScreen() {
   const showBack = useSettingsShowBack({ nested: true });
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
-  const hostOnly = useHostOnlyNotice();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,9 +63,11 @@ export default function TripsSettingsScreen() {
   }
 
   const choices: (number | null)[] = [null, ...TRIP_AUTO_END_HOURS];
+  const autoEndLabel = (hours: number | null) =>
+    hours === null ? t("settingOff") : t("hoursShort", { hours });
 
   return (
-    <Screen tabBarInset={tabBarInset} floating={hostOnly.floating}>
+    <Screen tabBarInset={tabBarInset}>
       <ScreenHeader
         title={t("tripsSettings")}
         subtitle={`${household.name} · ${t("sharedByEveryone")}`}
@@ -75,77 +76,85 @@ export default function TripsSettingsScreen() {
       />
 
       <SettingsSection>
-        <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+        <HostOnly locked={!isHost}>
           <CostAskToggle
             title={t("tripAskName")}
             body={t("tripAskNameBody")}
             value={household.tripAskName}
             disabled={!isHost || isSaving}
+            locked={!isHost}
             onChange={(value) => void save({ tripAskName: value })}
             colors={colors}
           />
         </HostOnly>
 
-        <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+        <HostOnly locked={!isHost}>
           <CostAskToggle
             title={t("tripSummarySetting")}
             body={t("tripSummarySettingBody")}
             value={household.tripSummary}
             disabled={!isHost || isSaving}
+            locked={!isHost}
             onChange={(value) => void save({ tripSummary: value })}
             colors={colors}
           />
         </HostOnly>
 
-        <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
+        <HostOnly locked={!isHost}>
           <CostAskToggle
             title={t("tripShopTogether")}
             body={t("tripShopTogetherBody")}
             value={household.tripShopTogether}
             disabled={!isHost || isSaving}
+            locked={!isHost}
             onChange={(value) => void save({ tripShopTogether: value })}
             colors={colors}
           />
         </HostOnly>
 
-        <CardBlock>
-          <SettingsCardCopy title={t("tripAutoEnd")} body={t("tripAutoEndBody")} />
-          <HostOnly locked={!isHost} onBlocked={hostOnly.show}>
-            <View className="mt-3 flex-row flex-wrap gap-2">
-              {choices.map((hours) => {
-                const selected = (household.tripAutoEndHours ?? null) === hours;
-                const label = hours === null ? t("settingOff") : t("hoursShort", { hours });
-                return (
-                  <Pressable
-                    key={String(hours)}
-                    disabled={!isHost || isSaving}
-                    onPress={() => {
-                      if (!selected) void save({ tripAutoEndHours: hours });
-                    }}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected, disabled: !isHost }}
-                    accessibilityLabel={label}
-                    className={`rounded-2xl px-4 py-3 active:opacity-80 ${
-                      selected ? "bg-cove-accent" : "bg-cove-mist"
-                    }`}
-                    style={{ opacity: isHost ? 1 : 0.6 }}
-                  >
-                    <AppText
-                      className={`text-base font-semibold ${selected ? "" : "text-cove-ink"}`}
-                      style={selected ? { color: colors.onAccent } : undefined}
+        <HostOnly locked={!isHost}>
+          <CardBlock>
+            <SettingsCardCopy title={t("tripAutoEnd")} body={t("tripAutoEndBody")} />
+            {isHost ? (
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                {choices.map((hours) => {
+                  const selected = (household.tripAutoEndHours ?? null) === hours;
+                  const label = autoEndLabel(hours);
+                  return (
+                    <Pressable
+                      key={String(hours)}
+                      disabled={!isHost || isSaving}
+                      onPress={() => {
+                        if (!selected) void save({ tripAutoEndHours: hours });
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected, disabled: !isHost }}
+                      accessibilityLabel={label}
+                      className={`rounded-2xl px-4 py-3 active:opacity-80 ${
+                        selected ? "bg-cove-accent" : "bg-cove-mist"
+                      }`}
                     >
-                      {label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </HostOnly>
-        </CardBlock>
+                      <AppText
+                        className={`text-base font-semibold ${selected ? "" : "text-cove-ink"}`}
+                        style={selected ? { color: colors.onAccent } : undefined}
+                      >
+                        {label}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View className="mt-3">
+                <HostLockPill
+                  label={autoEndLabel(household.tripAutoEndHours ?? null)}
+                  active={household.tripAutoEndHours != null}
+                />
+              </View>
+            )}
+          </CardBlock>
+        </HostOnly>
 
-        {!isHost ? (
-          <AppText className="px-2 text-xs text-cove-muted">{t("homeAlertsHostOnly")}</AppText>
-        ) : null}
         <FormMessage message={error} />
       </SettingsSection>
     </Screen>
