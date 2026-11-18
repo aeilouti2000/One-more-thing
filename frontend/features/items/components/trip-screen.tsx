@@ -54,7 +54,7 @@ import {
   formatTripMinutes,
   formatTripShare,
   lastPrices,
-  priceOf,
+  rememberedPrice,
   savedShopNames,
   summarizeTrip,
   tripDoneItems,
@@ -228,8 +228,14 @@ function TripBody() {
   const lastPriceLabel = useCallback(
     (item: Purchase) => {
       if (!costsEnabled) return null;
-      const price = priceOf(prices, item.name);
-      return price === null ? null : t("lastTimePrice", { price: formatMoney(price, currency) });
+      const price = rememberedPrice(prices, item.name, item);
+      if (!price) return null;
+      // Several pieces: say what one cost, which is what was remembered.
+      const amount =
+        price.each !== null && price.each !== price.cost
+          ? t("priceEach", { price: formatMoney(price.each, currency) })
+          : formatMoney(price.cost, currency);
+      return t("lastTimePrice", { price: amount });
     },
     [costsEnabled, currency, prices, t],
   );

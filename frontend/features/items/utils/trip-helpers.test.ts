@@ -63,6 +63,15 @@ test("last price is the newest priced purchase of that name", () => {
   assert.equal(priceOf(prices, "Eggs"), null);
 });
 
+test("a trip prices pieces by the line's quantity, measured items as bought", () => {
+  const prices = lastPrices([
+    bought("eggs", "2026-11-01T10:00:00Z", { name: "Eggs", cost: 3, quantity: 3 }),
+    bought("milk", "2026-11-01T10:00:00Z", { name: "Milk", cost: 2, quantity: 500, unit: "ml" }),
+  ]);
+  assert.equal(priceOf(prices, "Eggs", { quantity: 5 }), 5);
+  assert.equal(priceOf(prices, "Milk", { quantity: 250, unit: "ml" }), 2);
+});
+
 test("a trip's done items are this list's purchases since the trip started", () => {
   const start = new Date("2026-11-14T10:00:00Z").getTime();
   const done = tripDoneItems(
@@ -79,8 +88,8 @@ test("a trip's done items are this list's purchases since the trip started", () 
 
 test("progress uses real prices first, then the last price", () => {
   const prices = new Map([
-    ["eggs", 3],
-    ["milk", 1],
+    ["eggs", { cost: 3, quantity: 1 }],
+    ["milk", { cost: 1, quantity: 1 }],
   ]);
   const progress = tripProgress(
     [

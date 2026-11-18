@@ -1,5 +1,10 @@
 import { summarizeSpend } from "@/features/items/utils/currency";
-import { normalizeName } from "@/features/items/utils/insights";
+import {
+  normalizeName,
+  priceFor,
+  type PricedLine,
+  type PriceTarget,
+} from "@/features/items/utils/insights";
 import type { Purchase } from "@/features/items/types/purchase";
 
 function boughtMs(item: Purchase) {
@@ -29,9 +34,9 @@ export function savedShopNames(purchases: Purchase[], query = "", limit = 6): st
     .map(([, entry]) => entry.name);
 }
 
-/** Last price paid for each item name (normalized), from priced purchases. */
-export function lastPrices(purchases: Purchase[]): Map<string, number> {
-  const best = new Map<string, { cost: number; at: number }>();
+/** Last priced purchase of each item name (normalized). */
+export function lastPrices(purchases: Purchase[]): Map<string, PricedLine> {
+  const best = new Map<string, { line: PricedLine; at: number }>();
   for (const item of purchases) {
     if (item.status !== "bought") continue;
     if (typeof item.cost !== "number" || !Number.isFinite(item.cost) || item.cost <= 0) continue;
@@ -39,13 +44,32 @@ export function lastPrices(purchases: Purchase[]): Map<string, number> {
     if (!key) continue;
     const at = boughtMs(item);
     const seen = best.get(key);
-    if (!seen || at > seen.at) best.set(key, { cost: item.cost, at });
+    if (!seen || at > seen.at) {
+      best.set(key, { line: { cost: item.cost, quantity: item.quantity, unit: item.unit }, at });
+    }
   }
-  return new Map([...best.entries()].map(([key, entry]) => [key, entry.cost]));
+  return new Map([...best.entries()].map(([key, entry]) => [key, entry.line]));
 }
 
-export function priceOf(prices: Map<string, number>, name: string): number | null {
-  return prices.get(normalizeName(name)) ?? null;
+/**
+ * The remembered price for a line: pieces and packs are priced for the line's
+ * quantity, anything else keeps the whole price it was last bought at.
+ */
+export function rememberedPrice(
+  prices: Map<string, PricedLine>,
+  name: string,
+  target?: PriceTarget,
+): { cost: number; each: number | null } | null {
+  const last = prices.get(normalizeName(name));
+  return last ? priceFor(last, target) : null;
+}
+
+export function priceOf(
+  prices: Map<string, PricedLine>,
+  name: string,
+  target?: PriceTarget,
+): number | null {
+  return rememberedPrice(prices, name, target)?.cost ?? null;
 }
 
 /** Items bought on this trip's list (by anyone) since the trip started. */
@@ -69,13 +93,13 @@ export function tripDoneItems(
 export function tripProgress(
   done: Purchase[],
   remaining: number,
-  prices: Map<string, number>,
+  prices: Map<string, PricedLine>,
 ) {
   let estimate = 0;
   let estimated = 0;
   for (const item of done) {
     const own = typeof item.cost === "number" && Number.isFinite(item.cost) ? item.cost : null;
-    const amount = own ?? priceOf(prices, item.name);
+    const amount = own ?? priceOf(prices, item.name, item);
     if (amount === null) continue;
     estimate += amount;
     estimated += 1;

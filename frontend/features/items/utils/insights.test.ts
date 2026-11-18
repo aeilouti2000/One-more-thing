@@ -4,7 +4,9 @@ import type { Purchase } from "@/features/items/types/purchase";
 import { summarizeSpend } from "@/features/items/utils/currency";
 import {
   boughtInMonth,
+  isCountableUnit,
   lastPrice,
+  priceFor,
   previousMonth,
   purchasesToCsv,
   suggestItems,
@@ -62,9 +64,52 @@ test("remembers the last price by name", () => {
     item("Milk", "2026-11-01T10:00:00Z", { cost: 2.5 }),
     item("Milk", "2026-11-03T10:00:00Z", { cost: null }),
   ];
-  assert.deepEqual(lastPrice(purchases, " milk"), { cost: 2.5, boughtAt: "2026-11-01T10:00:00Z" });
+  assert.deepEqual(lastPrice(purchases, " milk"), {
+    cost: 2.5,
+    each: null,
+    boughtAt: "2026-11-01T10:00:00Z",
+  });
   assert.equal(lastPrice(purchases, "Bread"), null);
   assert.equal(lastPrice(purchases, "Milk", purchases[1].id)?.cost, 2);
+});
+
+test("pieces and packs are remembered by the price of one", () => {
+  // 3 pieces for 3 → 1 each, so 5 pieces suggest 5.
+  assert.deepEqual(priceFor({ cost: 3, quantity: 3 }, { quantity: 5 }), { cost: 5, each: 1 });
+  assert.deepEqual(priceFor({ cost: 5, quantity: 2, unit: "pack" }, { quantity: 1, unit: "pack" }), {
+    cost: 2.5,
+    each: 2.5,
+  });
+  // The same quantity gives back exactly what was paid (no rounding drift).
+  assert.equal(priceFor({ cost: 1, quantity: 3 }, { quantity: 3 }).cost, 1);
+  assert.equal(priceFor({ cost: 1, quantity: 3 }, { quantity: 1 }).cost, 0.333);
+});
+
+test("measured and custom units keep the whole price", () => {
+  for (const unit of ["ml", "g", "kg", "L", "bottle"]) {
+    assert.deepEqual(priceFor({ cost: 2, quantity: 500, unit }, { quantity: 250, unit }), {
+      cost: 2,
+      each: null,
+    });
+  }
+  // A different unit than last time: nothing to scale by.
+  assert.equal(priceFor({ cost: 3, quantity: 3 }, { quantity: 2, unit: "pack" }).cost, 3);
+  assert.equal(isCountableUnit(""), true);
+  assert.equal(isCountableUnit("pack"), true);
+  assert.equal(isCountableUnit("kg"), false);
+  assert.equal(isCountableUnit("box"), false);
+});
+
+test("suggestions and the cost sheet use the price of one piece", () => {
+  const purchases = [item("Eggs", "2026-11-01T10:00:00Z", { cost: 3, quantity: 3 })];
+  assert.equal(suggestItems(purchases, "eg")[0].lastCost, 1);
+  assert.deepEqual(lastPrice(purchases, "Eggs", undefined, { quantity: 5 }), {
+    cost: 5,
+    each: 1,
+    boughtAt: "2026-11-01T10:00:00Z",
+  });
+  const milk = [item("Milk", "2026-11-01T10:00:00Z", { cost: 2, quantity: 500, unit: "ml" })];
+  assert.equal(suggestItems(milk, "mi")[0].lastCost, 2);
 });
 
 test("month summary matches History's total and splits by category", () => {

@@ -66,7 +66,7 @@ function itemsIdentity(items: CostSheetItem[]) {
   return items.map((item) => `${item.id}:${item.name}`).join("|");
 }
 
-type LastPrices = Record<string, { cost: number; boughtAt: string }>;
+type LastPrices = Record<string, { cost: number; each: number | null; boughtAt: string }>;
 
 function costValues(items: CostSheetItem[], lastPrices: LastPrices, currency: string) {
   const next: Record<string, string> = {};
@@ -117,8 +117,9 @@ export function CostEntrySheet({
     const found: LastPrices = {};
     for (const item of items) {
       if (item.initialCost !== null && item.initialCost !== undefined) continue;
-      if (!purchases.some((purchase) => purchase.id === item.id)) continue;
-      const remembered = lastPrice(purchases, item.name, item.id);
+      const own = purchases.find((purchase) => purchase.id === item.id);
+      if (!own) continue;
+      const remembered = lastPrice(purchases, item.name, item.id, own);
       if (remembered) found[item.id] = remembered;
     }
     return found;
@@ -357,7 +358,7 @@ function LastPriceCaption({
   last,
   currency,
 }: {
-  last: { cost: number; boughtAt: string } | undefined;
+  last: { cost: number; each: number | null; boughtAt: string } | undefined;
   currency: string;
 }) {
   const { t, locale } = useI18n();
@@ -369,9 +370,14 @@ function LastPriceCaption({
         day: "numeric",
         month: "short",
       }).format(at);
+  // Several pieces: say what one cost, which is what was remembered.
+  const amount =
+    last.each !== null && last.each !== last.cost
+      ? t("priceEach", { price: formatMoney(last.each, currency) })
+      : formatMoney(last.cost, currency);
   return (
     <AppText className="text-xs text-cove-muted">
-      {t("lastPriceHint", { amount: formatMoney(last.cost, currency), date: when })}
+      {t("lastPriceHint", { amount, date: when })}
     </AppText>
   );
 }

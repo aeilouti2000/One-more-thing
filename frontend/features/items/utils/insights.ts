@@ -19,6 +19,45 @@ function hasCost(item: Purchase): item is Purchase & { cost: number } {
   return typeof item.cost === "number" && Number.isFinite(item.cost);
 }
 
+/** Plain pieces (no unit) and packs are counted; kg, ml and custom units are not. */
+export function isCountableUnit(unit: string | null | undefined) {
+  const key = (unit ?? "").trim().toLowerCase();
+  return key === "" || key === "pack";
+}
+
+function sameUnit(a: string | null | undefined, b: string | null | undefined) {
+  return (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 1000) / 1000;
+}
+
+/** A priced purchase: what was paid for the whole line, and how much of it. */
+export type PricedLine = { cost: number; quantity: number; unit?: string | null };
+export type PriceTarget = { quantity: number; unit?: string | null };
+
+/**
+ * What a remembered purchase suggests for a new line. Counted units (pieces,
+ * packs) go by the price of one, so 3 for JD 3 suggests JD 5 for 5. Anything
+ * measured (kg, ml, custom units) keeps the whole price it was bought at.
+ * `each` is the price of one when it was used, else null.
+ */
+export function priceFor(last: PricedLine, target?: PriceTarget): { cost: number; each: number | null } {
+  const scales =
+    target !== undefined &&
+    isCountableUnit(last.unit) &&
+    sameUnit(last.unit, target.unit) &&
+    last.quantity > 0 &&
+    target.quantity > 0;
+  if (!scales) return { cost: last.cost, each: null };
+  const each = last.cost / last.quantity;
+  return {
+    cost: target.quantity === last.quantity ? last.cost : roundMoney(each * target.quantity),
+    each: roundMoney(each),
+  };
+}
+
 /** Does the name match what was typed, at the start of any word first. */
 export function matchRank(name: string, query: string) {
   const text = normalizeName(name);
@@ -33,7 +72,7 @@ export type ItemSuggestion = {
   name: string;
   category: string;
   unit?: string;
-  /** What it cost the last time a price was entered. */
+  /** What it cost the last time a price was entered: for one piece or pack, else the whole line. */
   lastCost: number | null;
   lastBoughtAt: string;
 };
@@ -63,7 +102,8 @@ export function suggestItems(
     const entry = current ?? { item, rank, cost: null, costAt: -1 };
     if (at > boughtMs(entry.item)) entry.item = item;
     if (hasCost(item) && at > entry.costAt) {
-      entry.cost = item.cost;
+      // Picking a suggestion adds one, so show the price of one.
+      entry.cost = priceFor(item, { quantity: 1, unit: item.unit }).cost;
       entry.costAt = at;
     }
     byName.set(key, entry);
@@ -81,12 +121,16 @@ export function suggestItems(
     }));
 }
 
-/** What this item cost the last time it was bought with a price. */
+/**
+ * What this item cost the last time it was bought with a price. With a target
+ * line, pieces and packs are priced for its quantity (see priceFor).
+ */
 export function lastPrice(
   purchases: Purchase[],
   name: string,
   excludeId?: string,
-): { cost: number; boughtAt: string } | null {
+  target?: PriceTarget,
+): { cost: number; each: number | null; boughtAt: string } | null {
   const key = normalizeName(name);
   if (!key) return null;
   let best: (Purchase & { cost: number }) | null = null;
@@ -95,7 +139,7 @@ export function lastPrice(
     if (item.cost <= 0 || normalizeName(item.name) !== key) continue;
     if (!best || boughtMs(item) > boughtMs(best)) best = item;
   }
-  return best ? { cost: best.cost, boughtAt: best.boughtAt ?? best.createdAt } : null;
+  return best ? { ...priceFor(best, target), boughtAt: best.boughtAt ?? best.createdAt } : null;
 }
 
 /** Bought items of one calendar month ("2026-11"); an invoice stays whole. */
