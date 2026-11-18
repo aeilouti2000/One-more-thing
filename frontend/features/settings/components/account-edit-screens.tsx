@@ -366,14 +366,14 @@ export function AccountEmailScreen() {
             className="rounded-full px-2.5 py-1"
             style={{
               backgroundColor: withAlpha(
-                verified ? colors.accent : "#F08C2E",
+                verified ? colors.accentText : "#F08C2E",
                 0.14,
               ),
             }}
           >
             <AppText
               className="text-xs font-semibold"
-              style={{ color: verified ? colors.accent : "#F08C2E" }}
+              style={{ color: verified ? colors.accentText : "#F08C2E" }}
             >
               {verified ? t("emailVerifiedBadge") : t("emailPendingBadge")}
             </AppText>

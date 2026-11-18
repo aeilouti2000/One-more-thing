@@ -133,7 +133,7 @@ export function AuthBrand({ showName = true }: { showName?: boolean } = {}) {
         <AppText
           numberOfLines={1}
           style={{
-            color: colors.accent,
+            color: colors.accentText,
             fontWeight: "600",
             fontSize: 11,
             letterSpacing: 2.4,
@@ -238,7 +238,7 @@ export function AuthField({
         textAlignVertical="center"
         allowFontScaling={false}
         placeholderTextColor={withAlpha(colors.muted, 0.45)}
-        {...caretColors(colors.accent)}
+        {...caretColors(colors.accentText)}
         style={[
           preserveSpaces,
           singleLineInput,
@@ -459,7 +459,7 @@ export function AuthTextAction({
     >
       <AppText
         style={{
-          color: disabled ? colors.muted : colors.accent,
+          color: disabled ? colors.muted : colors.accentText,
           fontWeight: "600",
           fontSize: 13,
           lineHeight: 18,
@@ -492,7 +492,7 @@ export function AuthLink({ prompt, action, onPress }: AuthLinkProps) {
         {prompt}{" "}
         <AppText
           style={{
-            color: colors.accent,
+            color: colors.accentText,
             fontWeight: "600",
             fontSize: 13,
             lineHeight: 18,

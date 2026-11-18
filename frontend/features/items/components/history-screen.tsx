@@ -496,7 +496,7 @@ export default function HistoryScreen() {
                   className="ms-auto h-10 w-10 items-center justify-center rounded-full active:opacity-80"
                   style={{ backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line }}
                 >
-                  <Ionicons name="search" size={17} color={colors.accent} />
+                  <Ionicons name="search" size={17} color={colors.accentText} />
                 </Pressable>
               ) : null
             }
@@ -572,7 +572,7 @@ export default function HistoryScreen() {
               className="h-10 w-10 items-center justify-center rounded-full bg-cove-mist active:opacity-80"
               style={{ opacity: isExporting ? 0.5 : 1 }}
             >
-              <Ionicons name="share-outline" size={18} color={colors.accent} />
+              <Ionicons name="share-outline" size={18} color={colors.accentText} />
             </Pressable>
           </View>
         ) : null}
@@ -620,9 +620,9 @@ export default function HistoryScreen() {
               <Ionicons
                 name={isRTL ? "chevron-forward" : "chevron-back"}
                 size={iconSize.sm}
-                color={colors.accent}
+                color={colors.accentText}
               />
-              <AppText className="text-sm font-semibold text-cove-accent">
+              <AppText className="text-sm font-semibold text-cove-accent-text">
                 {t("invoiceAllTrips")}
               </AppText>
             </Pressable>
@@ -730,13 +730,13 @@ export default function HistoryScreen() {
                     {t("invoiceTripCount", { count: trip.count })}
                   </AppText>
                 </View>
-                <AppText className="text-sm font-semibold" style={{ color: colors.accent }}>
+                <AppText className="text-sm font-semibold" style={{ color: colors.accentText }}>
                   {formatMoney(trip.total, currency)}
                 </AppText>
               </Pressable>
             ))
           )}
-          {tripBusy ? <ActivityIndicator color={colors.accent} /> : null}
+          {tripBusy ? <ActivityIndicator color={colors.accentText} /> : null}
           <FormMessage message={tripError} />
         </View>
       </BottomSheet>
@@ -796,9 +796,9 @@ export default function HistoryScreen() {
           <Ionicons
             name={isRTL ? "chevron-forward" : "chevron-back"}
             size={iconSize.sm}
-            color={colors.accent}
+            color={colors.accentText}
           />
-          <AppText className="text-sm font-semibold text-cove-accent">
+          <AppText className="text-sm font-semibold text-cove-accent-text">
             {t("invoiceAllTrips")}
           </AppText>
         </Pressable>
@@ -823,9 +823,9 @@ export default function HistoryScreen() {
                   <Ionicons
                     name={isRTL ? "chevron-forward" : "chevron-back"}
                     size={iconSize.sm}
-                    color={colors.accent}
+                    color={colors.accentText}
                   />
-                  <AppText className="text-sm font-semibold text-cove-accent">
+                  <AppText className="text-sm font-semibold text-cove-accent-text">
                     {t("back")}
                   </AppText>
                 </Pressable>
@@ -897,7 +897,7 @@ function TripInvoiceList({
           style={{
             backgroundColor:
               selectedId === trip.id
-                ? withAlpha(colors.accent, 0.12)
+                ? withAlpha(colors.accentText, 0.12)
                 : colors.paper,
           }}
         >
@@ -922,7 +922,7 @@ function TripInvoiceList({
               </AppText>
             </View>
             <View className="flex-row items-center gap-1">
-              <AppText className="text-base font-semibold" style={{ color: colors.accent }}>
+              <AppText className="text-base font-semibold" style={{ color: colors.accentText }}>
                 {formatMoney(trip.total, currency)}
               </AppText>
               <Ionicons
@@ -1009,7 +1009,7 @@ function InvoiceView({
             className="h-9 w-9 items-center justify-center rounded-full active:opacity-70"
             style={{ backgroundColor: colors.mist }}
           >
-            <Ionicons name="pencil" size={16} color={colors.accent} />
+            <Ionicons name="pencil" size={16} color={colors.accentText} />
           </Pressable>
         ) : null}
       </View>
@@ -1059,7 +1059,7 @@ function InvoiceView({
                   className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
                   style={{ backgroundColor: colors.mist }}
                 >
-                  <Ionicons name="swap-horizontal" size={15} color={colors.accent} />
+                  <Ionicons name="swap-horizontal" size={15} color={colors.accentText} />
                 </Pressable>
               ) : null}
               {item.receiptId && item.receiptTotal !== null && item.receiptTotal !== undefined ? (
@@ -1081,7 +1081,7 @@ function InvoiceView({
 
       <View className="mt-4 flex-row items-center justify-between border-t border-cove-line pt-4">
         <AppText className="text-base font-semibold text-cove-ink">{t("itemCost")}</AppText>
-        <AppText className="text-lg font-semibold text-cove-accent">
+        <AppText className="text-lg font-semibold text-cove-accent-text">
           {formatMoney(total, currency)}
         </AppText>
       </View>
@@ -1212,10 +1212,10 @@ function ChoiceButton({
       style={{
         backgroundColor: selected ? colors.accent : colors.paper,
         borderWidth: 1,
-        borderColor: selected ? colors.accent : colors.line,
+        borderColor: selected ? colors.accentText : colors.line,
       }}
     >
-      <Ionicons name={icon} size={15} color={selected ? colors.onAccent : colors.accent} />
+      <Ionicons name={icon} size={15} color={selected ? colors.onAccent : colors.accentText} />
       <AppText
         className="text-xs font-semibold"
         style={{ color: selected ? colors.onAccent : colors.ink }}

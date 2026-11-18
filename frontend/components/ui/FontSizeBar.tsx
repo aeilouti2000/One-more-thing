@@ -63,7 +63,7 @@ export function FontSizeBar() {
       >
         <View className="flex-row items-center gap-2.5">
           <View
-            style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.accent }}
+            style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.accentText }}
           />
           <AppText className="flex-1 text-base font-semibold text-cove-ink">{t("previewMilk")}</AppText>
           <AppText className="text-sm text-cove-muted">×2</AppText>
@@ -147,7 +147,7 @@ export function FontSizeBar() {
                 borderRadius: THUMB / 2,
                 backgroundColor: colors.white,
                 borderWidth: 3,
-                borderColor: colors.accent,
+                borderColor: colors.accentText,
                 shadowColor: "#000",
                 shadowOpacity: 0.18,
                 shadowRadius: 6,
@@ -166,7 +166,7 @@ export function FontSizeBar() {
         </Pressable>
       </View>
 
-      <AppText className="-mt-2 text-center text-sm font-semibold text-cove-accent">
+      <AppText className="-mt-2 text-center text-sm font-semibold text-cove-accent-text">
         {labels[level]}
       </AppText>
     </View>

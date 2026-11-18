@@ -248,7 +248,7 @@ export default function ItemsScreen() {
   );
   const headerButton = {
     backgroundColor: scheme === "dark" ? colors.accent : colors.white,
-    icon: scheme === "dark" ? colors.onAccent : colors.accent,
+    icon: scheme === "dark" ? colors.onAccent : colors.accentText,
   };
   const headerFg = scheme === "dark" ? colors.ink : colors.onAccent;
   const selectedCategoryLabel = useCategoryLabel(
@@ -1414,7 +1414,7 @@ export default function ItemsScreen() {
                     <Ionicons
                       name="list-outline"
                       size={20}
-                      color={colors.accent}
+                      color={colors.accentText}
                     />
                     <AppText
                       numberOfLines={1}
@@ -1423,7 +1423,7 @@ export default function ItemsScreen() {
                       {listLabel(list.name, t("defaultList"))}
                     </AppText>
                     {busyAction === "move" ? (
-                      <ActivityIndicator color={colors.accent} />
+                      <ActivityIndicator color={colors.accentText} />
                     ) : (
                       <Ionicons
                         name={isRTL ? "chevron-back" : "chevron-forward"}
@@ -1451,7 +1451,7 @@ export default function ItemsScreen() {
               value={listName}
               onChangeText={setListName}
               placeholder={caretGap(t("listNamePlaceholder"))}
-              {...caretColors(colors.accent)}
+              {...caretColors(colors.accentText)}
               placeholderTextColor={colors.muted}
               textAlign={isRTL ? "right" : "left"}
               textAlignVertical="center"
@@ -1583,7 +1583,7 @@ export default function ItemsScreen() {
                           <Ionicons
                             name="checkmark"
                             size={18}
-                            color={colors.accent}
+                            color={colors.accentText}
                           />
                         ) : null}
                       </Pressable>
@@ -1626,10 +1626,10 @@ export default function ItemsScreen() {
                     borderTopColor: colors.line,
                   }}
                 >
-                  <Ionicons name="add" size={20} color={colors.accent} />
+                  <Ionicons name="add" size={20} color={colors.accentText} />
                   <AppText
                     className="text-base font-semibold"
-                    style={{ color: colors.accent }}
+                    style={{ color: colors.accentText }}
                   >
                     {t("newList")}
                   </AppText>

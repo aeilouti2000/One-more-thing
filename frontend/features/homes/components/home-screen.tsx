@@ -349,13 +349,13 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                     overflow: "hidden",
                     opacity: active ? 1 : 0,
                     backgroundColor:
-                      scheme === "dark" ? withAlpha(colors.accent, 0.22) : colors.paper,
+                      scheme === "dark" ? withAlpha(colors.accentText, 0.22) : colors.paper,
                   }}
                 />
                 <Ionicons
                   name={mode === "create" ? "add-circle-outline" : "key-outline"}
                   size={16}
-                  color={active ? colors.accent : colors.muted}
+                  color={active ? colors.accentText : colors.muted}
                 />
                 <AppText
                   className="text-sm font-semibold"
@@ -373,12 +373,12 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
         <View className="items-center gap-3 pt-1">
           <View
             className="h-16 w-16 items-center justify-center rounded-3xl"
-            style={{ backgroundColor: withAlpha(colors.accent, 0.12) }}
+            style={{ backgroundColor: withAlpha(colors.accentText, 0.12) }}
           >
             <Ionicons
               name={creating ? "home-outline" : "people-outline"}
               size={30}
-              color={colors.accent}
+              color={colors.accentText}
             />
           </View>
           <View className="items-center gap-1">
@@ -541,7 +541,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                   style={{
                     borderWidth: 1,
                     borderColor: current
-                      ? withAlpha(colors.accent, scheme === "dark" ? 0.45 : 0.3)
+                      ? withAlpha(colors.accentText, scheme === "dark" ? 0.45 : 0.3)
                       : "transparent",
                   }}
                 >
@@ -668,7 +668,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                       className="overflow-hidden rounded-3xl"
                       style={{
                         backgroundColor: active
-                          ? withAlpha(colors.accent, 0.12)
+                          ? withAlpha(colors.accentText, 0.12)
                           : colors.paper,
                       }}
                     >
@@ -690,7 +690,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                   style={{
                     backgroundColor:
                       widePane === "add"
-                        ? withAlpha(colors.accent, 0.12)
+                        ? withAlpha(colors.accentText, 0.12)
                         : colors.paper,
                   }}
                 >
@@ -701,7 +701,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                     <Ionicons
                       name="add-outline"
                       size={22}
-                      color={colors.accent}
+                      color={colors.accentText}
                     />
                   </View>
                   <View className="min-w-0 flex-1">
@@ -719,7 +719,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                     name={isRTL ? "chevron-back" : "chevron-forward"}
                     size={iconSize.sm}
                     color={
-                      widePane === "add" ? colors.accent : colors.ink
+                      widePane === "add" ? colors.accentText : colors.ink
                     }
                   />
                 </Pressable>
@@ -827,15 +827,15 @@ function CurrentHomeCard({
       style={{
         backgroundColor: colors.paper,
         borderWidth: 1,
-        borderColor: withAlpha(colors.accent, dark ? 0.35 : 0.25),
+        borderColor: withAlpha(colors.accentText, dark ? 0.35 : 0.25),
       }}
     >
       <View className="flex-row items-center gap-3">
         <View
           className="h-12 w-12 items-center justify-center rounded-2xl"
-          style={{ backgroundColor: withAlpha(colors.accent, dark ? 0.18 : 0.12) }}
+          style={{ backgroundColor: withAlpha(colors.accentText, dark ? 0.18 : 0.12) }}
         >
-          <Ionicons name="home" size={22} color={colors.accent} />
+          <Ionicons name="home" size={22} color={colors.accentText} />
         </View>
         <View className="min-w-0 flex-1">
           <AppText className="text-xs font-semibold text-cove-muted">{t("currentHome")}</AppText>
@@ -845,9 +845,9 @@ function CurrentHomeCard({
         </View>
         <View
           className="rounded-full px-3 py-1"
-          style={{ backgroundColor: withAlpha(colors.accent, dark ? 0.16 : 0.1) }}
+          style={{ backgroundColor: withAlpha(colors.accentText, dark ? 0.16 : 0.1) }}
         >
-          <AppText className="text-xs font-semibold" style={{ color: colors.accent }}>
+          <AppText className="text-xs font-semibold" style={{ color: colors.accentText }}>
             {role === "owner" ? t("host") : t("partner")}
           </AppText>
         </View>

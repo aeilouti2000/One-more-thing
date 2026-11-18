@@ -312,8 +312,8 @@ export function ItemPhotoField({
         accessibilityRole="button"
         className="flex-row items-center gap-1.5 self-start py-1 active:opacity-70"
       >
-        <Ionicons name="camera-outline" size={18} color={colors.accent} />
-        <AppText className="text-sm font-semibold text-cove-accent">{t("addPhoto")}</AppText>
+        <Ionicons name="camera-outline" size={18} color={colors.accentText} />
+        <AppText className="text-sm font-semibold text-cove-accent-text">{t("addPhoto")}</AppText>
       </Pressable>
     );
   }
@@ -344,10 +344,10 @@ export function ItemPhotoField({
         accessibilityLabel={t("itemPhotoChange")}
         hitSlop={6}
         className={`h-9 flex-row items-center gap-1 rounded-full px-3 ${uploading ? "opacity-50" : "active:opacity-75"}`}
-        style={{ backgroundColor: withAlpha(colors.accent, dark ? 0.18 : 0.12) }}
+        style={{ backgroundColor: withAlpha(colors.accentText, dark ? 0.18 : 0.12) }}
       >
-        <Ionicons name="camera-outline" size={16} color={colors.accent} />
-        <AppText className="text-[13px] font-semibold text-cove-accent">{t("itemPhotoChange")}</AppText>
+        <Ionicons name="camera-outline" size={16} color={colors.accentText} />
+        <AppText className="text-[13px] font-semibold text-cove-accent-text">{t("itemPhotoChange")}</AppText>
       </Pressable>
     </View>
   );

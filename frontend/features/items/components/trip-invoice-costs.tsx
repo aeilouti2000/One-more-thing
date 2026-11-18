@@ -140,7 +140,7 @@ export function TripInvoiceCosts({
     scanner.reset();
   }
 
-  const chipBorder = withAlpha(colors.accent, scheme === "dark" ? 0.45 : 0.35);
+  const chipBorder = withAlpha(colors.accentText, scheme === "dark" ? 0.45 : 0.35);
 
   return (
     <>
@@ -242,12 +242,12 @@ function ActionChip({
       accessibilityLabel={label}
       className="h-10 flex-row items-center gap-1.5 rounded-full px-3.5 active:opacity-75"
       style={{
-        backgroundColor: primary ? colors.accent : withAlpha(colors.accent, 0.08),
+        backgroundColor: primary ? colors.accent : withAlpha(colors.accentText, 0.08),
         borderWidth: primary ? 0 : 1,
         borderColor,
       }}
     >
-      <Ionicons name={icon} size={16} color={primary ? colors.onAccent : colors.accent} />
+      <Ionicons name={icon} size={16} color={primary ? colors.onAccent : colors.accentText} />
       <AppText
         numberOfLines={1}
         className="text-sm font-semibold"

@@ -49,9 +49,9 @@ export function InviteCodeCard({ code, homeName, onCopied }: InviteCodeCardProps
       >
         <View
           className="h-11 w-11 items-center justify-center rounded-2xl"
-          style={{ backgroundColor: withAlpha(colors.accent, dark ? 0.16 : 0.1) }}
+          style={{ backgroundColor: withAlpha(colors.accentText, dark ? 0.16 : 0.1) }}
         >
-          <Ionicons name="people-outline" size={22} color={colors.accent} />
+          <Ionicons name="people-outline" size={22} color={colors.accentText} />
         </View>
         <View className="min-w-0 flex-1">
           <AppText

@@ -56,7 +56,7 @@ export function FormMessage({
   return (
     <AppText
       className={`text-base leading-6 ${
-        tone === "success" ? "text-cove-accent" : ""
+        tone === "success" ? "text-cove-accent-text" : ""
       }`}
       style={tone === "success" ? undefined : { color: "#F87171" }}
     >

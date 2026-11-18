@@ -81,7 +81,7 @@ export function AppTextField({
         value={value}
         onChangeText={onChangeText}
         placeholder={caretGap(placeholder)}
-        {...caretColors(colors.accent)}
+        {...caretColors(colors.accentText)}
         placeholderTextColor={
           glass && scheme === "dark" ? withAlpha(colors.muted, 0.62) : colors.line
         }

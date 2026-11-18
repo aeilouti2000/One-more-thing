@@ -40,7 +40,7 @@ export function ReceiptSourceModal({
 
           {reading ? (
             <View className="items-center py-4">
-              <ActivityIndicator color={colors.accent} />
+              <ActivityIndicator color={colors.accentText} />
             </View>
           ) : (
             <>

@@ -353,7 +353,7 @@ function ItemsFabCluster({
                 {t("fabSwipeHint")}
               </AppText>
             </View>
-            <View style={[styles.hintCaret, { borderTopColor: colors.accent }]} />
+            <View style={[styles.hintCaret, { borderTopColor: colors.accentText }]} />
             <View style={styles.hintGhosts}>
               <GhostPill icon="cart" label={t("shop")} />
               <GhostPill icon="pin" label={t("pin")} />
@@ -385,14 +385,14 @@ function ItemsFabCluster({
             <View
               style={[
                 styles.countChip,
-                { borderColor: withAlpha(colors.accent, 0.7), backgroundColor: colors.paper },
+                { borderColor: withAlpha(colors.accentText, 0.7), backgroundColor: colors.paper },
               ]}
             >
               <Animated.View
                 pointerEvents="none"
-                style={[styles.countPulse, { borderColor: colors.accent }, pulseStyle]}
+                style={[styles.countPulse, { borderColor: colors.accentText }, pulseStyle]}
               />
-              <MaterialCommunityIcons name="cart" size={13} color={colors.accent} />
+              <MaterialCommunityIcons name="cart" size={13} color={colors.accentText} />
               <AppText className="text-xs font-bold" style={{ color: colors.ink }}>
                 {shopCount > 99 ? "99+" : shopCount}
               </AppText>
@@ -459,12 +459,12 @@ function GhostPill({
           opacity: 0.75,
           borderWidth: 1,
           borderStyle: "dashed",
-          borderColor: withAlpha(colors.accent, 0.8),
+          borderColor: withAlpha(colors.accentText, 0.8),
           backgroundColor: withAlpha(colors.paper, 0.85),
         },
       ]}
     >
-      <MaterialCommunityIcons name={icon} size={18} color={colors.accent} />
+      <MaterialCommunityIcons name={icon} size={18} color={colors.accentText} />
       <AppText numberOfLines={1} className="text-sm font-semibold" style={{ color: colors.ink }}>
         {label}
       </AppText>
@@ -525,13 +525,13 @@ function MiniAction({
           {
             opacity: inactive ? 0.55 : 1,
             borderWidth: 1,
-            borderColor: withAlpha(dark ? colors.muted : colors.accent, dark ? 0.4 : 0.34),
+            borderColor: withAlpha(dark ? colors.muted : colors.accentText, dark ? 0.4 : 0.34),
             backgroundColor: withAlpha(dark ? colors.deep : colors.mist, dark ? 0.72 : 0.82),
           },
         ]}
       >
         <GlassFill soft screenBlur />
-        <MaterialCommunityIcons name={icon} size={18} color={colors.accent} />
+        <MaterialCommunityIcons name={icon} size={18} color={colors.accentText} />
         <AppText numberOfLines={1} className="text-sm font-semibold" style={{ color: colors.ink }}>
           {label}
         </AppText>

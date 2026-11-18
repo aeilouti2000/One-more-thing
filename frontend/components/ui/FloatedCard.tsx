@@ -81,13 +81,13 @@ export function FloatedCardHeader({
       ? danger
       : iconTone === "neutral"
         ? colors.muted
-        : colors.accent;
+        : colors.accentText;
   const iconBg =
     iconTone === "danger"
       ? scheme === "dark"
         ? "rgba(240, 113, 120, 0.16)"
         : "rgba(194, 65, 74, 0.1)"
-      : withAlpha(colors.accent, scheme === "dark" ? 0.16 : 0.12);
+      : withAlpha(colors.accentText, scheme === "dark" ? 0.16 : 0.12);
 
   return (
     <View className={`mb-5 gap-3 ${className}`.trim()}>

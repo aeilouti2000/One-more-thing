@@ -190,7 +190,7 @@ function StoryBars({
   const { colors, scheme } = useTheme();
   const track =
     scheme === "dark" ? withAlpha("#FFFFFF", 0.12) : withAlpha(colors.ink, 0.1);
-  const fill = scheme === "dark" ? "#FFFFFF" : colors.accent;
+  const fill = scheme === "dark" ? "#FFFFFF" : colors.accentText;
   const activeStyle = useAnimatedStyle(() => ({
     width: `${progress.value * 100}%`,
   }));
@@ -371,7 +371,7 @@ function SyncScene() {
           </AppText>
           <View style={styles.pair}>
             <Person
-              color={colors.accent}
+              color={colors.accentText}
               ring={dark ? "#1A2333" : colors.paper}
             />
             <View style={{ marginStart: -5 }}>
@@ -425,8 +425,8 @@ function SyncScene() {
               StyleSheet.absoluteFill,
               styles.typingOutline,
               {
-                borderColor: withAlpha(colors.accent, 0.55),
-                backgroundColor: withAlpha(colors.accent, dark ? 0.14 : 0.08),
+                borderColor: withAlpha(colors.accentText, 0.55),
+                backgroundColor: withAlpha(colors.accentText, dark ? 0.14 : 0.08),
               },
               outlineStyle,
             ]}
@@ -452,7 +452,7 @@ function SyncScene() {
           </View>
           {landed ? (
             <Animated.View entering={FadeIn.duration(300)} style={styles.who}>
-              <Person color={colors.accent} size={14} />
+              <Person color={colors.accentText} size={14} />
               <AppText className="text-xs" style={{ color: colors.muted }}>
                 {t("showcaseNow")}
               </AppText>
@@ -561,7 +561,7 @@ function Bar({ value, done }: { value: number; done: boolean }) {
       <Animated.View
         style={[
           styles.fill,
-          { backgroundColor: done ? LIVE : colors.accent },
+          { backgroundColor: done ? LIVE : colors.accentText },
           style,
         ]}
       />
@@ -611,7 +611,7 @@ function TripScene() {
           progress={progress}
           size={68}
           stroke={6}
-          color={colors.accent}
+          color={colors.accentText}
           track={dark ? withAlpha("#FFFFFF", 0.1) : withAlpha(colors.ink, 0.08)}
         >
           <AppText

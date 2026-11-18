@@ -168,7 +168,7 @@ export function CategoryFilter({
             <Ionicons
               name="chevron-down"
               size={20}
-              color={filtered ? colors.onAccent : colors.accent}
+              color={filtered ? colors.onAccent : colors.accentText}
             />
           </View>
           <AppText
@@ -251,17 +251,17 @@ export function CategoryFilter({
                   <View
                     className="h-8 w-8 items-center justify-center rounded-xl"
                     style={{
-                      backgroundColor: withAlpha(colors.accent, dark ? 0.16 : 0.1),
+                      backgroundColor: withAlpha(colors.accentText, dark ? 0.16 : 0.1),
                     }}
                   >
-                    <Ionicons name="grid-outline" size={15} color={colors.accent} />
+                    <Ionicons name="grid-outline" size={15} color={colors.accentText} />
                   </View>
                   <TextInput
                     maxLength={40}
                     value={draft}
                     onChangeText={setDraft}
                     placeholder={caretGap(t("newCategoryPlaceholder"))}
-                    {...caretColors(colors.accent)}
+                    {...caretColors(colors.accentText)}
                     placeholderTextColor={
                       dark ? withAlpha(colors.muted, 0.55) : colors.line
                     }
@@ -324,7 +324,7 @@ function CategoryOption({
       accessibilityState={onPress ? { selected } : undefined}
       className={`flex-row items-center gap-3 rounded-xl px-3 py-2.5 ${onPress ? "active:opacity-80" : ""}`}
       style={{
-        backgroundColor: selected ? withAlpha(colors.accent, 0.16) : "transparent",
+        backgroundColor: selected ? withAlpha(colors.accentText, 0.16) : "transparent",
       }}
     >
       <AppText
@@ -343,7 +343,7 @@ function CategoryOption({
           <Ionicons name="trash-outline" size={18} color="#F87171" />
         </Pressable>
       ) : null}
-      {selected ? <Ionicons name="checkmark" size={18} color={colors.accent} /> : null}
+      {selected ? <Ionicons name="checkmark" size={18} color={colors.accentText} /> : null}
     </Row>
   );
 }

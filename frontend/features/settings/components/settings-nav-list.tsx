@@ -71,7 +71,7 @@ function NavRow({
       className="flex-row items-center gap-3 overflow-hidden rounded-3xl px-4 py-4 active:opacity-80"
       style={{
         backgroundColor: selected
-          ? withAlpha(colors.accent, 0.12)
+          ? withAlpha(colors.accentText, 0.12)
           : colors.paper,
       }}
     >
@@ -80,7 +80,7 @@ function NavRow({
       <Ionicons
         name={isRTL ? "chevron-back" : "chevron-forward"}
         size={iconSize.sm}
-        color={selected ? colors.accent : colors.ink}
+        color={selected ? colors.accentText : colors.ink}
       />
     </Pressable>
   );
@@ -103,7 +103,7 @@ function ProfileCard({ selected }: { selected: boolean }) {
       accessibilityLabel={`${t("account")}, ${name}`}
       className="flex-row items-center gap-3 overflow-hidden rounded-3xl px-4 py-4 active:opacity-80"
       style={{
-        backgroundColor: selected ? withAlpha(colors.accent, 0.12) : colors.paper,
+        backgroundColor: selected ? withAlpha(colors.accentText, 0.12) : colors.paper,
       }}
     >
       <View
@@ -125,7 +125,7 @@ function ProfileCard({ selected }: { selected: boolean }) {
       <Ionicons
         name={isRTL ? "chevron-back" : "chevron-forward"}
         size={iconSize.sm}
-        color={selected ? colors.accent : colors.ink}
+        color={selected ? colors.accentText : colors.ink}
       />
     </Pressable>
   );
@@ -148,13 +148,13 @@ function UpdateStrip() {
       accessibilityRole="button"
       accessibilityLabel={`${t("updateReady", { version: update.version })}, ${t("updateNow")}`}
       className="flex-row items-center gap-3 rounded-3xl px-4 py-3.5 active:opacity-80"
-      style={{ backgroundColor: withAlpha(colors.accent, 0.12) }}
+      style={{ backgroundColor: withAlpha(colors.accentText, 0.12) }}
     >
-      <Ionicons name="arrow-down-circle-outline" size={22} color={colors.accent} />
+      <Ionicons name="arrow-down-circle-outline" size={22} color={colors.accentText} />
       <AppText className="min-w-0 flex-1 text-sm font-semibold text-cove-ink">
         {t("updateReady", { version: update.version })}
       </AppText>
-      <AppText className="text-sm font-semibold" style={{ color: colors.accent }}>
+      <AppText className="text-sm font-semibold" style={{ color: colors.accentText }}>
         {t("updateNow")}
       </AppText>
     </Pressable>
@@ -231,7 +231,7 @@ export function SettingsWidePlaceholder() {
           backgroundColor: colors.mist,
         }}
       >
-        <Ionicons name="settings-outline" size={28} color={colors.accent} />
+        <Ionicons name="settings-outline" size={28} color={colors.accentText} />
       </View>
       <AppText className="mt-4 text-center text-lg font-semibold text-cove-ink">
         {t("settingsPickTitle")}

@@ -240,7 +240,7 @@ export function SelectionBar({
         style={[
           styles.shell,
           {
-            borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
+            borderColor: withAlpha(dark ? colors.muted : colors.accentText, 0.34),
             backgroundColor: withAlpha(
               dark ? colors.deep : colors.mist,
               dark ? 0.55 : 0.72,
@@ -502,7 +502,7 @@ function ChoiceRow({
         ]}
       >
         {busy ? (
-          <ActivityIndicator size="small" color={colors.accent} />
+          <ActivityIndicator size="small" color={colors.accentText} />
         ) : (
           <Ionicons
             name={isRTL ? "chevron-forward" : "chevron-back"}

@@ -51,7 +51,7 @@ export function SettingsCardIcon({
   icon: keyof typeof Ionicons.glyphMap;
   /** Drawn instead of `icon`, for symbols the app takes from the other icon set (the pin). */
   communityIcon?: keyof typeof MaterialCommunityIcons.glyphMap;
-  colors: { mist: string; accent: string };
+  colors: { mist: string; accentText: string };
 }) {
   return (
     <View
@@ -59,9 +59,9 @@ export function SettingsCardIcon({
       style={{ backgroundColor: colors.mist }}
     >
       {communityIcon ? (
-        <MaterialCommunityIcons name={communityIcon} size={22} color={colors.accent} />
+        <MaterialCommunityIcons name={communityIcon} size={22} color={colors.accentText} />
       ) : (
-        <Ionicons name={icon} size={22} color={colors.accent} />
+        <Ionicons name={icon} size={22} color={colors.accentText} />
       )}
     </View>
   );
@@ -102,7 +102,7 @@ export function SettingsNavCard({
   title: string;
   summary: string;
   onPress: () => void;
-  colors: { mist: string; accent: string; ink: string; muted: string };
+  colors: { mist: string; accent: string; accentText: string; ink: string; muted: string };
 }) {
   const { isRTL } = useI18n();
 
@@ -137,7 +137,7 @@ export function SettingsLinkCard({
   title: string;
   body: string;
   onPress: () => void;
-  colors: { mist: string; accent: string; muted: string };
+  colors: { mist: string; accent: string; accentText: string; muted: string };
 }) {
   const { isRTL } = useI18n();
 
@@ -264,14 +264,14 @@ function HostShake({ children }: { children: ReactNode }) {
 /** A read-only value with a lock, shown to members in place of a control. */
 export function HostLockPill({ label, active = false }: { label: string; active?: boolean }) {
   const { colors, scheme } = useTheme();
-  const color = active ? colors.accent : colors.ink;
+  const color = active ? colors.accentText : colors.ink;
   return (
     <HostShake>
       <View
         className="flex-row items-center gap-1.5 self-start rounded-xl px-2.5 py-1"
         style={{
           backgroundColor: active
-            ? withAlpha(colors.accent, scheme === "dark" ? 0.2 : 0.14)
+            ? withAlpha(colors.accentText, scheme === "dark" ? 0.2 : 0.14)
             : colors.mist,
         }}
       >
@@ -313,7 +313,7 @@ export function CostAskToggle({
   value: boolean;
   disabled: boolean;
   onChange: (value: boolean) => void;
-  colors: { mist: string; accent: string; white: string };
+  colors: { mist: string; accent: string; accentText: string; white: string };
   /** View-only (not the host): the value as a lock pill instead of a switch. */
   locked?: boolean;
 }) {

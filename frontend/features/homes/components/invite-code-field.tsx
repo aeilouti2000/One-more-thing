@@ -72,7 +72,7 @@ export function InviteCodeField({
               className="ms-2 rounded-full px-3 py-1.5 active:opacity-70"
               style={{ backgroundColor: colors.mist }}
             >
-              <AppText className="text-xs font-semibold" style={{ color: colors.accent }}>
+              <AppText className="text-xs font-semibold" style={{ color: colors.accentText }}>
                 {t("pasteCode")}
               </AppText>
             </Pressable>

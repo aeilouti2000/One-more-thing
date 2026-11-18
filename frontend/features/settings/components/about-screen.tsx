@@ -6,10 +6,10 @@ import { Linking, Platform, View } from "react-native";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppLogo } from "@/components/ui/AppLogo";
 import { AppText } from "@/components/ui/AppText";
-import { FloatMessage } from "@/components/ui/FloatMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { APP_NAME } from "@/constants/app";
+import { withAlpha } from "@/constants/theme";
 import {
   CardBlock,
   SettingsLinkCard,
@@ -37,7 +37,7 @@ const WHATS_NEW = [
 ] as const;
 
 export default function AboutScreen() {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const { t, locale } = useI18n();
   const showBack = useSettingsShowBack();
   const tabBarInset = useSettingsTabBarInset();
@@ -46,19 +46,21 @@ export default function AboutScreen() {
   const [isChecking, setIsChecking] = useState(false);
   const [checkFailed, setCheckFailed] = useState(false);
   const [fixReady, setFixReady] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  // The check button itself turns green for a moment when nothing is newer.
+  const [upToDate, setUpToDate] = useState(false);
   const version = installedAppVersion();
+  const dark = scheme === "dark";
+  const okColor = dark ? "#5FD39A" : "#1F7A4D";
 
   useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 3000);
+    if (!upToDate) return;
+    const timer = setTimeout(() => setUpToDate(false), 3000);
     return () => clearTimeout(timer);
-  }, [toast]);
+  }, [upToDate]);
 
   async function onCheck() {
     setIsChecking(true);
     setCheckFailed(false);
-    setToast(null);
     let fixFound = false;
     // The result lands in the shared update state this page reads.
     await checkAppUpdate({ patient: false });
@@ -78,7 +80,7 @@ export default function AboutScreen() {
     setIsChecking(false);
     setCheckFailed(true);
     // Nothing newer anywhere: say so, since the button otherwise just stops.
-    if (!fixFound && readUpdateState().status === "current") setToast(t("upToDate"));
+    if (!fixFound && readUpdateState().status === "current") setUpToDate(true);
   }
 
   // Set only when the app runs a fix downloaded after it was installed.
@@ -105,12 +107,7 @@ export default function AboutScreen() {
           : null;
 
   return (
-    <Screen
-      tabBarInset={tabBarInset}
-      floating={toast ? <FloatMessage message={toast} tone="success" wide /> : null}
-      // On phones the tab bar is hidden here, so the toast can rest at the bottom.
-      floatingLow={!tabBarInset}
-    >
+    <Screen tabBarInset={tabBarInset}>
       <ScreenHeader
         title={t("aboutHelp")}
         subtitle={t("aboutHelpSummary")}
@@ -140,7 +137,13 @@ export default function AboutScreen() {
                 icon="arrow-down-circle-outline"
                 onPress={() => void Linking.openURL(update.downloadUrl).catch(() => undefined)}
               />
-            ) : Platform.OS === "web" ? null : (
+            ) : Platform.OS === "web" ? null : upToDate ? (
+              <AppButton
+                label={t("upToDate")}
+                icon="checkmark-circle"
+                fill={{ background: withAlpha(okColor, dark ? 0.2 : 0.14), label: okColor }}
+              />
+            ) : (
               <AppButton
                 label={t("checkForUpdate")}
                 variant="secondary"
@@ -158,7 +161,7 @@ export default function AboutScreen() {
           </AppText>
           {WHATS_NEW.map((key) => (
             <View key={key} className="mt-3 flex-row items-start gap-3">
-              <Ionicons name="checkmark-circle-outline" size={18} color={colors.accent} />
+              <Ionicons name="checkmark-circle-outline" size={18} color={colors.accentText} />
               <AppText className="min-w-0 flex-1 text-sm leading-5 text-cove-muted">
                 {t(key)}
               </AppText>

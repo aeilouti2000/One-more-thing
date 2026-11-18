@@ -70,8 +70,6 @@ type ScreenProps = {
   refreshing?: boolean;
   onRefresh?: () => void;
   floating?: ReactNode;
-  /** Sit the floating toast at the very bottom; for screens with no tab bar under it. */
-  floatingLow?: boolean;
   top?: ReactNode;
   dock?: ReactNode;
   /** Full-screen overlay layer for a floating action button (positions itself). */
@@ -126,7 +124,6 @@ export function Screen({
   refreshing = false,
   onRefresh,
   floating,
-  floatingLow = false,
   top,
   dock,
   fab,
@@ -375,8 +372,8 @@ export function Screen({
     <RefreshControl
       refreshing={refreshing}
       onRefresh={onRefresh}
-      tintColor={colors.accent}
-      colors={[colors.accent]}
+      tintColor={colors.accentText}
+      colors={[colors.accentText]}
       progressBackgroundColor={scheme === "dark" ? colors.deep : colors.white}
     />
   ) : undefined;
@@ -443,8 +440,8 @@ export function Screen({
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor={colors.accent}
-                colors={[colors.accent]}
+                tintColor={colors.accentText}
+                colors={[colors.accentText]}
                 progressBackgroundColor={scheme === "dark" ? colors.deep : colors.white}
               />
             ) : undefined
@@ -465,7 +462,7 @@ export function Screen({
         <View
           pointerEvents="box-none"
           className={`absolute inset-x-0 ${fab ? "bottom-40" : "bottom-28"} items-center px-4`}
-          style={floatingAboveDock ?? (floatingLow ? { bottom: dockBottom } : null)}
+          style={floatingAboveDock}
         >
           {floating}
         </View>

@@ -127,7 +127,7 @@ export default function PermissionsSettingsScreen() {
         {ROWS.map((row) => {
           const state = states[row.id];
           const granted = state === "granted" || state === "limited";
-          const tone = granted ? colors.accent : state === "denied" ? colors.ink : colors.muted;
+          const tone = granted ? colors.accentText : state === "denied" ? colors.ink : colors.muted;
           return (
             <CardBlock key={row.id}>
               <View className="flex-row items-start gap-3">
@@ -163,7 +163,7 @@ export default function PermissionsSettingsScreen() {
                       onPress={() => void Linking.openSettings()}
                       className="mt-3 self-start active:opacity-80"
                     >
-                      <AppText className="text-sm font-semibold text-cove-accent">
+                      <AppText className="text-sm font-semibold text-cove-accent-text">
                         {granted ? t("permissionManage") : t("openPhoneSettings")}
                       </AppText>
                     </Pressable>

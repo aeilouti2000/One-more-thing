@@ -139,10 +139,24 @@ function onAccentFor(accentHex) {
   return relativeLuminance(accentHex) > 0.55 ? "#121212" : "#FFFFFF";
 }
 
-function withOnAccent(palette) {
+/**
+ * The accent for text, icons and outlines. A dark pick is fine as a button
+ * fill, but drawn on a dark surface it disappears, so dark mode lifts it to a
+ * readable shade of the same hue. Light mode uses the accent as is.
+ */
+function accentTextFor(accentHex, scheme) {
+  if (scheme !== "dark") return accentHex;
+  // Bright enough to read on a dark surface already.
+  if (relativeLuminance(accentHex) >= 0.2) return accentHex;
+  const { h, s } = hexToHsl(accentHex);
+  return s < 12 ? hslToHex(0, 0, 80) : hslToHex(h, Math.min(s, 70), 68);
+}
+
+function withOnAccent(palette, scheme = "light") {
   return {
     ...palette,
     onAccent: onAccentFor(palette.accent),
+    accentText: accentTextFor(palette.accent, scheme),
   };
 }
 
@@ -174,7 +188,7 @@ function buildColors(scheme, accentHex, surfaceDepth = DEFAULT_SURFACE_DEPTH) {
         deep: mixHex("#101010", "#030303", depth),
         white: "#FFFFFF",
         transparent: "transparent",
-      });
+      }, "dark");
     }
 
     return withOnAccent({
@@ -213,7 +227,7 @@ function buildColors(scheme, accentHex, surfaceDepth = DEFAULT_SURFACE_DEPTH) {
       deep: darkSurface(tint, "#090B0E", "#020304", 0.08, 0.04, depth),
       white: "#FFFFFF",
       transparent: "transparent",
-    });
+    }, "dark");
   }
 
   // Light scheme: keep surfaces derived from hue; accent respects pick within a usable band.
@@ -418,6 +432,7 @@ function getCssVars(palette) {
     "--color-cove-ink": palette.ink,
     "--color-cove-accent": palette.accent,
     "--color-cove-accent-deep": palette.accentDeep,
+    "--color-cove-accent-text": palette.accentText,
     "--color-cove-on-accent": palette.onAccent,
     "--color-cove-soft": palette.soft,
     "--color-cove-deep": palette.deep,

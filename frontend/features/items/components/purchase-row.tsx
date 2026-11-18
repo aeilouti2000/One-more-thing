@@ -183,7 +183,7 @@ export function PurchaseRow({
               </View>
               {selected ? (
                 <View pointerEvents="none">
-                  <Ionicons name="checkmark-circle" size={26} color={colors.accent} />
+                  <Ionicons name="checkmark-circle" size={26} color={colors.accentText} />
                 </View>
               ) : showsStepper && onChangeQuantity && !stepperOpen ? (
                 <Pressable
@@ -221,7 +221,7 @@ export function PurchaseRow({
                     }`}
                     style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.paper }}
                   >
-                    <Ionicons name="remove" size={16} color={colors.accent} />
+                    <Ionicons name="remove" size={16} color={colors.accentText} />
                   </Pressable>
                   <View pointerEvents="none">
                     <AppText className="min-w-6 text-center text-sm font-semibold text-cove-ink">
@@ -258,7 +258,7 @@ export function PurchaseRow({
                       className="h-8 w-8 items-center justify-center rounded-full border border-cove-line active:opacity-80"
                       style={{ backgroundColor: scheme === "dark" ? colors.soft : colors.paper }}
                     >
-                      <Ionicons name="arrow-undo-outline" size={16} color={colors.accent} />
+                      <Ionicons name="arrow-undo-outline" size={16} color={colors.accentText} />
                     </Pressable>
                   ) : null}
                   {onBuyAgain || buyAgainBusy ? (
@@ -292,7 +292,7 @@ export function PurchaseRow({
             <View pointerEvents="none" className="flex-row items-center gap-1.5 overflow-hidden">
               {showCategory ? (
                 <View className="min-w-0 overflow-hidden rounded-full bg-cove-mist px-2.5 py-1">
-                  <AppText numberOfLines={1} className="text-xs font-semibold text-cove-accent">
+                  <AppText numberOfLines={1} className="text-xs font-semibold text-cove-accent-text">
                     {categoryLabel}
                   </AppText>
                 </View>
@@ -315,7 +315,7 @@ export function PurchaseRow({
               {purchase.status === "bought" ? <StatusBadge status={purchase.status} /> : null}
               {purchase.status === "bought" && costLabel ? (
                 <View className="rounded-full bg-cove-mist px-2.5 py-1">
-                  <AppText className="text-xs font-semibold text-cove-accent">{costLabel}</AppText>
+                  <AppText className="text-xs font-semibold text-cove-accent-text">{costLabel}</AppText>
                 </View>
               ) : null}
             </View>
@@ -332,7 +332,7 @@ export function PurchaseRow({
             {
               ...cardRadius,
               borderWidth: SELECTION_BORDER,
-              borderColor: colors.accent,
+              borderColor: colors.accentText,
             },
           ]}
         />

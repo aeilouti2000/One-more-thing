@@ -254,11 +254,17 @@ export function GlassTabBar({
     const fast = edges(lead.value);
     const slow = edges(trail.value);
     const left = Math.min(fast[0], slow[0]);
+    const pill = Math.max(fast[1], slow[1]) - left;
     return {
       opacity: 1,
-      width: Math.max(fast[1], slow[1]) - left,
-      left,
-      transform: [{ scale: 1 + HELD_SCALE * held.value }],
+      width: pill,
+      // The pill rests centred in the bar and is moved with a transform.
+      // A `left` offset gets mirrored by the system on right-to-left phones,
+      // which sent the pill to the opposite tab.
+      transform: [
+        { translateX: left + pill / 2 - width / 2 },
+        { scale: 1 + HELD_SCALE * held.value },
+      ],
     };
   });
 
@@ -267,9 +273,9 @@ export function GlassTabBar({
   const dark = scheme === "dark";
   const pillFill = dark
     ? withAlpha(colors.white, 0.0)
-    : withAlpha(colors.accent, 0.14);
-  const pillTint = withAlpha(colors.accent, dark ? 0.1 : 0.1);
-  const pillBorder = withAlpha(colors.accent, dark ? 0.55 : 0.38);
+    : withAlpha(colors.accentText, 0.14);
+  const pillTint = withAlpha(colors.accentText, dark ? 0.1 : 0.1);
+  const pillBorder = withAlpha(colors.accentText, dark ? 0.55 : 0.38);
   const pillSheen = dark
     ? ([withAlpha(colors.white, 0.2), withAlpha(colors.white, 0)] as const)
     : ([withAlpha(colors.white, 0.65), withAlpha(colors.white, 0.05)] as const);
@@ -282,27 +288,31 @@ export function GlassTabBar({
   const shellSize = shellWidth != null ? { width: shellWidth } : null;
   const shellContent = (
     <>
-      <Animated.View
+      <View
         pointerEvents="none"
-        style={[
-          styles.pill,
-          {
-            backgroundColor: pillFill,
-            borderColor: pillBorder,
-          },
-          indicator,
-        ]}
+        style={[StyleSheet.absoluteFill, styles.track]}
       >
-        <View
-          style={[StyleSheet.absoluteFill, { backgroundColor: pillTint }]}
-        />
-        <LinearGradient
-          colors={[...pillSheen]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
+        <Animated.View
+          style={[
+            styles.pill,
+            {
+              backgroundColor: pillFill,
+              borderColor: pillBorder,
+            },
+            indicator,
+          ]}
+        >
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: pillTint }]}
+          />
+          <LinearGradient
+            colors={[...pillSheen]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      </View>
       <View
         accessibilityRole="tablist"
         collapsable={false}
@@ -327,7 +337,7 @@ export function GlassTabBar({
               highlighted={(hoverIndex ?? state.index) === index}
               label={label}
               icon={options.tabBarIcon}
-              activeColor={colors.accent}
+              activeColor={colors.accentText}
               idleColor={colors.muted}
               onPress={() => {
                 const event = emitter.emit({
@@ -390,7 +400,7 @@ export function GlassTabBar({
               shellSize,
               {
                 borderColor: withAlpha(
-                  dark ? colors.muted : colors.accent,
+                  dark ? colors.muted : colors.accentText,
                   0.34,
                 ),
                 backgroundColor: withAlpha(
@@ -579,11 +589,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 3,
   },
+  track: {
+    alignItems: "center",
+    paddingVertical: EDGE_GAP,
+  },
   pill: {
-    position: "absolute",
-    top: EDGE_GAP,
-    bottom: EDGE_GAP,
-    left: 0,
+    flex: 1,
     borderRadius: tabBar.radius - EDGE_GAP,
     borderWidth: 0.5,
     overflow: "hidden",

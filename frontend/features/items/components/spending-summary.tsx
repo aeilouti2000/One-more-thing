@@ -68,7 +68,7 @@ export function SpendingSummary({
   const danger = scheme === "dark" ? "#F07178" : "#C2414A";
   const warning = scheme === "dark" ? "#E6B450" : "#B7791F";
   const used = budget ? current.total / budget : 0;
-  const budgetColor = used >= 1 ? danger : used >= WARN_AT ? warning : colors.accent;
+  const budgetColor = used >= 1 ? danger : used >= WARN_AT ? warning : colors.accentText;
   const track = withAlpha(colors.muted, 0.2);
 
   let comparison: string | null = null;
@@ -110,7 +110,7 @@ export function SpendingSummary({
               className="h-10 w-10 items-center justify-center rounded-full bg-cove-mist active:opacity-80"
               style={{ opacity: exporting ? 0.5 : 1 }}
             >
-              <Ionicons name="share-outline" size={18} color={colors.accent} />
+              <Ionicons name="share-outline" size={18} color={colors.accentText} />
             </Pressable>
           ) : null}
         </View>
@@ -163,7 +163,7 @@ export function SpendingSummary({
                   {formatMoney(row.total, currency)}
                 </AppText>
               </View>
-              <Bar fraction={largest > 0 ? row.total / largest : 0} color={colors.accent} track={track} />
+              <Bar fraction={largest > 0 ? row.total / largest : 0} color={colors.accentText} track={track} />
             </View>
           ))}
         </View>

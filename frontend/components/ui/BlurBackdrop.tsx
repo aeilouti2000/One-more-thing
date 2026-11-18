@@ -65,7 +65,7 @@ function SolidFrost({
           {
             backgroundColor: neutral
               ? withAlpha(dark ? colors.white : "#12141A", dark ? 0.03 : 0.02)
-              : withAlpha(colors.accent, soft ? (dark ? 0.12 : 0.08) : dark ? 0.16 : 0.1),
+              : withAlpha(colors.accentText, soft ? (dark ? 0.12 : 0.08) : dark ? 0.16 : 0.1),
           },
         ]}
       />
@@ -162,7 +162,7 @@ export function GlassFill({
             backgroundColor: neutral
               ? withAlpha(dark ? colors.paper : colors.white, dark ? 0.88 : 0.92)
               : withAlpha(
-                  colors.accent,
+                  colors.accentText,
                   soft ? (dark ? 0.06 : 0.08) : dark ? 0.22 : 0.24,
                 ),
           },

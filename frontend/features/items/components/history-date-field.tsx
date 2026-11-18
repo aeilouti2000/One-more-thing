@@ -106,13 +106,13 @@ export function HistoryDateField({
           style={{
             backgroundColor: selected ? colors.accent : colors.paper,
             borderWidth: 1,
-            borderColor: selected ? colors.accent : colors.line,
+            borderColor: selected ? colors.accentText : colors.line,
           }}
         >
           <Ionicons
             name="calendar-outline"
             size={15}
-            color={selected ? colors.onAccent : colors.accent}
+            color={selected ? colors.onAccent : colors.accentText}
           />
           <AppText
             className="text-xs font-semibold"
@@ -217,7 +217,7 @@ export function HistoryDateField({
                     style={{
                       backgroundColor: isSelected ? colors.accent : "transparent",
                       borderWidth: isToday && !isSelected ? 1 : 0,
-                      borderColor: colors.accent,
+                      borderColor: colors.accentText,
                     }}
                   >
                     <AppText

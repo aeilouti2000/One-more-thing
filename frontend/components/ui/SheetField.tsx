@@ -76,14 +76,14 @@ export function SheetField({
       {chip || icon ? (
         <View
           className="h-9 min-w-11 items-center justify-center rounded-xl px-2.5"
-          style={{ backgroundColor: withAlpha(colors.accent, scheme === "dark" ? 0.18 : 0.12) }}
+          style={{ backgroundColor: withAlpha(colors.accentText, scheme === "dark" ? 0.18 : 0.12) }}
         >
           {chip ? (
-            <AppText className="text-sm font-semibold" style={{ color: colors.accent }}>
+            <AppText className="text-sm font-semibold" style={{ color: colors.accentText }}>
               {chip}
             </AppText>
           ) : icon ? (
-            <Ionicons name={icon} size={18} color={colors.accent} />
+            <Ionicons name={icon} size={18} color={colors.accentText} />
           ) : null}
         </View>
       ) : null}
@@ -91,7 +91,7 @@ export function SheetField({
         value={value}
         onChangeText={onChangeText}
         placeholder={caretGap(placeholder)}
-        {...caretColors(colors.accent)}
+        {...caretColors(colors.accentText)}
         placeholderTextColor={withAlpha(colors.muted, 0.55)}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}

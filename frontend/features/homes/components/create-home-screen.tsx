@@ -107,7 +107,7 @@ export default function CreateHomeScreen() {
             onPress={() => router.push("/join-home")}
             className="items-center py-1"
           >
-            <AppText className="text-base text-cove-accent">
+            <AppText className="text-base text-cove-accent-text">
               {t("haveCode")}
             </AppText>
           </Pressable>

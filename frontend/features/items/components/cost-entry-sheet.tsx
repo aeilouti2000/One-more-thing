@@ -314,14 +314,14 @@ function CostField({
         className={`items-center justify-center rounded-xl ${large ? "h-9 min-w-11 px-2.5" : "h-7 min-w-9 px-2"}`}
         style={{
           backgroundColor: withAlpha(
-            colors.accent,
+            colors.accentText,
             scheme === "dark" ? 0.18 : 0.12,
           ),
         }}
       >
         <AppText
           className={`font-semibold ${large ? "text-sm" : "text-xs"}`}
-          style={{ color: colors.accent }}
+          style={{ color: colors.accentText }}
         >
           {symbol}
         </AppText>
@@ -330,7 +330,7 @@ function CostField({
         value={value}
         onChangeText={onChangeText}
         placeholder={caretGap(placeholder)}
-        {...caretColors(colors.accent)}
+        {...caretColors(colors.accentText)}
         placeholderTextColor={withAlpha(colors.muted, 0.55)}
         keyboardType="decimal-pad"
         onFocus={onFocus}
@@ -402,7 +402,7 @@ function MatchedCaption({
         {name ? `${t("receiptMatched")}: ${name}` : t("receiptMatched")}
       </AppText>
       <Pressable onPress={onClear} accessibilityRole="button" accessibilityLabel={t("receiptClear")}>
-        <AppText className="text-xs font-semibold" style={{ color: colors.accent }}>
+        <AppText className="text-xs font-semibold" style={{ color: colors.accentText }}>
           {t("receiptClear")}
         </AppText>
       </Pressable>
@@ -448,7 +448,7 @@ function ReceiptSummary({
         {t("receiptAssignedSum", { amount: formatMoney(placed, currency) })}
       </AppText>
       {pending ? (
-        <AppText className="text-xs font-medium" style={{ color: colors.accent, textAlign: isRTL ? "right" : "left" }}>
+        <AppText className="text-xs font-medium" style={{ color: colors.accentText, textAlign: isRTL ? "right" : "left" }}>
           {t("receiptTapItem", { amount: formatMoney(pending.amount, currency) })}
         </AppText>
       ) : null}
@@ -469,7 +469,7 @@ function ReceiptSummary({
                   className="max-w-full rounded-xl px-2.5 py-1.5 active:opacity-80"
                   style={{
                     backgroundColor: selected
-                      ? withAlpha(colors.accent, scheme === "dark" ? 0.28 : 0.16)
+                      ? withAlpha(colors.accentText, scheme === "dark" ? 0.28 : 0.16)
                       : scheme === "dark"
                         ? withAlpha(colors.white, 0.06)
                         : "#F4F5F7",
@@ -578,9 +578,9 @@ function CostSheetBody({
           }}
         >
           {scanning ? (
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.accentText} />
           ) : (
-            <Ionicons name="scan-outline" size={iconSize.sm} color={colors.accent} />
+            <Ionicons name="scan-outline" size={iconSize.sm} color={colors.accentText} />
           )}
           <AppText className="text-sm font-semibold text-cove-ink">
             {scanning ? t("scanReceiptWorking") : t("scanReceipt")}
@@ -620,7 +620,7 @@ function CostSheetBody({
                 accessibilityRole="button"
                 className="active:opacity-80"
               >
-                <AppText className="text-xs font-semibold" style={{ color: colors.accent }}>
+                <AppText className="text-xs font-semibold" style={{ color: colors.accentText }}>
                   {t("receiptTapItem", {
                     amount: formatMoney(
                       receipt?.lines.find((line) => line.id === pendingLineId)?.amount,
@@ -708,10 +708,10 @@ function CostSheetBody({
             height: ACTION_HEIGHT,
             borderRadius: ACTION_RADIUS,
             borderWidth: 1.5,
-            borderColor: withAlpha(colors.accent, 0.6),
+            borderColor: withAlpha(colors.accentText, 0.6),
           }}
         >
-          <AppText numberOfLines={1} className="text-sm font-semibold" style={{ color: colors.accent }}>
+          <AppText numberOfLines={1} className="text-sm font-semibold" style={{ color: colors.accentText }}>
             {skipLabel}
           </AppText>
         </Pressable>

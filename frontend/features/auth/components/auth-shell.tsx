@@ -297,7 +297,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
                   styles.logoGlow,
                   {
                     backgroundColor: withAlpha(
-                      colors.accent,
+                      colors.accentText,
                       dark ? 0.16 : 0.14,
                     ),
                   },

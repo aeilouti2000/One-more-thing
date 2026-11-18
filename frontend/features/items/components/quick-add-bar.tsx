@@ -130,7 +130,7 @@ export function QuickAddBar({
           {
             backgroundColor: colors.paper,
             borderWidth: 1.5,
-            borderColor: withAlpha(colors.accent, focused ? 0.9 : dark ? 0.45 : 0.35),
+            borderColor: withAlpha(colors.accentText, focused ? 0.9 : dark ? 0.45 : 0.35),
             borderRadius: BAR_RADIUS,
           },
           shakeStyle,
@@ -140,11 +140,11 @@ export function QuickAddBar({
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: withAlpha(colors.accent, focused ? 0.16 : dark ? 0.1 : 0.07) },
+            { backgroundColor: withAlpha(colors.accentText, focused ? 0.16 : dark ? 0.1 : 0.07) },
           ]}
         />
         <View className="flex-row items-center gap-2 py-2 pe-2 ps-4">
-          <Ionicons name="cart-outline" size={20} color={colors.accent} />
+          <Ionicons name="cart-outline" size={20} color={colors.accentText} />
           <View className="relative h-12 min-w-0 flex-1 justify-center px-1">
             {showHint ? (
               <View
@@ -181,7 +181,7 @@ export function QuickAddBar({
               onChangeText={onChangeText}
               maxLength={120}
               placeholder={caretGap(showHint ? "" : t("quickAddPlaceholder"))}
-              {...caretColors(colors.accent)}
+              {...caretColors(colors.accentText)}
               placeholderTextColor={colors.muted}
               onSubmitEditing={handleAdd}
               // "Done" adds the item and leaves the keyboard up for the next one.
@@ -221,7 +221,7 @@ export function QuickAddBar({
             style={{
               backgroundColor: addEnabled
                 ? colors.accent
-                : withAlpha(colors.accent, dark ? 0.38 : 0.42),
+                : withAlpha(colors.accentText, dark ? 0.38 : 0.42),
             }}
           >
             {busy ? (

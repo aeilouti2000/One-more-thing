@@ -61,7 +61,7 @@ export function FoldPaneEmpty({
           backgroundColor: colors.mist,
         }}
       >
-        <Ionicons name={icon} size={28} color={colors.accent} />
+        <Ionicons name={icon} size={28} color={colors.accentText} />
       </View>
       <AppText className="mt-4 text-center text-lg font-semibold text-cove-ink">
         {title}

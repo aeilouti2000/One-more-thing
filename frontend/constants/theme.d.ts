@@ -11,6 +11,8 @@ export type ThemeColors = {
   ink: string;
   accent: string;
   accentDeep: string;
+  /** Accent for text, icons and outlines; lifted in dark mode so it stays readable. */
+  accentText: string;
   onAccent: string;
   soft: string;
   deep: string;

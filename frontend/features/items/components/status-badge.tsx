@@ -20,7 +20,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       <AppText
         className={`text-xs font-semibold ${
           isRTL ? "" : "uppercase tracking-wide"
-        } ${isBought ? "text-cove-ink" : "text-cove-accent"}`}
+        } ${isBought ? "text-cove-ink" : "text-cove-accent-text"}`}
       >
         {isBought ? t("bought") : t("needed")}
       </AppText>

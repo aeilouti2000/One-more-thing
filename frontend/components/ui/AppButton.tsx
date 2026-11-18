@@ -56,10 +56,10 @@ export function AppButton({
 
   const surface: ViewStyle =
     variant === "primary"
-      ? { backgroundColor: inactive ? neutral : (fill?.background ?? colors.accent) }
+      ? { backgroundColor: inactive ? neutral : (fill?.background ?? colors.accentText) }
       : variant === "secondary"
         ? {
-            backgroundColor: inactive ? neutral : withAlpha(colors.accent, dark ? 0.16 : 0.1),
+            backgroundColor: inactive ? neutral : withAlpha(colors.accentText, dark ? 0.16 : 0.1),
           }
         : variant === "danger"
           ? { backgroundColor: inactive ? neutral : withAlpha(DANGER, dark ? 0.14 : 0.1) }
@@ -71,7 +71,7 @@ export function AppButton({
       ? (fill?.label ?? colors.onAccent)
       : variant === "danger"
         ? DANGER
-        : colors.accent;
+        : colors.accentText;
 
   return (
     <Pressable

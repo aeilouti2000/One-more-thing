@@ -87,7 +87,7 @@ export function HomeCard({
 
   const peopleLabel =
     members.length > 1 ? t("peopleCount", { count: members.length }) : t("justYou");
-  const tileBg = selected ? withAlpha(colors.accent, dark ? 0.2 : 0.12) : withAlpha(colors.muted, 0.14);
+  const tileBg = selected ? withAlpha(colors.accentText, dark ? 0.2 : 0.12) : withAlpha(colors.muted, 0.14);
 
   return (
     <View
@@ -107,7 +107,7 @@ export function HomeCard({
           <Ionicons
             name={selected ? "home" : "home-outline"}
             size={20}
-            color={selected ? colors.accent : colors.muted}
+            color={selected ? colors.accentText : colors.muted}
           />
         </View>
         <View className="min-w-0 flex-1">

@@ -312,10 +312,10 @@ export function ThemeColorPicker() {
           >
             <View
               className="flex-row items-center gap-1.5 px-3.5"
-              style={{ height: 34, borderRadius: 17, backgroundColor: withAlpha(colors.accent, 0.1) }}
+              style={{ height: 34, borderRadius: 17, backgroundColor: withAlpha(colors.accentText, 0.1) }}
             >
-              <Ionicons name="refresh" size={15} color={colors.accent} />
-              <AppText className="text-sm font-semibold text-cove-accent">{t("themeColorReset")}</AppText>
+              <Ionicons name="refresh" size={15} color={colors.accentText} />
+              <AppText className="text-sm font-semibold text-cove-accent-text">{t("themeColorReset")}</AppText>
             </View>
           </Pressable>
         ) : null}
@@ -481,7 +481,7 @@ export function ThemeColorPicker() {
             />
             {accent.toUpperCase() !== DEFAULT_ACCENT.toUpperCase() || dirty || depthDirty ? (
               <Pressable onPress={resetColor} className="items-center py-2 active:opacity-80">
-                <AppText className="text-sm font-semibold text-cove-accent">
+                <AppText className="text-sm font-semibold text-cove-accent-text">
                   {t("themeColorReset")}
                 </AppText>
               </Pressable>

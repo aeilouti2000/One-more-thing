@@ -120,7 +120,7 @@ function ThemeTile({
           padding: 6,
           backgroundColor: colors.paper,
           borderWidth: 2,
-          borderColor: selected ? colors.accent : "transparent",
+          borderColor: selected ? colors.accentText : "transparent",
         }}
       >
         {mode === "system" ? (

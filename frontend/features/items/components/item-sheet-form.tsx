@@ -193,7 +193,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
         <View className="min-w-0 flex-1">
           <View className="flex-row items-center gap-2">
             {titleIcon ? (
-              <MaterialCommunityIcons name={titleIcon} size={20} color={colors.accent} />
+              <MaterialCommunityIcons name={titleIcon} size={20} color={colors.accentText} />
             ) : null}
             <AppText className="text-lg font-semibold text-cove-ink" numberOfLines={1}>
               {title}
@@ -231,7 +231,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
         onChangeText={onChangeName}
         maxLength={120}
         placeholder={caretGap(t("itemSheetNamePlaceholder"))}
-        {...caretColors(colors.accent)}
+        {...caretColors(colors.accentText)}
         placeholderTextColor={withAlpha(colors.muted, 0.7)}
         autoFocus={autoFocusName}
         onFocus={() => setNameFocused(true)}
@@ -334,9 +334,9 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
           style={{
             height: 42,
             borderRadius: FIELD_RADIUS,
-            backgroundColor: unitOpen ? withAlpha(colors.accent, 0.16) : chipBg,
+            backgroundColor: unitOpen ? withAlpha(colors.accentText, 0.16) : chipBg,
             borderWidth: 1,
-            borderColor: unitOpen ? colors.accent : "transparent",
+            borderColor: unitOpen ? colors.accentText : "transparent",
           }}
         >
           <AppText className="text-sm font-semibold text-cove-ink" numberOfLines={1}>
@@ -413,7 +413,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
                 onChangeUnit(value.slice(0, 20));
               }}
               placeholder={caretGap(t("unitCustomPlaceholder"))}
-              {...caretColors(colors.accent)}
+              {...caretColors(colors.accentText)}
               placeholderTextColor={withAlpha(colors.muted, 0.7)}
               autoFocus
               returnKeyType="done"
@@ -461,7 +461,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
           onChangeText={onChangeNotes}
           maxLength={500}
           placeholder={caretGap(t("notesPlaceholder"))}
-          {...caretColors(colors.accent)}
+          {...caretColors(colors.accentText)}
           placeholderTextColor={withAlpha(colors.muted, 0.7)}
           autoFocus={noteOpen && !notes}
           multiline
@@ -483,8 +483,8 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
           accessibilityRole="button"
           className="mt-5 flex-row items-center gap-1.5 self-start py-1 active:opacity-70"
         >
-          <Ionicons name="add" size={18} color={colors.accent} />
-          <AppText className="text-sm font-semibold text-cove-accent">{t("addNote")}</AppText>
+          <Ionicons name="add" size={18} color={colors.accentText} />
+          <AppText className="text-sm font-semibold text-cove-accent-text">{t("addNote")}</AppText>
         </Pressable>
       )}
 
@@ -506,7 +506,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
           style={{
             height: BUTTON_HEIGHT,
             borderRadius: 18,
-            backgroundColor: canSubmit ? colors.accent : withAlpha(colors.accent, dark ? 0.28 : 0.3),
+            backgroundColor: canSubmit ? colors.accent : withAlpha(colors.accentText, dark ? 0.28 : 0.3),
           }}
         >
           {submitting ? (
@@ -542,7 +542,7 @@ export function ItemSheetSecondaryButton({
   onPress: () => void;
 }) {
   const { colors, scheme } = useTheme();
-  const color = tone === "success" ? (scheme === "dark" ? "#7FDCA0" : "#1F8A4C") : colors.accent;
+  const color = tone === "success" ? (scheme === "dark" ? "#7FDCA0" : "#1F8A4C") : colors.accentText;
   return (
     <Pressable
       disabled={disabled}
@@ -586,7 +586,7 @@ export function ItemSheetToggle({
       className="flex-row items-center gap-3 rounded-2xl px-4 active:opacity-80"
       style={{ height: 48, backgroundColor: dark ? withAlpha(colors.white, 0.05) : withAlpha("#12141A", 0.04) }}
     >
-      {icon ? <MaterialCommunityIcons name={icon} size={18} color={colors.accent} /> : null}
+      {icon ? <MaterialCommunityIcons name={icon} size={18} color={colors.accentText} /> : null}
       <AppText className="min-w-0 flex-1 text-sm text-cove-ink" numberOfLines={1}>
         {label}
       </AppText>

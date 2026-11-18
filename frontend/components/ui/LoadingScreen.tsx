@@ -13,7 +13,7 @@ export function LoadingScreen() {
       <View className="mb-5">
         <AppLogo size={88} />
       </View>
-      <ActivityIndicator size="large" color={colors.accent} />
+      <ActivityIndicator size="large" color={colors.accentText} />
     </View>
   );
 }

@@ -1116,7 +1116,7 @@ function TripBody() {
 
       {tipVisible && activeItems.length > 0 ? (
         <View className="mb-4 flex-row items-center gap-3 rounded-3xl bg-cove-mist px-4 py-3">
-          <Ionicons name="hand-left-outline" size={18} color={colors.accent} />
+          <Ionicons name="hand-left-outline" size={18} color={colors.accentText} />
           <AppText className="min-w-0 flex-1 text-sm text-cove-ink">{t("tripHoldTip")}</AppText>
           <Pressable
             onPress={dismissTip}
@@ -1549,7 +1549,7 @@ function TripCheckRow({
                       height: CHECK_SIZE,
                       borderRadius: CHECK_SIZE / 2,
                       borderWidth: 2,
-                      borderColor: colors.accent,
+                      borderColor: colors.accentText,
                     },
                     rippleStyle,
                   ]}
@@ -1569,7 +1569,7 @@ function TripCheckRow({
                   ]}
                 />
                 <Animated.View style={ringStyle}>
-                  <Ionicons name="ellipse-outline" size={CHECK_SIZE} color={colors.accent} />
+                  <Ionicons name="ellipse-outline" size={CHECK_SIZE} color={colors.accentText} />
                 </Animated.View>
                 <Animated.View
                   style={[
@@ -1684,7 +1684,7 @@ function HoldOption({
       accessibilityLabel={label}
       className="flex-row items-center gap-3 rounded-2xl bg-cove-mist px-4 py-4 active:opacity-80"
     >
-      <Ionicons name={icon} size={iconSize.sm} color={colors.accent} />
+      <Ionicons name={icon} size={iconSize.sm} color={colors.accentText} />
       <AppText className="text-base font-semibold text-cove-ink">{label}</AppText>
     </Pressable>
   );
@@ -1760,6 +1760,8 @@ function UndoToast({ name, onUndo }: { name: string; onUndo: () => void }) {
   const dark = scheme === "dark";
   const surface = dark ? colors.paper : colors.ink;
   const text = dark ? colors.ink : colors.paper;
+  // In light mode the bar is dark blue, so the accent blue would vanish on it.
+  const action = dark ? colors.accentText : colors.paper;
   return (
     <View
       pointerEvents="box-none"
@@ -1784,7 +1786,7 @@ function UndoToast({ name, onUndo }: { name: string; onUndo: () => void }) {
           elevation: 8,
         }}
       >
-        <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+        <Ionicons name="checkmark-circle" size={20} color={action} />
         <AppText numberOfLines={1} className="min-w-0 flex-1 text-sm" style={{ color: text }}>
           {t("boughtToast", { name })}
         </AppText>
@@ -1795,8 +1797,8 @@ function UndoToast({ name, onUndo }: { name: string; onUndo: () => void }) {
           hitSlop={8}
           className="flex-row items-center gap-1 rounded-xl px-3 py-2 active:opacity-70"
         >
-          <Ionicons name="arrow-undo" size={15} color={colors.accent} />
-          <AppText className="text-sm font-semibold" style={{ color: colors.accent }}>
+          <Ionicons name="arrow-undo" size={15} color={action} />
+          <AppText className="text-sm font-semibold" style={{ color: action }}>
             {t("undoBought")}
           </AppText>
         </Pressable>

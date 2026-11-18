@@ -482,9 +482,9 @@ export function ItemDetailCard({
                 <Ionicons
                   name={isRTL ? "chevron-forward" : "chevron-back"}
                   size={18}
-                  color={colors.accent}
+                  color={colors.accentText}
                 />
-                <AppText className="text-sm font-semibold text-cove-accent">
+                <AppText className="text-sm font-semibold text-cove-accent-text">
                   {t("back")}
                 </AppText>
               </Pressable>

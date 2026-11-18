@@ -154,7 +154,7 @@ export default function NotificationsSettingsScreen() {
                     onPress={() => void Linking.openSettings()}
                     className="mt-3 self-start active:opacity-80"
                   >
-                    <AppText className="text-sm font-semibold text-cove-accent">
+                    <AppText className="text-sm font-semibold text-cove-accent-text">
                       {t("openPhoneSettings")}
                     </AppText>
                   </Pressable>

@@ -36,7 +36,7 @@ export default function LanguageSettingsScreen() {
             style={{
               width: 96,
               height: 96,
-              backgroundColor: withAlpha(colors.accent, 0.1),
+              backgroundColor: withAlpha(colors.accentText, 0.1),
             }}
           >
             <View
@@ -44,10 +44,10 @@ export default function LanguageSettingsScreen() {
               style={{
                 width: 72,
                 height: 72,
-                backgroundColor: withAlpha(colors.accent, 0.18),
+                backgroundColor: withAlpha(colors.accentText, 0.18),
               }}
             >
-              <Ionicons name="language-outline" size={34} color={colors.accent} />
+              <Ionicons name="language-outline" size={34} color={colors.accentText} />
             </View>
           </View>
           <AppText className="mt-5 text-center text-xl font-semibold text-cove-ink">

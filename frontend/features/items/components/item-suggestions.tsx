@@ -67,7 +67,7 @@ export function ItemSuggestions({
             <AppText className="text-sm text-cove-muted" numberOfLines={1}>
               {detail}
             </AppText>
-            <Ionicons name="add-circle-outline" size={20} color={colors.accent} />
+            <Ionicons name="add-circle-outline" size={20} color={colors.accentText} />
           </Pressable>
         );
       })}

@@ -377,7 +377,7 @@ function PinsBody() {
             borderRadius: tabBarInset ? tabBar.radius : 28,
             borderWidth: 1,
             overflow: "hidden",
-            borderColor: withAlpha(dark ? colors.muted : colors.accent, 0.34),
+            borderColor: withAlpha(dark ? colors.muted : colors.accentText, 0.34),
             backgroundColor: withAlpha(dark ? colors.deep : colors.mist, dark ? 0.55 : 0.72),
             shadowColor: shadow.color,
             shadowOffset: shadow.offset,
@@ -526,7 +526,7 @@ function PinsBody() {
                 }}
               >
                 <View className="flex-row items-center gap-3">
-                  <MaterialCommunityIcons name="pin" size={18} color={colors.accent} />
+                  <MaterialCommunityIcons name="pin" size={18} color={colors.accentText} />
                   <View className="min-w-0 flex-1 gap-1.5">
                     <View className="flex-row items-center gap-2">
                       <AppText
@@ -537,11 +537,11 @@ function PinsBody() {
                       </AppText>
                       {due ? (
                         <View className="flex-row items-center gap-1">
-                          <Ionicons name="calendar-outline" size={12} color={colors.accent} />
+                          <Ionicons name="calendar-outline" size={12} color={colors.accentText} />
                           <AppText
                             numberOfLines={1}
                             className="text-xs font-semibold"
-                            style={{ color: colors.accent }}
+                            style={{ color: colors.accentText }}
                           >
                             {due}
                           </AppText>
@@ -724,7 +724,7 @@ function MetaChip({
         flexShrink: shrink ? 1 : 0,
         minWidth: shrink ? 0 : undefined,
         backgroundColor: accent
-          ? withAlpha(colors.accent, scheme === "dark" ? 0.22 : 0.14)
+          ? withAlpha(colors.accentText, scheme === "dark" ? 0.22 : 0.14)
           : scheme === "dark"
             ? colors.mist
             : colors.soft,
@@ -733,7 +733,7 @@ function MetaChip({
       <AppText
         numberOfLines={1}
         className="text-xs font-medium"
-        style={{ color: accent ? colors.accent : colors.muted }}
+        style={{ color: accent ? colors.accentText : colors.muted }}
       >
         {label}
       </AppText>

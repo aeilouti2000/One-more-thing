@@ -89,7 +89,7 @@ function CategoriesBody() {
           backgroundColor: dark ? colors.paper : colors.mist,
           borderWidth: tabBar.borderWidth,
           borderColor: withAlpha(
-            focused ? colors.accent : dark ? colors.muted : colors.accent,
+            focused ? colors.accentText : dark ? colors.muted : colors.accentText,
             focused ? 0.55 : 0.28,
           ),
           shadowColor: dark ? "#000000" : colors.ink,
@@ -102,16 +102,16 @@ function CategoriesBody() {
         <View className="flex-row items-center gap-2.5 px-3.5 py-2.5">
           <View
             className="h-9 w-9 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: withAlpha(colors.accent, dark ? 0.22 : 0.14) }}
+            style={{ backgroundColor: withAlpha(colors.accentText, dark ? 0.22 : 0.14) }}
           >
-            <Ionicons name="grid-outline" size={17} color={colors.accent} />
+            <Ionicons name="grid-outline" size={17} color={colors.accentText} />
           </View>
           <TextInput
             maxLength={40}
             value={draft}
             onChangeText={setDraft}
             placeholder={caretGap(t("newCategoryPlaceholder"))}
-            {...caretColors(colors.accent)}
+            {...caretColors(colors.accentText)}
             placeholderTextColor={colors.muted}
             onSubmitEditing={() => void add()}
             onFocus={() => setFocused(true)}
@@ -143,7 +143,7 @@ function CategoriesBody() {
             style={{
               backgroundColor: canAdd
                 ? colors.accent
-                : withAlpha(colors.accent, dark ? 0.35 : 0.28),
+                : withAlpha(colors.accentText, dark ? 0.35 : 0.28),
             }}
           >
             {busy ? (
