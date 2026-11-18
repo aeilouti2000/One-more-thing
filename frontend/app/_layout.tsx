@@ -11,10 +11,12 @@ import { AppState, Modal, Platform } from "react-native";
 import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
+import * as SplashScreen from "expo-splash-screen";
 import { BlurScreen } from "@/components/ui/BlurBackdrop";
 import { DragOverlayProvider } from "@/components/ui/DragOverlay";
 import { TabBlurProvider } from "@/components/ui/TabBlurTarget";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
+import { LaunchIntro } from "@/components/ui/LaunchIntro";
 import { ProblemScreen } from "@/components/ui/ProblemScreen";
 import { translate } from "@/constants/i18n";
 import { clearCurrentProfileCache } from "@/features/offline/profile-cache";
@@ -25,10 +27,11 @@ import {
   resetAppUpdateDismissal,
   type AppUpdate,
 } from "@/lib/app-release";
-import { AuthProvider } from "@/features/auth/providers/auth-provider";
+import { AuthProvider, useAuth } from "@/features/auth/providers/auth-provider";
 import { CategoriesProvider } from "@/features/items/providers/categories-provider";
-import { PurchasesProvider } from "@/features/items/hooks/use-purchases";
+import { PurchasesProvider, usePurchasesData } from "@/features/items/hooks/use-purchases";
 import { HouseholdProvider } from "@/features/homes/providers/household-provider";
+import { useHousehold } from "@/features/homes/hooks/use-household";
 import { NotificationsProvider } from "@/features/notifications/providers/notifications-provider";
 import { FontScaleProvider } from "@/providers/FontScaleProvider";
 import { LanguageProvider } from "@/providers/LanguageProvider";
@@ -129,6 +132,15 @@ function UpdateGate() {
   );
 }
 
+/** The launch intro bursts once the first real screen has what it needs. */
+function AppLaunchIntro() {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const { isLoading: isHomeLoading } = useHousehold();
+  const { isLoading: isItemsLoading } = usePurchasesData();
+  const ready = !isAuthLoading && (!user || (!isHomeLoading && !isItemsLoading));
+  return <LaunchIntro ready={ready} />;
+}
+
 /**
  * Shown instead of a blank app when rendering fails anywhere. The providers
  * below are not available here, so it uses only what needs none.
@@ -136,6 +148,8 @@ function UpdateGate() {
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   useEffect(() => {
     logError("render", error);
+    // The launch intro may never have run, so make sure the splash goes.
+    void SplashScreen.hideAsync();
   }, [error]);
 
   return (
@@ -181,6 +195,7 @@ export default function RootLayout() {
                       </TabBlurProvider>
                     </BlurScreen>
                   </DragOverlayProvider>
+                  <AppLaunchIntro />
                 </GestureHandlerRootView>
                 </PurchasesProvider>
                 </CategoriesProvider>

@@ -37,6 +37,7 @@ import { formatAppError, logError } from "@/lib/errors";
 import { takePushToken } from "@/features/notifications/api/push";
 import { setPostAuthRoute } from "@/features/auth/lib/post-auth-route";
 
+// Kept up until the launch intro has drawn the same logo over the app.
 void SplashScreen.preventAutoHideAsync();
 
 type AuthResult = {
@@ -140,8 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isMounted) setUser(null);
       } finally {
         if (!isMounted) return;
+        // The launch intro (components/ui/LaunchIntro) hides the native splash.
         setIsLoading(false);
-        void SplashScreen.hideAsync();
       }
     })();
 
