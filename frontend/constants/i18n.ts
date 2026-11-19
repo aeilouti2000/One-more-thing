@@ -928,6 +928,11 @@ const en = {
   featureRecapBody: "A short look back at each month: trips, favourites and price changes.",
   featureTripTotalTitle: "Live trip total",
   featureTripTotalBody: "See what the whole trip will cost and what it leaves of your budget.",
+  whatsNew5: "Trips now show what the whole trip will cost and what it leaves of this month's budget.",
+  whatsNew6: "\"Anything missing?\": ask everyone at home from the shop. They can answer from the notification.",
+  whatsNew7: "Later shelf: park an item until another day and it comes back by itself.",
+  whatsNew8: "Sets: save a group of items and add them all in one tap.",
+  whatsNew9: "Monthly recap in History at the start of each month.",
   shopAskReplyFailedNotice: "Couldn't send your answer. Open the app to try again.",
   laterParkedHint: "\"{{name}}\" is on your Later shelf. Add it to bring it back.",
 } as const;
@@ -1855,6 +1860,11 @@ const ar: { [K in keyof typeof en]: string } = {
   featureRecapBody: "نظرة سريعة على كل شهر: الرحلات والأكثر شراءً وتغيّر الأسعار.",
   featureTripTotalTitle: "مجموع الرحلة المباشر",
   featureTripTotalBody: "اعرف تكلفة الرحلة كاملة وما يتبقى من ميزانيتك.",
+  whatsNew5: "تعرض الرحلات الآن التكلفة المتوقعة للرحلة كاملة وما يتبقى من ميزانية هذا الشهر.",
+  whatsNew6: "«هل ينقص شيء؟»: اسأل جميع أفراد المنزل من المتجر، ويمكنهم الرد من الإشعار.",
+  whatsNew7: "رف «لاحقاً»: أجّل عنصراً إلى يوم آخر وسيعود وحده.",
+  whatsNew8: "المجموعات: احفظ مجموعة عناصر وأضفها كلها بضغطة واحدة.",
+  whatsNew9: "ملخص شهري في السجل مع بداية كل شهر.",
   shopAskReplyFailedNotice: "تعذّر إرسال ردّك. افتح التطبيق للمحاولة مجدداً.",
   laterParkedHint: "«{{name}}» موجود في «لاحقاً». أضفه ليعود إلى القائمة.",
 };
