@@ -114,6 +114,7 @@ export default function TripsSettingsScreen() {
 
         <HostOnly locked={!isHost}>
           <CostAskToggle
+          <CostAskToggle
             title={t("tripEstimateSetting")}
             body={
               household.costsEnabled

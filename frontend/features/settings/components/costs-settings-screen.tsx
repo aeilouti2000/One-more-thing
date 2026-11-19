@@ -304,6 +304,18 @@ export default function CostsSettingsScreen() {
               />
             </HostOnly>
 
+            <HostOnly locked={!isHost}>
+              <CostAskToggle
+                title={t("recapSetting")}
+                body={t("recapSettingBody")}
+                value={household.monthlyRecap !== false}
+                disabled={!isHost || isSavingCosts}
+                locked={!isHost}
+                onChange={(value) => void saveCostSettings({ monthlyRecap: value })}
+                colors={colors}
+              />
+            </HostOnly>
+
             <CardBlock>
               <AppText className="text-base font-semibold text-cove-ink">{t("exportTitle")}</AppText>
               <AppText className="mt-1 text-sm text-cove-muted">{t("exportBody")}</AppText>

@@ -18,6 +18,8 @@ export type CostSettings = {
   tripCostMode: TripCostMode;
   /** What the home plans to spend in a calendar month; null = no budget. */
   monthlyBudget: number | null;
+  /** Show last month's recap in History at the start of a month. */
+  monthlyRecap: boolean;
 };
 
 export type TripSettings = {
@@ -54,6 +56,7 @@ export type Household = {
   tripSummary: boolean;
   tripShopTogether: boolean;
   tripEstimate: boolean;
+  monthlyRecap: boolean;
 };
 
 export type HomeSummary = {

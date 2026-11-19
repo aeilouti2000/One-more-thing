@@ -32,6 +32,7 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { formatMoney, summarizeSpend, sumKnownCosts } from "@/features/items/utils/currency";
+import { RecapCard } from "@/features/items/components/recap-card";
 import { SpendingSummary } from "@/features/items/components/spending-summary";
 import { useExportPurchases } from "@/features/items/hooks/use-export";
 import { matchRank } from "@/features/items/utils/insights";
@@ -529,6 +530,10 @@ export default function HistoryScreen() {
               </>
             }
           />
+        ) : null}
+
+        {!isSearching && isDefaultView && mode === "list" ? (
+          <RecapCard purchases={bought} now={now} />
         ) : null}
 
         {query ? (

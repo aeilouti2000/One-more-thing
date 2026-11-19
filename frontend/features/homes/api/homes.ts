@@ -31,6 +31,7 @@ function withCostDefaults(home: Household): Household {
     tripShopTogether: home.tripShopTogether === true,
     // On unless turned off (also when an older server doesn't send them).
     tripEstimate: home.tripEstimate !== false,
+    monthlyRecap: home.monthlyRecap !== false,
   };
 }
 
