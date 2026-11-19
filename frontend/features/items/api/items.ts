@@ -53,6 +53,8 @@ type ItemResponse = {
   notFoundAt?: string | null;
   notFoundBy?: string | null;
   notFoundByName?: string | null;
+  laterAt?: string | null;
+  laterUntil?: string | null;
 };
 
 function toPurchase(item: ItemResponse): Purchase {
@@ -92,6 +94,8 @@ function toPurchase(item: ItemResponse): Purchase {
     notFoundAt: item.notFoundAt ?? undefined,
     notFoundById: item.notFoundBy ?? undefined,
     notFoundByName: item.notFoundByName ?? undefined,
+    laterAt: item.laterAt ?? undefined,
+    laterUntil: item.laterUntil ?? undefined,
   };
 }
 
@@ -336,6 +340,32 @@ export async function setItemsUrgent(itemIds: string[], urgent: boolean) {
     const ids = await savedItemIds(itemIds);
     if (ids.length === 0) return { error: null };
     await api.post("/items/urgent", { ids, urgent });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}
+
+/** Parks items on the Later shelf; `until` (ISO) is when they return by themselves. */
+export async function setItemsLater(itemIds: string[], until: string | null) {
+  if (itemIds.length === 0) return { error: null };
+  try {
+    const ids = await savedItemIds(itemIds);
+    if (ids.length === 0) return { error: null };
+    await api.post("/items/later", { ids, until });
+    return { error: null };
+  } catch (error) {
+    return { error: formatAppError(error) };
+  }
+}
+
+/** Brings parked items back to the list now. */
+export async function clearItemsLater(itemIds: string[]) {
+  if (itemIds.length === 0) return { error: null };
+  try {
+    const ids = await savedItemIds(itemIds);
+    if (ids.length === 0) return { error: null };
+    await api.post("/items/later/clear", { ids });
     return { error: null };
   } catch (error) {
     return { error: formatAppError(error) };

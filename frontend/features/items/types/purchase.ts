@@ -32,6 +32,13 @@ export type Purchase = {
   notFoundAt?: string;
   notFoundById?: string;
   notFoundByName?: string;
+  /**
+   * On the Later shelf since this moment: still wanted, but off the list (not
+   * counted, not shopped) until it comes back.
+   */
+  laterAt?: string;
+  /** When it returns by itself; missing = only when someone brings it back. */
+  laterUntil?: string;
   createdAt: string;
   boughtAt?: string;
 };

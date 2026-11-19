@@ -2,7 +2,7 @@ import "@/features/auth/utils/session-storage";
 
 const STORAGE_KEY = "one-more-thing.swipe-actions";
 
-export const SWIPE_ACTION_IDS = ["buy", "pin", "move", "urgent", "delete"] as const;
+export const SWIPE_ACTION_IDS = ["buy", "pin", "move", "urgent", "later", "delete"] as const;
 
 export type SwipeAction = (typeof SWIPE_ACTION_IDS)[number];
 
@@ -11,6 +11,7 @@ export const SWIPE_ACTION_TONE: Record<SwipeAction, { bg: string; fg: string }> 
   pin: { bg: "#DDD6FE", fg: "#5B21B6" },
   move: { bg: "#BFDBFE", fg: "#1E3A8A" },
   urgent: { bg: "#FDE68A", fg: "#92400E" },
+  later: { bg: "#99F6E4", fg: "#115E59" },
   delete: { bg: "#FECACA", fg: "#B91C1C" },
 };
 

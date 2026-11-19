@@ -21,6 +21,8 @@ import {
   markItemsBought,
   setItemNotFound,
   setItemsCategory,
+  setItemsLater,
+  clearItemsLater,
   setItemsUnit,
   setItemsUrgent,
   undoItemBought,
@@ -51,6 +53,7 @@ import type {
   PurchaseCategory,
   PurchaseStatus,
 } from "@/features/items/types/purchase";
+import { normalizeName } from "@/features/items/utils/insights";
 import { latestInvoiceThisMonth } from "@/features/items/utils/trips";
 
 type AddItemValues = Omit<NewItemInput, "homeId" | "userId"> & {
@@ -60,13 +63,20 @@ type AddItemValues = Omit<NewItemInput, "homeId" | "userId"> & {
 
 type UsePurchasesResult = {
   purchases: Purchase[];
+  /** What is on the lists now (parked items are in `later`). */
   needed: Purchase[];
+  /** Still wanted, but parked on the Later shelf. */
+  later: Purchase[];
   bought: Purchase[];
   getById: (id: string) => Purchase | undefined;
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  addItem: (values: AddItemValues) => Promise<{ error: string | null }>;
+  /**
+   * `restored`: nothing new was added, because that name was waiting on the
+   * list's Later shelf and came back instead.
+   */
+  addItem: (values: AddItemValues) => Promise<{ error: string | null; restored?: boolean }>;
   /** Attach/replace (photo) or remove (null) an item's photo. */
   setItemPhoto: (
     id: string,
@@ -131,6 +141,13 @@ type UsePurchasesResult = {
   /** unit "" clears it (plain pieces). */
   setManyUnit: (ids: string[], unit: string) => Promise<{ error: string | null }>;
   reorderNeeded: (ids: string[]) => Promise<{ error: string | null }>;
+  /**
+   * Park items on the Later shelf. `until` is when they return by themselves;
+   * null keeps them there until someone brings them back.
+   */
+  setManyLater: (ids: string[], until: Date | null) => Promise<{ error: string | null }>;
+  /** Bring parked items back to the list now. */
+  bringBackMany: (ids: string[]) => Promise<{ error: string | null }>;
 };
 
 /**
@@ -370,6 +387,37 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         return {
           error: translate(!user ? "errorNeedLogin" : "errorNeedHome"),
         };
+      }
+
+      // Already wanted, just parked for later: adding it again (typed, picked
+      // from a suggestion, a pin's "add now") brings that one back instead of
+      // making a twin that would be joined by the parked one on its day.
+      const wantedName = normalizeName(values.name);
+      const parked = purchasesRef.current.find(
+        (item) =>
+          item.status === "needed" &&
+          Boolean(item.laterAt) &&
+          (!values.listId || item.listId === values.listId) &&
+          normalizeName(item.name) === wantedName,
+      );
+      if (parked) {
+        const endParkedChange = noteLocalChange();
+        const back = (item: Purchase) =>
+          item.id === parked.id ? { ...item, laterAt: undefined, laterUntil: undefined } : item;
+        setPurchases((current) => current.map(back));
+        let restored: { error: string | null };
+        try {
+          restored = await clearItemsLater([parked.id]);
+        } finally {
+          endParkedChange();
+        }
+        if (restored.error) {
+          await refresh();
+          return { error: restored.error };
+        }
+        rememberItems(purchasesRef.current.map(back));
+        emitListChanged();
+        return { error: null, restored: true };
       }
 
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -929,6 +977,24 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     [patchManyNeeded],
   );
 
+  const setManyLater = useCallback(
+    (ids: string[], until: Date | null) => {
+      const laterUntil = until ? until.toISOString() : undefined;
+      return patchManyNeeded(ids, { laterAt: new Date().toISOString(), laterUntil }, () =>
+        setItemsLater(ids, laterUntil ?? null),
+      );
+    },
+    [patchManyNeeded],
+  );
+
+  const bringBackMany = useCallback(
+    (ids: string[]) =>
+      patchManyNeeded(ids, { laterAt: undefined, laterUntil: undefined }, () =>
+        clearItemsLater(ids),
+      ),
+    [patchManyNeeded],
+  );
+
   const reorderNeeded = useCallback(
     async (ids: string[]) => {
       if (!user) return { error: translate("errorNeedLogin") };
@@ -962,7 +1028,11 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   );
 
   const needed = useMemo(
-    () => purchases.filter((item) => item.status === "needed"),
+    () => purchases.filter((item) => item.status === "needed" && !item.laterAt),
+    [purchases],
+  );
+  const later = useMemo(
+    () => purchases.filter((item) => item.status === "needed" && Boolean(item.laterAt)),
     [purchases],
   );
   const bought = useMemo(
@@ -982,6 +1052,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     () => ({
       purchases,
       needed,
+      later,
       bought,
       getById,
       isLoading: isHomeLoading || isLoading,
@@ -1005,10 +1076,13 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       setManyCategory,
       setManyUnit,
       reorderNeeded,
+      setManyLater,
+      bringBackMany,
     }),
     [
       purchases,
       needed,
+      later,
       bought,
       getById,
       isHomeLoading,
@@ -1033,6 +1107,8 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       setManyCategory,
       setManyUnit,
       reorderNeeded,
+      setManyLater,
+      bringBackMany,
     ],
   );
 

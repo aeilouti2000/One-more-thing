@@ -187,12 +187,21 @@ export function SwipeableItem({
 
 function actionLabel(
   action: SwipeAction,
-  t: (key: "markSelectedBought" | "pinSelected" | "moveSelected" | "markSelectedUrgent" | "delete") => string,
+  t: (
+    key:
+      | "markSelectedBought"
+      | "pinSelected"
+      | "moveSelected"
+      | "markSelectedUrgent"
+      | "laterAction"
+      | "delete",
+  ) => string,
 ) {
   if (action === "buy") return t("markSelectedBought");
   if (action === "pin") return t("pinSelected");
   if (action === "move") return t("moveSelected");
   if (action === "urgent") return t("markSelectedUrgent");
+  if (action === "later") return t("laterAction");
   return t("delete");
 }
 
@@ -207,6 +216,8 @@ function ActionFace({ action, label }: { action: SwipeAction; label: string }) {
       <Ionicons name="swap-horizontal" size={28} color={tone.fg} />
     ) : action === "urgent" ? (
       <Ionicons name="flash" size={28} color={tone.fg} />
+    ) : action === "later" ? (
+      <Ionicons name="hourglass-outline" size={26} color={tone.fg} />
     ) : (
       <Ionicons name="trash-outline" size={28} color={tone.fg} />
     );

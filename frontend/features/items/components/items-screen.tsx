@@ -42,6 +42,9 @@ import { QuickAddBar } from "@/features/items/components/quick-add-bar";
 import { ReorderableList } from "@/features/items/components/reorderable-list";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ItemsFab } from "@/features/items/components/items-fab";
+import { LaterSheet } from "@/features/items/components/later-sheet";
+import { LaterShelf } from "@/features/items/components/later-shelf";
+import { formatLaterDay } from "@/features/items/utils/later-dates";
 import { SwipeableItem } from "@/features/items/components/swipeable-item";
 import { TripResumeSheet } from "@/features/items/components/trip-resume-sheet";
 import { useWideLayout } from "@/hooks/use-wide-layout";
@@ -95,7 +98,12 @@ import { onFocusList, onListChanged } from "@/features/items/utils/list-sync";
 import { CategoryFilter } from "@/features/items/components/category-filter";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { ItemSuggestions } from "@/features/items/components/item-suggestions";
-import { matchRank, suggestItems, type ItemSuggestion } from "@/features/items/utils/insights";
+import {
+  matchRank,
+  normalizeName,
+  suggestItems,
+  type ItemSuggestion,
+} from "@/features/items/utils/insights";
 import {
   useCategories,
   useCategoryLabel,
@@ -116,6 +124,7 @@ export default function ItemsScreen() {
   const { household, refresh: refreshHome } = useHousehold();
   const {
     needed,
+    later,
     purchases,
     isLoading,
     error,
@@ -129,10 +138,12 @@ export default function ItemsScreen() {
     updateItem,
     reorderNeeded,
     addItem,
+    setManyLater,
+    bringBackMany,
   } = usePurchases();
   const { colors, scheme } = useTheme();
   const { setHidden: setTabBarHidden } = useTabBarVisibility();
-  const { t, isRTL } = useI18n();
+  const { t, isRTL, locale } = useI18n();
   const { categories } = useCategories();
   const unitLabel = useUnitLabel();
   const wide = useWideLayout();
@@ -152,6 +163,11 @@ export default function ItemsScreen() {
   const [isMovingToList, setIsMovingToList] = useState(false);
   const [floatMessage, setFloatMessage] = useState<string | null>(null);
   const [floatTone, setFloatTone] = useState<"error" | "success">("error");
+  // Items waiting for a return day in the Later sheet; null = sheet closed.
+  const [laterIds, setLaterIds] = useState<string[] | null>(null);
+  const [laterName, setLaterName] = useState<string | null>(null);
+  const [laterOpen, setLaterOpen] = useState(false);
+  const [bringingBackId, setBringingBackId] = useState<string | null>(null);
   const itemsRef = useRef(needed);
   itemsRef.current = needed;
   const pendingQuantity = useRef(new Map<string, number>());
@@ -228,6 +244,18 @@ export default function ItemsScreen() {
         : [],
     [needed, selectedListId],
   );
+  // Parked items of this list, the next to return first, undated ones last.
+  const laterItems = useMemo(
+    () =>
+      selectedListId
+        ? later
+            .filter((item) => item.listId === selectedListId)
+            .sort((a, b) =>
+              (a.laterUntil ?? "\uffff").localeCompare(b.laterUntil ?? "\uffff"),
+            )
+        : [],
+    [later, selectedListId],
+  );
   const visibleItems = useMemo(
     () =>
       quickCategory === "all"
@@ -242,6 +270,12 @@ export default function ItemsScreen() {
     () => (typed ? listItems.filter((item) => matchRank(item.name, typed) > 0) : visibleItems),
     [listItems, typed, visibleItems],
   );
+  // What is typed names something parked on this list: adding it brings it back.
+  const typedParked = useMemo(() => {
+    if (!typed) return null;
+    const key = normalizeName(typed);
+    return laterItems.find((item) => normalizeName(item.name) === key) ?? null;
+  }, [laterItems, typed]);
   const suggestions = useMemo(
     () => suggestItems(purchases, typed, { exclude: listItems.map((item) => item.name) }),
     [listItems, purchases, typed],
@@ -484,6 +518,58 @@ export default function ItemsScreen() {
     setIsConfirmingDelete(false);
   }
 
+  function askLater(ids: string[]) {
+    if (ids.length === 0) return;
+    setActionError(null);
+    // Kept for the sheet's title: once parked, the item is no longer in `needed`.
+    setLaterName(ids.length === 1 ? (needed.find((item) => item.id === ids[0])?.name ?? null) : null);
+    setLaterIds(ids);
+  }
+
+  async function parkIds(ids: string[], until: Date | null) {
+    if (busyAction || ids.length === 0) return;
+    setBusyAction("later");
+    setActionError(null);
+    const result = await setManyLater(ids, until);
+    setBusyAction(null);
+    if (result.error) {
+      // The sheet stays open and shows why.
+      setActionError(result.error);
+      return;
+    }
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setLaterIds(null);
+    setSelectedIds(new Set());
+    setIsConfirmingDelete(false);
+    // Show where they went.
+    setLaterOpen(true);
+    setFloatTone("success");
+    setFloatMessage(
+      until
+        ? t("laterMovedUntil", { date: formatLaterDay(until, locale) })
+        : t("laterMoved"),
+    );
+  }
+
+  const bringBack = useCallback(
+    async (id: string) => {
+      setBringingBackId(id);
+      setActionError(null);
+      const result = await bringBackMany([id]);
+      setBringingBackId(null);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+      void Haptics.selectionAsync();
+      setFloatTone("success");
+      setFloatMessage(t("laterBroughtBack"));
+    },
+    [bringBackMany, t],
+  );
+  const toggleLater = useCallback(() => setLaterOpen((open) => !open), []);
+
+  // "Anything missing?" from someone at the shop, until this person answers.
   const bulkCostItems = useMemo(
     () =>
       (bulkCostIds ?? []).map((id) => {
@@ -733,6 +819,7 @@ export default function ItemsScreen() {
     pinIds,
     markUrgentIds,
     askMove,
+    askLater,
     startSelection,
     toggleSelection,
     changeQuantity,
@@ -743,6 +830,7 @@ export default function ItemsScreen() {
     pinIds,
     markUrgentIds,
     askMove,
+    askLater,
     startSelection,
     toggleSelection,
     changeQuantity,
@@ -759,6 +847,7 @@ export default function ItemsScreen() {
     else if (action === "buy") void handlers.markBoughtIds([id]);
     else if (action === "pin") void handlers.pinIds([id]);
     else if (action === "urgent") void handlers.markUrgentIds([id]);
+    else if (action === "later") handlers.askLater([id]);
     else handlers.askMove([id]);
   }, []);
 
@@ -827,6 +916,14 @@ export default function ItemsScreen() {
     });
     setIsQuickAdding(false);
     if (result.error) setActionError(result.error);
+    else if (result.restored) noteBroughtBack();
+  }
+
+  /** The name was on the Later shelf: it came back instead of being added twice. */
+  function noteBroughtBack() {
+    void Haptics.selectionAsync();
+    setFloatTone("success");
+    setFloatMessage(t("laterBroughtBack"));
   }
 
   async function quickAdd() {
@@ -847,7 +944,7 @@ export default function ItemsScreen() {
       setActionError(result.error);
       // Not added: give the text back instead of making them type it again.
       setQuickName((current) => current || name);
-    }
+    } else if (result.restored) noteBroughtBack();
   }
 
   function closeListForm() {
@@ -1134,6 +1231,7 @@ export default function ItemsScreen() {
       onPin={() => void pinIds([...selectedIds])}
       onUrgent={() => void markUrgentIds([...selectedIds])}
       onMove={() => askMove([...selectedIds])}
+      onLater={() => askLater([...selectedIds])}
       onDelete={() => askDelete([...selectedIds])}
       allSelected={allSelected(
         shownItems.map((item) => item.id),
@@ -1230,7 +1328,9 @@ export default function ItemsScreen() {
         ) : shownItems.length === 0 ? (
           typed ? (
             <AppText className="px-3 py-4 text-center text-sm text-cove-muted">
-              {t("searchNotOnList", { name: typed })}
+              {typedParked
+                ? t("laterParkedHint", { name: typedParked.name })
+                : t("searchNotOnList", { name: typed })}
             </AppText>
           ) : (
           <Animated.View entering={FadeIn.duration(240)}>
@@ -1294,8 +1394,30 @@ export default function ItemsScreen() {
           />
           </Animated.View>
         )}
+        {showListSkeleton || isSelecting || typed ? null : (
+          <LaterShelf
+            items={laterItems}
+            open={laterOpen}
+            onToggle={toggleLater}
+            busyId={bringingBackId}
+            onBringBack={bringBack}
+          />
+        )}
       </View>
       </SwipeSlideContent>
+
+      <LaterSheet
+        visible={laterIds !== null}
+        name={laterName}
+        count={laterIds?.length ?? 0}
+        busy={busyAction === "later"}
+        error={laterIds !== null ? actionError : null}
+        onPick={(until) => void parkIds(laterIds ?? [], until)}
+        onClose={() => {
+          setLaterIds(null);
+          setActionError(null);
+        }}
+      />
 
       <ConfirmModal
         visible={isConfirmingDelete}

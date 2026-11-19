@@ -39,6 +39,7 @@ export type SelectionAction =
   | "bought"
   | "pin"
   | "urgent"
+  | "later"
   | "delete"
   | "move"
   | "category"
@@ -62,6 +63,8 @@ type SelectionBarProps = {
   onUrgent: () => void;
   onDelete: () => void;
   onMove: () => void;
+  /** Park the selection on the Later shelf. */
+  onLater: () => void;
   onSelectAll: () => void;
   onSetCategory: (category: PurchaseCategory) => void;
   onSetUnit: (unit: string) => void;
@@ -102,6 +105,7 @@ export function SelectionBar({
   onUrgent,
   onDelete,
   onMove,
+  onLater,
   onSelectAll,
   onSetCategory,
   onSetUnit,
@@ -163,6 +167,14 @@ export function SelectionBar({
       color: DANGER,
       busy: busyAction === "urgent",
       onPress: onUrgent,
+    },
+    {
+      key: "later",
+      label: t("laterAction"),
+      icon: <Ionicons name="hourglass-outline" size={18} color={ink} />,
+      color: ink,
+      busy: busyAction === "later",
+      onPress: onLater,
     },
     {
       key: "delete",

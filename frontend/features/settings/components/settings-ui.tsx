@@ -340,25 +340,41 @@ export function CostAskToggle({
 
 export function swipeActionName(
   action: SwipeAction,
-  t: (key: "markSelectedBought" | "pinSelected" | "moveSelected" | "markSelectedUrgent" | "delete") => string,
+  t: (
+    key:
+      | "markSelectedBought"
+      | "pinSelected"
+      | "moveSelected"
+      | "markSelectedUrgent"
+      | "laterAction"
+      | "delete",
+  ) => string,
 ) {
   if (action === "buy") return t("markSelectedBought");
   if (action === "pin") return t("pinSelected");
   if (action === "move") return t("moveSelected");
   if (action === "urgent") return t("markSelectedUrgent");
+  if (action === "later") return t("laterAction");
   return t("delete");
 }
 
 function swipeActionHint(
   action: SwipeAction,
   t: (
-    key: "swipeBuyHint" | "swipePinHint" | "swipeMoveHint" | "swipeUrgentHint" | "swipeDeleteHint",
+    key:
+      | "swipeBuyHint"
+      | "swipePinHint"
+      | "swipeMoveHint"
+      | "swipeUrgentHint"
+      | "swipeLaterHint"
+      | "swipeDeleteHint",
   ) => string,
 ) {
   if (action === "buy") return t("swipeBuyHint");
   if (action === "pin") return t("swipePinHint");
   if (action === "move") return t("swipeMoveHint");
   if (action === "urgent") return t("swipeUrgentHint");
+  if (action === "later") return t("swipeLaterHint");
   return t("swipeDeleteHint");
 }
 
@@ -367,6 +383,7 @@ function SwipeActionGlyph({ action, color, size = 18 }: { action: SwipeAction; c
   if (action === "pin") return <MaterialCommunityIcons name="pin" size={size} color={color} />;
   if (action === "move") return <Ionicons name="swap-horizontal" size={size} color={color} />;
   if (action === "urgent") return <Ionicons name="flash" size={size} color={color} />;
+  if (action === "later") return <Ionicons name="hourglass-outline" size={size} color={color} />;
   return <Ionicons name="trash-outline" size={size} color={color} />;
 }
 
@@ -376,6 +393,7 @@ const SWIPE_ACTION_LABEL_DARK: Record<SwipeAction, string> = {
   pin: "#C4B5FD",
   move: "#93C5FD",
   urgent: "#FCD34D",
+  later: "#5EEAD4",
   delete: "#F07178",
 };
 
