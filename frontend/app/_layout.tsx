@@ -63,6 +63,7 @@ function ThemedNavigation() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="trip" />
         <Stack.Screen name="pins" options={{ animation: "fade" }} />
+        <Stack.Screen name="sets" options={{ animation: "fade" }} />
         {/* Going deeper slides in from the side; changing context fades. */}
         <Stack.Screen name="legal" options={deeper} />
         <Stack.Screen name="recap" options={deeper} />

@@ -47,6 +47,7 @@ import { isUnsavedItemId } from "@/features/items/api/items";
 import { replyShopAsk, type ShopAskReply } from "@/features/items/api/shop-asks";
 import { adoptShopAsk, dropShopAsk, useShopAsks } from "@/features/items/hooks/use-shop-asks";
 import { LaterSheet } from "@/features/items/components/later-sheet";
+import { SaveSetSheet } from "@/features/items/components/save-set-sheet";
 import { LaterShelf } from "@/features/items/components/later-shelf";
 import { formatLaterDay } from "@/features/items/utils/later-dates";
 import { SwipeableItem } from "@/features/items/components/swipeable-item";
@@ -171,6 +172,7 @@ export default function ItemsScreen() {
   const [laterIds, setLaterIds] = useState<string[] | null>(null);
   const [laterName, setLaterName] = useState<string | null>(null);
   const [laterOpen, setLaterOpen] = useState(false);
+  const [isSavingSet, setIsSavingSet] = useState(false);
   const [bringingBackId, setBringingBackId] = useState<string | null>(null);
   const itemsRef = useRef(needed);
   itemsRef.current = needed;
@@ -1297,6 +1299,10 @@ export default function ItemsScreen() {
       onUrgent={() => void markUrgentIds([...selectedIds])}
       onMove={() => askMove([...selectedIds])}
       onLater={() => askLater([...selectedIds])}
+      onSaveSet={() => {
+        setActionError(null);
+        setIsSavingSet(true);
+      }}
       onDelete={() => askDelete([...selectedIds])}
       allSelected={allSelected(
         shownItems.map((item) => item.id),
@@ -1335,6 +1341,7 @@ export default function ItemsScreen() {
               setIsAddingDetails(true);
             }}
             onPins={() => router.push("/pins")}
+            onSets={() => router.push("/sets")}
             shopCount={visibleItems.length}
             shopDisabled={shopDisabled}
             shopLockedByName={shopBlocked ? shopLock?.shopperName : null}
@@ -1481,6 +1488,21 @@ export default function ItemsScreen() {
         )}
       </View>
       </SwipeSlideContent>
+
+      <SaveSetSheet
+        visible={isSavingSet}
+        homeId={household?.id ?? null}
+        items={selectedItems}
+        onClose={() => setIsSavingSet(false)}
+        onSaved={(name) => {
+          setIsSavingSet(false);
+          setSelectedIds(new Set());
+          setIsConfirmingDelete(false);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setFloatTone("success");
+          setFloatMessage(t("setSaved", { name }));
+        }}
+      />
 
       <LaterSheet
         visible={laterIds !== null}

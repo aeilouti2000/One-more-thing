@@ -14,6 +14,7 @@ type ProfileSnapshot = {
   historyLists: Record<string, unknown[]>;
   categories: Record<string, unknown[]>;
   pins: Record<string, unknown[]>;
+  sets: Record<string, unknown[]>;
 };
 
 export type CachedHousehold = {
@@ -51,6 +52,7 @@ function emptySnapshot(): ProfileSnapshot {
     historyLists: {},
     categories: {},
     pins: {},
+    sets: {},
   };
 }
 
@@ -77,6 +79,8 @@ function readSnapshot(userId: string): ProfileSnapshot | null {
       categories:
         parsed.categories && typeof parsed.categories === "object" ? parsed.categories : {},
       pins: parsed.pins && typeof parsed.pins === "object" ? parsed.pins : {},
+      // Missing in a copy saved by an older version.
+      sets: parsed.sets && typeof parsed.sets === "object" ? parsed.sets : {},
     };
   } catch {
     return null;
@@ -179,6 +183,18 @@ export function readCachedPins<T>(homeId: string): T[] | null {
 export function writeCachedPins(homeId: string, pins: unknown[]) {
   updateSnapshot((snapshot) => {
     snapshot.pins[homeId] = pins;
+  });
+}
+
+export function readCachedSets<T>(homeId: string): T[] | null {
+  const userId = currentUserId();
+  const sets = userId ? readSnapshot(userId)?.sets[homeId] : undefined;
+  return Array.isArray(sets) ? (sets as T[]) : null;
+}
+
+export function writeCachedSets(homeId: string, sets: unknown[]) {
+  updateSnapshot((snapshot) => {
+    snapshot.sets[homeId] = sets;
   });
 }
 

@@ -65,6 +65,8 @@ type SelectionBarProps = {
   onMove: () => void;
   /** Park the selection on the Later shelf. */
   onLater: () => void;
+  /** Save the selection as a set. */
+  onSaveSet: () => void;
   onSelectAll: () => void;
   onSetCategory: (category: PurchaseCategory) => void;
   onSetUnit: (unit: string) => void;
@@ -106,6 +108,7 @@ export function SelectionBar({
   onDelete,
   onMove,
   onLater,
+  onSaveSet,
   onSelectAll,
   onSetCategory,
   onSetUnit,
@@ -209,6 +212,13 @@ export function SelectionBar({
       icon: <MaterialCommunityIcons name="scale-balance" size={19} color={ink} />,
       color: ink,
       onPress: () => setPicker("unit"),
+    },
+    {
+      key: "set",
+      label: t("saveAsSet"),
+      icon: <MaterialCommunityIcons name="card-multiple-outline" size={19} color={ink} />,
+      color: ink,
+      onPress: onSaveSet,
     },
     {
       key: "selectAll",

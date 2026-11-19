@@ -41,6 +41,9 @@ const MENU_IN_MS = 220;
 const MENU_OUT_MS = 180;
 /** Share of the timeline each pill is offset by (stagger). */
 const MENU_STAGGER = 0.25;
+/** Pills in the menu; each one's own slice must end by the time the menu is open. */
+const MENU_PILLS = 3;
+const MENU_SLICE = 1 - MENU_STAGGER * (MENU_PILLS - 1);
 
 /** Row with the arrow and the shop count chip beside it. */
 const ARROW_ROW_WIDTH = 104;
@@ -74,6 +77,7 @@ function writeHintSeen() {
 type Props = {
   onAdd: () => void;
   onPins: () => void;
+  onSets: () => void;
   shopCount: number;
   shopDisabled: boolean;
   shopLockedByName?: string | null;
@@ -164,6 +168,7 @@ export function ItemsFab(props: Props) {
 function ItemsFabCluster({
   onAdd,
   onPins,
+  onSets,
   shopCount,
   shopDisabled,
   shopLockedByName,
@@ -327,7 +332,7 @@ function ItemsFabCluster({
         <View pointerEvents={open ? "box-none" : "none"} style={styles.menu}>
           <MiniAction
             progress={menu}
-            index={1}
+            index={2}
             icon="cart"
             label={shopLabel}
             badge={shopLocked || shopCount === 0 ? null : shopCount}
@@ -337,10 +342,17 @@ function ItemsFabCluster({
           />
           <MiniAction
             progress={menu}
-            index={0}
+            index={1}
             icon="pin"
             label={t("pin")}
             onPress={() => run(onPins)}
+          />
+          <MiniAction
+            progress={menu}
+            index={0}
+            icon="card-multiple-outline"
+            label={t("setsTitle")}
+            onPress={() => run(onSets)}
           />
         </View>
       ) : null}
@@ -357,6 +369,7 @@ function ItemsFabCluster({
             <View style={styles.hintGhosts}>
               <GhostPill icon="cart" label={t("shop")} />
               <GhostPill icon="pin" label={t("pin")} />
+              <GhostPill icon="card-multiple-outline" label={t("setsTitle")} />
             </View>
           </Animated.View>
         </View>
@@ -501,7 +514,7 @@ function MiniAction({
   const pillStyle = useAnimatedStyle(() => {
     const local = interpolate(
       progress.value,
-      [start, start + (1 - MENU_STAGGER)],
+      [start, start + MENU_SLICE],
       [0, 1],
       Extrapolation.CLAMP,
     );
