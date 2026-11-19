@@ -43,6 +43,7 @@ export default function SettingsLayout() {
     "costs",
     "language",
     "appearance",
+    "app-icon",
   ];
 
   // Android: JS stack. With the native stack, Android's back gesture (forced

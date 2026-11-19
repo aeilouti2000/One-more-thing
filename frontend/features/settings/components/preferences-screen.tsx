@@ -9,6 +9,7 @@ import {
   type SwipeActionPrefs,
 } from "@/features/items/utils/swipe-actions";
 import { canUsePush, readPushEnabled } from "@/features/notifications/api/push";
+import { canChangeAppIcon, currentAppIcon } from "@/lib/app-icon";
 import {
   SettingsLinkCard,
   SettingsSection,
@@ -41,6 +42,9 @@ export default function PreferencesScreen() {
   }, [pathname]);
 
   const languageLabel = LOCALES.find((item) => item.id === locale)?.label ?? t("language");
+  const appIcon = currentAppIcon();
+  const appIconLabel =
+    appIcon === "system" ? t("themeSystem") : appIcon === "light" ? t("light") : t("dark");
   const themeLabel =
     preference === "system" ? t("themeSystem") : scheme === "dark" ? t("dark") : t("light");
 
@@ -88,6 +92,15 @@ export default function PreferencesScreen() {
           onPress={() => router.push("/settings/appearance" as Href)}
           colors={colors}
         />
+        {canChangeAppIcon() ? (
+          <SettingsLinkCard
+            icon="apps-outline"
+            title={t("appIcon")}
+            body={appIconLabel}
+            onPress={() => router.push("/settings/app-icon" as Href)}
+            colors={colors}
+          />
+        ) : null}
       </SettingsSection>
     </Screen>
   );

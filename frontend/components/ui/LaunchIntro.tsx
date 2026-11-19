@@ -47,7 +47,7 @@ const VIEW_BOX = `${50 - VIEW / 2} ${50 - VIEW / 2} ${VIEW} ${VIEW}`;
 const NAVY = "#071633";
 const SOFT_BLUE = "#8FAEE6";
 const WHITE = "#FFFFFF";
-const AMBER = "#FFB020";
+const EMERALD = "#21C47A";
 /** Outline traced before a shape fills in, about 1.4 dp on screen. */
 const OUTLINE = 0.7;
 const FILL_MS = 180;
@@ -94,11 +94,11 @@ const row = (cy: number, barWidth: number, color: string, at: number): Shape[] =
 const SHAPES: Shape[] = [
   ...row(26.5, 24, SOFT_BLUE, 50),
   ...row(45.5, 36, WHITE, 300),
-  { kind: "fill", d: pill(18, 58, 64, 22), color: AMBER, at: 1100 },
+  { kind: "fill", d: pill(18, 58, 64, 22), color: EMERALD, at: 1100 },
   {
     kind: "stroke",
     d: pill(18, 58, 64, 22),
-    color: AMBER,
+    color: EMERALD,
     width: OUTLINE,
     length: pillLength(64, 22),
     at: 650,

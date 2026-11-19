@@ -33,7 +33,8 @@ import { useTheme } from "@/providers/ThemeProvider";
  */
 
 const LIVE = "#5FD08A";
-const AMBER = "#FFB020";
+/** The brand colour of the OMT row in the app icon. */
+const EMERALD = "#21C47A";
 const PARTNER = "#E0A64A";
 const TRIP_BLUE = "#5AAEFF";
 
@@ -431,7 +432,7 @@ function SyncScene() {
               outlineStyle,
             ]}
           />
-          <View style={[styles.ring, { borderColor: AMBER }]} />
+          <View style={[styles.ring, { borderColor: EMERALD }]} />
           <View style={styles.typed}>
             <AppText
               numberOfLines={1}
@@ -714,7 +715,7 @@ function CostsScene() {
     <View style={styles.scene}>
       <SceneHeader
         icon="receipt-outline"
-        tint={AMBER}
+        tint={EMERALD}
         title={t("showcaseCostsTitle")}
         body={t("showcaseCostsBody")}
       />
@@ -763,7 +764,7 @@ function CostsScene() {
               ) : (
                 <AppText
                   className="text-sm"
-                  style={{ color: AMBER, fontWeight: "700" }}
+                  style={{ color: EMERALD, fontWeight: "700" }}
                 >
                   —
                 </AppText>
@@ -782,14 +783,14 @@ function CostsScene() {
           <Animated.View
             style={[
               styles.scan,
-              { backgroundColor: withAlpha(AMBER, 0.14) },
+              { backgroundColor: withAlpha(EMERALD, 0.14) },
               bumpStyle,
             ]}
           >
-            <Ionicons name="scan-outline" size={13} color={AMBER} />
+            <Ionicons name="scan-outline" size={13} color={EMERALD} />
             <AppText
               className="text-xs"
-              style={{ color: AMBER, fontWeight: "700" }}
+              style={{ color: EMERALD, fontWeight: "700" }}
             >
               {t("scanReceipt")}
             </AppText>

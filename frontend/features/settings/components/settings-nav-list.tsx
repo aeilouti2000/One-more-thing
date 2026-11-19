@@ -21,7 +21,7 @@ type NavId = "account" | "home-settings" | "preferences" | "permissions" | "abou
 const NAV_PAGES: Record<NavId, string[]> = {
   account: ["account"],
   "home-settings": ["home-settings", "categories", "pins", "costs", "trips", "home-alerts"],
-  preferences: ["preferences", "notifications", "swipe-actions", "language", "appearance"],
+  preferences: ["preferences", "notifications", "swipe-actions", "language", "appearance", "app-icon"],
   permissions: ["permissions"],
   about: ["about", "whats-new", "features"],
 };

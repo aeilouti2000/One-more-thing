@@ -17,7 +17,7 @@ export function ListsHeaderIcon() {
       <Image
         source={scheme === "dark" ? darkIcon : lightIcon}
         contentFit="contain"
-        style={{ width: 36, height: 36 }}
+        style={{ width: 46, height: 46 }}
       />
     </View>
   );

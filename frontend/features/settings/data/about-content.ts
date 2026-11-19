@@ -109,6 +109,13 @@ export const APP_FEATURES: AppFeatureGroup[] = [
       { id: "language", icon: "language-outline", title: "featureLanguageTitle", body: "featureLanguageBody" },
       { id: "look", icon: "moon-outline", title: "featureLookTitle", body: "featureLookBody" },
       {
+        id: "icon",
+        icon: "apps-outline",
+        title: "featureIconTitle",
+        body: "featureIconBody",
+        since: "2.10.0",
+      },
+      {
         id: "swipe",
         icon: "swap-horizontal-outline",
         title: "featureSwipeTitle",

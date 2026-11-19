@@ -10,7 +10,7 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), "../assets/images");
 const TMP = mkdtempSync(join(tmpdir(), "omt-icons-"));
 
 const NAVY = "#071633";
-const AMBER = "#FFB020";
+const EMERALD = "#21C47A";
 const WHITE = "#FFFFFF";
 const SOFT_BLUE = "#8FAEE6";
 const PAPER = "#F3F6FB";
@@ -25,8 +25,8 @@ const omt = (color) =>
   stroke("M45.4 73.6V64.4L50 71.3L54.6 64.4V73.6", color, 3.6) +
   stroke("M62.7 64.4H71.9M67.3 64.4V73.6", color, 3.6);
 
-/** The mark on a 100x100 canvas: two ticked rows, then the amber OMT row. */
-function glyph({ row1, row2, ink, letters = NAVY, amber = AMBER }) {
+/** The mark on a 100x100 canvas: two ticked rows, then the emerald OMT row. */
+function glyph({ row1, row2, ink, letters = NAVY, badge = EMERALD }) {
   return (
     `<circle cx="24.5" cy="26.5" r="6.5" fill="${row1}"/>` +
     tick(24.5, 26.5, ink) +
@@ -34,7 +34,7 @@ function glyph({ row1, row2, ink, letters = NAVY, amber = AMBER }) {
     `<circle cx="24.5" cy="45.5" r="6.5" fill="${row2}"/>` +
     tick(24.5, 45.5, ink) +
     pill(36, 39, 36, 13, row2) +
-    pill(18, 58, 64, 22, amber) +
+    pill(18, 58, 64, 22, badge) +
     omt(letters)
   );
 }
@@ -52,30 +52,41 @@ function monochromeGlyph() {
   return `<defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">${shapes}</mask></defs><rect width="100" height="100" fill="#fff" mask="url(#m)"/>`;
 }
 
-function svg({ body, background, scale = 1 }) {
-  const bg = background ? `<rect width="100" height="100" fill="${background}"/>` : "";
+function svg({ body, background, round = false, scale = 1 }) {
+  const bg = !background
+    ? ""
+    : round
+      ? `<circle cx="50" cy="50" r="50" fill="${background}"/>`
+      : `<rect width="100" height="100" fill="${background}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${bg}<g transform="translate(50 50) scale(${scale}) translate(-50 -50)">${body}</g></svg>`;
 }
 
 const dark = glyph({ row1: SOFT_BLUE, row2: WHITE, ink: NAVY });
 const light = glyph({ row1: SOFT_BLUE, row2: NAVY, ink: PAPER });
 // iOS tints this one itself, so it only needs greys on black.
-const tinted = glyph({ row1: "#8C8C8C", row2: "#FFFFFF", ink: "#000000", letters: "#000000", amber: "#D9D9D9" });
+const tinted = glyph({ row1: "#8C8C8C", row2: "#FFFFFF", ink: "#000000", letters: "#000000", badge: "#D9D9D9" });
 
 // Android crops adaptive icons to the middle of the canvas, and the system
 // splash crops to a circle, so those marks are drawn smaller than the tile.
 const ADAPTIVE = 0.7;
 const SPLASH = 0.86;
+// The header badge is a circle too, but small, so the mark fills more of it.
+const BADGE = 1.08;
 
 const files = [
   ["icon.png", 1024, { body: dark, background: NAVY }],
   ["ios-icon-light.png", 1024, { body: light, background: PAPER }],
   ["ios-icon-tinted.png", 1024, { body: tinted, background: "#000000" }],
   ["android-icon-foreground.png", 1024, { body: dark, scale: ADAPTIVE }],
+  // The "Light" alternate launcher icon (Preferences → App icon), on PAPER.
+  ["android-icon-foreground-light.png", 1024, { body: light, scale: ADAPTIVE }],
   ["android-icon-monochrome.png", 1024, { body: monochromeGlyph(), scale: ADAPTIVE }],
   ["splash-icon.png", 1024, { body: dark, background: NAVY, scale: SPLASH }],
   ["splash-glyph.png", 1024, { body: dark, scale: SPLASH }],
   ["favicon.png", 192, { body: dark, background: NAVY }],
+  // Round badge in the Lists screen header, one per app theme.
+  ["lists-header-dark.png", 128, { body: dark, background: NAVY, round: true, scale: BADGE }],
+  ["lists-header-light.png", 128, { body: light, background: PAPER, round: true, scale: BADGE }],
 ];
 
 for (const [name, size, options] of files) {

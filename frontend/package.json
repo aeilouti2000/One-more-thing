@@ -27,6 +27,7 @@
     "@react-navigation/native": "^7.1.8",
     "babel-preset-expo": "~58.0.0",
     "expo": "~58.0.25",
+    "expo-alternate-app-icons": "^11.0.0",
     "expo-blur": "~58.0.6",
     "expo-clipboard": "~58.0.4",
     "expo-constants": "~58.0.15",

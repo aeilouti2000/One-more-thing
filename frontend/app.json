@@ -79,7 +79,30 @@
       ],
       "@react-native-google-signin/google-signin",
       "expo-secure-store",
-      "./plugins/with-thin-text-cursor"
+      "./plugins/with-thin-text-cursor",
+      [
+        "expo-alternate-app-icons",
+        [
+          {
+            "name": "Light",
+            "ios": "./assets/images/ios-icon-light.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground-light.png",
+              "backgroundColor": "#F3F6FB",
+              "monochromeImage": "./assets/images/android-icon-monochrome.png"
+            }
+          },
+          {
+            "name": "Dark",
+            "ios": "./assets/images/icon.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground.png",
+              "backgroundColor": "#071633",
+              "monochromeImage": "./assets/images/android-icon-monochrome.png"
+            }
+          }
+        ]
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
