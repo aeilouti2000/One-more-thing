@@ -299,6 +299,9 @@ export class TypeormHomesRepository implements IHomesRepository {
       tripAutoEndHours: home.tripAutoEndHours ?? null,
       tripSummary: home.tripSummary !== false,
       tripShopTogether: home.tripShopTogether === true,
+      tripEstimate: home.tripEstimate !== false,
+      tripAskHome: home.tripAskHome !== false,
+      monthlyRecap: home.monthlyRecap !== false,
       members: rows.map((row) => ({
         id: row.id,
         role: row.role,

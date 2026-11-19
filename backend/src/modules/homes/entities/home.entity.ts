@@ -76,6 +76,18 @@ export class Home {
   @Column({ name: "trip_shop_together", type: "boolean", default: false })
   tripShopTogether: boolean;
 
+  /** Show the whole-trip estimate and what it leaves of the budget on a trip. */
+  @Column({ name: "trip_estimate", type: "boolean", default: true })
+  tripEstimate: boolean;
+
+  /** Offer "Anything missing?" on a trip, to ask the rest of the home. */
+  @Column({ name: "trip_ask_home", type: "boolean", default: true })
+  tripAskHome: boolean;
+
+  /** Show last month's recap in History at the start of a month. */
+  @Column({ name: "monthly_recap", type: "boolean", default: true })
+  monthlyRecap: boolean;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
 

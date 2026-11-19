@@ -73,6 +73,10 @@ export class UpdateCostSettingsDto {
   @Min(0.001)
   @Max(999_999_999)
   monthlyBudget?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  monthlyRecap?: boolean;
 }
 
 export class UpdateTripSettingsDto {
@@ -92,6 +96,14 @@ export class UpdateTripSettingsDto {
   @IsOptional()
   @IsBoolean()
   tripShopTogether?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  tripEstimate?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  tripAskHome?: boolean;
 }
 
 export class UpdateNotificationSettingsDto {

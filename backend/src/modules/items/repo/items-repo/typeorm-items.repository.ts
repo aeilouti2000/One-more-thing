@@ -3,7 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
 import { User } from "../../../../users/user.entity";
 import { Item } from "../../entities/item.entity";
-import { applyNeededOrder, placeNeededItem } from "../../utils/item-order";
+import { applyNeededOrder, placeNeededItem, placeNeededItems } from "../../utils/item-order";
 import { IItemsRepository, type ItemPatch, type NewItemInput } from "./items.repository";
 
 @Injectable()
@@ -63,12 +63,79 @@ export class TypeormItemsRepository implements IItemsRepository {
         cost,
         notFoundAt: null,
         notFoundBy: null,
+        laterAt: null,
+        laterUntil: null,
       })
       .where("id = :id", { id })
       .andWhere("home_id = :homeId", { homeId })
       .andWhere("status = :status", { status: "needed" })
       .execute();
     return result.affected ?? 0;
+  }
+
+  async setLater(ids: string[], homeId: string, at: Date | null, until: Date | null) {
+    if (ids.length === 0) return 0;
+    const result = await this.items.update(
+      { id: In(ids), homeId, status: "needed" },
+      { laterAt: at, laterUntil: at ? until : null },
+    );
+    return result.affected ?? 0;
+  }
+
+  async releaseDueLater(homeId?: string) {
+    const result: unknown = await this.items.query(
+      `UPDATE items
+          SET later_at = NULL, later_until = NULL
+        WHERE later_until IS NOT NULL
+          AND later_until <= now()
+          AND status = 'needed'
+          ${homeId ? "AND home_id = $1::uuid" : ""}
+        RETURNING id, home_id AS "homeId", list_id AS "listId", name`,
+      homeId ? [homeId] : [],
+    );
+    // node-postgres answers UPDATE … RETURNING as [rows, count].
+    const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result;
+    return (Array.isArray(rows) ? rows : []) as {
+      id: string;
+      homeId: string;
+      listId: string;
+      name: string;
+    }[];
+  }
+
+  async insertMany(inputs: NewItemInput[]) {
+    if (inputs.length === 0) return [];
+    const rows = inputs.map((input) => this.items.create(input));
+    // Saved together in one transaction; save() fills in ids and dates.
+    return this.items.save(rows);
+  }
+
+  placeNeededMany(homeId: string, itemIds: string[], listId: string) {
+    return placeNeededItems(this.items, homeId, itemIds, listId);
+  }
+
+  findLatestByName(homeId: string, name: string) {
+    return this.items
+      .createQueryBuilder("item")
+      .where("item.home_id = :homeId", { homeId })
+      .andWhere("lower(item.name) = lower(:name)", { name: name.trim() })
+      .orderBy("item.created_at", "DESC")
+      .limit(1)
+      .getOne();
+  }
+
+  async countAddedSince(homeId: string, listId: string, since: Date) {
+    const rows = await this.items
+      .createQueryBuilder("item")
+      .select("item.added_by", "userId")
+      .addSelect("count(*)", "count")
+      // The home narrows it to that home's rows; (list_id, created_at) is indexed.
+      .where("item.home_id = :homeId", { homeId })
+      .andWhere("item.list_id = :listId", { listId })
+      .andWhere("item.created_at >= :since", { since })
+      .groupBy("item.added_by")
+      .getRawMany<{ userId: string; count: string }>();
+    return rows.map((row) => ({ userId: row.userId, count: Number(row.count) }));
   }
 
   async setNotFound(id: string, homeId: string, userId: string | null, at: Date | null) {
@@ -109,7 +176,9 @@ export class TypeormItemsRepository implements IItemsRepository {
            bought_at = $${timeParam},
            cost = CASE id ${cases} ELSE cost END,
            not_found_at = NULL,
-           not_found_by = NULL
+           not_found_by = NULL,
+           later_at = NULL,
+           later_until = NULL
        WHERE home_id = $${homeParam}::uuid
          AND status = 'needed'
          AND id IN (${inList})`,

@@ -221,9 +221,14 @@ export class PinsService {
     // "Already on the list" is checked per list: the same name on another
     // list doesn't stop a pin from arriving on its own list.
     const needed = await this.items.findNeeded(homeId);
-    const onList = new Set(
-      needed.map((item) => `${item.listId}:${item.name.trim().toLowerCase()}`),
-    );
+    const onList = new Set<string>();
+    // Parked on the Later shelf: still wanted, but not on the list right now.
+    const parked = new Map<string, string>();
+    for (const item of needed) {
+      const key = `${item.listId}:${item.name.trim().toLowerCase()}`;
+      if (item.laterAt) parked.set(key, item.id);
+      else onList.add(key);
+    }
     const now = new Date();
     const arrived: { name: string; listId: string }[] = [];
 
@@ -240,6 +245,17 @@ export class PinsService {
       const listId = await targetList(pin.listId);
       const key = `${listId}:${pin.name.trim().toLowerCase()}`;
       if (onList.has(key)) continue;
+
+      // Its item is waiting on the Later shelf: the pin's day brings that one
+      // back instead of adding a second, so a parked item can't swallow its pin.
+      const parkedId = parked.get(key);
+      if (parkedId) {
+        await this.items.setLater([parkedId], homeId, null, null);
+        parked.delete(key);
+        onList.add(key);
+        arrived.push({ name: pin.name, listId });
+        continue;
+      }
 
       const created = await this.items.insert({
         homeId,

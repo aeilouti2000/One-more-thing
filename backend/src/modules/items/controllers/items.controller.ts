@@ -23,6 +23,7 @@ import {
   CreateTripReceiptDto,
   ClaimShopLockDto,
   ItemIdsDto,
+  LaterItemsDto,
   UndoBoughtDto,
   MarkBoughtDto,
   MarkBoughtItemsDto,
@@ -284,5 +285,17 @@ export class ItemsController {
   @Post("items/unit")
   setUnit(@CurrentUser() user: User, @Body() body: SetUnitItemsDto) {
     return this.items.setManyUnit(user.id, body.ids, body.unit);
+  }
+
+  /** Park items on the Later shelf, optionally until a day. */
+  @Post("items/later")
+  setLater(@CurrentUser() user: User, @Body() body: LaterItemsDto) {
+    return this.items.setManyLater(user.id, body.ids, body.until ? new Date(body.until) : null);
+  }
+
+  /** Bring parked items back to the list now. */
+  @Post("items/later/clear")
+  clearLater(@CurrentUser() user: User, @Body() body: ItemIdsDto) {
+    return this.items.clearManyLater(user.id, body.ids);
   }
 }

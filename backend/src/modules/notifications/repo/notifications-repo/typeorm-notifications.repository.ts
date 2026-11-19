@@ -47,7 +47,9 @@ export class TypeormNotificationsRepository implements INotificationsRepository 
       .addSelect("token.locale", "locale")
       .addSelect("person.notifyAdded", "added")
       .addSelect("person.notifyUrgent", "urgent")
-      .addSelect("person.notifyDue", "due");
+      .addSelect("person.notifyDue", "due")
+      .addSelect("person.notifyShopping", "shopping")
+      .addSelect("person.notifyLater", "later");
     if (actorId) query.andWhere("token.userId != :actorId", { actorId });
     return query.getRawMany<Recipient>();
   }
@@ -55,12 +57,21 @@ export class TypeormNotificationsRepository implements INotificationsRepository 
   async getPrefs(userId: string): Promise<NotificationPrefs> {
     const user = await this.users.findOne({
       where: { id: userId },
-      select: { id: true, notifyAdded: true, notifyUrgent: true, notifyDue: true },
+      select: {
+        id: true,
+        notifyAdded: true,
+        notifyUrgent: true,
+        notifyDue: true,
+        notifyShopping: true,
+        notifyLater: true,
+      },
     });
     return {
       added: user?.notifyAdded !== false,
       urgent: user?.notifyUrgent !== false,
       due: user?.notifyDue !== false,
+      shopping: user?.notifyShopping !== false,
+      later: user?.notifyLater !== false,
     };
   }
 
@@ -69,6 +80,8 @@ export class TypeormNotificationsRepository implements INotificationsRepository 
     if (typeof patch.added === "boolean") update.notifyAdded = patch.added;
     if (typeof patch.urgent === "boolean") update.notifyUrgent = patch.urgent;
     if (typeof patch.due === "boolean") update.notifyDue = patch.due;
+    if (typeof patch.shopping === "boolean") update.notifyShopping = patch.shopping;
+    if (typeof patch.later === "boolean") update.notifyLater = patch.later;
     if (Object.keys(update).length > 0) await this.users.update(userId, update);
     return this.getPrefs(userId);
   }

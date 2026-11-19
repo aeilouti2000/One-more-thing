@@ -24,6 +24,9 @@ export type Household = {
   tripAutoEndHours: number | null;
   tripSummary: boolean;
   tripShopTogether: boolean;
+  tripEstimate: boolean;
+  tripAskHome: boolean;
+  monthlyRecap: boolean;
   members: HouseholdMember[];
 };
 

@@ -5,18 +5,20 @@ import { DomainError } from "../../../common/domain.error";
 import { tokensMatch } from "../../../common/crypto";
 import type { AppConfig } from "../../../config/env";
 import { NotificationsService } from "../../notifications/services/notifications.service";
+import { ItemsService } from "../services/items.service";
 import { PinsService } from "../services/pins.service";
 
 /**
  * Called by an outside scheduler (GitHub Actions, see .github/workflows/pins-tick.yml).
  * On Render's free plan the server sleeps when idle, which stops the in-process
- * timer; this request wakes it and adds every due pin right away.
+ * timer; this request wakes it and adds every due pin (and returns every due Later item) right away.
  */
 @SkipThrottle()
 @Controller("internal")
 export class PinsCronController {
   constructor(
     private readonly pins: PinsService,
+    private readonly items: ItemsService,
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService<AppConfig, true>,
   ) {}
@@ -28,9 +30,14 @@ export class PinsCronController {
     if (!expected || !secret || !tokensMatch(secret, expected)) {
       throw new DomainError("NOT_FOUND", "Not found", HttpStatus.NOT_FOUND);
     }
-    await this.pins.materializeDueHomes();
-    // Send the "back on the list" notices before the server can fall asleep again.
-    await this.notifications.flushPending();
+    try {
+      await this.pins.materializeDueHomes();
+      await this.items.releaseDueLater();
+    } finally {
+      // Send the "back on the list" notices before the server can fall asleep
+      // again, also for whatever was added before something failed.
+      await this.notifications.flushPending();
+    }
     return { ok: true };
   }
 }

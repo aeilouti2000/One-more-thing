@@ -25,6 +25,7 @@ import { TripsTogether1740000000020 } from "./database/migrations/1740000000020-
 import { OncePinsInterval1740000000021 } from "./database/migrations/1740000000021-OncePinsInterval";
 import { RotateRefreshTokens1740000000022 } from "./database/migrations/1740000000022-RotateRefreshTokens";
 import { MemberAndListIndexes1740000000023 } from "./database/migrations/1740000000023-MemberAndListIndexes";
+import { LaterAsksSets1740000000024 } from "./database/migrations/1740000000024-LaterAsksSets";
 import { EmailCode } from "./modules/auth/entities/email-code.entity";
 import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
 import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
@@ -41,6 +42,8 @@ import { HomesModule } from "./modules/homes/homes.module";
 import { CustomCategory } from "./modules/items/entities/custom-category.entity";
 import { HiddenCategory } from "./modules/items/entities/hidden-category.entity";
 import { Item } from "./modules/items/entities/item.entity";
+import { ItemSet } from "./modules/items/entities/item-set.entity";
+import { ShopAsk } from "./modules/items/entities/shop-ask.entity";
 import { ListShopLock } from "./modules/items/entities/list-shop-lock.entity";
 import { Pin } from "./modules/items/entities/pin.entity";
 import { ShoppingList } from "./modules/items/entities/shopping-list.entity";
@@ -83,6 +86,8 @@ import { User } from "./users/user.entity";
             TripReceipt,
             ItemImage,
             EmailCode,
+            ShopAsk,
+            ItemSet,
           ],
           migrations: [
             Init1740000000000,
@@ -109,6 +114,7 @@ import { User } from "./users/user.entity";
             OncePinsInterval1740000000021,
             RotateRefreshTokens1740000000022,
             MemberAndListIndexes1740000000023,
+            LaterAsksSets1740000000024,
           ],
           migrationsRun: true,
         };

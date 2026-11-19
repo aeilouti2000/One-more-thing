@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { ItemsService } from "./items.service";
 import { PinsService } from "./pins.service";
 
 const DUE_CHECK_MS = 60_000;
@@ -9,7 +10,10 @@ export class PinsScheduler implements OnModuleInit, OnModuleDestroy {
   private timer: ReturnType<typeof setInterval> | null = null;
   private running = false;
 
-  constructor(private readonly pins: PinsService) {}
+  constructor(
+    private readonly pins: PinsService,
+    private readonly items: ItemsService,
+  ) {}
 
   onModuleInit() {
     void this.tick();
@@ -28,6 +32,14 @@ export class PinsScheduler implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.warn(
         `Could not add due pins: ${error instanceof Error ? error.message : "unknown"}`,
+      );
+    }
+    // Parked items whose day has come return on the same beat.
+    try {
+      await this.items.releaseDueLater();
+    } catch (error) {
+      this.logger.warn(
+        `Could not return Later items: ${error instanceof Error ? error.message : "unknown"}`,
       );
     } finally {
       this.running = false;

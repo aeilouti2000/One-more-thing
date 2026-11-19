@@ -3,6 +3,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsNumber,
@@ -343,4 +344,93 @@ export class CreateListDto {
   @MinLength(1)
   @MaxLength(80)
   name: string;
+}
+
+export class LaterItemsDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_BULK_ITEMS)
+  @IsUUID("all", { each: true })
+  ids: string[];
+
+  /** The moment the items return by themselves; null = only by hand. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsDateString()
+  until?: string | null;
+}
+
+export class ShopAskReplyDto {
+  @IsIn(["nothing", "done"])
+  reply: "nothing" | "done";
+}
+
+export class ShopAskItemDto {
+  @Trim()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  name: string;
+}
+
+export class SetItemDto {
+  @Trim()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  name: string;
+
+  @IsNumber()
+  @Min(1)
+  @Max(9999)
+  quantity: number;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(40)
+  unit?: string | null;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  category: ItemCategory;
+}
+
+export class CreateSetDto {
+  @Trim()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(60)
+  name: string;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => SetItemDto)
+  items: SetItemDto[];
+}
+
+export class UpdateSetDto {
+  @IsOptional()
+  @Trim()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(60)
+  name?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => SetItemDto)
+  items?: SetItemDto[];
+}
+
+export class AddSetDto {
+  @IsOptional()
+  @IsUUID()
+  listId?: string;
 }

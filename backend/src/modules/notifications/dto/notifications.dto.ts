@@ -37,4 +37,12 @@ export class NotificationPrefsDto {
   @IsOptional()
   @IsBoolean()
   due?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  shopping?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  later?: boolean;
 }

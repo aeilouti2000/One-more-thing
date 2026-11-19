@@ -1,7 +1,15 @@
 import type { PushToken } from "../../entities/push-token.entity";
 
 /** Which kinds of list notification a person wants. */
-export type NotificationPrefs = { added: boolean; urgent: boolean; due: boolean };
+export type NotificationPrefs = {
+  added: boolean;
+  urgent: boolean;
+  due: boolean;
+  /** Someone at the shop asks the home if anything is missing. */
+  shopping: boolean;
+  /** An item parked for later is back on the list. */
+  later: boolean;
+};
 
 /** A phone to notify. Missing choices count as "wanted". */
 export type Recipient = { token: string; locale: string } & Partial<NotificationPrefs>;

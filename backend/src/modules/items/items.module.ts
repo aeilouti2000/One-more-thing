@@ -7,9 +7,13 @@ import { ItemImagesController } from "./controllers/item-images.controller";
 import { ItemsController } from "./controllers/items.controller";
 import { PinsController } from "./controllers/pins.controller";
 import { PinsCronController } from "./controllers/pins-cron.controller";
+import { SetsController } from "./controllers/sets.controller";
+import { ShopAsksController } from "./controllers/shop-asks.controller";
 import { CustomCategory } from "./entities/custom-category.entity";
 import { HiddenCategory } from "./entities/hidden-category.entity";
 import { Item } from "./entities/item.entity";
+import { ItemSet } from "./entities/item-set.entity";
+import { ShopAsk } from "./entities/shop-ask.entity";
 import { ItemImage } from "./entities/item-image.entity";
 import { ListShopLock } from "./entities/list-shop-lock.entity";
 import { Pin } from "./entities/pin.entity";
@@ -28,6 +32,8 @@ import { ItemImagesService } from "./services/item-images.service";
 import { ItemsService } from "./services/items.service";
 import { PinsScheduler } from "./services/pins.scheduler";
 import { PinsService } from "./services/pins.service";
+import { SetsService } from "./services/sets.service";
+import { ShopAsksService } from "./services/shop-asks.service";
 import { ShopLocksService } from "./services/shop-locks.service";
 
 @Module({
@@ -42,11 +48,20 @@ import { ShopLocksService } from "./services/shop-locks.service";
       HiddenCategory,
       TripReceipt,
       ItemImage,
+      ShopAsk,
+      ItemSet,
     ]),
     HomesModule,
     NotificationsModule,
   ],
-  controllers: [ItemsController, ItemImagesController, PinsController, PinsCronController],
+  controllers: [
+    ItemsController,
+    ItemImagesController,
+    PinsController,
+    PinsCronController,
+    ShopAsksController,
+    SetsController,
+  ],
   providers: [
     ItemsService,
     ItemImagesService,
@@ -54,6 +69,8 @@ import { ShopLocksService } from "./services/shop-locks.service";
     PinsScheduler,
     CategoriesService,
     ShopLocksService,
+    ShopAsksService,
+    SetsService,
     { provide: ITEMS_REPOSITORY, useClass: TypeormItemsRepository },
     { provide: LISTS_REPOSITORY, useClass: TypeormListsRepository },
     { provide: PINS_REPOSITORY, useClass: TypeormPinsRepository },

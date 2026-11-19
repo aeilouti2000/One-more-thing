@@ -79,6 +79,7 @@ export class HomesService {
       askCostOnTripEnd?: boolean;
       tripCostMode?: TripCostMode;
       monthlyBudget?: number | null;
+      monthlyRecap?: boolean;
     },
   ) {
     const membership = await this.requireMembership(userId, homeId);
@@ -104,6 +105,8 @@ export class HomesService {
       patch.monthlyBudget = input.monthlyBudget;
     }
 
+    if (typeof input.monthlyRecap === "boolean") patch.monthlyRecap = input.monthlyRecap;
+
     if (Object.keys(patch).length > 0) {
       await this.homes.updateHome(homeId, patch);
     }
@@ -118,6 +121,8 @@ export class HomesService {
       tripAutoEndHours?: number | null;
       tripSummary?: boolean;
       tripShopTogether?: boolean;
+      tripEstimate?: boolean;
+      tripAskHome?: boolean;
     },
   ) {
     const membership = await this.requireMembership(userId, homeId);
@@ -137,6 +142,8 @@ export class HomesService {
     if (typeof input.tripShopTogether === "boolean") {
       patch.tripShopTogether = input.tripShopTogether;
     }
+    if (typeof input.tripEstimate === "boolean") patch.tripEstimate = input.tripEstimate;
+    if (typeof input.tripAskHome === "boolean") patch.tripAskHome = input.tripAskHome;
     if (Object.keys(patch).length > 0) await this.homes.updateHome(homeId, patch);
     return this.homes.loadHome(homeId);
   }

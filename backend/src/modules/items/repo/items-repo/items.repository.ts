@@ -48,6 +48,29 @@ export interface IItemsRepository {
   ): Promise<number>;
   /** Sets or clears the "not found" mark on a needed item. Returns rows changed. */
   setNotFound(id: string, homeId: string, userId: string | null, at: Date | null): Promise<number>;
+  /**
+   * Parks needed items on the Later shelf (at + until), or brings them back
+   * (at: null). Returns rows changed.
+   */
+  setLater(ids: string[], homeId: string, at: Date | null, until: Date | null): Promise<number>;
+  /**
+   * Brings back every parked item whose day has come, in one statement, so two
+   * servers (or the timer and a request) never release the same item twice.
+   * With a homeId only that home is checked.
+   */
+  releaseDueLater(homeId?: string): Promise<{ id: string; homeId: string; listId: string; name: string }[]>;
+  /** Several new needed items in one statement, in the order given. */
+  insertMany(inputs: NewItemInput[]): Promise<Item[]>;
+  /** Puts these needed items, in this order, right after the list's urgent ones. */
+  placeNeededMany(homeId: string, itemIds: string[], listId: string): Promise<void>;
+  /** The newest item with this name in the home, any status (case-insensitive). */
+  findLatestByName(homeId: string, name: string): Promise<Item | null>;
+  /** How many items each person added to a list of the home since a moment. */
+  countAddedSince(
+    homeId: string,
+    listId: string,
+    since: Date,
+  ): Promise<{ userId: string; count: number }[]>;
   deleteInHome(ids: string[], homeId: string): Promise<void>;
   findNeededByIds(ids: string[], homeId: string): Promise<Item[]>;
   deleteNeededOnList(homeId: string, listId: string): Promise<void>;

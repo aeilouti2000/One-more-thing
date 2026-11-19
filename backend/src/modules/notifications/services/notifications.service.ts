@@ -18,7 +18,25 @@ const SEND_CHUNK = 100;
 const RECEIPT_CHUNK = 300;
 const MAX_GROUP_ITEMS = 50;
 
-export type NoticeKind = "added" | "urgent" | "due";
+export type NoticeKind = "added" | "urgent" | "due" | "later";
+
+/**
+ * The notification category the app registers for "Anything missing?": it puts
+ * the two answers (type an item, or "Nothing, thanks") on the notification.
+ * Expo allows neither ":" nor "-" in a category id.
+ */
+export const SHOP_ASK_CATEGORY = "shopAsk";
+
+type PushMessage = {
+  to: string;
+  title: string;
+  body: string;
+  sound: "default";
+  priority: "high";
+  channelId: string;
+  categoryId?: string;
+  data: Record<string, unknown>;
+};
 
 export type NoticeItem = { name: string; urgent: boolean; listId: string | null };
 
@@ -154,6 +172,67 @@ export class NotificationsService implements OnModuleDestroy {
     });
   }
 
+  /** A parked item's day has come: it is back on its list. */
+  notifyLaterBack(input: { homeId: string; itemName: string; listId?: string | null }) {
+    this.enqueue(input.homeId, undefined, "", "later", {
+      name: input.itemName,
+      urgent: false,
+      listId: input.listId ?? null,
+    });
+  }
+
+  /**
+   * A shopper asks the rest of the home if anything is missing. Sent at once
+   * (the shopper is standing in the shop) and without holding up the request.
+   */
+  notifyShopAsk(input: {
+    homeId: string;
+    actorId: string;
+    actorName: string;
+    listId: string;
+    askId: string;
+  }) {
+    const task = this.sendShopAsk(input).finally(() => this.inFlight.delete(task));
+    this.inFlight.add(task);
+  }
+
+  private async sendShopAsk(input: {
+    homeId: string;
+    actorId: string;
+    actorName: string;
+    listId: string;
+    askId: string;
+  }) {
+    try {
+      const recipients = await this.tokens.findRecipients(input.homeId, input.actorId);
+      const messages: PushMessage[] = recipients
+        .filter((recipient) => recipient.shopping !== false)
+        .map((recipient) => {
+          const copy = shopAskCopy(recipient.locale, input.actorName);
+          return {
+            to: recipient.token,
+            title: copy.title,
+            body: copy.body,
+            sound: "default",
+            priority: "high",
+            channelId: "list-updates",
+            categoryId: SHOP_ASK_CATEGORY,
+            data: {
+              type: "shop_ask",
+              homeId: input.homeId,
+              listId: input.listId,
+              askId: input.askId,
+            },
+          };
+        });
+      await this.deliver(messages);
+    } catch (error) {
+      this.logger.warn(
+        `Could not send shop question: ${error instanceof Error ? error.message : "unknown"}`,
+      );
+    }
+  }
+
   /** Sends everything queued now (shutdown, tests) and waits for it. */
   async flushPending() {
     for (const key of [...this.pending.keys()]) this.flush(key);
@@ -207,7 +286,7 @@ export class NotificationsService implements OnModuleDestroy {
       const type =
         group.kind === "added" && anyUrgent && group.items.length === 1 ? "added_urgent" : group.kind;
 
-      const messages = recipients.flatMap((recipient) => {
+      const messages = recipients.flatMap((recipient): PushMessage[] => {
         // Each person only hears about the kinds of change they asked for.
         const items = wantedItems(recipient, group.kind, group.items);
         if (items.length === 0) return [];
@@ -224,46 +303,51 @@ export class NotificationsService implements OnModuleDestroy {
           },
         ];
       });
-      if (messages.length === 0) return;
-
-      const sent: { id: string; token: string }[] = [];
-      const expired: string[] = [];
-
-      const batches: (typeof messages)[] = [];
-      for (let index = 0; index < messages.length; index += SEND_CHUNK) {
-        batches.push(messages.slice(index, index + SEND_CHUNK));
-      }
-
-      while (batches.length > 0) {
-        const chunk = batches.shift()!;
-        const result = await this.post<{ data?: ExpoTicket[] }>(EXPO_PUSH_URL, chunk);
-        if (!result.ok) {
-          // Tokens from different Expo projects (an old dev or Expo Go install
-          // next to the real app) can't share one request: Expo rejects all of
-          // them. Send each project's tokens on its own.
-          const split = splitByProject(result.errors, chunk);
-          if (split) batches.push(...split);
-          continue;
-        }
-
-        (result.data.data ?? []).forEach((ticket, ticketIndex) => {
-          const token = chunk[ticketIndex]?.to;
-          if (!token) return;
-          if (ticket.status === "ok" && ticket.id) sent.push({ id: ticket.id, token });
-          if (ticket.status === "error") {
-            if (ticket.details?.error === "DeviceNotRegistered") expired.push(token);
-            else this.logger.warn(`Push ticket error: ${ticket.details?.error ?? "unknown"}`);
-          }
-        });
-      }
-
-      if (expired.length > 0) await this.tokens.deleteTokens(expired);
-      if (sent.length > 0) this.scheduleReceiptCheck(sent);
+      await this.deliver(messages);
     } catch (error) {
       this.logger.warn(
         `Could not send list notification: ${error instanceof Error ? error.message : "unknown"}`,
       );
     }
+  }
+
+  /** Hands messages to Expo in batches and drops tokens Expo says are gone. */
+  private async deliver(messages: PushMessage[]) {
+    if (messages.length === 0) return;
+
+    const sent: { id: string; token: string }[] = [];
+    const expired: string[] = [];
+
+    const batches: PushMessage[][] = [];
+    for (let index = 0; index < messages.length; index += SEND_CHUNK) {
+      batches.push(messages.slice(index, index + SEND_CHUNK));
+    }
+
+    while (batches.length > 0) {
+      const chunk = batches.shift()!;
+      const result = await this.post<{ data?: ExpoTicket[] }>(EXPO_PUSH_URL, chunk);
+      if (!result.ok) {
+        // Tokens from different Expo projects (an old dev or Expo Go install
+        // next to the real app) can't share one request: Expo rejects all of
+        // them. Send each project's tokens on its own.
+        const split = splitByProject(result.errors, chunk);
+        if (split) batches.push(...split);
+        continue;
+      }
+
+      (result.data.data ?? []).forEach((ticket, ticketIndex) => {
+        const token = chunk[ticketIndex]?.to;
+        if (!token) return;
+        if (ticket.status === "ok" && ticket.id) sent.push({ id: ticket.id, token });
+        if (ticket.status === "error") {
+          if (ticket.details?.error === "DeviceNotRegistered") expired.push(token);
+          else this.logger.warn(`Push ticket error: ${ticket.details?.error ?? "unknown"}`);
+        }
+      });
+    }
+
+    if (expired.length > 0) await this.tokens.deleteTokens(expired);
+    if (sent.length > 0) this.scheduleReceiptCheck(sent);
   }
 
   private scheduleReceiptCheck(sent: { id: string; token: string }[]) {
@@ -355,6 +439,7 @@ export function wantedItems<T extends { urgent: boolean }>(
   const added = recipient.added !== false;
   const urgent = recipient.urgent !== false;
   if (kind === "due") return recipient.due !== false ? items : [];
+  if (kind === "later") return recipient.later !== false ? items : [];
   if (kind === "urgent") return urgent ? items : [];
   if (added) return items;
   return urgent ? items.filter((item) => item.urgent) : [];
@@ -392,6 +477,9 @@ export function noticeCopy(
     if (count > 1) {
       const list = nameList("ar", names);
       if (kind === "due") return { title: "عادت إلى القائمة", body: `حان موعد ${arabicItems(count)}: ${list}` };
+      if (kind === "later") {
+        return { title: "عادت إلى القائمة", body: `عادت ${arabicItems(count)} من «لاحقاً»: ${list}` };
+      }
       if (kind === "urgent") {
         return { title: "عناصر عاجلة", body: `${actor} علّم ${arabicItems(count)} عاجلة: ${list}` };
       }
@@ -401,6 +489,7 @@ export function noticeCopy(
       };
     }
     if (kind === "due") return { title: "عاد إلى القائمة", body: `حان موعد ${item}` };
+    if (kind === "later") return { title: "عاد إلى القائمة", body: `عاد ${item} من «لاحقاً»` };
     if (kind === "urgent") return { title: "عنصر عاجل", body: `${actor} علّم ${item} عاجلاً` };
     if (anyUrgent) return { title: "عنصر عاجل", body: `${actor} أضاف ${item} وعلّمه عاجلاً` };
     return { title: "عنصر جديد", body: `${actor} أضاف ${item}` };
@@ -409,6 +498,9 @@ export function noticeCopy(
   if (count > 1) {
     const list = nameList("en", names);
     if (kind === "due") return { title: "Back on the list", body: `${count} items are due: ${list}` };
+    if (kind === "later") {
+      return { title: "Back on the list", body: `${count} items are back from Later: ${list}` };
+    }
     if (kind === "urgent") {
       return { title: "Urgent items", body: `${actor} marked ${count} items urgent: ${list}` };
     }
@@ -418,7 +510,23 @@ export function noticeCopy(
     };
   }
   if (kind === "due") return { title: "Back on the list", body: `${item} is due` };
+  if (kind === "later") return { title: "Back on the list", body: `${item} is back from Later` };
   if (kind === "urgent") return { title: "Urgent item", body: `${actor} marked ${item} urgent` };
   if (anyUrgent) return { title: "Urgent item", body: `${actor} added ${item} and marked it urgent` };
   return { title: "New item", body: `${actor} added ${item}` };
+}
+
+/** "Anything missing?" from someone at the shop, in the reader's language. */
+export function shopAskCopy(locale: string, actorName: string) {
+  const name = actorName.trim();
+  if (locale === "ar") {
+    return {
+      title: name ? `${name} في المتجر الآن` : "أحد أفراد المنزل في المتجر الآن",
+      body: "هل ينقصك شيء؟ أضفه قبل الدفع.",
+    };
+  }
+  return {
+    title: name ? `${name} is at the shop` : "Someone is at the shop",
+    body: "Need anything? Add it before they pay.",
+  };
 }

@@ -43,7 +43,20 @@ export type ItemView = {
   notFoundAt: Date | null;
   notFoundBy: string | null;
   notFoundByName: string | null;
+  /** On the Later shelf since this moment; null = on the list. */
+  laterAt: Date | null;
+  /** When it returns by itself; null with laterAt = only by hand. */
+  laterUntil: Date | null;
 };
+
+/**
+ * A list being read returns its home's due Later items at most this often. The
+ * timer does it every minute anyway; this only covers a server that just woke.
+ */
+const RELEASE_ON_READ_GAP_MS = 60_000;
+
+/** The furthest ahead an item can be parked. */
+const MAX_LATER_MS = 366 * 24 * 60 * 60_000;
 
 @Injectable()
 export class ItemsService {
@@ -58,10 +71,20 @@ export class ItemsService {
     @InjectRepository(Item) private readonly itemRows: Repository<Item>,
   ) {}
 
+  /** When each home's due Later items were last returned by a read. */
+  private readonly releasedOnReadAt = new Map<string, number>();
+
   async list(userId: string, homeId: string) {
     await this.homes.requireMembership(userId, homeId);
     // Due pins are a bonus here (the timer adds them too): never fail the read.
     await this.pins.materializeDue(homeId).catch(() => undefined);
+    // The same for parked items whose day has come. A trip reads the list every
+    // few seconds, so this write runs once a minute per home, not per read.
+    const now = Date.now();
+    if (now - (this.releasedOnReadAt.get(homeId) ?? 0) >= RELEASE_ON_READ_GAP_MS) {
+      this.releasedOnReadAt.set(homeId, now);
+      await this.releaseDueLater(homeId).catch(() => undefined);
+    }
     const rows = await this.items.findByHome(homeId);
     return this.withNames(rows);
   }
@@ -604,6 +627,58 @@ export class ItemsService {
     return { updated: rows.length };
   }
 
+  /**
+   * Parks items on the Later shelf. `until` is the day they return by
+   * themselves; null keeps them there until someone brings them back.
+   */
+  async setManyLater(userId: string, ids: string[], until: Date | null) {
+    const rows = await this.neededInOneHome(userId, ids);
+    const now = new Date();
+    if (until && (until.getTime() <= now.getTime() || until.getTime() - now.getTime() > MAX_LATER_MS)) {
+      throw new DomainError(
+        "INVALID_LATER_DATE",
+        "Pick a day within the next year.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    await this.items.setLater(
+      rows.map((item) => item.id),
+      rows[0].homeId,
+      now,
+      until,
+    );
+    return { updated: rows.length, laterAt: now, laterUntil: until };
+  }
+
+  /** Brings parked items back to the list now. */
+  async clearManyLater(userId: string, ids: string[]) {
+    const rows = await this.neededInOneHome(userId, ids);
+    await this.items.setLater(
+      rows.map((item) => item.id),
+      rows[0].homeId,
+      null,
+      null,
+    );
+    return { updated: rows.length };
+  }
+
+  /**
+   * Returns parked items whose day has come to their lists and tells the home.
+   * With a homeId only that home is checked (a list being opened).
+   */
+  async releaseDueLater(homeId?: string) {
+    const released = await this.items.releaseDueLater(homeId);
+    // Queued together, so several returning items arrive as one notification.
+    for (const item of released) {
+      this.notifications.notifyLaterBack({
+        homeId: item.homeId,
+        itemName: item.name,
+        listId: item.listId,
+      });
+    }
+    return released.length;
+  }
+
   /** The still-needed items behind these ids; every id must be one, in the caller's home. */
   private async neededInOneHome(userId: string, ids: string[]) {
     const uniqueIds = [...new Set(ids)];
@@ -763,7 +838,8 @@ export class ItemsService {
     return homeId;
   }
 
-  private async withNames(rows: Item[]): Promise<ItemView[]> {
+  /** Rows as the app sees them (names of people, lists and invoices filled in). */
+  async withNames(rows: Item[]): Promise<ItemView[]> {
     const ids = [
       ...new Set(
         rows.flatMap((row) =>
@@ -809,6 +885,8 @@ export class ItemsService {
       notFoundBy: row.status === "needed" ? (row.notFoundBy ?? null) : null,
       notFoundByName:
         row.status === "needed" && row.notFoundBy ? (names.get(row.notFoundBy) ?? "Member") : null,
+      laterAt: row.status === "needed" ? (row.laterAt ?? null) : null,
+      laterUntil: row.status === "needed" && row.laterAt ? (row.laterUntil ?? null) : null,
     }));
   }
 }

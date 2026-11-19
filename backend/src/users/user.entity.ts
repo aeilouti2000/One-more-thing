@@ -47,6 +47,14 @@ export class User {
   @Column({ name: "notify_due", type: "boolean", default: true })
   notifyDue: boolean;
 
+  /** Someone at the shop asks the home if anything is missing. */
+  @Column({ name: "notify_shopping", type: "boolean", default: true })
+  notifyShopping: boolean;
+
+  /** An item parked for later is back on the list. */
+  @Column({ name: "notify_later", type: "boolean", default: true })
+  notifyLater: boolean;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
 

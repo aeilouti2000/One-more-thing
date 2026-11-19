@@ -127,6 +127,17 @@ export class Item {
   @Column({ name: "not_found_by", type: "uuid", nullable: true })
   notFoundBy: string | null;
 
+  /**
+   * On the Later shelf since this moment: still needed, but off the list (not
+   * counted, not shopped) until it is brought back. Null = on the list.
+   */
+  @Column({ name: "later_at", type: "timestamptz", nullable: true })
+  laterAt: Date | null;
+
+  /** When a parked item returns by itself; null = only when someone brings it back. */
+  @Column({ name: "later_until", type: "timestamptz", nullable: true })
+  laterUntil: Date | null;
+
   /** Current photo (item_images row). A new id on every replace. */
   @Column({ name: "image_id", type: "uuid", nullable: true })
   imageId: string | null;

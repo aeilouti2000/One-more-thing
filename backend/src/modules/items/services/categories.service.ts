@@ -101,4 +101,29 @@ export class CategoriesService {
     }
     throw new DomainError("CATEGORY_NOT_FOUND", "That category was not found.", HttpStatus.BAD_REQUEST);
   }
+
+  /**
+   * A category the home can use right now: the wanted one when it still
+   * exists, else "Other", else the home's first category. For items that are
+   * created from a remembered category (a set, a typed name).
+   */
+  async usableOr(homeId: string, wanted: string | null | undefined): Promise<string> {
+    return (await this.usableResolver(homeId))(wanted);
+  }
+
+  /** The same answer for many categories from one look at the home's categories. */
+  async usableResolver(homeId: string): Promise<(wanted: string | null | undefined) => string> {
+    const [hiddenRows, customRows] = await Promise.all([
+      this.categories.findHidden(homeId),
+      this.categories.findCustom(homeId),
+    ]);
+    const hidden = new Set(hiddenRows.map((row) => row.categoryId));
+    const usable = [
+      ...ITEM_CATEGORIES.filter((id) => !hidden.has(id)),
+      ...customRows.map((row) => row.id),
+    ];
+    const known = new Set<string>(usable);
+    const fallback = known.has(FALLBACK_CATEGORY) ? FALLBACK_CATEGORY : (usable[0] ?? FALLBACK_CATEGORY);
+    return (wanted) => (wanted && known.has(wanted) ? wanted : fallback);
+  }
 }

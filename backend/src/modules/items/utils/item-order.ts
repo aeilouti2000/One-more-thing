@@ -16,6 +16,29 @@ export async function placeNeededItem(
   await writeOrder(items, ordered.map((row) => row.id));
 }
 
+/**
+ * Places several needed items at once, in the order given, right after the
+ * list's urgent ones: one read and one write however many there are.
+ */
+export async function placeNeededItems(
+  items: Repository<Item>,
+  homeId: string,
+  itemIds: string[],
+  listId: string,
+) {
+  if (itemIds.length === 0) return;
+  const rows = await neededRows(items, homeId, listId);
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const placing = itemIds.map((id) => byId.get(id)).filter((row): row is Item => Boolean(row));
+  if (placing.length === 0) return;
+  const moving = new Set(placing.map((row) => row.id));
+  const rest = rows.filter((row) => !moving.has(row.id));
+  const index = rest.findIndex((row) => !row.urgent);
+  const ordered =
+    index === -1 ? [...rest, ...placing] : [...rest.slice(0, index), ...placing, ...rest.slice(index)];
+  await writeOrder(items, ordered.map((row) => row.id));
+}
+
 export async function applyNeededOrder(items: Repository<Item>, homeId: string, ids: string[]) {
   const rows = await neededRows(items, homeId);
   const known = new Set(rows.map((row) => row.id));

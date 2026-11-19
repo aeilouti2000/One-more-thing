@@ -31,6 +31,10 @@ describe("PinsService lists", () => {
       return row;
     }),
     placeNeeded: jest.fn(async () => undefined),
+    setLater: jest.fn(async (ids: string[], ..._rest: unknown[]) => {
+      for (const item of items) if (ids.includes(item.id)) item.laterAt = null;
+      return ids.length;
+    }),
   };
   const listsRepo = {
     findFirstActive: jest.fn(async () => lists[0]),
@@ -38,7 +42,7 @@ describe("PinsService lists", () => {
   };
   const homes = { requireMembership: jest.fn(async () => ({ homeId: "h1" })) };
   const categories = { assertUsable: jest.fn(async () => undefined) };
-  const notifications = { notifyPinDue: jest.fn(async () => undefined) };
+  const notifications = { notifyPinDue: jest.fn(async (..._args: unknown[]) => undefined) };
   const service = new PinsService(
     pinsRepo as never,
     itemsRepo as never,
@@ -86,6 +90,20 @@ describe("PinsService lists", () => {
       ["Milk", "list-b"],
       ["Bread", "list-a"],
     ]);
+  });
+
+  it("a due pin brings its parked item back instead of adding a second one", async () => {
+    pins = [
+      { id: "p1", name: "Milk", listId: "list-a", intervalDays: 7, nextDueAt: new Date(), quantity: 1 },
+    ];
+    items = [{ id: "i0", name: "milk", listId: "list-a", laterAt: new Date() }];
+    await service.materializeDue("h1");
+    expect(items).toHaveLength(1);
+    expect(items[0].laterAt).toBeNull();
+    expect(itemsRepo.setLater).toHaveBeenCalledWith(["i0"], "h1", null, null);
+    expect(notifications.notifyPinDue).toHaveBeenCalledWith(
+      expect.objectContaining({ itemName: "Milk", listId: "list-a" }),
+    );
   });
 });
 
