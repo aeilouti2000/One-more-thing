@@ -8,6 +8,7 @@ import {
   savedShopNames,
   summarizeTrip,
   tripDoneItems,
+  tripBudget,
   tripProgress,
 } from "./trip-helpers";
 
@@ -91,16 +92,46 @@ test("progress uses real prices first, then the last price", () => {
     ["eggs", { cost: 3, quantity: 1 }],
     ["milk", { cost: 1, quantity: 1 }],
   ]);
+  const needs = (name: string, extra: Partial<Purchase> = {}): Purchase => ({
+    ...bought(name, "2026-11-14T09:00:00Z", extra),
+    status: "needed",
+    boughtAt: undefined,
+  });
   const progress = tripProgress(
     [
       bought("Milk", "2026-11-14T10:00:00Z", { cost: 1.5 }),
       bought("Eggs", "2026-11-14T10:01:00Z"),
       bought("Tahini", "2026-11-14T10:02:00Z"),
     ],
-    4,
+    [needs("Milk", { quantity: 2 }), needs("Eggs"), needs("Saffron"), needs("Salt")],
     prices,
   );
-  assert.deepEqual(progress, { done: 3, total: 7, estimate: 4.5, estimated: 2 });
+  assert.deepEqual(progress, {
+    done: 3,
+    total: 7,
+    estimate: 4.5,
+    estimated: 2,
+    // 4.5 in the basket + 2 milk (1 each) + eggs at the last price (3).
+    expected: 9.5,
+    // Only the milk's price was really entered.
+    recorded: 1.5,
+    // Tahini (bought) plus saffron and salt (still to buy).
+    unpriced: 3,
+  });
+});
+
+test("trip budget: the entered prices are not counted twice", () => {
+  // 100 spent this month already includes the 10 entered on this trip.
+  assert.deepEqual(tripBudget({ budget: 200, monthSpent: 100, expected: 40, recorded: 10 }), {
+    left: 70,
+    tone: "ok",
+  });
+  assert.equal(tripBudget({ budget: 200, monthSpent: 150, expected: 20, recorded: 0 })?.tone, "warn");
+  assert.deepEqual(tripBudget({ budget: 200, monthSpent: 190, expected: 30, recorded: 0 }), {
+    left: -20,
+    tone: "over",
+  });
+  assert.equal(tripBudget({ budget: null, monthSpent: 10, expected: 5, recorded: 0 }), null);
 });
 
 test("summary counts an invoice total once and takes the shop name", () => {

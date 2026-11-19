@@ -87,30 +87,76 @@ export function tripDoneItems(
 }
 
 /**
- * Progress for the card at the top of a trip. The estimate is the real price
- * where one was entered, else the last price paid; unknown prices add nothing.
+ * Progress for the card at the top of a trip.
+ *
+ * `estimate` is what is in the basket so far: the real price where one was
+ * entered, else the last price paid. `expected` adds the last price of what is
+ * still to buy, so it is what the whole trip should cost. Items never priced
+ * add nothing and are counted in `unpriced`.
  */
 export function tripProgress(
   done: Purchase[],
-  remaining: number,
+  remaining: Purchase[],
   prices: Map<string, PricedLine>,
 ) {
   let estimate = 0;
   let estimated = 0;
+  let recorded = 0;
   for (const item of done) {
     const own = typeof item.cost === "number" && Number.isFinite(item.cost) ? item.cost : null;
     const amount = own ?? priceOf(prices, item.name, item);
     if (amount === null) continue;
     estimate += amount;
     estimated += 1;
+    if (own !== null) recorded += own;
+  }
+  let ahead = 0;
+  let aheadPriced = 0;
+  for (const item of remaining) {
+    const amount = priceOf(prices, item.name, item);
+    if (amount === null) continue;
+    ahead += amount;
+    aheadPriced += 1;
   }
   return {
     done: done.length,
-    total: done.length + remaining,
-    estimate: Math.round(estimate * 1000) / 1000,
+    total: done.length + remaining.length,
+    estimate: roundMoney(estimate),
     /** How many of the done items have a price (real or last). */
     estimated,
+    /** Basket so far plus the last prices of what is still to buy. */
+    expected: roundMoney(estimate + ahead),
+    /** The part of `estimate` that is real, entered prices (already in the month's spending). */
+    recorded: roundMoney(recorded),
+    /** Items, bought or still to buy, that have no price to go by. */
+    unpriced: done.length - estimated + (remaining.length - aheadPriced),
   };
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 1000) / 1000;
+}
+
+/** Share of the budget at which the trip card starts to warn (same as History). */
+export const BUDGET_WARN_AT = 0.8;
+
+/**
+ * What a trip leaves of the month's budget. `monthSpent` already holds the
+ * real prices entered on this trip (`recorded`), so only the rest of the
+ * expected total is added on top.
+ */
+export function tripBudget(input: {
+  budget: number | null | undefined;
+  monthSpent: number;
+  expected: number;
+  recorded: number;
+}): { left: number; tone: "ok" | "warn" | "over" } | null {
+  const { budget } = input;
+  if (!budget || budget <= 0) return null;
+  const spentAfter = input.monthSpent + Math.max(0, input.expected - input.recorded);
+  const left = roundMoney(budget - spentAfter);
+  const tone = left < 0 ? "over" : spentAfter / budget >= BUDGET_WARN_AT ? "warn" : "ok";
+  return { left, tone };
 }
 
 export type TripSummary = {

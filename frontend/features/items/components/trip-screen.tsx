@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AppState, BackHandler, Platform, Pressable, View, type LayoutChangeEvent } from "react-native";
 import Animated, {
   Easing,
+  FadeIn,
   FadeInDown,
   FadeOutDown,
   Extrapolation,
@@ -50,6 +51,7 @@ import {
 } from "@/features/items/api/shop-locks";
 import { FloatMessage } from "@/components/ui/FloatMessage";
 import { formatMoney } from "@/features/items/utils/currency";
+import { currentMonth, summarizeMonth } from "@/features/items/utils/insights";
 import {
   formatTripMinutes,
   formatTripShare,
@@ -57,6 +59,7 @@ import {
   rememberedPrice,
   savedShopNames,
   summarizeTrip,
+  tripBudget,
   tripDoneItems,
   tripProgress,
   type TripSummary,
@@ -245,9 +248,34 @@ function TripBody() {
     [bought, category, listId, startedAt],
   );
   const progress = useMemo(
-    () => tripProgress(doneItems, tripItems.length, prices),
-    [doneItems, prices, tripItems.length],
+    () => ({
+      ...tripProgress(doneItems, activeItems, prices),
+      total: doneItems.length + tripItems.length,
+    }),
+    [activeItems, doneItems, prices, tripItems.length],
   );
+  // The whole trip's expected cost, and what it leaves of the month's budget.
+  const showForecast = costsEnabled && household?.tripEstimate !== false;
+  const monthSpent = useMemo(
+    () => (showForecast ? summarizeMonth(bought, currentMonth(new Date(startedAt))).total : 0),
+    [bought, showForecast, startedAt],
+  );
+  const forecast = useMemo(() => {
+    if (!showForecast) return null;
+    const priced = progress.total - notFoundItems.length - progress.unpriced;
+    if (priced <= 0) return null;
+    return {
+      // Nothing left to buy: the whole trip is what is already in the basket.
+      whole: activeItems.length > 0 ? progress.expected : null,
+      unpriced: progress.unpriced,
+      budget: tripBudget({
+        budget: household?.monthlyBudget,
+        monthSpent,
+        expected: progress.expected,
+        recorded: progress.recorded,
+      }),
+    };
+  }, [activeItems.length, household?.monthlyBudget, monthSpent, notFoundItems.length, progress, showForecast]);
 
   const askCostOnCheck =
     household?.costsEnabled === true && household.askCostOnSingleBuy !== false;
@@ -1117,6 +1145,8 @@ function TripBody() {
               ? t("tripEstimate", { amount: formatMoney(progress.estimate, currency) })
               : null
           }
+          forecast={forecast}
+          currency={currency}
         />
       ) : null}
 
@@ -1637,28 +1667,70 @@ function TripCheckRow({
   );
 }
 
+type TripForecast = {
+  /** Expected cost of the whole trip; null once nothing is left to buy. */
+  whole: number | null;
+  unpriced: number;
+  budget: { left: number; tone: "ok" | "warn" | "over" } | null;
+};
+
 function TripProgressCard({
   done,
   total,
   estimate,
+  forecast,
+  currency,
 }: {
   done: number;
   total: number;
   estimate: string | null;
+  forecast: TripForecast | null;
+  currency: string;
 }) {
   const { t } = useI18n();
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const share = total > 0 ? Math.min(1, done / total) : 0;
   const fill = useSharedValue(share);
   useEffect(() => {
     fill.value = withTiming(share, { duration: 420, easing: Easing.out(Easing.cubic) });
   }, [fill, share]);
   const fillStyle = useAnimatedStyle(() => ({ width: `${fill.value * 100}%` }));
+
+  const whole =
+    forecast && forecast.whole !== null
+      ? t("tripWholeAmount", { amount: formatMoney(forecast.whole, currency) })
+      : null;
+  const budget = forecast?.budget ?? null;
+  // The same amber and red History uses for the month's budget.
+  const budgetColor =
+    budget?.tone === "over"
+      ? scheme === "dark"
+        ? "#F07178"
+        : "#C2414A"
+      : budget?.tone === "warn"
+        ? scheme === "dark"
+          ? "#E6B450"
+          : "#B7791F"
+        : null;
+  const budgetLabel = budget ? t(budget.tone === "over" ? "tripBudgetOver" : "tripBudgetLeft") : null;
+  const budgetAmount = budget ? formatMoney(Math.abs(budget.left), currency) : null;
+  const unpriced =
+    forecast && forecast.unpriced > 0 ? t("tripUnpriced", { count: forecast.unpriced }) : null;
+  const showForecast = Boolean(whole || budget);
+
   return (
     <View
       className="mb-5 rounded-3xl bg-cove-paper px-4 py-4"
       accessible
-      accessibilityLabel={[t("tripProgress", { done, total }), estimate].filter(Boolean).join(", ")}
+      accessibilityLabel={[
+        t("tripProgress", { done, total }),
+        estimate,
+        whole ? `${t("tripWhole")} ${whole}` : null,
+        budgetLabel ? `${budgetLabel} ${budgetAmount}` : null,
+        showForecast ? unpriced : null,
+      ]
+        .filter(Boolean)
+        .join(", ")}
     >
       <AppText className="text-base font-semibold text-cove-ink">
         {t("tripProgress", { done, total })}
@@ -1669,6 +1741,33 @@ function TripProgressCard({
           style={[{ height: "100%", borderRadius: 999, backgroundColor: colors.accent }, fillStyle]}
         />
       </View>
+      {showForecast ? (
+        <Animated.View entering={FadeIn.duration(180)} className="mt-3 gap-1.5">
+          {whole ? (
+            <View className="flex-row items-baseline justify-between gap-3">
+              <AppText className="min-w-0 flex-1 text-sm text-cove-muted">{t("tripWhole")}</AppText>
+              <AppText className="text-base font-semibold text-cove-ink">{whole}</AppText>
+            </View>
+          ) : null}
+          {budgetLabel ? (
+            <View className="flex-row items-baseline justify-between gap-3">
+              <AppText
+                className={`min-w-0 flex-1 text-sm ${budget?.tone === "over" ? "font-semibold" : ""}`}
+                style={{ color: budget?.tone === "over" ? (budgetColor ?? colors.muted) : colors.muted }}
+              >
+                {budgetLabel}
+              </AppText>
+              <AppText
+                className="text-base font-semibold"
+                style={{ color: budgetColor ?? colors.ink }}
+              >
+                {budgetAmount}
+              </AppText>
+            </View>
+          ) : null}
+          {unpriced ? <AppText className="text-xs text-cove-muted">{unpriced}</AppText> : null}
+        </Animated.View>
+      ) : null}
     </View>
   );
 }

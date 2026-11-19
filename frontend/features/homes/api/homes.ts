@@ -29,6 +29,8 @@ function withCostDefaults(home: Household): Household {
     tripAutoEndHours: typeof home.tripAutoEndHours === "number" ? home.tripAutoEndHours : null,
     tripSummary: home.tripSummary !== false,
     tripShopTogether: home.tripShopTogether === true,
+    // On unless turned off (also when an older server doesn't send them).
+    tripEstimate: home.tripEstimate !== false,
   };
 }
 

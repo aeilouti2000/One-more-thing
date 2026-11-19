@@ -809,6 +809,16 @@ const en = {
   errorGoogleMismatch: "Use the Google account linked to this account.",
   errorGoogleAlreadyLinked: "Disconnect the current Google account first.",
   errorEmailSend: "Couldn't send the email. Try again.",
+  tripWhole: "Whole trip",
+  tripWholeAmount: "about {{amount}}",
+  tripBudgetLeft: "Left this month after it",
+  tripBudgetOver: "Over this month's budget by",
+  tripUnpriced: "Items without a price yet: {{count}}",
+  tripEstimateSetting: "Trip total and budget",
+  tripEstimateSettingBody: "On a trip, show what the whole trip will cost and what it leaves of this month's budget.",
+  tripEstimateNeedsCosts: "Needs \"Track costs\" turned on.",
+  featureTripTotalTitle: "Live trip total",
+  featureTripTotalBody: "See what the whole trip will cost and what it leaves of your budget.",
 } as const;
 
 const ar: { [K in keyof typeof en]: string } = {
@@ -1615,6 +1625,16 @@ const ar: { [K in keyof typeof en]: string } = {
   errorGoogleMismatch: "استخدم حساب Google المرتبط بهذا الحساب.",
   errorGoogleAlreadyLinked: "افصل حساب Google الحالي أولاً.",
   errorEmailSend: "تعذّر إرسال البريد. حاول مرة أخرى.",
+  tripWhole: "الرحلة كاملة",
+  tripWholeAmount: "حوالي {{amount}}",
+  tripBudgetLeft: "المتبقي لهذا الشهر بعدها",
+  tripBudgetOver: "تجاوز ميزانية هذا الشهر بـ",
+  tripUnpriced: "عناصر بلا سعر بعد: {{count}}",
+  tripEstimateSetting: "مجموع الرحلة والميزانية",
+  tripEstimateSettingBody: "أثناء الرحلة، اعرض التكلفة المتوقعة للرحلة كاملة وما يتبقى من ميزانية هذا الشهر.",
+  tripEstimateNeedsCosts: "يتطلب تفعيل «تتبّع التكاليف».",
+  featureTripTotalTitle: "مجموع الرحلة المباشر",
+  featureTripTotalBody: "اعرف تكلفة الرحلة كاملة وما يتبقى من ميزانيتك.",
 };
 
 export const messages = { en, ar };

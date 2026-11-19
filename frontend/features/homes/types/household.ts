@@ -29,6 +29,8 @@ export type TripSettings = {
   tripSummary: boolean;
   /** Let more than one person shop the same list at the same time. */
   tripShopTogether: boolean;
+  /** Show the whole-trip estimate, and what it leaves of the budget, on a trip. */
+  tripEstimate: boolean;
 };
 
 export const TRIP_AUTO_END_HOURS = [2, 4, 8] as const;
@@ -51,6 +53,7 @@ export type Household = {
   tripAutoEndHours: number | null;
   tripSummary: boolean;
   tripShopTogether: boolean;
+  tripEstimate: boolean;
 };
 
 export type HomeSummary = {

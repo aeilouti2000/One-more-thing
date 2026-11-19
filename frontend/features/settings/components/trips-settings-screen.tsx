@@ -113,6 +113,22 @@ export default function TripsSettingsScreen() {
         </HostOnly>
 
         <HostOnly locked={!isHost}>
+          <CostAskToggle
+            title={t("tripEstimateSetting")}
+            body={
+              household.costsEnabled
+                ? t("tripEstimateSettingBody")
+                : `${t("tripEstimateSettingBody")} ${t("tripEstimateNeedsCosts")}`
+            }
+            value={household.tripEstimate !== false}
+            disabled={!isHost || isSaving}
+            locked={!isHost}
+            onChange={(value) => void save({ tripEstimate: value })}
+            colors={colors}
+          />
+        </HostOnly>
+
+        <HostOnly locked={!isHost}>
           <CardBlock>
             <SettingsCardCopy title={t("tripAutoEnd")} body={t("tripAutoEndBody")} />
             {isHost ? (
