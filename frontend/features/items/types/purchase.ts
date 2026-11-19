@@ -25,6 +25,8 @@ export type Purchase = {
   listId?: string;
   listName?: string;
   addedByName: string;
+  /** Who added it (user id), to tell my additions from someone else's. */
+  addedById?: string;
   boughtByName?: string;
   /** Who bought it (user id), to tell my purchases from a partner's. */
   boughtById?: string;

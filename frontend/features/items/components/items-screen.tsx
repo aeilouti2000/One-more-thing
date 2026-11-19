@@ -42,6 +42,10 @@ import { QuickAddBar } from "@/features/items/components/quick-add-bar";
 import { ReorderableList } from "@/features/items/components/reorderable-list";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ItemsFab } from "@/features/items/components/items-fab";
+import { ShopAskCard } from "@/features/items/components/shop-ask-card";
+import { isUnsavedItemId } from "@/features/items/api/items";
+import { replyShopAsk, type ShopAskReply } from "@/features/items/api/shop-asks";
+import { adoptShopAsk, dropShopAsk, useShopAsks } from "@/features/items/hooks/use-shop-asks";
 import { LaterSheet } from "@/features/items/components/later-sheet";
 import { LaterShelf } from "@/features/items/components/later-shelf";
 import { formatLaterDay } from "@/features/items/utils/later-dates";
@@ -570,6 +574,67 @@ export default function ItemsScreen() {
   const toggleLater = useCallback(() => setLaterOpen((open) => !open), []);
 
   // "Anything missing?" from someone at the shop, until this person answers.
+  const askEnabled =
+    (household?.members.length ?? 0) > 1 && household?.tripAskHome !== false;
+  const { asks, refresh: refreshAsks } = useShopAsks(household?.id ?? null, askEnabled);
+  // Coming back to the list also checks for a question (for phones without
+  // its notification); skipped when the last check was moments ago.
+  useFocusEffect(
+    useCallback(() => {
+      refreshAsks();
+    }, [refreshAsks]),
+  );
+  const openAsk = useMemo(
+    () => asks.find((ask) => !ask.mine && ask.myReply === null) ?? null,
+    [asks],
+  );
+  // Saved items on the asked list: when this person adds one, the card moves
+  // on from "Need anything?" to "You added 2. Anything else?".
+  const openAskListId = openAsk?.listId ?? null;
+  const savedOnAskedList = useMemo(
+    () =>
+      openAskListId
+        ? needed.filter((item) => item.listId === openAskListId && !isUnsavedItemId(item.id)).length
+        : 0,
+    [needed, openAskListId],
+  );
+  const seenOnAskedList = useRef(savedOnAskedList);
+  useEffect(() => {
+    if (openAskListId && savedOnAskedList > seenOnAskedList.current) refreshAsks(true);
+    seenOnAskedList.current = savedOnAskedList;
+  }, [openAskListId, refreshAsks, savedOnAskedList]);
+  const [isAnsweringAsk, setIsAnsweringAsk] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
+  const [quickFocusSignal, setQuickFocusSignal] = useState(0);
+
+  function addForAsk() {
+    if (!openAsk) return;
+    // The item belongs on the list being shopped.
+    if (openAsk.listId !== selectedListId && lists.some((list) => list.id === openAsk.listId)) {
+      setSelectedListId(openAsk.listId);
+    }
+    setQuickFocusSignal((value) => value + 1);
+  }
+
+  async function answerAsk(reply: ShopAskReply) {
+    if (!openAsk || isAnsweringAsk) return;
+    setIsAnsweringAsk(true);
+    setAskError(null);
+    const result = await replyShopAsk(openAsk.id, reply);
+    setIsAnsweringAsk(false);
+    if (result.gone) {
+      // Ended meanwhile (the trip is over): nothing left to answer.
+      dropShopAsk(openAsk.id);
+      return;
+    }
+    if (result.error || !result.ask) {
+      setAskError(result.error ?? t("errorGeneric"));
+      return;
+    }
+    void Haptics.selectionAsync();
+    adoptShopAsk(result.ask);
+  }
+
   const bulkCostItems = useMemo(
     () =>
       (bulkCostIds ?? []).map((id) => {
@@ -1280,9 +1345,20 @@ export default function ItemsScreen() {
     >
       {isSelecting ? null : header}
 
+      {isSelecting || !openAsk ? null : (
+        <ShopAskCard
+          ask={openAsk}
+          busy={isAnsweringAsk}
+          error={askError}
+          onAdd={addForAsk}
+          onReply={(reply) => void answerAsk(reply)}
+        />
+      )}
+
       {isSelecting ? null : (
         <>
           <QuickAddBar
+            focusSignal={quickFocusSignal}
             value={quickName}
             onChangeText={setQuickName}
             onSubmit={() => void quickAdd()}

@@ -1,0 +1,153 @@
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { useEffect, useState } from "react";
+import { Pressable, View } from "react-native";
+import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
+import { AppButton } from "@/components/ui/AppButton";
+import { AppText } from "@/components/ui/AppText";
+import { FormMessage } from "@/components/ui/FormMessage";
+import { firstName } from "@/features/items/api/shop-locks";
+import type { ShopAsk } from "@/features/items/api/shop-asks";
+import { useI18n } from "@/providers/LanguageProvider";
+import { useTheme } from "@/providers/ThemeProvider";
+
+/** With more people than this, the answers start folded to one line. */
+const OPEN_BY_DEFAULT_UP_TO = 3;
+
+type AskHomeCardProps = {
+  /** The shopper's open question on this list; null before asking. */
+  ask: ShopAsk | null;
+  asking: boolean;
+  error: string | null;
+  onAsk: () => void;
+};
+
+/**
+ * "Anything missing?" at the top of a trip. Before asking: one button for the
+ * whole home. After: who answered what, one line per person.
+ */
+export function AskHomeCard({ ask, asking, error, onAsk }: AskHomeCardProps) {
+  const { t } = useI18n();
+  const { colors, scheme } = useTheme();
+  const [open, setOpen] = useState<boolean | null>(null);
+  // "4 min ago" moves on by itself while the card is on screen.
+  const [now, setNow] = useState(() => Date.now());
+  const askId = ask?.id ?? null;
+  useEffect(() => {
+    if (!askId) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [askId]);
+
+  const icon = (
+    <View className="h-11 w-11 items-center justify-center rounded-full bg-cove-mist">
+      <Ionicons name="chatbubbles-outline" size={21} color={colors.accentText} />
+    </View>
+  );
+
+  if (!ask) {
+    return (
+      <View className="mb-3 rounded-3xl bg-cove-paper px-4 py-3.5">
+        <View className="flex-row items-center gap-3">
+          {icon}
+          <View className="min-w-0 flex-1">
+            <AppText className="text-base font-semibold text-cove-ink">{t("askHomeTitle")}</AppText>
+            <AppText className="mt-0.5 text-sm text-cove-muted">{t("askHomeBody")}</AppText>
+          </View>
+          <AppButton
+            label={t("askHomeButton")}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onAsk();
+            }}
+            loading={asking}
+            disabled={asking}
+            compact
+            fit
+          />
+        </View>
+        <FormMessage message={error} />
+      </View>
+    );
+  }
+
+  const answered = ask.replies.filter((reply) => reply.reply !== null || reply.added > 0).length;
+  const minutes = Math.max(0, Math.floor((now - new Date(ask.createdAt).getTime()) / 60_000));
+  const time = minutes < 1 ? t("askHomeJustNow") : t("askHomeMinutesAgo", { minutes });
+  const expanded = open ?? ask.replies.length <= OPEN_BY_DEFAULT_UP_TO;
+  const addedColor = scheme === "dark" ? "#6EE7A8" : "#166534";
+  const summary = t("askHomeAnswered", { answered, total: ask.replies.length, time });
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      layout={LinearTransition.duration(200)}
+      className="mb-3 rounded-3xl bg-cove-paper px-4 py-3.5"
+    >
+      <Pressable
+        onPress={() => {
+          void Haptics.selectionAsync();
+          setOpen(!expanded);
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={`${t("askHomeAsked")}. ${summary}. ${t(
+          expanded ? "askHomeHideReplies" : "askHomeShowReplies",
+        )}`}
+        className="flex-row items-center gap-3 active:opacity-80"
+      >
+        {icon}
+        <View className="min-w-0 flex-1">
+          <AppText className="text-base font-semibold text-cove-ink">{t("askHomeAsked")}</AppText>
+          <AppText numberOfLines={1} className="mt-0.5 text-sm text-cove-muted">
+            {summary}
+          </AppText>
+        </View>
+        <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
+      </Pressable>
+
+      {expanded ? (
+        <Animated.View entering={FadeIn.duration(160)} className="mt-3 gap-2.5">
+          {ask.replies.map((reply) => {
+            const name = firstName(reply.name) || reply.name;
+            const added = reply.added > 0;
+            const text = added
+              ? t("askHomeReplyAdded", { count: reply.added })
+              : reply.reply === "nothing"
+                ? t("askHomeReplyNothing")
+                : t("askHomeReplyWaiting");
+            const waiting = !added && reply.reply === null;
+            return (
+              <View
+                key={reply.userId}
+                accessible
+                accessibilityLabel={`${name}: ${text}`}
+                className="flex-row items-center gap-3"
+              >
+                <View className="h-7 w-7 items-center justify-center rounded-full bg-cove-mist">
+                  <AppText className="text-xs font-semibold text-cove-accent-text">
+                    {name.slice(0, 1).toUpperCase()}
+                  </AppText>
+                </View>
+                <AppText numberOfLines={1} className="min-w-0 flex-1 text-sm text-cove-ink">
+                  {name}
+                </AppText>
+                <AppText
+                  numberOfLines={1}
+                  className={`shrink text-sm ${added ? "font-semibold" : ""}`}
+                  style={{
+                    color: added ? addedColor : colors.muted,
+                    opacity: waiting ? 0.7 : 1,
+                  }}
+                >
+                  {text}
+                </AppText>
+              </View>
+            );
+          })}
+        </Animated.View>
+      ) : null}
+    </Animated.View>
+  );
+}

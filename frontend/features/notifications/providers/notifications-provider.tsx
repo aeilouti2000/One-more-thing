@@ -4,7 +4,12 @@ import { AppState } from "react-native";
 import { switchHome } from "@/features/homes/api/homes";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { writeStoredListId } from "@/features/items/utils/list-storage";
+import { refreshShopAsksIfShown, resetShopAsks } from "@/features/items/hooks/use-shop-asks";
 import { emitFocusList, emitListChanged } from "@/features/items/utils/list-sync";
+import {
+  handleShopAskAction,
+  isShopAskAction,
+} from "@/features/notifications/api/shop-ask-actions";
 import {
   canUsePush,
   loadNotifications,
@@ -71,6 +76,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     void sync();
   }, [sync]);
 
+  // Another person signed in on this phone: the last one's questions go.
+  useEffect(() => resetShopAsks, [userId]);
+
   // Retry a failed registration, and pick up permission granted in phone settings.
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -91,10 +99,20 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     void loadNotifications().then(async (Notifications) => {
       if (cancelled || !Notifications) return;
-      received = Notifications.addNotificationReceivedListener(() => {
+      received = Notifications.addNotificationReceivedListener((event) => {
         emitListChanged();
+        // "Anything missing?" just arrived: show its card without waiting.
+        const data = (event.request.content.data ?? {}) as Record<string, unknown>;
+        if (data.type === "shop_ask" && typeof data.homeId === "string") {
+          refreshShopAsksIfShown(data.homeId);
+        }
       });
       response = Notifications.addNotificationResponseReceivedListener((event) => {
+        // An answer given on the notification itself: no screen to open.
+        if (isShopAskAction(event)) {
+          void handleShopAskAction(Notifications, event);
+          return;
+        }
         const next = readOpened(event);
         if (!next) return;
         opened.current = next;
@@ -116,6 +134,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       // The tap that launched a closed app happens before these listeners exist.
       const launch = await Notifications.getLastNotificationResponseAsync().catch(() => null);
       if (cancelled || !launch) return;
+      if (isShopAskAction(launch)) {
+        void handleShopAskAction(Notifications, launch);
+        void Notifications.clearLastNotificationResponseAsync?.().catch(() => undefined);
+        return;
+      }
       const next = readOpened(launch);
       if (next) {
         opened.current = next;

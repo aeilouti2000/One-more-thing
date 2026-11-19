@@ -435,6 +435,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         photoUploading: Boolean(values.photo),
         listId: values.listId,
         addedByName: user.name,
+        addedById: user.id,
         createdAt: new Date().toISOString(),
       };
 

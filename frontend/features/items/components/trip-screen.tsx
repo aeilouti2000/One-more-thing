@@ -50,6 +50,9 @@ import {
   type ShopLock,
 } from "@/features/items/api/shop-locks";
 import { FloatMessage } from "@/components/ui/FloatMessage";
+import { AskHomeCard } from "@/features/items/components/ask-home-card";
+import { askHome, endShopAsk, SHOP_ASK_POLL_MS } from "@/features/items/api/shop-asks";
+import { adoptShopAsk, dropShopAsk, useShopAsks } from "@/features/items/hooks/use-shop-asks";
 import { formatMoney } from "@/features/items/utils/currency";
 import { currentMonth, summarizeMonth } from "@/features/items/utils/insights";
 import {
@@ -247,6 +250,7 @@ function TripBody() {
     () => tripDoneItems(bought, { listId, category, startedAt }),
     [bought, category, listId, startedAt],
   );
+  // "Couldn't find it" items stay on the list but aren't expected in the basket.
   const progress = useMemo(
     () => ({
       ...tripProgress(doneItems, activeItems, prices),
@@ -337,6 +341,65 @@ function TripBody() {
 
   const multiMemberHome = (household?.members.length ?? 0) > 1;
   const shopTogether = multiMemberHome && household?.tripShopTogether === true;
+  // "Anything missing?": ask the rest of the home, and see who answered.
+  const askEnabled = multiMemberHome && household?.tripAskHome !== false && listId !== null;
+  const { asks, refresh: refreshAsks } = useShopAsks(homeId, askEnabled);
+  const myAsk = useMemo(
+    () => asks.find((ask) => ask.mine && ask.listId === listId) ?? null,
+    [asks, listId],
+  );
+  const myAskId = myAsk?.id ?? null;
+  const myAskRef = useRef(myAskId);
+  useEffect(() => {
+    myAskRef.current = myAskId;
+  }, [myAskId]);
+  /** Nobody needs to answer a trip that is over. */
+  const endMyAsk = useCallback(() => {
+    const askId = myAskRef.current;
+    if (!askId) return;
+    myAskRef.current = null;
+    void endShopAsk(askId);
+    dropShopAsk(askId);
+  }, []);
+  const [isAsking, setIsAsking] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
+  // Only while a question is open does the trip check for answers.
+  useEffect(() => {
+    if (!myAskId) return;
+    const timer = setInterval(() => refreshAsks(true), SHOP_ASK_POLL_MS);
+    return () => clearInterval(timer);
+  }, [myAskId, refreshAsks]);
+  // Someone answered by adding items: load them now, not at the next sync.
+  const addedByOthers = myAsk ? myAsk.replies.reduce((sum, reply) => sum + reply.added, 0) : 0;
+  const seenAdded = useRef(addedByOthers);
+  useEffect(() => {
+    if (addedByOthers > seenAdded.current) void refresh();
+    seenAdded.current = addedByOthers;
+  }, [addedByOthers, refresh]);
+  const askTheHome = useCallback(async () => {
+    if (!homeId || !listId || isAsking) return;
+    setIsAsking(true);
+    setAskError(null);
+    const result = await askHome(homeId, listId);
+    setIsAsking(false);
+    if (result.error || !result.ask) {
+      setAskError(result.error ?? translate("errorGeneric"));
+      return;
+    }
+    adoptShopAsk(result.ask);
+  }, [homeId, isAsking, listId]);
+  // Items someone else added after the question: tagged with who added them.
+  const askSince = myAsk ? new Date(myAsk.createdAt).getTime() : null;
+  const addedNote = useCallback(
+    (item: Purchase) => {
+      if (askSince === null || !item.addedById || item.addedById === userId) return null;
+      const created = new Date(item.createdAt).getTime();
+      if (!(created >= askSince)) return null;
+      return t("askHomeJustAdded", { name: firstName(item.addedByName) || t("partner") });
+    },
+    [askSince, t, userId],
+  );
+
   const lockHeldRef = useRef(false);
   const newTripClaimedRef = useRef(false);
   // Others shopping this list right now (shopping together).
@@ -474,6 +537,7 @@ function TripBody() {
       lockHeldRef.current = false;
       void releaseShopLock(homeId, listId);
     }
+    endMyAsk();
     closePage();
   }
 
@@ -549,6 +613,7 @@ function TripBody() {
             }),
           );
           allowLeaveRef.current = true;
+          endMyAsk();
           closePage();
           return;
         }
@@ -587,6 +652,7 @@ function TripBody() {
               }),
             );
             allowLeaveRef.current = true;
+            endMyAsk();
             closePage();
           }
         });
@@ -1088,6 +1154,7 @@ function TripBody() {
     onHold: openHold,
     registerBuyer,
     priceLabel: lastPriceLabel,
+    addedNote,
     userId,
   };
 
@@ -1134,6 +1201,15 @@ function TripBody() {
             </AppText>
           </View>
         </View>
+      ) : null}
+
+      {askEnabled && (myAsk || tripItems.length > 0) ? (
+        <AskHomeCard
+          ask={myAsk}
+          asking={isAsking}
+          error={askError}
+          onAsk={() => void askTheHome()}
+        />
       ) : null}
 
       {tripItems.length > 0 && progress.total > 0 ? (
@@ -1327,6 +1403,8 @@ type RowActions = {
   /** Lets the hold sheet's "Bought it" play the row's own check. */
   registerBuyer: (id: string, buy: (() => void) | null) => void;
   priceLabel: (item: Purchase) => string | null;
+  /** "Sara just added", for items that arrived after the shopper asked the home. */
+  addedNote: (item: Purchase) => string | null;
   userId: string | null;
 };
 
@@ -1353,6 +1431,7 @@ function TripGroup({
             onHold={() => actions.onHold(item)}
             registerBuyer={actions.registerBuyer}
             priceLabel={actions.priceLabel(item)}
+            addedNote={actions.addedNote(item)}
             notFoundLabel={
               item.notFoundAt
                 ? item.notFoundById && item.notFoundById === actions.userId
@@ -1376,6 +1455,7 @@ function TripCheckRow({
   onHold,
   registerBuyer,
   priceLabel,
+  addedNote,
   notFoundLabel,
 }: {
   item: Purchase;
@@ -1387,6 +1467,8 @@ function TripCheckRow({
   registerBuyer: (id: string, buy: (() => void) | null) => void;
   /** "last time JD 1.200", when known. */
   priceLabel: string | null;
+  /** "Sara just added": it arrived after the shopper asked the home. */
+  addedNote: string | null;
   /** Not found: "you", a name, or "" (unknown). Null when it was found. */
   notFoundLabel: string | null;
 }) {
@@ -1632,6 +1714,22 @@ function TripCheckRow({
                 <AppText className="mt-1 text-sm text-cove-muted">
                   {priceLabel ? `${quantity} · ${priceLabel}` : quantity}
                 </AppText>
+                {addedNote ? (
+                  <View
+                    className="mt-1.5 self-start rounded-full px-2.5 py-0.5"
+                    style={{
+                      backgroundColor:
+                        scheme === "dark" ? "rgba(110,231,168,0.16)" : "#BBF7D0",
+                    }}
+                  >
+                    <AppText
+                      className="text-xs font-semibold"
+                      style={{ color: scheme === "dark" ? "#6EE7A8" : "#166534" }}
+                    >
+                      {addedNote}
+                    </AppText>
+                  </View>
+                ) : null}
                 {notFoundText ? (
                   <View className="mt-1 flex-row items-center gap-1">
                     <Ionicons name="search-outline" size={13} color={notFoundColor} />

@@ -3,12 +3,26 @@ import { api } from "@/lib/api";
 import { formatAppError } from "@/lib/errors";
 
 /** Which kinds of list notification this person wants. */
-export type NotificationPrefs = { added: boolean; urgent: boolean; due: boolean };
+export type NotificationPrefs = {
+  added: boolean;
+  urgent: boolean;
+  due: boolean;
+  /** Someone at the shop asks the home if anything is missing. */
+  shopping: boolean;
+  /** An item parked for later is back on the list. */
+  later: boolean;
+};
 
-export const NOTIFICATION_KINDS = ["added", "urgent", "due"] as const;
+export const NOTIFICATION_KINDS = ["added", "urgent", "shopping", "due", "later"] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
-const ALL_ON: NotificationPrefs = { added: true, urgent: true, due: true };
+const ALL_ON: NotificationPrefs = {
+  added: true,
+  urgent: true,
+  due: true,
+  shopping: true,
+  later: true,
+};
 const CACHE_KEY = "omt.push.prefs";
 
 function storage() {
@@ -25,6 +39,9 @@ function clean(value: Partial<NotificationPrefs> | null | undefined): Notificati
     added: value?.added !== false,
     urgent: value?.urgent !== false,
     due: value?.due !== false,
+    // Missing on an older server: on, like every other kind.
+    shopping: value?.shopping !== false,
+    later: value?.later !== false,
   };
 }
 

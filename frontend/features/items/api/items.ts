@@ -46,6 +46,7 @@ type ItemResponse = {
   listId?: string;
   listName?: string;
   addedByName: string;
+  addedBy?: string | null;
   boughtByName: string | null;
   boughtBy?: string | null;
   createdAt: string;
@@ -87,6 +88,7 @@ function toPurchase(item: ItemResponse): Purchase {
     listId: item.listId,
     listName: item.listName,
     addedByName: item.addedByName,
+    addedById: item.addedBy ?? undefined,
     boughtByName: item.boughtByName ?? undefined,
     boughtById: item.boughtBy ?? undefined,
     createdAt: item.createdAt,

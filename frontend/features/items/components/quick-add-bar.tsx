@@ -35,6 +35,8 @@ type QuickAddBarProps = {
   busy?: boolean;
   inputStyle?: StyleProp<TextStyle>;
   footer?: ReactNode;
+  /** Each new number above zero puts the cursor in the bar (and opens the keyboard). */
+  focusSignal?: number;
 };
 
 const BAR_RADIUS = 999;
@@ -50,6 +52,7 @@ export function QuickAddBar({
   busy = false,
   inputStyle,
   footer,
+  focusSignal = 0,
 }: QuickAddBarProps) {
   const { colors, scheme } = useTheme();
   const { t, isRTL } = useI18n();
@@ -57,6 +60,10 @@ export function QuickAddBar({
   const inputRef = useRef<TextInputHandle>(null);
   const [focused, setFocused] = useState(false);
   const showHint = !value && !focused && !busy;
+
+  useEffect(() => {
+    if (focusSignal > 0) inputRef.current?.focus();
+  }, [focusSignal]);
 
   const phrases = useMemo(
     () => [

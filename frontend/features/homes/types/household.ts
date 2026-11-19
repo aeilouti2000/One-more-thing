@@ -33,6 +33,8 @@ export type TripSettings = {
   tripShopTogether: boolean;
   /** Show the whole-trip estimate, and what it leaves of the budget, on a trip. */
   tripEstimate: boolean;
+  /** Offer "Anything missing?" on a trip, to ask the rest of the home. */
+  tripAskHome: boolean;
 };
 
 export const TRIP_AUTO_END_HOURS = [2, 4, 8] as const;
@@ -56,6 +58,7 @@ export type Household = {
   tripSummary: boolean;
   tripShopTogether: boolean;
   tripEstimate: boolean;
+  tripAskHome: boolean;
   monthlyRecap: boolean;
 };
 

@@ -114,10 +114,28 @@ export default function NotificationsSettingsScreen() {
     setPrefs(result.prefs);
   }
 
-  const kindCopy: Record<NotificationKind, { icon: "add-circle-outline" | "alert-circle-outline" | "pin-outline"; title: string; body: string }> = {
+  const kindCopy: Record<
+    NotificationKind,
+    {
+      icon:
+        | "add-circle-outline"
+        | "alert-circle-outline"
+        | "pin-outline"
+        | "chatbubbles-outline"
+        | "hourglass-outline";
+      title: string;
+      body: string;
+    }
+  > = {
     added: { icon: "add-circle-outline", title: t("notifyAdded"), body: t("notifyAddedBody") },
     urgent: { icon: "alert-circle-outline", title: t("notifyUrgent"), body: t("notifyUrgentBody") },
+    shopping: {
+      icon: "chatbubbles-outline",
+      title: t("notifyShopping"),
+      body: t("notifyShoppingBody"),
+    },
     due: { icon: "pin-outline", title: t("notifyDue"), body: t("notifyDueBody") },
+    later: { icon: "hourglass-outline", title: t("notifyLater"), body: t("notifyLaterBody") },
   };
   const phoneOn = pushStatus === "on" || pushStatus === "error";
   // The choices follow the account, so they still matter where this device

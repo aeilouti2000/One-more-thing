@@ -114,6 +114,17 @@ export default function TripsSettingsScreen() {
 
         <HostOnly locked={!isHost}>
           <CostAskToggle
+            title={t("tripAskSetting")}
+            body={t("tripAskSettingBody")}
+            value={household.tripAskHome !== false}
+            disabled={!isHost || isSaving}
+            locked={!isHost}
+            onChange={(value) => void save({ tripAskHome: value })}
+            colors={colors}
+          />
+        </HostOnly>
+
+        <HostOnly locked={!isHost}>
           <CostAskToggle
             title={t("tripEstimateSetting")}
             body={

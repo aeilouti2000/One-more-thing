@@ -3,6 +3,10 @@ import { Alert, Platform } from "react-native";
 import "@/features/auth/utils/session-storage";
 import { api } from "@/lib/api";
 import { getLocale, translate, type Locale } from "@/constants/i18n";
+import {
+  CONFIRM_CHANNEL,
+  registerShopAskCategory,
+} from "@/features/notifications/api/shop-ask-actions";
 
 const ENABLED_KEY = "omt.push.enabled";
 const TOKEN_KEY = "omt.push.token";
@@ -119,7 +123,13 @@ export async function syncPushRegistration(
         name: translate("listAlerts", undefined, locale),
         importance: Notifications.AndroidImportance.HIGH,
       });
+      // "Added: Lemons" after answering from a notification: shown, never loud.
+      await Notifications.setNotificationChannelAsync(CONFIRM_CHANNEL, {
+        name: translate("listConfirmations", undefined, locale),
+        importance: Notifications.AndroidImportance.LOW,
+      });
     }
+    await registerShopAskCategory(Notifications);
 
     let permission = await readNotificationPermission();
     if (permission === "undetermined" && options.prompt) {
