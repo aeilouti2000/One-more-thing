@@ -12,12 +12,13 @@ export function ListsHeaderIcon() {
   return (
     <View
       className="items-center justify-center"
-      style={headerIconFrameStyle(scheme, colors)}
+      style={[headerIconFrameStyle(scheme, colors), { overflow: "hidden" }]}
     >
+      {/* The badge is a full circle with its own background, so it fills the frame. */}
       <Image
         source={scheme === "dark" ? darkIcon : lightIcon}
-        contentFit="contain"
-        style={{ width: 46, height: 46 }}
+        contentFit="cover"
+        style={{ width: "100%", height: "100%" }}
       />
     </View>
   );

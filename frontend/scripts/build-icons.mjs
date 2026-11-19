@@ -68,25 +68,27 @@ const tinted = glyph({ row1: "#8C8C8C", row2: "#FFFFFF", ink: "#000000", letters
 
 // Android crops adaptive icons to the middle of the canvas, and the system
 // splash crops to a circle, so those marks are drawn smaller than the tile.
-const ADAPTIVE = 0.7;
+// Square tiles (icon, favicon): leave clear space around the mark.
+const TILE = 0.86;
+const ADAPTIVE = 0.62;
 const SPLASH = 0.86;
-// The header badge is a circle too, but small, so the mark fills more of it.
-const BADGE = 1.08;
+// The header badge is a circle, so the mark needs room at the corners.
+const BADGE = 0.84;
 
 const files = [
-  ["icon.png", 1024, { body: dark, background: NAVY }],
-  ["ios-icon-light.png", 1024, { body: light, background: PAPER }],
-  ["ios-icon-tinted.png", 1024, { body: tinted, background: "#000000" }],
+  ["icon.png", 1024, { body: dark, background: NAVY, scale: TILE }],
+  ["ios-icon-light.png", 1024, { body: light, background: PAPER, scale: TILE }],
+  ["ios-icon-tinted.png", 1024, { body: tinted, background: "#000000", scale: TILE }],
   ["android-icon-foreground.png", 1024, { body: dark, scale: ADAPTIVE }],
   // The "Light" alternate launcher icon (Preferences → App icon), on PAPER.
   ["android-icon-foreground-light.png", 1024, { body: light, scale: ADAPTIVE }],
   ["android-icon-monochrome.png", 1024, { body: monochromeGlyph(), scale: ADAPTIVE }],
   ["splash-icon.png", 1024, { body: dark, background: NAVY, scale: SPLASH }],
   ["splash-glyph.png", 1024, { body: dark, scale: SPLASH }],
-  ["favicon.png", 192, { body: dark, background: NAVY }],
+  ["favicon.png", 192, { body: dark, background: NAVY, scale: TILE }],
   // Round badge in the Lists screen header, one per app theme.
-  ["lists-header-dark.png", 128, { body: dark, background: NAVY, round: true, scale: BADGE }],
-  ["lists-header-light.png", 128, { body: light, background: PAPER, round: true, scale: BADGE }],
+  ["lists-header-dark.png", 192, { body: dark, background: NAVY, round: true, scale: BADGE }],
+  ["lists-header-light.png", 192, { body: light, background: PAPER, round: true, scale: BADGE }],
 ];
 
 for (const [name, size, options] of files) {
