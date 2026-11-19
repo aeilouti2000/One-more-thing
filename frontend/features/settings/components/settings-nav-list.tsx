@@ -23,7 +23,7 @@ const NAV_PAGES: Record<NavId, string[]> = {
   "home-settings": ["home-settings", "categories", "pins", "costs", "trips", "home-alerts"],
   preferences: ["preferences", "notifications", "swipe-actions", "language", "appearance"],
   permissions: ["permissions"],
-  about: ["about"],
+  about: ["about", "whats-new", "features"],
 };
 
 function activeNavId(pathname: string): NavId | null {

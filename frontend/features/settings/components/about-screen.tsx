@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
 import * as Updates from "expo-updates";
 import { useEffect, useState } from "react";
@@ -16,6 +15,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-ui";
 import { useUpdateState } from "@/features/settings/components/settings-nav-list";
+import { WHATS_NEW } from "@/features/settings/data/about-content";
 import {
   useSettingsShowBack,
   useSettingsSplitJoin,
@@ -27,14 +27,6 @@ import { useTheme } from "@/providers/ThemeProvider";
 
 const SUPPORT_EMAIL = "onemorething95@gmail.com";
 
-const WHATS_NEW = [
-  "whatsNew1",
-  "whatsNew2",
-  "whatsNew3",
-  "whatsNew4",
-  "whatsNew5",
-  "whatsNew6",
-] as const;
 
 export default function AboutScreen() {
   const { colors, scheme } = useTheme();
@@ -155,19 +147,20 @@ export default function AboutScreen() {
           </View>
         </CardBlock>
 
-        <CardBlock>
-          <AppText className="text-base font-semibold text-cove-ink">
-            {t("whatsNewTitle", { version })}
-          </AppText>
-          {WHATS_NEW.map((key) => (
-            <View key={key} className="mt-3 flex-row items-start gap-3">
-              <Ionicons name="checkmark-circle-outline" size={18} color={colors.accentText} />
-              <AppText className="min-w-0 flex-1 text-sm leading-5 text-cove-muted">
-                {t(key)}
-              </AppText>
-            </View>
-          ))}
-        </CardBlock>
+        <SettingsLinkCard
+          icon="sparkles-outline"
+          title={t("whatsNewCard")}
+          body={t("whatsNewCardBody", { version, count: WHATS_NEW.length })}
+          onPress={() => router.push("/settings/whats-new" as Href)}
+          colors={colors}
+        />
+        <SettingsLinkCard
+          icon="apps-outline"
+          title={t("appFeatures")}
+          body={t("appFeaturesBody")}
+          onPress={() => router.push("/settings/features" as Href)}
+          colors={colors}
+        />
 
         <SettingsLinkCard
           icon="mail-outline"
