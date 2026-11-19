@@ -28,8 +28,6 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
-  FadeIn,
-  FadeOut,
   interpolate,
   runOnJS,
   useAnimatedStyle,
@@ -454,9 +452,26 @@ function ToolButton({
   );
 }
 
+/**
+ * Fades a sheet page in when it mounts. This is an animated opacity on
+ * purpose, not Reanimated's `entering` layout animation: while one of those
+ * runs, Reanimated holds on to the view's frame, so a page still laying out
+ * (text, the Google button) could keep a stale, too-small native size.
+ * Android only routes a tap into children inside their parent's bounds, so
+ * the buttons below that size stopped responding.
+ */
+export function usePageFadeIn(duration = 240) {
+  const opacity = useSharedValue(0);
+  useEffect(() => {
+    opacity.set(withTiming(1, { duration }));
+  }, [duration, opacity]);
+  return useAnimatedStyle(() => ({ opacity: opacity.value }));
+}
+
 /** Scrollable page content inside the open sheet (Log in, Sign up, …). */
 export function AuthSheetPage({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
+  const fadeIn = usePageFadeIn();
   const keyboardHeight = useAndroidKeyboardLift();
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const scrollY = useRef(0);
@@ -480,11 +495,7 @@ export function AuthSheetPage({ children }: { children: ReactNode }) {
   }, [keyboardHeight]);
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(240)}
-      exiting={FadeOut.duration(120)}
-      style={styles.flex}
-    >
+    <Animated.View style={[styles.flex, fadeIn]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}

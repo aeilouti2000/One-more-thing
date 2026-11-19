@@ -1,12 +1,15 @@
 import { router, type Href } from "expo-router";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   AuthButton,
   AuthLegal,
   AuthLink,
 } from "@/features/auth/components/auth-frame";
-import { useAuthShell } from "@/features/auth/components/auth-shell";
+import {
+  useAuthShell,
+  usePageFadeIn,
+} from "@/features/auth/components/auth-shell";
 import { GoogleAuthSection } from "@/features/auth/components/google-auth-section";
 import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -21,21 +24,23 @@ export default function WelcomeScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { setWelcomeHeight } = useAuthShell();
+  const fadeIn = usePageFadeIn();
 
   return (
     <Animated.View
-      entering={FadeIn.duration(240)}
-      exiting={FadeOut.duration(120)}
       onLayout={(event) => setWelcomeHeight(event.nativeEvent.layout.height)}
-      style={{
-        paddingHorizontal: 22,
-        paddingTop: 4,
-        paddingBottom: Math.max(insets.bottom, 12) + 4,
-        gap: 12,
-        width: "100%",
-        maxWidth: 480,
-        alignSelf: "center",
-      }}
+      style={[
+        fadeIn,
+        {
+          paddingHorizontal: 22,
+          paddingTop: 4,
+          paddingBottom: Math.max(insets.bottom, 12) + 4,
+          gap: 12,
+          width: "100%",
+          maxWidth: 480,
+          alignSelf: "center",
+        },
+      ]}
     >
       <AppText
         className="text-sm"
