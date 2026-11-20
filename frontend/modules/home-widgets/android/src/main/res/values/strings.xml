@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="hw_list_name">Shopping list</string>
+  <string name="hw_list_desc">Your shared list. Tick items off without opening the app.</string>
+  <string name="hw_budget_name">Budget ring</string>
+  <string name="hw_budget_desc">This month\'s spending against your budget.</string>
+  <string name="hw_pins_name">Pinned items</string>
+  <string name="hw_pins_desc">Tap a pinned item to put it on the list.</string>
+  <string name="hw_pulse_name">Home pulse</string>
+  <string name="hw_pulse_desc">Who added and bought what in your home.</string>
+
+  <!-- Shown until the app has handed the widget its first data. -->
+  <string name="hw_fallback_title">One More Thing</string>
+  <string name="hw_fallback_body">Open the app to load this widget.</string>
+
+  <!-- Sample content for the picture in the widget picker. -->
+  <string name="hw_pv_home">Home</string>
+  <string name="hw_pv_to_buy">4 to buy</string>
+  <string name="hw_pv_milk">Milk</string>
+  <string name="hw_pv_bread">Bread</string>
+  <string name="hw_pv_eggs">Eggs</string>
+  <string name="hw_pv_coffee">Coffee</string>
+  <string name="hw_pv_tomato">Tomatoes</string>
+  <string name="hw_pv_urgent">Urgent</string>
+  <string name="hw_pv_x2">×2</string>
+  <string name="hw_pv_spent">312</string>
+  <string name="hw_pv_of">of 500</string>
+  <string name="hw_pv_left">188 left</string>
+  <string name="hw_pv_days">11 days · ≈ 17 a day</string>
+  <string name="hw_pv_pinned">Pinned</string>
+  <string name="hw_pv_tap">Tap to add</string>
+  <string name="hw_pv_pulse">Home pulse</string>
+  <string name="hw_pv_ev1">Sara added Milk</string>
+  <string name="hw_pv_ev2">Omar bought 12 items</string>
+  <string name="hw_pv_ev3">Sara added Coffee</string>
+  <string name="hw_pv_t1">10:31</string>
+  <string name="hw_pv_t2">09:12</string>
+  <string name="hw_pv_t3">08:40</string>
+</resources>

@@ -1,0 +1,12 @@
+{
+  "name": "app-night-mode",
+  "version": "1.0.0",
+  "description": "Tells Android which theme the app uses, so the system splash matches it.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "license": "MIT",
+  "peerDependencies": {
+    "expo": "*",
+    "react-native": "*"
+  }
+}

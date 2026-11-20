@@ -1,0 +1,55 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <receiver
+      android:name="expo.modules.homewidgets.ListWidgetProvider"
+      android:exported="true"
+      android:label="@string/hw_list_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/hw_list_info" />
+    </receiver>
+    <receiver
+      android:name="expo.modules.homewidgets.BudgetWidgetProvider"
+      android:exported="true"
+      android:label="@string/hw_budget_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/hw_budget_info" />
+    </receiver>
+    <receiver
+      android:name="expo.modules.homewidgets.PinsWidgetProvider"
+      android:exported="true"
+      android:label="@string/hw_pins_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/hw_pins_info" />
+    </receiver>
+    <receiver
+      android:name="expo.modules.homewidgets.PulseWidgetProvider"
+      android:exported="true"
+      android:label="@string/hw_pulse_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/hw_pulse_info" />
+    </receiver>
+
+    <!-- Taps on a row or a tile. Only this app can send to it. -->
+    <receiver android:name="expo.modules.homewidgets.WidgetTapReceiver" android:exported="false" />
+
+    <!-- Feeds the scrolling rows of a widget to the home screen. -->
+    <service
+      android:name="expo.modules.homewidgets.WidgetCollectionService"
+      android:exported="false"
+      android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+    <!-- Runs the app's sync code while the app is closed. -->
+    <service
+      android:name="expo.modules.homewidgets.WidgetSyncJobService"
+      android:exported="false"
+      android:permission="android.permission.BIND_JOB_SERVICE" />
+  </application>
+</manifest>

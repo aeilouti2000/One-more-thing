@@ -6,13 +6,14 @@ export const SWIPE_ACTION_IDS = ["buy", "pin", "move", "urgent", "later", "delet
 
 export type SwipeAction = (typeof SWIPE_ACTION_IDS)[number];
 
-export const SWIPE_ACTION_TONE: Record<SwipeAction, { bg: string; fg: string }> = {
-  buy: { bg: "#BBF7D0", fg: "#166534" },
-  pin: { bg: "#DDD6FE", fg: "#5B21B6" },
-  move: { bg: "#BFDBFE", fg: "#1E3A8A" },
-  urgent: { bg: "#FDE68A", fg: "#92400E" },
-  later: { bg: "#99F6E4", fg: "#115E59" },
-  delete: { bg: "#FECACA", fg: "#B91C1C" },
+/** bg/fg: the soft chip colours. solid: the swipe lane once the pull is far enough. */
+export const SWIPE_ACTION_TONE: Record<SwipeAction, { bg: string; fg: string; solid: string }> = {
+  buy: { bg: "#BBF7D0", fg: "#166534", solid: "#22A06B" },
+  pin: { bg: "#DDD6FE", fg: "#5B21B6", solid: "#7C5CDB" },
+  move: { bg: "#BFDBFE", fg: "#1E3A8A", solid: "#2F7FE0" },
+  urgent: { bg: "#FDE68A", fg: "#92400E", solid: "#D98A0B" },
+  later: { bg: "#99F6E4", fg: "#115E59", solid: "#14A098" },
+  delete: { bg: "#FECACA", fg: "#B91C1C", solid: "#E5484D" },
 };
 
 export type SwipeActionPrefs = {

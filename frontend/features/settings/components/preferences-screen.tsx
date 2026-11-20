@@ -20,6 +20,7 @@ import {
   useSettingsSplitJoin,
   useSettingsTabBarInset,
 } from "@/features/settings/hooks/use-settings-chrome";
+import { readWidgetStatus, widgetCount, widgetsAvailable } from "@/modules/home-widgets/src";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -33,12 +34,14 @@ export default function PreferencesScreen() {
   const pathname = usePathname();
   const [swipes, setSwipes] = useState<SwipeActionPrefs>(readSwipeActions);
   const [pushOn, setPushOn] = useState(readPushEnabled);
+  const [widgets, setWidgets] = useState(() => widgetCount(readWidgetStatus()));
 
   useEffect(() => subscribeSwipeActions(setSwipes), []);
   // The switch lives on another page; read it again when coming back here.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- re-read a stored value on navigation
     setPushOn(readPushEnabled());
+    setWidgets(widgetCount(readWidgetStatus()));
   }, [pathname]);
 
   const languageLabel = LOCALES.find((item) => item.id === locale)?.label ?? t("language");
@@ -98,6 +101,15 @@ export default function PreferencesScreen() {
             title={t("appIcon")}
             body={appIconLabel}
             onPress={() => router.push("/settings/app-icon" as Href)}
+            colors={colors}
+          />
+        ) : null}
+        {widgetsAvailable ? (
+          <SettingsLinkCard
+            icon="grid-outline"
+            title={t("widgetsTitle")}
+            body={widgets > 0 ? t("widgetsCount", { count: widgets }) : t("widgetsNone")}
+            onPress={() => router.push("/settings/widgets" as Href)}
             colors={colors}
           />
         ) : null}

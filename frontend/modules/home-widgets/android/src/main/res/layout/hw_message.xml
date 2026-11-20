@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Signed out, no home yet, or nothing loaded: one line of what to do. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/hw_root" android:layout_width="match_parent" android:layout_height="match_parent">
+  <ImageView android:id="@+id/hw_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/hw_bg" android:scaleType="fitXY" android:tint="@color/hw_d_bg" android:importantForAccessibility="no" />
+  <LinearLayout android:id="@+id/hw_body" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center" android:padding="14dp">
+    <TextView android:id="@+id/hw_title" style="@style/HwText.Strong" android:layout_width="wrap_content"
+      android:layout_height="wrap_content" android:textAlignment="center" android:maxLines="2" android:ellipsize="end"
+      android:text="@string/hw_fallback_title" android:textSize="14sp" />
+    <TextView android:id="@+id/hw_subtitle" style="@style/HwText" android:layout_width="wrap_content"
+      android:layout_height="wrap_content" android:layout_marginTop="3dp" android:textAlignment="center"
+      android:maxLines="3" android:ellipsize="end" android:text="@string/hw_fallback_body" android:textSize="12sp"
+      android:textColor="@color/hw_d_muted" />
+  </LinearLayout>
+</FrameLayout>

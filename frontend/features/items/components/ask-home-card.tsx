@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
-import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { firstName } from "@/features/items/api/shop-locks";
@@ -27,7 +26,7 @@ type AskHomeCardProps = {
  * whole home. After: who answered what, one line per person.
  */
 export function AskHomeCard({ ask, asking, error, onAsk }: AskHomeCardProps) {
-  const { t } = useI18n();
+  const { t, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
   const [open, setOpen] = useState<boolean | null>(null);
   // "4 min ago" moves on by itself while the card is on screen.
@@ -55,17 +54,43 @@ export function AskHomeCard({ ask, asking, error, onAsk }: AskHomeCardProps) {
             <AppText className="text-base font-semibold text-cove-ink">{t("askHomeTitle")}</AppText>
             <AppText className="mt-0.5 text-sm text-cove-muted">{t("askHomeBody")}</AppText>
           </View>
-          <AppButton
-            label={t("askHomeButton")}
+          {/* Round send button; the label is for screen readers. */}
+          <Pressable
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onAsk();
             }}
-            loading={asking}
             disabled={asking}
-            compact
-            fit
-          />
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel={t("askHomeButton")}
+            accessibilityState={{ disabled: asking, busy: asking }}
+            className="active:scale-95 active:opacity-90"
+          >
+            <View
+              className="h-12 w-12 items-center justify-center rounded-full"
+              style={{
+                backgroundColor: colors.accentText,
+                shadowColor: colors.accentText,
+                shadowOpacity: scheme === "dark" ? 0.45 : 0.35,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 4,
+              }}
+            >
+              {asking ? (
+                <ActivityIndicator color={colors.onAccent} />
+              ) : (
+                <Ionicons
+                  name="send"
+                  size={20}
+                  color={colors.onAccent}
+                  // Points the way text reads; nudged right so it looks centred.
+                  style={{ transform: [{ scaleX: isRTL ? -1 : 1 }, { translateX: 1.5 }] }}
+                />
+              )}
+            </View>
+          </Pressable>
         </View>
         <FormMessage message={error} />
       </View>

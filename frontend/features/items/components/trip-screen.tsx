@@ -3,10 +3,17 @@ import * as Haptics from "expo-haptics";
 import type { NavigationProp, ParamListBase } from "@react-navigation/native";
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AppState, BackHandler, Platform, Pressable, View, type LayoutChangeEvent } from "react-native";
+import {
+  AppState,
+  BackHandler,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+} from "react-native";
 import Animated, {
   Easing,
-  FadeIn,
   FadeInDown,
   FadeOutDown,
   Extrapolation,
@@ -26,6 +33,7 @@ import { ReceiptSourceModal } from "@/features/items/components/receipt-source-m
 import { AppButton } from "@/components/ui/AppButton";
 import { SheetField } from "@/components/ui/SheetField";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { AppText } from "@/components/ui/AppText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -51,6 +59,13 @@ import {
 } from "@/features/items/api/shop-locks";
 import { FloatMessage } from "@/components/ui/FloatMessage";
 import { AskHomeCard } from "@/features/items/components/ask-home-card";
+import {
+  Flyer,
+  TripDockCard,
+  type Flight,
+  type PendingPrice,
+  type Rect,
+} from "@/features/items/components/trip-price-dock";
 import { askHome, endShopAsk, SHOP_ASK_POLL_MS } from "@/features/items/api/shop-asks";
 import { adoptShopAsk, dropShopAsk, useShopAsks } from "@/features/items/hooks/use-shop-asks";
 import { formatMoney } from "@/features/items/utils/currency";
@@ -59,6 +74,7 @@ import {
   formatTripMinutes,
   formatTripShare,
   lastPrices,
+  priceOf,
   rememberedPrice,
   savedShopNames,
   summarizeTrip,
@@ -83,6 +99,7 @@ import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Purchase } from "@/features/items/types/purchase";
+import type { ViewHandle } from "@/lib/native-refs";
 
 const ROW_GAP = 12;
 const CHECK_SIZE = iconSize.md;
@@ -97,6 +114,10 @@ const SHEET_SWAP_MS = 350;
 
 /** How long the floating Undo toast stays up after a check. */
 const UNDO_TOAST_MS = 5000;
+/** A saved price takes this long to fly into the total before it counts. */
+const PRICE_LAND_MS = 420;
+/** Space under the trip card's slot in the list. */
+const DOCK_GAP = 20;
 /** Row id for the single "Total paid" field in trip-total mode. */
 const TRIP_TOTAL_ROW_ID = "trip-total";
 
@@ -126,7 +147,7 @@ function TripBody() {
   const { household } = useHousehold();
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const { t, locale } = useI18n();
+  const { t, locale, isRTL } = useI18n();
   // Leaves the trip (the page uses the stack's normal animation).
   const closePage = useCallback(() => router.back(), []);
   const { categories } = useCategories();
@@ -168,7 +189,19 @@ function TripBody() {
     () => resumed?.boughtIds ?? [],
   );
   const [tripCostOpen, setTripCostOpen] = useState(false);
-  const [singleCostItem, setSingleCostItem] = useState<Purchase | null>(null);
+  // Bought items waiting in the trip card for their price.
+  const [pending, setPending] = useState<PendingPrice[]>([]);
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const [leaveAskOpen, setLeaveAskOpen] = useState(false);
+  const [isKeepingPrices, setIsKeepingPrices] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const [dockHeight, setDockHeight] = useState(0);
+  const scrollY = useSharedValue(0);
+  const dockSlotY = useSharedValue(-1);
+  const overlayRef = useRef<ViewHandle>(null);
+  const dockRef = useRef<ViewHandle>(null);
+  const estimateRef = useRef<ViewHandle>(null);
   const [isSavingCosts, setIsSavingCosts] = useState(false);
   const [scanPhase, setScanPhase] = useState<"picking" | "reading" | null>(null);
   const [receiptCover, setReceiptCover] = useState(false);
@@ -187,7 +220,6 @@ function TripBody() {
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notedIds = useRef(new Set<string>());
   const finishedRef = useRef(false);
-  const singleCostResolver = useRef<((value: number | null | undefined) => void) | null>(null);
   const inflightChecks = useRef(0);
   const undoing = useRef(false);
   const allowLeaveRef = useRef(false);
@@ -283,6 +315,39 @@ function TripBody() {
 
   const askCostOnCheck =
     household?.costsEnabled === true && household.askCostOnSingleBuy !== false;
+
+  // Only what is still part of this trip: an undone item drops out by itself.
+  const visiblePending = useMemo(
+    () => pending.filter((entry) => sessionBoughtIds.includes(entry.id)),
+    [pending, sessionBoughtIds],
+  );
+  const openPending = useMemo(
+    () => visiblePending.filter((entry) => !entry.saving),
+    [visiblePending],
+  );
+  const pendingCountRef = useRef(0);
+  useLayoutEffect(() => {
+    pendingCountRef.current = visiblePending.length;
+  });
+  // A waiting item adds nothing to "so far" until its price is in.
+  const heldBack = useMemo(() => {
+    let sum = 0;
+    let priced = 0;
+    for (const entry of visiblePending) {
+      const item = doneItems.find((row) => row.id === entry.id);
+      if (!item) continue;
+      const own = typeof item.cost === "number" && Number.isFinite(item.cost) ? item.cost : null;
+      const amount = own ?? priceOf(prices, item.name, item);
+      if (amount === null) continue;
+      sum += amount;
+      priced += 1;
+    }
+    return { sum, priced };
+  }, [doneItems, prices, visiblePending]);
+  const soFar =
+    costsEnabled && (progress.estimated - heldBack.priced > 0 || visiblePending.length > 0)
+      ? Math.max(0, Math.round((progress.estimate - heldBack.sum) * 1000) / 1000)
+      : null;
 
   const unpricedSessionIds = useMemo(
     () =>
@@ -730,31 +795,6 @@ function TripBody() {
     };
   }, [autoEndMs, homeId, listId]);
 
-  async function askCostForItem(item: Purchase): Promise<number | null | undefined> {
-    if (!askCostOnCheck) return null;
-    // Avoid overlapping prompts (would orphan the first check's promise).
-    if (singleCostResolver.current || tripCostOpen) return undefined;
-    return new Promise((resolve) => {
-      singleCostResolver.current = resolve;
-      setSingleCostItem(item);
-    });
-  }
-
-  function resolveSingleCost(value: number | null | undefined) {
-    const resolve = singleCostResolver.current;
-    singleCostResolver.current = null;
-    setSingleCostItem(null);
-    resolve?.(value);
-  }
-
-  const singleCostSheetItems = useMemo(
-    () =>
-      singleCostItem
-        ? [{ id: singleCostItem.id, name: singleCostItem.name }]
-        : [],
-    [singleCostItem],
-  );
-
   const noteInflight = useCallback((delta: number) => {
     inflightChecks.current = Math.max(0, inflightChecks.current + delta);
   }, []);
@@ -770,6 +810,15 @@ function TripBody() {
       });
     }
     lastActivityRef.current = Date.now();
+    if (askCostOnCheck && item) {
+      // A second waiting item folds them all behind the arrow.
+      if (openPending.length === 1) setPendingOpen(false);
+      setPending((current) =>
+        current.some((entry) => entry.id === id)
+          ? current
+          : [...current, { id, name: item.name, remembered: priceOf(prices, item.name, item) }],
+      );
+    }
     // Part of this trip from the tap, and "still saving" until the answer is
     // in: the row leaves the page at once, and the item that empties the list
     // must still be counted when the trip finishes itself.
@@ -817,7 +866,128 @@ function TripBody() {
       return;
     }
     setSessionBoughtIds((current) => current.filter((id) => id !== recent.id));
+    setPending((current) => current.filter((entry) => entry.id !== recent.id));
     setUndoId(null);
+  }
+
+  const removeFlight = useCallback((key: string) => {
+    setFlights((current) => current.filter((flight) => flight.key !== key));
+  }, []);
+
+  /** Sends something from `from` (window coordinates) toward the trip card. */
+  const launchFlight = useCallback(
+    (kind: Flight["kind"], label: string, from: Rect, target: "dock" | "estimate") => {
+      const root = overlayRef.current;
+      const goal = (target === "estimate" ? estimateRef.current : null) ?? dockRef.current;
+      if (!root || !goal || from.width <= 0) return;
+      root.measureInWindow((rootX, rootY) => {
+        goal.measureInWindow((x, y, width, height) => {
+          const start = { ...from, x: from.x - rootX, y: from.y - rootY };
+          const flight: Flight =
+            kind === "row"
+              ? // Lands on the card's lower edge, where its price line appears.
+                {
+                  key: `${kind}-${Date.now()}`,
+                  kind,
+                  label,
+                  from: start,
+                  toX: start.x,
+                  toY: y - rootY + height - from.height / 2,
+                }
+              : {
+                  key: `${kind}-${Date.now()}`,
+                  kind,
+                  label,
+                  from: start,
+                  toX: (isRTL ? x + width - from.width : x) - rootX,
+                  toY: y - rootY - 4,
+                };
+          setFlights((current) => [...current, flight]);
+        });
+      });
+    },
+    [isRTL],
+  );
+
+  const flyRowToDock = useCallback(
+    (item: Purchase, from: Rect) => launchFlight("row", item.name, from, "dock"),
+    [launchFlight],
+  );
+
+  async function savePendingPrice(id: string, cost: number, from: Rect) {
+    const entry = pending.find((row) => row.id === id);
+    if (!entry || entry.saving) return;
+    setActionError(null);
+    lastActivityRef.current = Date.now();
+    setPending((current) =>
+      current.map((row) => (row.id === id ? { ...row, saving: true } : row)),
+    );
+    launchFlight("price", `${entry.name} · ${formatMoney(cost, currency)}`, from, "estimate");
+    const startedAt = Date.now();
+    noteInflight(1);
+    let result: Awaited<ReturnType<typeof updateCosts>>;
+    try {
+      result = await updateCosts([{ id, cost }]);
+    } finally {
+      noteInflight(-1);
+    }
+    if (result.error) {
+      setPending((current) =>
+        current.map((row) => (row.id === id ? { ...row, saving: false } : row)),
+      );
+      setActionError(result.error);
+      return;
+    }
+    // Count it once the price has landed on the total.
+    setTimeout(
+      () => setPending((current) => current.filter((row) => row.id !== id)),
+      Math.max(0, PRICE_LAND_MS - (Date.now() - startedAt)),
+    );
+  }
+
+  function skipPendingPrice(id: string) {
+    lastActivityRef.current = Date.now();
+    setPending((current) => current.filter((row) => row.id !== id));
+  }
+
+  /** "Enter prices": back to the trip, with every waiting price open. */
+  function enterPrices() {
+    if (isKeepingPrices) return;
+    setLeaveAskOpen(false);
+    setLeaveError(null);
+    setPendingOpen(true);
+  }
+
+  /** "Leave anyway": waiting items keep their last price, then the trip ends. */
+  async function leaveWithPending() {
+    if (isKeepingPrices) return;
+    const kept = openPending.flatMap((entry) =>
+      entry.remembered !== null ? [{ id: entry.id, cost: entry.remembered }] : [],
+    );
+    if (kept.length > 0) {
+      setIsKeepingPrices(true);
+      setLeaveError(null);
+      const result = await updateCosts(kept);
+      setIsKeepingPrices(false);
+      if (result.error) {
+        setLeaveError(result.error);
+        return;
+      }
+    }
+    setPending([]);
+    pendingCountRef.current = 0;
+    setLeaveAskOpen(false);
+    // Two sheets can't swap in one frame: let the question close first.
+    setTimeout(() => {
+      // One total for the trip is a different question: still ask it.
+      if (tripTotalMode && askTripCosts) {
+        setFrozenTotalIds(sessionBoughtIds);
+        setTripCostOpen(true);
+        return;
+      }
+      // They chose to leave: don't ask for the same prices again.
+      exitTrip();
+    }, SHEET_SWAP_MS);
   }
 
   async function shareList() {
@@ -917,8 +1087,8 @@ function TripBody() {
       skipName();
       return;
     }
-    if (singleCostResolver.current) {
-      resolveSingleCost(undefined);
+    if (leaveAskOpen) {
+      enterPrices();
       return;
     }
     if (tripCostOpen) {
@@ -929,6 +1099,11 @@ function TripBody() {
     }
     // Block leave only while a check-off animation/API is in flight (not during cost prompt).
     if (inflightChecks.current > 0) return;
+    if (openPending.length > 0) {
+      setLeaveError(null);
+      setLeaveAskOpen(true);
+      return;
+    }
     if (askTripCosts) {
       setFrozenTripCostItems(liveTripCostItems);
       setFrozenTotalIds(sessionBoughtIds);
@@ -992,7 +1167,7 @@ function TripBody() {
       if (allowLeaveRef.current) return;
       if (
         inflightChecks.current > 0 ||
-        singleCostResolver.current ||
+        pendingCountRef.current > 0 ||
         tripCostOpenRef.current ||
         nameOpenRef.current ||
         endStepsRef.current
@@ -1036,8 +1211,8 @@ function TripBody() {
     if (!tripCleared || autoFinishedRef.current) return;
     let timer: ReturnType<typeof setTimeout>;
     const attempt = () => {
-      // Wait out a check still animating / saving, or a cost prompt.
-      if (inflightChecks.current > 0 || singleCostResolver.current) {
+      // Wait out a check still animating / saving, or prices still to confirm.
+      if (inflightChecks.current > 0 || pendingCountRef.current > 0) {
         timer = setTimeout(attempt, 250);
         return;
       }
@@ -1147,8 +1322,10 @@ function TripBody() {
   }
 
   const shopChoices = household?.tripAskName ? savedShopNames(bought, tripName) : [];
+  const showDock = (tripItems.length > 0 || visiblePending.length > 0) && progress.total > 0;
   const rowProps = {
-    onAskCost: askCostForItem,
+    docks: askCostOnCheck,
+    onFly: flyRowToDock,
     onCheck: checkOff,
     onInflight: noteInflight,
     onHold: openHold,
@@ -1160,6 +1337,38 @@ function TripBody() {
 
   return (
     <Screen
+      scrollY={scrollY}
+      overlay={
+        <View
+          ref={overlayRef}
+          collapsable={false}
+          pointerEvents="box-none"
+          style={StyleSheet.absoluteFill}
+        >
+          {showDock ? (
+            <TripDockCard
+              scrollY={scrollY}
+              slotY={dockSlotY}
+              onNaturalHeight={setDockHeight}
+              dockRef={dockRef}
+              estimateRef={estimateRef}
+              done={progress.done}
+              total={progress.total}
+              soFar={soFar}
+              forecast={forecast}
+              currency={currency}
+              pending={openPending}
+              pendingOpen={pendingOpen}
+              onTogglePending={() => setPendingOpen((open) => !open)}
+              onSavePrice={(id, cost, from) => void savePendingPrice(id, cost, from)}
+              onSkipPrice={skipPendingPrice}
+            />
+          ) : null}
+          {flights.map((flight) => (
+            <Flyer key={flight.key} flight={flight} onDone={removeFlight} />
+          ))}
+        </View>
+      }
       floating={note ? <FloatMessage message={note} tone="success" /> : null}
       fab={
         recent && !tripCleared ? (
@@ -1212,17 +1421,14 @@ function TripBody() {
         />
       ) : null}
 
-      {tripItems.length > 0 && progress.total > 0 ? (
-        <TripProgressCard
-          done={progress.done}
-          total={progress.total}
-          estimate={
-            costsEnabled && progress.estimated > 0
-              ? t("tripEstimate", { amount: formatMoney(progress.estimate, currency) })
-              : null
-          }
-          forecast={forecast}
-          currency={currency}
+      {showDock ? (
+        // Holds the trip card's place in the list; the card itself floats above.
+        <View
+          collapsable={false}
+          style={{ height: dockHeight, marginBottom: DOCK_GAP }}
+          onLayout={(event) => {
+            dockSlotY.value = event.nativeEvent.layout.y;
+          }}
         />
       ) : null}
 
@@ -1340,16 +1546,17 @@ function TripBody() {
         ) : null}
       </BottomSheet>
 
-      <CostEntrySheet
-        visible={singleCostItem !== null}
-        title={t("enterCost")}
-        subtitle={singleCostItem?.name}
-        currency={household?.currency ?? "JOD"}
-        items={singleCostSheetItems}
-        skipLabel={t("skipCost")}
-        onConfirm={(entries) => resolveSingleCost(entries[0]?.cost ?? null)}
-        onSkip={() => resolveSingleCost(null)}
-        onClose={() => resolveSingleCost(undefined)}
+      <ConfirmModal
+        visible={leaveAskOpen}
+        title={t("tripLeavePricesTitle")}
+        message={t("tripLeavePricesBody", { count: openPending.length })}
+        confirmLabel={t("tripLeaveAnyway")}
+        cancelLabel={t("tripEnterPrices")}
+        icon="pricetag-outline"
+        error={leaveError}
+        loading={isKeepingPrices}
+        onConfirm={() => void leaveWithPending()}
+        onCancel={enterPrices}
       />
 
       <CostEntrySheet
@@ -1396,7 +1603,9 @@ function TripBody() {
 }
 
 type RowActions = {
-  onAskCost: (item: Purchase) => Promise<number | null | undefined>;
+  /** Bought rows travel to the trip card, where their price is asked. */
+  docks: boolean;
+  onFly: (item: Purchase, from: Rect) => void;
   onCheck: (id: string, cost: number | null) => Promise<boolean>;
   onInflight: (delta: number) => void;
   onHold: (item: Purchase) => void;
@@ -1425,8 +1634,9 @@ function TripGroup({
             key={item.id}
             item={item}
             gap={index < items.length - 1 ? ROW_GAP : 0}
-            onAskCost={() => actions.onAskCost(item)}
-            onCheck={(cost) => actions.onCheck(item.id, cost)}
+            docks={actions.docks}
+            onFly={(from) => actions.onFly(item, from)}
+            onCheck={() => actions.onCheck(item.id, null)}
             onInflight={actions.onInflight}
             onHold={() => actions.onHold(item)}
             registerBuyer={actions.registerBuyer}
@@ -1449,7 +1659,8 @@ function TripGroup({
 function TripCheckRow({
   item,
   gap,
-  onAskCost,
+  docks,
+  onFly,
   onCheck,
   onInflight,
   onHold,
@@ -1460,8 +1671,9 @@ function TripCheckRow({
 }: {
   item: Purchase;
   gap: number;
-  onAskCost: () => Promise<number | null | undefined>;
-  onCheck: (cost: number | null) => Promise<boolean>;
+  docks: boolean;
+  onFly: (from: Rect) => void;
+  onCheck: () => Promise<boolean>;
   onInflight: (delta: number) => void;
   onHold: () => void;
   registerBuyer: (id: string, buy: (() => void) | null) => void;
@@ -1485,7 +1697,7 @@ function TripCheckRow({
   const photoUri = itemPhotoUri(item);
   const [viewingPhoto, setViewingPhoto] = useState(false);
   const locked = useRef(false);
-  const pendingCost = useRef<number | null>(null);
+  const cardRef = useRef<ViewHandle>(null);
   const mounted = useRef(true);
   const held = useRef(false);
   const [leaving, setLeaving] = useState(false);
@@ -1493,6 +1705,8 @@ function TripCheckRow({
   const check = useSharedValue(0);
   const ripple = useSharedValue(0);
   const leave = useSharedValue(0);
+  // Flying to the trip card: a copy travels, so the row itself goes at once.
+  const flown = useSharedValue(0);
 
   useEffect(() => {
     mounted.current = true;
@@ -1516,6 +1730,7 @@ function TripCheckRow({
   }
 
   function restore() {
+    flown.value = 0;
     check.value = withTiming(0, { duration: 180 });
     ripple.value = withTiming(0, { duration: 160 });
     leave.value = withTiming(0, { duration: 240, easing: Easing.out(Easing.cubic) }, (finished) => {
@@ -1530,7 +1745,7 @@ function TripCheckRow({
   }
 
   function commit() {
-    void onCheck(pendingCost.current).then((ok) => {
+    void onCheck().then((ok) => {
       releaseInflight();
       if (!ok && mounted.current) restore();
     });
@@ -1540,6 +1755,28 @@ function TripCheckRow({
     locked.current = true;
     setLeaving(true);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (docks) {
+      const card = cardRef.current;
+      const close = () => {
+        flown.value = 1;
+        leave.value = withTiming(
+          1,
+          { duration: LEAVE_MS, easing: Easing.out(Easing.cubic) },
+          (finished) => {
+            if (finished) runOnJS(commit)();
+          },
+        );
+      };
+      if (!card) {
+        close();
+        return;
+      }
+      card.measureInWindow((x, y, width, height) => {
+        onFly({ x, y, width, height });
+        close();
+      });
+      return;
+    }
     check.value = withSpring(1, { damping: 13, stiffness: 340, mass: 0.45 });
     ripple.value = withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) });
     leave.value = withDelay(
@@ -1550,20 +1787,10 @@ function TripCheckRow({
     );
   }
 
-  async function playExit() {
+  function playExit() {
     if (locked.current || held.current) return;
     held.current = true;
     onInflight(1);
-    const cost = await onAskCost();
-    if (cost === undefined) {
-      releaseInflight();
-      return;
-    }
-    pendingCost.current = cost;
-    if (!mounted.current) {
-      void onCheck(cost);
-      return;
-    }
     startExit();
   }
 
@@ -1572,7 +1799,7 @@ function TripCheckRow({
     playExitRef.current = playExit;
   });
   useEffect(() => {
-    registerBuyer(item.id, () => void playExitRef.current());
+    registerBuyer(item.id, () => playExitRef.current());
     return () => registerBuyer(item.id, null);
   }, [item.id, registerBuyer]);
 
@@ -1586,7 +1813,7 @@ function TripCheckRow({
   });
 
   const motionStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(leave.value, [0, 0.5], [1, 0], Extrapolation.CLAMP),
+    opacity: flown.value ? 0 : interpolate(leave.value, [0, 0.5], [1, 0], Extrapolation.CLAMP),
     transformOrigin: isRTL ? "right center" : "left center",
     transform: [{ scale: interpolate(leave.value, [0, 0.5], [1, 0.9], Extrapolation.CLAMP) }],
   }));
@@ -1637,6 +1864,8 @@ function TripCheckRow({
             }}
           >
             <View
+              ref={cardRef}
+              collapsable={false}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -1762,111 +1991,6 @@ function TripCheckRow({
         onClose={() => setViewingPhoto(false)}
       />
     </Animated.View>
-  );
-}
-
-type TripForecast = {
-  /** Expected cost of the whole trip; null once nothing is left to buy. */
-  whole: number | null;
-  unpriced: number;
-  budget: { left: number; tone: "ok" | "warn" | "over" } | null;
-};
-
-function TripProgressCard({
-  done,
-  total,
-  estimate,
-  forecast,
-  currency,
-}: {
-  done: number;
-  total: number;
-  estimate: string | null;
-  forecast: TripForecast | null;
-  currency: string;
-}) {
-  const { t } = useI18n();
-  const { colors, scheme } = useTheme();
-  const share = total > 0 ? Math.min(1, done / total) : 0;
-  const fill = useSharedValue(share);
-  useEffect(() => {
-    fill.value = withTiming(share, { duration: 420, easing: Easing.out(Easing.cubic) });
-  }, [fill, share]);
-  const fillStyle = useAnimatedStyle(() => ({ width: `${fill.value * 100}%` }));
-
-  const whole =
-    forecast && forecast.whole !== null
-      ? t("tripWholeAmount", { amount: formatMoney(forecast.whole, currency) })
-      : null;
-  const budget = forecast?.budget ?? null;
-  // The same amber and red History uses for the month's budget.
-  const budgetColor =
-    budget?.tone === "over"
-      ? scheme === "dark"
-        ? "#F07178"
-        : "#C2414A"
-      : budget?.tone === "warn"
-        ? scheme === "dark"
-          ? "#E6B450"
-          : "#B7791F"
-        : null;
-  const budgetLabel = budget ? t(budget.tone === "over" ? "tripBudgetOver" : "tripBudgetLeft") : null;
-  const budgetAmount = budget ? formatMoney(Math.abs(budget.left), currency) : null;
-  const unpriced =
-    forecast && forecast.unpriced > 0 ? t("tripUnpriced", { count: forecast.unpriced }) : null;
-  const showForecast = Boolean(whole || budget);
-
-  return (
-    <View
-      className="mb-5 rounded-3xl bg-cove-paper px-4 py-4"
-      accessible
-      accessibilityLabel={[
-        t("tripProgress", { done, total }),
-        estimate,
-        whole ? `${t("tripWhole")} ${whole}` : null,
-        budgetLabel ? `${budgetLabel} ${budgetAmount}` : null,
-        showForecast ? unpriced : null,
-      ]
-        .filter(Boolean)
-        .join(", ")}
-    >
-      <AppText className="text-base font-semibold text-cove-ink">
-        {t("tripProgress", { done, total })}
-      </AppText>
-      {estimate ? <AppText className="mt-1 text-sm text-cove-muted">{estimate}</AppText> : null}
-      <View className="mt-3 h-2 overflow-hidden rounded-full bg-cove-mist">
-        <Animated.View
-          style={[{ height: "100%", borderRadius: 999, backgroundColor: colors.accent }, fillStyle]}
-        />
-      </View>
-      {showForecast ? (
-        <Animated.View entering={FadeIn.duration(180)} className="mt-3 gap-1.5">
-          {whole ? (
-            <View className="flex-row items-baseline justify-between gap-3">
-              <AppText className="min-w-0 flex-1 text-sm text-cove-muted">{t("tripWhole")}</AppText>
-              <AppText className="text-base font-semibold text-cove-ink">{whole}</AppText>
-            </View>
-          ) : null}
-          {budgetLabel ? (
-            <View className="flex-row items-baseline justify-between gap-3">
-              <AppText
-                className={`min-w-0 flex-1 text-sm ${budget?.tone === "over" ? "font-semibold" : ""}`}
-                style={{ color: budget?.tone === "over" ? (budgetColor ?? colors.muted) : colors.muted }}
-              >
-                {budgetLabel}
-              </AppText>
-              <AppText
-                className="text-base font-semibold"
-                style={{ color: budgetColor ?? colors.ink }}
-              >
-                {budgetAmount}
-              </AppText>
-            </View>
-          ) : null}
-          {unpriced ? <AppText className="text-xs text-cove-muted">{unpriced}</AppText> : null}
-        </Animated.View>
-      ) : null}
-    </View>
   );
 }
 

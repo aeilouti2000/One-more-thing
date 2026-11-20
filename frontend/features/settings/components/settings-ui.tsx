@@ -10,10 +10,16 @@ import {
   type ReactNode,
 } from "react";
 import Animated, {
+  Easing,
+  Extrapolation,
   FadeInDown,
   FadeOut,
+  cancelAnimation,
+  interpolate,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withRepeat,
   withSequence,
   withTiming,
   type SharedValue,
@@ -387,7 +393,7 @@ function SwipeActionGlyph({ action, color, size = 18 }: { action: SwipeAction; c
   return <Ionicons name="trash-outline" size={size} color={color} />;
 }
 
-/** Readable action tint on paper/mist; chip faces keep SWIPE_ACTION_TONE.fg. */
+/** Readable action tint on the dark cards; light mode uses the solid lane colour. */
 const SWIPE_ACTION_LABEL_DARK: Record<SwipeAction, string> = {
   buy: "#4ADE80",
   pin: "#C4B5FD",
@@ -398,37 +404,110 @@ const SWIPE_ACTION_LABEL_DARK: Record<SwipeAction, string> = {
 };
 
 function swipeActionLabelColor(action: SwipeAction, scheme: "light" | "dark") {
-  return scheme === "dark" ? SWIPE_ACTION_LABEL_DARK[action] : SWIPE_ACTION_TONE[action].fg;
+  return scheme === "dark" ? SWIPE_ACTION_LABEL_DARK[action] : SWIPE_ACTION_TONE[action].solid;
 }
 
-function SwipePreviewEdge({
-  action,
-  side,
-  label,
-}: {
-  action: SwipeAction;
-  side: "left" | "right";
-  label: string;
-}) {
-  const tone = SWIPE_ACTION_TONE[action];
+/** Icon tile: a wash of the lane colour, so the page matches the real swipe. */
+function swipeActionTile(action: SwipeAction, scheme: "light" | "dark") {
+  return withAlpha(SWIPE_ACTION_TONE[action].solid, scheme === "dark" ? 0.22 : 0.14);
+}
+
+const PREVIEW_PULL = 0.44;
+
+/** A small item card that swipes itself, showing the same lanes as the list. */
+function SwipePreview({ left, right }: { left: SwipeAction; right: SwipeAction }) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  // -1 = pulled left, 1 = pulled right.
+  const pull = useSharedValue(0);
+  const width = useSharedValue(0);
+
+  useEffect(() => {
+    const move = { duration: 520, easing: Easing.inOut(Easing.cubic) };
+    pull.value = withDelay(
+      600,
+      withRepeat(
+        withSequence(
+          withTiming(-1, move),
+          withDelay(900, withTiming(0, move)),
+          withDelay(500, withTiming(1, move)),
+          withDelay(900, withTiming(0, move)),
+          withDelay(700, withTiming(0, { duration: 1 })),
+        ),
+        -1,
+      ),
+    );
+    return () => cancelAnimation(pull);
+  }, [pull]);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: pull.value * width.value * PREVIEW_PULL }],
+  }));
+  // Swiping left opens the lane on the right edge, and the other way round.
+  const leftLane = useAnimatedStyle(() => ({
+    opacity: interpolate(pull.value, [-0.12, 0], [1, 0], Extrapolation.CLAMP),
+  }));
+  const rightLane = useAnimatedStyle(() => ({
+    opacity: interpolate(pull.value, [0, 0.12], [0, 1], Extrapolation.CLAMP),
+  }));
+
+  function lane(action: SwipeAction, edge: "left" | "right", style: typeof leftLane) {
+    return (
+      <Animated.View
+        style={[
+          {
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            flexDirection: edge === "left" ? "row" : "row-reverse",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 16,
+            backgroundColor: SWIPE_ACTION_TONE[action].solid,
+          },
+          style,
+        ]}
+      >
+        <SwipeActionGlyph action={action} color="#FFFFFF" size={20} />
+        <AppText className="text-sm font-semibold" style={{ color: "#FFFFFF" }} numberOfLines={1}>
+          {swipeActionName(action, t)}
+        </AppText>
+      </Animated.View>
+    );
+  }
+
   return (
     <View
-      className="w-[72px] items-center justify-center gap-1 px-1"
-      style={{ backgroundColor: tone.bg }}
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+      className="overflow-hidden rounded-2xl"
+      style={{ direction: "ltr", height: 56 }}
+      onLayout={(event) => {
+        width.value = event.nativeEvent.layout.width;
+      }}
     >
-      <SwipeActionGlyph action={action} color={tone.fg} size={20} />
-      <AppText
-        className="text-center text-[11px] font-semibold"
-        style={{ color: tone.fg }}
-        numberOfLines={1}
+      {lane(left, "right", leftLane)}
+      {lane(right, "left", rightLane)}
+      <Animated.View
+        className="flex-1 flex-row items-center gap-3 rounded-2xl px-4"
+        style={[
+          { backgroundColor: colors.mist, borderWidth: 1, borderColor: withAlpha(colors.muted, 0.18) },
+          cardStyle,
+        ]}
       >
-        {label}
-      </AppText>
-      <Ionicons
-        name={side === "left" ? "arrow-back" : "arrow-forward"}
-        size={12}
-        color={withAlpha(tone.fg, 0.7)}
-      />
+        <Ionicons name="menu" size={18} color={colors.muted} />
+        <View
+          className="h-2.5 w-24 rounded-full"
+          style={{ backgroundColor: withAlpha(colors.muted, 0.35) }}
+        />
+        <View className="flex-1" />
+        <View
+          className="h-5 w-5 rounded-full"
+          style={{ borderWidth: 1, borderColor: withAlpha(colors.muted, 0.35) }}
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -458,7 +537,6 @@ export function SwipeActionSettings() {
 
   function sideCard(side: "left" | "right") {
     const selected = prefs[side];
-    const tone = SWIPE_ACTION_TONE[selected];
     const expanded = openSide === side;
     const title = side === "left" ? t("swipeLeft") : t("swipeRight");
     return (
@@ -472,12 +550,12 @@ export function SwipeActionSettings() {
         >
           <View
             className="h-10 w-10 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: tone.bg }}
+            style={{ backgroundColor: swipeActionTile(selected, scheme) }}
           >
             <Ionicons
               name={side === "left" ? "arrow-back" : "arrow-forward"}
               size={18}
-              color={tone.fg}
+              color={swipeActionLabelColor(selected, scheme)}
             />
           </View>
           <View className="min-w-0 flex-1">
@@ -501,7 +579,6 @@ export function SwipeActionSettings() {
           <View className="mt-3 gap-1.5">
             {SWIPE_ACTION_IDS.map((action) => {
               const active = selected === action;
-              const meta = SWIPE_ACTION_TONE[action];
               const taken = prefs[side === "left" ? "right" : "left"] === action;
               return (
                 <Pressable
@@ -513,14 +590,14 @@ export function SwipeActionSettings() {
                   className="flex-row items-center gap-3 rounded-2xl px-2.5 py-2.5 active:opacity-80"
                   style={{
                     backgroundColor: colors.mist,
-                    opacity: taken && !active ? 0.55 : 1,
+                    opacity: taken && !active ? 0.5 : 1,
                   }}
                 >
                   <View
                     className="h-9 w-9 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: meta.bg }}
+                    style={{ backgroundColor: swipeActionTile(action, scheme) }}
                   >
-                    <SwipeActionGlyph action={action} color={meta.fg} />
+                    <SwipeActionGlyph action={action} color={swipeActionLabelColor(action, scheme)} />
                   </View>
                   <View className="min-w-0 flex-1">
                     <AppText className="text-sm font-semibold text-cove-ink">{label(action)}</AppText>
@@ -532,6 +609,15 @@ export function SwipeActionSettings() {
                       size={20}
                       color={swipeActionLabelColor(action, scheme)}
                     />
+                  ) : taken ? (
+                    <View
+                      className="rounded-full px-2 py-0.5"
+                      style={{ borderWidth: 1, borderColor: withAlpha(colors.muted, 0.4) }}
+                    >
+                      <AppText className="text-[11px] text-cove-muted">
+                        {side === "left" ? t("swipeUsedOnRight") : t("swipeUsedOnLeft")}
+                      </AppText>
+                    </View>
                   ) : null}
                 </Pressable>
               );
@@ -549,21 +635,28 @@ export function SwipeActionSettings() {
           <SettingsCardIcon icon="swap-horizontal-outline" colors={colors} />
           <SettingsCardCopy title={t("swipeActions")} body={t("swipeActionsBody")} />
         </View>
-        <View
-          className="overflow-hidden rounded-2xl"
-          style={{ direction: "ltr", backgroundColor: colors.mist }}
-        >
-          <View className="flex-row" style={{ minHeight: 76 }}>
-            <SwipePreviewEdge action={prefs.left} side="left" label={label(prefs.left)} />
-            <View
-              className="min-w-0 flex-1 justify-center gap-1 px-4"
-              style={{ backgroundColor: colors.paper }}
-            >
-              <View className="h-2.5 w-24 rounded-full" style={{ backgroundColor: colors.mist }} />
-              <View className="h-2 w-16 rounded-full" style={{ backgroundColor: withAlpha(colors.mist, 0.7) }} />
+        <SwipePreview left={prefs.left} right={prefs.right} />
+        <View className="mt-2.5 flex-row justify-between gap-3" style={{ direction: "ltr" }}>
+          {(["left", "right"] as const).map((side) => (
+            <View key={side} className="min-w-0 shrink flex-row items-center gap-1">
+              {side === "left" ? (
+                <Ionicons name="arrow-back" size={12} color={colors.muted} />
+              ) : null}
+              <AppText className="shrink text-xs text-cove-muted" numberOfLines={1}>
+                {side === "left" ? t("swipeLeft") : t("swipeRight")}
+                {": "}
+                <AppText
+                  className="text-xs font-semibold"
+                  style={{ color: swipeActionLabelColor(prefs[side], scheme) }}
+                >
+                  {label(prefs[side])}
+                </AppText>
+              </AppText>
+              {side === "right" ? (
+                <Ionicons name="arrow-forward" size={12} color={colors.muted} />
+              ) : null}
             </View>
-            <SwipePreviewEdge action={prefs.right} side="right" label={label(prefs.right)} />
-          </View>
+          ))}
         </View>
       </CardBlock>
 

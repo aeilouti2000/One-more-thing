@@ -48,4 +48,4 @@ frontend/ios/
 frontend/android/
 
 # local module compile output
-frontend/modules/receipt-ocr/android/build/
+frontend/modules/*/android/build/

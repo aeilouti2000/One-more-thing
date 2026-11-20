@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!--
+    The phone's own typeface. Android does not load an app's font files inside
+    a widget (the home screen draws it with a restricted copy of our resources),
+    so the app's Readex Pro cannot be used here.
+  -->
+  <style name="HwText">
+    <item name="android:includeFontPadding">false</item>
+    <item name="android:textColor">@color/hw_d_ink</item>
+    <item name="android:textAlignment">viewStart</item>
+    <item name="android:fontFamily">sans-serif</item>
+  </style>
+  <style name="HwText.Strong">
+    <item name="android:fontFamily">sans-serif-medium</item>
+  </style>
+</resources>

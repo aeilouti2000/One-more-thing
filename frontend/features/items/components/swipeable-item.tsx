@@ -1,147 +1,134 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
+  Easing,
   Extrapolation,
   interpolate,
+  interpolateColor,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { useScreenSwipeGesture } from "@/components/ui/Screen";
+import { withAlpha } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { SWIPE_ACTION_TONE, type SwipeAction } from "@/features/items/utils/swipe-actions";
 import { CARD_RADIUS } from "@/features/items/components/purchase-row";
 
-const REVEAL_RATIO = 0.36;
-const COMMIT_RATIO = 0.5;
+/** How far the card must be pulled, as a share of its width, for the action to run. */
+const COMMIT_RATIO = 0.4;
+const RETURN_MS = 220;
+const FLY_MS = 200;
+/** A flown-off card comes back if its row is still there (the action was cancelled). */
+const FLY_BACK_MS = 700;
 
 type SwipeableItemProps = {
   enabled: boolean;
-  revealed: boolean;
+  /** Kept for callers; a short swipe now springs back instead of staying open. */
+  revealed?: boolean;
   leftAction: SwipeAction;
   rightAction: SwipeAction;
-  onReveal: (open: boolean) => void;
+  onReveal?: (open: boolean) => void;
   onAction: (action: SwipeAction) => void;
   children: ReactNode;
 };
 
 export function SwipeableItem({
   enabled,
-  revealed,
   leftAction,
   rightAction,
-  onReveal,
   onAction,
   children,
 }: SwipeableItemProps) {
   const { t } = useI18n();
   const screenSwipe = useScreenSwipeGesture();
-  const [settled, setSettled] = useState<"left" | "right" | null>(null);
   const widthSV = useSharedValue(0);
   const travel = useSharedValue(0);
-  const resting = useSharedValue(0);
-  const dragging = useSharedValue(false);
-  const callbacks = useRef({ onReveal, onAction, leftAction, rightAction });
+  // 0 → 1 once the pull is far enough to run the action.
+  const armed = useSharedValue(0);
+  const isArmed = useSharedValue(false);
+  const flyBack = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callbacks = useRef({ onAction, leftAction, rightAction });
   useLayoutEffect(() => {
-    callbacks.current = { onReveal, onAction, leftAction, rightAction };
+    callbacks.current = { onAction, leftAction, rightAction };
   });
+  useEffect(
+    () => () => {
+      if (flyBack.current) clearTimeout(flyBack.current);
+    },
+    [],
+  );
 
-  useEffect(() => {
-    if (revealed || dragging.value) return;
-    resting.set(0);
-    travel.set(withTiming(0, { duration: 180 }));
-    // Depends on a UI-thread value (dragging), so it can't be derived in render.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSettled(null);
-  }, [dragging, revealed, resting, travel]);
-
-  function settle(direction: number) {
-    const side = direction < 0 ? "left" : direction > 0 ? "right" : null;
-    setSettled(side);
-    callbacks.current.onReveal(side !== null);
+  function tick() {
+    void Haptics.selectionAsync();
   }
 
-  function fireAction(direction: number) {
-    if (direction === 0) return;
+  function commit(direction: number, flown: boolean) {
     const action =
       direction < 0 ? callbacks.current.leftAction : callbacks.current.rightAction;
-    setSettled(null);
-    callbacks.current.onReveal(false);
     callbacks.current.onAction(action);
+    if (!flown) return;
+    if (flyBack.current) clearTimeout(flyBack.current);
+    flyBack.current = setTimeout(() => {
+      armed.set(0);
+      travel.set(withTiming(0, { duration: RETURN_MS, easing: Easing.out(Easing.cubic) }));
+    }, FLY_BACK_MS);
   }
 
-  function trigger() {
-    const side = resting.value < 0 ? "left" : resting.value > 0 ? "right" : null;
-    if (!side) return;
-    const direction = side === "left" ? -1 : 1;
-    resting.set(0);
-    travel.set(withTiming(0, { duration: 180 }));
-    fireAction(direction);
-  }
-
-  const report = (direction: number) => settle(direction);
-  const commit = (direction: number) => fireAction(direction);
+  const leftFlies = leftAction === "buy";
+  const rightFlies = rightAction === "buy";
   const gesture = usePanGesture({
     enabled,
     activeOffsetX: [-18, 18],
     failOffsetY: [-14, 14],
     // A swipe on the card belongs to the item action, not the list pager.
     block: enabled ? (screenSwipe ?? undefined) : undefined,
-    onActivate: () => {
-      dragging.set(true);
-    },
     onUpdate: (event) => {
       const width = Math.max(widthSV.value, 1);
-      const next = resting.value * width + event.translationX;
-      travel.set(Math.max(-width, Math.min(width, next)));
+      const next = Math.max(-width, Math.min(width, event.translationX));
+      travel.set(next);
+      const far = Math.abs(next) >= width * COMMIT_RATIO;
+      if (far !== isArmed.value) {
+        isArmed.set(far);
+        armed.set(withTiming(far ? 1 : 0, { duration: 120 }));
+        if (far) runOnJS(tick)();
+      }
     },
     onDeactivate: (event) => {
-      dragging.set(false);
-      if (event.canceled) {
-        const width = Math.max(widthSV.value, 1);
-        travel.set(withTiming(resting.value * width, { duration: 180 }));
-        return;
-      }
       const width = Math.max(widthSV.value, 1);
-      const projected = resting.value * width + event.translationX;
-      const ratio = projected / width;
-      if (ratio <= -COMMIT_RATIO || ratio >= COMMIT_RATIO) {
-        const direction = ratio < 0 ? -1 : 1;
-        resting.set(0);
-        travel.set(withTiming(0, { duration: 180 }, () => {
-          runOnJS(commit)(direction);
-        }));
+      const far = !event.canceled && isArmed.value;
+      const direction = travel.value < 0 ? -1 : 1;
+      isArmed.set(false);
+      if (!far) {
+        armed.set(withTiming(0, { duration: 120 }));
+        travel.set(withTiming(0, { duration: RETURN_MS, easing: Easing.out(Easing.cubic) }));
         return;
       }
-      const direction = ratio <= -REVEAL_RATIO ? -1 : ratio >= REVEAL_RATIO ? 1 : 0;
-      resting.set(direction);
-      travel.set(withTiming(direction * width, { duration: 180 }, () => {
-        runOnJS(report)(direction);
-      }));
+      const flies = direction < 0 ? leftFlies : rightFlies;
+      if (flies) {
+        travel.set(
+          withTiming(direction * width * 1.05, { duration: FLY_MS }, () => {
+            runOnJS(commit)(direction, true);
+          }),
+        );
+        return;
+      }
+      // Actions that keep the row, or ask first, just let the card come back.
+      runOnJS(commit)(direction, false);
+      travel.set(
+        withTiming(0, { duration: RETURN_MS, easing: Easing.out(Easing.cubic) }, () => {
+          armed.set(0);
+        }),
+      );
     },
   });
 
-  const leftBg = SWIPE_ACTION_TONE[leftAction].bg;
-  const rightBg = SWIPE_ACTION_TONE[rightAction].bg;
-
-  const leftStyle = useAnimatedStyle(() => {
-    const width = Math.max(widthSV.value, 1);
-    const amount = interpolate(-travel.value / width, [0, 1], [0, 1], Extrapolation.CLAMP);
-    return { opacity: amount };
-  });
-
-  const rightStyle = useAnimatedStyle(() => {
-    const width = Math.max(widthSV.value, 1);
-    const amount = interpolate(travel.value / width, [0, 1], [0, 1], Extrapolation.CLAMP);
-    return { opacity: amount };
-  });
-
-  const openSide = settled;
-  const openAction = openSide === "left" ? leftAction : openSide === "right" ? rightAction : null;
+  const cardStyle = useAnimatedStyle(() => ({ transform: [{ translateX: travel.value }] }));
 
   return (
     <GestureDetector gesture={gesture}>
@@ -151,35 +138,24 @@ export function SwipeableItem({
         }}
         style={{ borderRadius: CARD_RADIUS }}
       >
-        <View pointerEvents={openAction ? "none" : "auto"}>{children}</View>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: leftBg, borderRadius: CARD_RADIUS, overflow: "hidden" },
-            leftStyle,
-          ]}
-        >
-          <ActionFace action={leftAction} label={actionLabel(leftAction, t)} />
-        </Animated.View>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: rightBg, borderRadius: CARD_RADIUS, overflow: "hidden" },
-            rightStyle,
-          ]}
-        >
-          <ActionFace action={rightAction} label={actionLabel(rightAction, t)} />
-        </Animated.View>
-        {openAction ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={actionLabel(openAction, t)}
-            onPress={trigger}
-            style={StyleSheet.absoluteFill}
-          />
-        ) : null}
+        {/* Swiping right opens the lane on the left edge, and the other way round. */}
+        <ActionLane
+          action={rightAction}
+          label={actionLabel(rightAction, t)}
+          side="left"
+          travel={travel}
+          width={widthSV}
+          armed={armed}
+        />
+        <ActionLane
+          action={leftAction}
+          label={actionLabel(leftAction, t)}
+          side="right"
+          travel={travel}
+          width={widthSV}
+          armed={armed}
+        />
+        <Animated.View style={cardStyle}>{children}</Animated.View>
       </Animated.View>
     </GestureDetector>
   );
@@ -205,29 +181,83 @@ function actionLabel(
   return t("delete");
 }
 
-function ActionFace({ action, label }: { action: SwipeAction; label: string }) {
-  const tone = SWIPE_ACTION_TONE[action];
-  const icon =
-    action === "buy" ? (
-      <MaterialCommunityIcons name="cart-check" size={28} color={tone.fg} />
-    ) : action === "pin" ? (
-      <MaterialCommunityIcons name="pin" size={26} color={tone.fg} />
-    ) : action === "move" ? (
-      <Ionicons name="swap-horizontal" size={28} color={tone.fg} />
-    ) : action === "urgent" ? (
-      <Ionicons name="flash" size={28} color={tone.fg} />
-    ) : action === "later" ? (
-      <Ionicons name="hourglass-outline" size={26} color={tone.fg} />
-    ) : (
-      <Ionicons name="trash-outline" size={28} color={tone.fg} />
-    );
+function ActionLane({
+  action,
+  label,
+  side,
+  travel,
+  width,
+  armed,
+}: {
+  action: SwipeAction;
+  label: string;
+  side: "left" | "right";
+  travel: SharedValue<number>;
+  width: SharedValue<number>;
+  armed: SharedValue<number>;
+}) {
+  const solid = SWIPE_ACTION_TONE[action].solid;
+  const soft = withAlpha(solid, 0.22);
+  const sign = side === "left" ? 1 : -1;
+
+  const laneStyle = useAnimatedStyle(() => {
+    const pulled = (sign * travel.value) / Math.max(width.value, 1);
+    return {
+      opacity: interpolate(pulled, [0, 0.06], [0, 1], Extrapolation.CLAMP),
+      backgroundColor: interpolateColor(armed.value, [0, 1], [soft, solid]),
+    };
+  });
+  const iconStyle = useAnimatedStyle(() => {
+    const pulled = (sign * travel.value) / Math.max(width.value, 1);
+    const grow = interpolate(pulled, [0, COMMIT_RATIO], [0.7, 1], Extrapolation.CLAMP);
+    return { transform: [{ scale: grow + armed.value * 0.2 }] };
+  });
+  const restStyle = useAnimatedStyle(() => ({ opacity: 1 - armed.value }));
+  const armedStyle = useAnimatedStyle(() => ({ opacity: armed.value }));
 
   return (
-    <View className="flex-1 items-center justify-center gap-1">
-      {icon}
-      <AppText className="text-sm font-semibold" style={{ color: tone.fg }}>
-        {label}
-      </AppText>
-    </View>
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        {
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          borderRadius: CARD_RADIUS,
+          // Physical sides: the lane follows the finger, not the reading direction.
+          direction: "ltr",
+          flexDirection: side === "left" ? "row" : "row-reverse",
+          alignItems: "center",
+          gap: 8,
+          paddingHorizontal: 18,
+        },
+        laneStyle,
+      ]}
+    >
+      <Animated.View style={iconStyle}>
+        <Animated.View style={restStyle}>
+          <ActionIcon action={action} color={solid} />
+        </Animated.View>
+        <Animated.View style={[{ position: "absolute", top: 0, left: 0 }, armedStyle]}>
+          <ActionIcon action={action} color="#FFFFFF" />
+        </Animated.View>
+      </Animated.View>
+      <Animated.View style={armedStyle}>
+        <AppText className="text-sm font-semibold" style={{ color: "#FFFFFF" }}>
+          {label}
+        </AppText>
+      </Animated.View>
+    </Animated.View>
   );
+}
+
+function ActionIcon({ action, color }: { action: SwipeAction; color: string }) {
+  if (action === "buy") return <MaterialCommunityIcons name="cart-check" size={24} color={color} />;
+  if (action === "pin") return <MaterialCommunityIcons name="pin" size={24} color={color} />;
+  if (action === "move") return <Ionicons name="swap-horizontal" size={24} color={color} />;
+  if (action === "urgent") return <Ionicons name="flash" size={24} color={color} />;
+  if (action === "later") return <Ionicons name="hourglass-outline" size={24} color={color} />;
+  return <Ionicons name="trash-outline" size={24} color={color} />;
 }

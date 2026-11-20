@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="hw_list_name">قائمة التسوق</string>
+  <string name="hw_list_desc">قائمتكم المشتركة. علّم العناصر دون فتح التطبيق.</string>
+  <string name="hw_budget_name">حلقة الميزانية</string>
+  <string name="hw_budget_desc">مصروف هذا الشهر مقابل ميزانيتكم.</string>
+  <string name="hw_pins_name">العناصر المثبّتة</string>
+  <string name="hw_pins_desc">اضغط على عنصر مثبّت لإضافته إلى القائمة.</string>
+  <string name="hw_pulse_name">نبض المنزل</string>
+  <string name="hw_pulse_desc">من أضاف ومن اشترى في منزلكم.</string>
+
+  <string name="hw_fallback_title">One More Thing</string>
+  <string name="hw_fallback_body">افتح التطبيق لتحميل هذه الأداة.</string>
+
+  <string name="hw_pv_home">المنزل</string>
+  <string name="hw_pv_to_buy">4 للشراء</string>
+  <string name="hw_pv_milk">حليب</string>
+  <string name="hw_pv_bread">خبز</string>
+  <string name="hw_pv_eggs">بيض</string>
+  <string name="hw_pv_coffee">قهوة</string>
+  <string name="hw_pv_tomato">بندورة</string>
+  <string name="hw_pv_urgent">عاجل</string>
+  <string name="hw_pv_x2">×2</string>
+  <string name="hw_pv_spent">312</string>
+  <string name="hw_pv_of">من 500</string>
+  <string name="hw_pv_left">المتبقي 188</string>
+  <string name="hw_pv_days">11 يومًا · ≈ 17 يوميًا</string>
+  <string name="hw_pv_pinned">المثبّتة</string>
+  <string name="hw_pv_tap">اضغط للإضافة</string>
+  <string name="hw_pv_pulse">نبض المنزل</string>
+  <string name="hw_pv_ev1">سارة أضافت حليب</string>
+  <string name="hw_pv_ev2">عمر اشترى 12 عنصرًا</string>
+  <string name="hw_pv_ev3">سارة أضافت قهوة</string>
+  <string name="hw_pv_t1">10:31</string>
+  <string name="hw_pv_t2">09:12</string>
+  <string name="hw_pv_t3">08:40</string>
+</resources>

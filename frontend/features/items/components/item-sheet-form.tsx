@@ -255,7 +255,12 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
       {showRecent ? (
         <View className="mt-4 gap-2">
           <AppText className="text-xs font-semibold text-cove-muted">{t("recent")}</AppText>
-          <View className="flex-row flex-wrap gap-2">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerClassName="gap-2"
+          >
             {recent!.map((pick) => (
               <Pressable
                 key={pick.name.toLowerCase()}
@@ -273,7 +278,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
                 </AppText>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
         </View>
       ) : null}
 

@@ -31,6 +31,7 @@ import {
   writeStoredThemePreference,
   type ThemePreference,
 } from "@/lib/theme-storage";
+import { setAppNightMode } from "@/modules/app-night-mode/src";
 
 type ThemeContextValue = {
   /** The theme in use: the phone's, unless the user picked one. */
@@ -97,6 +98,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
     ).document;
     webDocument?.documentElement.classList.toggle("dark", scheme === "dark");
+    // Android shows its launch splash before any JS runs; this is how it learns the app's theme.
+    setAppNightMode(preference);
 
     writeStoredAccent(accent);
     writeStoredSurfaceDepth(surfaceDepth);

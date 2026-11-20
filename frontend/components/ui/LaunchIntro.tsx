@@ -15,13 +15,14 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
+import { useTheme } from "@/providers/ThemeProvider";
 
 /**
- * Must match the expo-splash-screen config in app.json. The native splash is
- * plain navy (its image is transparent), so this overlay can replace it at any
- * moment without a visible change, and the logo is drawn from nothing.
+ * Must match the expo-splash-screen config in app.json (light and dark). The
+ * native splash is a plain colour (its image is transparent), so this overlay
+ * can replace it at any moment without a visible change, and the logo is drawn
+ * from nothing.
  */
-const SPLASH_BACKGROUND = "#071633";
 /** Same size the logo had on the native splash: 240 dp for the 1024 px artwork. */
 const LOGO_SIZE = 240;
 
@@ -48,6 +49,14 @@ const NAVY = "#071633";
 const SOFT_BLUE = "#8FAEE6";
 const WHITE = "#FFFFFF";
 const EMERALD = "#21C47A";
+const PAPER = "#F3F6FB";
+
+/** Same colours as the dark and light app icons in scripts/build-icons.mjs. */
+const PALETTES = {
+  dark: { background: NAVY, row1: SOFT_BLUE, row2: WHITE, ink: NAVY },
+  light: { background: PAPER, row1: SOFT_BLUE, row2: NAVY, ink: PAPER },
+} as const;
+type Palette = (typeof PALETTES)[keyof typeof PALETTES];
 /** Outline traced before a shape fills in, about 1.4 dp on screen. */
 const OUTLINE = 0.7;
 const FILL_MS = 180;
@@ -66,7 +75,7 @@ type Shape =
   | { kind: "stroke"; d: string; color: string; width: number; length: number; at: number; ms: number };
 
 /** A ticked row: circle and bar trace their outlines and fill in, then the tick is drawn. */
-const row = (cy: number, barWidth: number, color: string, at: number): Shape[] => [
+const row = (cy: number, barWidth: number, color: string, ink: string, at: number): Shape[] => [
   { kind: "fill", d: circle(24.5, cy, 6.5), color, at: at + 350 },
   { kind: "stroke", d: circle(24.5, cy, 6.5), color, width: OUTLINE, length: circleLength(6.5), at, ms: 350 },
   { kind: "fill", d: pill(36, cy - 6.5, barWidth, 13), color, at: at + 500 },
@@ -82,7 +91,7 @@ const row = (cy: number, barWidth: number, color: string, at: number): Shape[] =
   {
     kind: "stroke",
     d: `M21.7 ${cy + 0.2}l2 2l3.6-4.2`,
-    color: NAVY,
+    color: ink,
     width: 1.9,
     length: Math.hypot(2, 2) + Math.hypot(3.6, 4.2),
     at: at + 500,
@@ -91,9 +100,9 @@ const row = (cy: number, barWidth: number, color: string, at: number): Shape[] =
 ];
 
 /** The logo in drawing order; `at` and `ms` are milliseconds from the start of the drawing. */
-const SHAPES: Shape[] = [
-  ...row(26.5, 24, SOFT_BLUE, 50),
-  ...row(45.5, 36, WHITE, 300),
+const buildShapes = (palette: Palette): Shape[] => [
+  ...row(26.5, 24, palette.row1, palette.ink, 50),
+  ...row(45.5, 36, palette.row2, palette.ink, 300),
   { kind: "fill", d: pill(18, 58, 64, 22), color: EMERALD, at: 1100 },
   {
     kind: "stroke",
@@ -119,8 +128,14 @@ const SHAPES: Shape[] = [
   { kind: "stroke", d: "M67.3 64.4V73.6", color: NAVY, width: 3.6, length: 9.2, at: 1560, ms: 190 },
 ];
 
+const SHAPES = {
+  dark: buildShapes(PALETTES.dark),
+  light: buildShapes(PALETTES.light),
+};
+
+// Timing is the same in both themes.
 const DRAW_MS = Math.max(
-  ...SHAPES.map((s) => (s.kind === "stroke" ? s.at + s.ms : s.at + FILL_MS)),
+  ...SHAPES.dark.map((s) => (s.kind === "stroke" ? s.at + s.ms : s.at + FILL_MS)),
 );
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -169,7 +184,7 @@ function StrokePath({ shape, clock }: { shape: StrokeShape; clock: SharedValue<n
   );
 }
 
-// Swap instantly: the overlay underneath is the same navy, so a fade adds nothing.
+// Swap instantly: the overlay underneath is the same colour, so a fade adds nothing.
 SplashScreen.setOptions({ duration: 0, fade: false });
 
 /**
@@ -181,6 +196,9 @@ SplashScreen.setOptions({ duration: 0, fade: false });
  * waits for it (up to MAX_HOLD_MS) so the burst reveals content, not a spinner.
  */
 export function LaunchIntro({ ready }: { ready: boolean }) {
+  const { scheme } = useTheme();
+  const palette = PALETTES[scheme];
+  const shapes = SHAPES[scheme];
   const reduceMotion = useReducedMotion();
   const [done, setDone] = useState(false);
   const [nativeHidden, setNativeHidden] = useState(false);
@@ -287,14 +305,14 @@ export function LaunchIntro({ ready }: { ready: boolean }) {
       importantForAccessibility="no-hide-descendants"
       onLayout={hideNative}
     >
-      <StatusBar style="light" />
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <Animated.View
-        style={[StyleSheet.absoluteFill, { backgroundColor: SPLASH_BACKGROUND }, backdropStyle]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: palette.background }, backdropStyle]}
       />
       <View style={styles.center} pointerEvents="none">
         <Animated.View style={[styles.logo, logoStyle]}>
           <Svg width={LOGO_SIZE} height={LOGO_SIZE} viewBox={VIEW_BOX}>
-            {SHAPES.map((shape, i) => (
+            {shapes.map((shape, i) => (
               shape.kind === "fill" ? (
                 <FillPath key={i} shape={shape} clock={clock} />
               ) : (

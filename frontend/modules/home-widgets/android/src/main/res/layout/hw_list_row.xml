@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/hw_row" android:layout_width="match_parent" android:layout_height="36dp"
+  android:orientation="horizontal" android:gravity="center_vertical">
+  <FrameLayout android:layout_width="20dp" android:layout_height="20dp">
+    <ImageView android:id="@+id/hw_check_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+      android:src="@drawable/hw_ring" android:importantForAccessibility="no" />
+    <ImageView android:id="@+id/hw_check_mark" android:layout_width="12dp" android:layout_height="12dp"
+      android:layout_gravity="center" android:src="@drawable/hw_ic_check" android:visibility="gone"
+      android:importantForAccessibility="no" />
+  </FrameLayout>
+  <TextView android:id="@+id/hw_row_name" style="@style/HwText" android:layout_width="0dp" android:layout_weight="1"
+    android:layout_height="wrap_content" android:layout_marginStart="10dp" android:maxLines="1" android:ellipsize="end"
+    android:textSize="14sp" />
+  <TextView android:id="@+id/hw_row_flag" style="@style/HwText.Strong" android:layout_width="wrap_content"
+    android:layout_height="wrap_content" android:layout_marginStart="8dp" android:maxLines="1" android:textSize="11sp" />
+  <TextView android:id="@+id/hw_row_detail" style="@style/HwText" android:layout_width="wrap_content"
+    android:layout_height="wrap_content" android:layout_marginStart="8dp" android:maxWidth="110dp" android:maxLines="1"
+    android:ellipsize="end" android:textSize="12sp" android:textColor="@color/hw_d_muted" />
+</LinearLayout>

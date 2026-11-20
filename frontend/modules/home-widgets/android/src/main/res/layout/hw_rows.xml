@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A header and scrolling rows: the list and the home pulse. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/hw_root" android:layout_width="match_parent" android:layout_height="match_parent">
+  <ImageView android:id="@+id/hw_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/hw_bg" android:scaleType="fitXY" android:tint="@color/hw_d_bg" android:importantForAccessibility="no" />
+  <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+    android:paddingTop="10dp" android:paddingBottom="10dp" android:paddingStart="14dp" android:paddingEnd="14dp">
+    <LinearLayout android:id="@+id/hw_header" android:layout_width="match_parent" android:layout_height="32dp"
+      android:orientation="horizontal" android:gravity="center_vertical">
+      <TextView android:id="@+id/hw_title" style="@style/HwText.Strong" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:maxWidth="170dp" android:maxLines="1" android:ellipsize="end"
+        android:textSize="15sp" />
+      <TextView android:id="@+id/hw_subtitle" style="@style/HwText" android:layout_width="0dp" android:layout_weight="1"
+        android:layout_height="wrap_content" android:layout_marginStart="8dp" android:maxLines="1" android:ellipsize="end"
+        android:textSize="12sp" android:textColor="@color/hw_d_muted" />
+      <FrameLayout android:id="@+id/hw_add" android:layout_width="30dp" android:layout_height="30dp"
+        android:layout_marginStart="8dp" android:visibility="gone">
+        <ImageView android:id="@+id/hw_add_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+          android:src="@drawable/hw_round_10" android:tint="@color/hw_d_fill" android:importantForAccessibility="no" />
+        <ImageView android:id="@+id/hw_add_icon" android:layout_width="16dp" android:layout_height="16dp"
+          android:layout_gravity="center" android:src="@drawable/hw_ic_plus" android:importantForAccessibility="no" />
+      </FrameLayout>
+    </LinearLayout>
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+      android:layout_marginTop="2dp">
+      <ListView android:id="@+id/hw_collection" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:divider="@null" android:dividerHeight="0dp" android:scrollbars="none"
+        android:listSelector="@android:color/transparent" />
+      <LinearLayout android:id="@+id/hw_empty" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical" android:gravity="center" android:paddingBottom="6dp">
+        <TextView android:id="@+id/hw_empty_title" style="@style/HwText.Strong" android:layout_width="wrap_content"
+          android:layout_height="wrap_content" android:textAlignment="center" android:maxLines="1" android:ellipsize="end"
+          android:textSize="14sp" />
+        <TextView android:id="@+id/hw_empty_body" style="@style/HwText" android:layout_width="wrap_content"
+          android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textAlignment="center"
+          android:maxLines="2" android:ellipsize="end" android:textSize="12sp" android:textColor="@color/hw_d_muted" />
+      </LinearLayout>
+    </FrameLayout>
+  </LinearLayout>
+</FrameLayout>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The picture shown in the phone's widget picker. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent">
+<ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/hw_bg" android:scaleType="fitXY" android:tint="@color/hw_d_bg" android:importantForAccessibility="no" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:paddingTop="10dp" android:paddingBottom="10dp" android:paddingStart="14dp" android:paddingEnd="14dp" >
+<LinearLayout android:layout_width="match_parent" android:layout_height="30dp" android:orientation="horizontal" android:gravity="center_vertical">
+<TextView style="@style/HwText.Strong" android:layout_height="wrap_content" android:maxLines="1" android:textSize="15sp" android:textColor="@color/hw_d_ink" android:text="@string/hw_pv_home" android:layout_width="wrap_content" />
+<TextView style="@style/HwText" android:layout_height="wrap_content" android:maxLines="1" android:textSize="12sp" android:textColor="@color/hw_d_muted" android:text="@string/hw_pv_to_buy" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="8dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="34dp" android:orientation="horizontal" android:gravity="center_vertical">
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/hw_ring" android:tint="@color/hw_d_muted" android:importantForAccessibility="no" />
+<TextView style="@style/HwText" android:layout_height="wrap_content" android:maxLines="1" android:textSize="14sp" android:textColor="@color/hw_d_ink" android:text="@string/hw_pv_milk" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="10dp" />
+<TextView style="@style/HwText.Strong" android:layout_height="wrap_content" android:maxLines="1" android:textSize="11sp" android:textColor="@color/hw_d_urgent" android:text="@string/hw_pv_urgent" android:layout_width="wrap_content" />
+<TextView style="@style/HwText" android:layout_height="wrap_content" android:maxLines="1" android:textSize="12sp" android:textColor="@color/hw_d_muted" android:text="@string/hw_pv_x2" android:layout_width="wrap_content" android:layout_marginStart="8dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="34dp" android:orientation="horizontal" android:gravity="center_vertical">
+<FrameLayout android:layout_width="20dp" android:layout_height="20dp"><ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/hw_circle" android:tint="@color/hw_d_fill" android:importantForAccessibility="no" /><ImageView android:layout_width="12dp" android:layout_height="12dp" android:layout_gravity="center" android:src="@drawable/hw_ic_check" android:importantForAccessibility="no" /></FrameLayout>
+<TextView style="@style/HwText" android:layout_height="wrap_content" android:maxLines="1" android:textSize="14sp" android:textColor="@color/hw_d_muted" android:text="@string/hw_pv_bread" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="10dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="34dp" android:orientation="horizontal" android:gravity="center_vertical">
+<ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/hw_ring" android:tint="@color/hw_d_muted" android:importantForAccessibility="no" />
+<TextView style="@style/HwText" android:layout_height="wrap_content" android:maxLines="1" android:textSize="14sp" android:textColor="@color/hw_d_ink" android:text="@string/hw_pv_eggs" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="10dp" />
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>

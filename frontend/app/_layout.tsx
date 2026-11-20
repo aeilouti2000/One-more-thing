@@ -33,6 +33,7 @@ import { PurchasesProvider, usePurchasesData } from "@/features/items/hooks/use-
 import { HouseholdProvider } from "@/features/homes/providers/household-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { NotificationsProvider } from "@/features/notifications/providers/notifications-provider";
+import { WidgetPublisher } from "@/features/widgets/widget-publisher";
 import { FontScaleProvider } from "@/providers/FontScaleProvider";
 import { LanguageProvider } from "@/providers/LanguageProvider";
 import { ThemeProvider, useTheme } from "@/providers/ThemeProvider";
@@ -198,6 +199,7 @@ export default function RootLayout() {
                     </BlurScreen>
                   </DragOverlayProvider>
                   <AppLaunchIntro />
+                  <WidgetPublisher />
                 </GestureHandlerRootView>
                 </PurchasesProvider>
                 </CategoriesProvider>

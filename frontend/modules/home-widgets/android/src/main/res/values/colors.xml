@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Only until the app's own colours arrive, and for the widget picker. -->
+  <color name="hw_d_bg">#14171C</color>
+  <color name="hw_d_surface">#1F2630</color>
+  <color name="hw_d_ink">#ECEEF1</color>
+  <color name="hw_d_muted">#9AA7BD</color>
+  <color name="hw_d_accent">#5CB3FA</color>
+  <color name="hw_d_fill">#2196F3</color>
+  <color name="hw_d_urgent">#FF8A5E</color>
+</resources>

@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.onemorething.homewidgets'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.homewidgets"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // Only to start the app's JavaScript in the background (see WidgetSyncJobService).
+  compileOnly "com.facebook.react:react-android"
+}

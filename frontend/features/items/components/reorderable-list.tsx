@@ -285,6 +285,7 @@ export function ReorderableList({
                 targetIndex={targetIndex}
                 settling={settling}
                 hiddenId={hiddenId}
+                shown={overlay.shown}
                 layout={layout}
                 onHold={hold}
                 onBegin={() => beginDrag(purchase.id)}
@@ -401,6 +402,7 @@ function DragHandle({
   targetIndex,
   settling,
   hiddenId,
+  shown,
   layout,
   onHold,
   onBegin,
@@ -414,6 +416,7 @@ function DragHandle({
   targetIndex: SharedValue<number>;
   settling: SharedValue<boolean>;
   hiddenId: SharedValue<string>;
+  shown: SharedValue<number>;
   layout: SharedValue<ListLayout>;
   onHold: (active: boolean) => void;
   onBegin: () => void;
@@ -480,13 +483,16 @@ function DragHandle({
               layout.set(moveInLayout(layout.value, from, to));
               activeIndex.set(-1);
               targetIndex.set(-1);
-              // Then show the real row, and only once it has been drawn let
-              // React remove the floating copy that covers it.
+              // Then show the real row, and once it has been drawn hide the
+              // floating copy here on the UI thread. React removes it later;
+              // if it were still visible then, it would jump back to where
+              // the drag started when the drag offset is cleared.
               requestAnimationFrame(() => {
                 "worklet";
                 hiddenId.set("");
                 requestAnimationFrame(() => {
                   "worklet";
+                  shown.set(0);
                   requestAnimationFrame(() => {
                     "worklet";
                     runOnJS(commitDrag)(from, to);
@@ -505,7 +511,7 @@ function DragHandle({
         }),
     );
     // Shared values are stable. JS callbacks are read through the ref at call time.
-  }, [activeIndex, dragX, dragY, hiddenId, id, layout, settling, targetIndex]);
+  }, [activeIndex, dragX, dragY, hiddenId, id, layout, settling, shown, targetIndex]);
   /* eslint-enable react-hooks/refs */
 
   return (

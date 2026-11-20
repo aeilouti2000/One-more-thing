@@ -2,7 +2,7 @@
   "expo": {
     "name": "One More Thing",
     "slug": "one-more-thing",
-    "version": "2.9.1",
+    "version": "2.9.2",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -24,7 +24,7 @@
     "android": {
       "package": "com.onemorething.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 49,
+      "versionCode": 50,
       "adaptiveIcon": {
         "backgroundColor": "#071633",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -49,7 +49,7 @@
           "image": "./assets/images/splash-blank.png",
           "imageWidth": 240,
           "resizeMode": "contain",
-          "backgroundColor": "#071633",
+          "backgroundColor": "#F3F6FB",
           "dark": {
             "image": "./assets/images/splash-blank.png",
             "backgroundColor": "#071633"

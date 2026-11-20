@@ -2,8 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
-import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
+import { Pressable, ScrollView, View } from "react-native";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -36,8 +42,8 @@ import { readCachedLists } from "@/features/offline/profile-cache";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
-/** Item names shown on a card before "+N". */
-const CHIPS_SHOWN = 5;
+/** How long "Added" stays on a card's button. */
+const ADDED_MS = 1800;
 
 export default function SetsScreen() {
   return (
@@ -60,6 +66,9 @@ function SetsBody() {
     homeId ? (readCachedLists<HomeList>(homeId) ?? []) : [],
   );
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [addedId, setAddedId] = useState<string | null>(null);
+  // Cards slide in one after another on first open, like the Pins page.
+  const [revealing, setRevealing] = useState(() => !homeId || cachedSets(homeId) === null);
   const [editing, setEditing] = useState<ItemSet | null>(null);
   const [float, setFloat] = useState<{ message: string; tone: "success" | "error" } | null>(null);
 
@@ -84,6 +93,21 @@ function SetsBody() {
       void load();
     }, [load]),
   );
+
+  const waitingForSets = isLoading && sets.length === 0 && !error;
+  if (waitingForSets && !revealing) setRevealing(true);
+  useEffect(() => {
+    if (waitingForSets || !revealing) return;
+    // Once the first cards have mounted, sets saved or edited later don't animate.
+    const timer = setTimeout(() => setRevealing(false), 600);
+    return () => clearTimeout(timer);
+  }, [waitingForSets, revealing]);
+
+  useEffect(() => {
+    if (!addedId) return;
+    const timer = setTimeout(() => setAddedId(null), ADDED_MS);
+    return () => clearTimeout(timer);
+  }, [addedId]);
 
   useEffect(() => {
     if (!float) return;
@@ -128,6 +152,9 @@ function SetsBody() {
         return;
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setAddedId(set.id);
+      // Everything went in: the button says so. Partial results still explain.
+      if (result.added > 0 && result.skipped === 0) return;
       setFloat({
         message:
           result.added === 0
@@ -169,12 +196,15 @@ function SetsBody() {
         </Animated.View>
       ) : (
         <View className="gap-3">
-          {sets.map((set) => (
+          {sets.map((set, index) => (
             <SetCard
               key={set.id}
+              index={index}
+              reveal={revealing}
               set={set}
               estimate={estimate(set)}
               adding={addingId === set.id}
+              added={addedId === set.id}
               disabled={addingId !== null}
               onOpen={openSet}
               onAdd={addAll}
@@ -201,77 +231,124 @@ function SetsBody() {
 }
 
 const SetCard = memo(function SetCard({
+  index,
+  reveal,
   set,
   estimate,
   adding,
+  added,
   disabled,
   onOpen,
   onAdd,
 }: {
+  index: number;
+  reveal: boolean;
   set: ItemSet;
   estimate: string | null;
   adding: boolean;
+  added: boolean;
   disabled: boolean;
   onOpen: (set: ItemSet) => void;
   onAdd: (set: ItemSet) => void;
 }) {
-  const { t } = useI18n();
-  const meta = estimate
-    ? t("setItemsAbout", { count: set.items.length, amount: estimate })
-    : t("setItemsCount", { count: set.items.length });
-  const shown = set.items.slice(0, CHIPS_SHOWN);
-  const more = set.items.length - shown.length;
+  const { t, isRTL } = useI18n();
+  const { colors, scheme } = useTheme();
+  const count = t("setItemsCount", { count: set.items.length });
+  const meta = estimate ? `${count} · ${t("setAbout")} ${estimate}` : count;
+  const addLabel =
+    set.items.length === 1 ? t("setAddOne") : t("setAddItems", { count: set.items.length });
 
   return (
     <Animated.View
-      entering={FadeIn.duration(200)}
+      entering={
+        reveal
+          ? FadeInDown.delay(Math.min(index, 8) * 30)
+              .duration(420)
+              .easing(Easing.out(Easing.cubic))
+          : FadeIn.duration(200)
+      }
       exiting={FadeOut.duration(150)}
       layout={LinearTransition.duration(200)}
-      className="rounded-3xl bg-cove-paper px-4 py-4"
     >
-      <View className="flex-row items-center gap-3">
+      <View
+        className="rounded-3xl bg-cove-paper px-4 py-4"
+        style={{
+          shadowColor: scheme === "dark" ? "#000000" : colors.ink,
+          shadowOpacity: scheme === "dark" ? 0.28 : 0.08,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 2,
+        }}
+      >
         <Pressable
           onPress={() => onOpen(set)}
           accessibilityRole="button"
           accessibilityLabel={`${set.name}, ${meta}. ${t("setEdit")}`}
-          className="min-w-0 flex-1 active:opacity-80"
+          className="flex-row items-center gap-3 active:opacity-80"
         >
-          <AppText numberOfLines={1} className="text-base font-semibold text-cove-ink">
-            {set.name}
-          </AppText>
-          <AppText numberOfLines={1} className="mt-0.5 text-sm text-cove-muted">
-            {meta}
-          </AppText>
+          <View className="min-w-0 flex-1">
+            <AppText numberOfLines={1} className="text-base font-semibold text-cove-ink">
+              {set.name}
+            </AppText>
+            <AppText numberOfLines={1} className="mt-0.5 text-sm text-cove-muted">
+              {count}
+              {estimate ? (
+                <>
+                  {` · ${t("setAbout")} `}
+                  <AppText className="text-sm font-semibold text-cove-muted">{estimate}</AppText>
+                </>
+              ) : null}
+            </AppText>
+          </View>
+          <Ionicons
+            name={isRTL ? "chevron-back" : "chevron-forward"}
+            size={18}
+            color={colors.muted}
+            style={{ opacity: 0.5 }}
+          />
         </Pressable>
-        <AppButton
-          label={t("setAddAll")}
-          onPress={() => onAdd(set)}
-          loading={adding}
-          disabled={disabled}
-          compact
-          fit
-        />
+
+        {/* One line of items, swiped sideways like the add sheet's chips. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="mt-3"
+          contentContainerClassName="gap-1.5"
+        >
+          {set.items.map((item) => (
+            <Pressable
+              key={item.name}
+              onPress={() => onOpen(set)}
+              accessible={false}
+              className="flex-row items-center rounded-full bg-cove-mist px-2.5 py-1 active:opacity-80"
+            >
+              <AppText numberOfLines={1} className="text-xs font-semibold text-cove-accent-text">
+                {item.name}
+              </AppText>
+              {item.quantity > 1 ? (
+                <AppText className="ms-1 text-xs font-semibold text-cove-accent-text opacity-60">
+                  ×{item.quantity}
+                </AppText>
+              ) : null}
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <View
+          className="mt-3 pt-3"
+          style={{ borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.14)" }}
+        >
+          <AppButton
+            label={added ? t("setAddDone") : addLabel}
+            icon={added ? "checkmark" : "cart-outline"}
+            variant={added ? "primary" : "secondary"}
+            onPress={() => onAdd(set)}
+            loading={adding}
+            disabled={disabled && !added}
+            compact
+          />
+        </View>
       </View>
-      <Pressable
-        onPress={() => onOpen(set)}
-        accessible={false}
-        className="mt-3 flex-row flex-wrap gap-1.5 active:opacity-80"
-      >
-        {shown.map((item) => (
-          <View key={item.name} className="max-w-full rounded-full bg-cove-mist px-2.5 py-1">
-            <AppText numberOfLines={1} className="text-xs font-semibold text-cove-accent-text">
-              {item.name}
-            </AppText>
-          </View>
-        ))}
-        {more > 0 ? (
-          <View className="rounded-full bg-cove-mist px-2.5 py-1">
-            <AppText className="text-xs font-semibold text-cove-accent-text">
-              {t("setMore", { count: more })}
-            </AppText>
-          </View>
-        ) : null}
-      </Pressable>
     </Animated.View>
   );
 });

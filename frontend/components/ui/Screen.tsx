@@ -25,6 +25,7 @@ import {
 import Animated, {
   Easing,
   runOnJS,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -74,6 +75,13 @@ type ScreenProps = {
   dock?: ReactNode;
   /** Full-screen overlay layer for a floating action button (positions itself). */
   fab?: ReactNode;
+  /**
+   * Full-screen layer above the page and outside its blur target, so glass in
+   * it can blur the page. It positions itself and does not move `floating`.
+   */
+  overlay?: ReactNode;
+  /** Kept at the page's scroll offset (plain scrolling pages only). */
+  scrollY?: SharedValue<number>;
   /** Place the dock in the gap beside the centered fold tab bar. */
   dockBeside?: boolean;
   onSwipe?: (direction: SwipeDirection) => void;
@@ -127,6 +135,8 @@ export function Screen({
   top,
   dock,
   fab,
+  overlay: overlayLayer,
+  scrollY,
   dockBeside = false,
   onSwipe,
   canSwipe,
@@ -152,6 +162,9 @@ export function Screen({
   const translateX = useSharedValue(0);
   const fade = useSharedValue(1);
   const isAnimating = useSharedValue(false);
+  const trackScroll = useAnimatedScrollHandler((event) => {
+    scrollY?.set(event.contentOffset.y);
+  });
   const canNext = useSharedValue(1);
   const canPrev = useSharedValue(1);
   const bottomPad = tabBarInset ? (fab ? "pb-40" : "pb-32") : "pb-10";
@@ -426,6 +439,25 @@ export function Screen({
       {scroll ? (
         onSwipe ? (
           swipeBody
+        ) : scrollY ? (
+          <Animated.ScrollView
+            style={{ flex: 1 }}
+            scrollEnabled={scrollEnabled}
+            removeClippedSubviews={false}
+            contentContainerStyle={{
+              paddingHorizontal: spacing.screen,
+              paddingTop: top ? spacing.lg : spacing.sm,
+              paddingBottom: tabBarInset ? (fab ? 160 : 128) : 40,
+            }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={nestedScrollEnabled}
+            refreshControl={refreshControl}
+            onScroll={trackScroll}
+            scrollEventThrottle={16}
+          >
+            {children}
+          </Animated.ScrollView>
         ) : (
         <ScrollView
           className="flex-1"
@@ -458,6 +490,7 @@ export function Screen({
 
   const overlay = (
     <>
+      {overlayLayer}
       {floating ? (
         <View
           pointerEvents="box-none"

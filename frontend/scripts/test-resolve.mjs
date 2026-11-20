@@ -16,7 +16,7 @@ registerHooks({
       base = resolvePath(dirname(fileURLToPath(context.parentURL)), specifier);
     }
     if (base) {
-      for (const candidate of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`]) {
+      for (const candidate of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}.js`]) {
         if (existsSync(candidate)) {
           try {
             return nextResolve(pathToFileURL(candidate).href, context);
