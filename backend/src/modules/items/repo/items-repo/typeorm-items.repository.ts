@@ -20,7 +20,8 @@ export class TypeormItemsRepository implements IItemsRepository {
   findByHome(homeId: string) {
     return this.items.find({
       where: { homeId },
-      order: { sortOrder: "ASC", createdAt: "DESC" },
+      // The id settles ties (items added in one tap share a time), so the order never flips.
+      order: { sortOrder: "ASC", createdAt: "DESC", id: "ASC" },
     });
   }
 

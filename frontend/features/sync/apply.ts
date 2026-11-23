@@ -11,7 +11,7 @@ import type { Product, Trip } from "@/features/sync/types";
  */
 
 const byServerOrder = (a: Purchase, b: Purchase) =>
-  (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || b.createdAt.localeCompare(a.createdAt);
+  (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id);
 
 function inWindow(item: Purchase, windowStartMs: number) {
   if (item.status !== "bought") return true;

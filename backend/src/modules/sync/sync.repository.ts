@@ -76,6 +76,7 @@ export class SyncRepository {
       })
       .orderBy("item.sort_order", "ASC")
       .addOrderBy("item.created_at", "DESC")
+      .addOrderBy("item.id", "ASC")
       .getMany();
   }
 
