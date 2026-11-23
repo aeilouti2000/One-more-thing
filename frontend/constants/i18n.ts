@@ -1054,6 +1054,23 @@ const en = {
   widgetBudgetMost: "Most: {{category}}",
   widgetBudgetNone: "No budget set",
   widgetBudgetSetHint: "Set one in Costs",
+  // History redesign and icons (perf refactor)
+  iconFor: "Icon for {{name}}",
+  iconEveryone: "Everyone in your home sees it",
+  iconEveryTrip: "Used for every trip named {{name}}",
+  iconPickOne: "Pick one",
+  iconAny: "Any",
+  iconAnyPlaceholder: "Type or paste one emoji",
+  iconOneEmoji: "Use exactly one emoji.",
+  iconUpload: "Upload an image",
+  iconUploadOffline: "Uploading an image needs a connection.",
+  iconSave: "Save",
+  iconReset: "Reset to default",
+  iconChange: "Change icon",
+  iconDefault: "Default icon",
+  iconChosenEmoji: "Emoji you picked",
+  iconChosenImage: "Your image",
+  iconNameTripFirst: "Name this trip first: its icon belongs to the shop name.",
 } as const;
 
 const ar: { [K in keyof typeof en]: string } = {
@@ -2105,6 +2122,23 @@ const ar: { [K in keyof typeof en]: string } = {
   widgetBudgetMost: "الأكثر: {{category}}",
   widgetBudgetNone: "لا ميزانية محددة",
   widgetBudgetSetHint: "حدّدها من التكاليف",
+  // History redesign and icons (perf refactor)
+  iconFor: "أيقونة {{name}}",
+  iconEveryone: "يراها كل من في بيتك",
+  iconEveryTrip: "تُستخدم لكل رحلة باسم {{name}}",
+  iconPickOne: "اختر واحدة",
+  iconAny: "أي رمز",
+  iconAnyPlaceholder: "اكتب أو الصق رمزاً تعبيرياً واحداً",
+  iconOneEmoji: "استخدم رمزاً تعبيرياً واحداً فقط.",
+  iconUpload: "رفع صورة",
+  iconUploadOffline: "رفع صورة يحتاج إلى اتصال.",
+  iconSave: "حفظ",
+  iconReset: "العودة إلى الافتراضي",
+  iconChange: "تغيير الأيقونة",
+  iconDefault: "الأيقونة الافتراضية",
+  iconChosenEmoji: "رمز اخترته",
+  iconChosenImage: "صورتك",
+  iconNameTripFirst: "سمِّ هذه الرحلة أولاً: أيقونتها مرتبطة باسم المتجر.",
 };
 
 export const messages = { en, ar };

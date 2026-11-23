@@ -10,6 +10,8 @@ export type PhotoSource = "camera" | "library";
  */
 export async function pickItemPhoto(
   source: PhotoSource,
+  /** `square`: the person crops it to a square first (icons). */
+  crop?: { square?: boolean },
 ): Promise<{ ok: true; photo: PickedPhoto } | { ok: false; denied: boolean }> {
   // Android's photo picker needs no permission; iOS and the camera do.
   if (source === "camera" || Platform.OS === "ios") {
@@ -24,6 +26,7 @@ export async function pickItemPhoto(
     mediaTypes: ["images"],
     quality: 0.7,
     exif: false,
+    ...(crop?.square ? { allowsEditing: true, aspect: [1, 1] as [number, number] } : {}),
   };
   const result =
     source === "camera"

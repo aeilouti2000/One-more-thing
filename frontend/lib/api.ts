@@ -301,6 +301,8 @@ export const api = {
     request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }, auth),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   /** Multipart upload (e.g. a photo). */
   upload: <T>(path: string, form: FormData, method: "POST" | "PUT" = "PUT") =>
     request<T>(path, { method, body: form }),

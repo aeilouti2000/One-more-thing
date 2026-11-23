@@ -26,6 +26,9 @@ import { AppText } from "@/components/ui/AppText";
 import { BlurBackdrop, DialogGlass, GlassFill } from "@/components/ui/BlurBackdrop";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { HomeIcon } from "@/components/ui/HomeIcon";
+import { IconSheet } from "@/components/ui/IconSheet";
+import { useLoadIcons } from "@/features/icons/use-icons";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen, SwipeSlideContent } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
@@ -173,6 +176,10 @@ export default function HistoryScreen() {
   // Move targets ignore the list/date filter: any trip of the item's month.
   const allTrips = useMemo(() => groupPurchasesIntoTrips(bought), [bought]);
   const [renaming, setRenaming] = useState<ShoppingTrip | null>(null);
+  /** The shop whose icon is being changed; set after naming a trip that had no name. */
+  const [shopIcon, setShopIcon] = useState<string | null>(null);
+  const [iconAfterRename, setIconAfterRename] = useState(false);
+  useLoadIcons();
   const [tripName, setTripName] = useState("");
   const [movingItem, setMovingItem] = useState<Purchase | null>(null);
   const [tripBusy, setTripBusy] = useState(false);
@@ -206,6 +213,18 @@ export default function HistoryScreen() {
     // A trip without an invoice got one: its id is now the invoice id.
     if (openTripId === renaming.id && result.receiptId) setOpenTripId(result.receiptId);
     setRenaming(null);
+    // Named so that it can have an icon: go on to the icon now.
+    if (iconAfterRename && tripName.trim()) setShopIcon(tripName.trim());
+    setIconAfterRename(false);
+  }
+
+  function changeShopIcon(trip: ShoppingTrip) {
+    if (trip.name?.trim()) {
+      setShopIcon(trip.name.trim());
+      return;
+    }
+    setIconAfterRename(true);
+    startRename(trip);
   }
 
   async function moveItemTo(trip: ShoppingTrip) {
@@ -236,6 +255,8 @@ export default function HistoryScreen() {
         count={trip.count}
         onPressItem={(purchase) => setOpenItemId(purchase.id)}
         onRename={() => startRename(trip)}
+        shopName={trip.name}
+        onChangeIcon={() => changeShopIcon(trip)}
         onMoveItem={(purchase) => {
           setTripError(null);
           setMovingItem(purchase);
@@ -677,10 +698,25 @@ export default function HistoryScreen() {
         />
       )}
 
-      <BottomSheet visible={renaming !== null} locked={tripBusy} onClose={() => setRenaming(null)}>
+      <IconSheet
+        target={shopIcon ? { kind: "shop", name: shopIcon } : null}
+        title={shopIcon ?? ""}
+        onClose={() => setShopIcon(null)}
+      />
+
+      <BottomSheet
+        visible={renaming !== null}
+        locked={tripBusy}
+        onClose={() => {
+          setRenaming(null);
+          setIconAfterRename(false);
+        }}
+      >
         <View className="gap-4">
           <AppText className="text-xl font-semibold text-cove-ink">{t("renameTrip")}</AppText>
-          <AppText className="text-sm text-cove-muted">{t("renameTripBody")}</AppText>
+          <AppText className="text-sm text-cove-muted">
+            {iconAfterRename ? t("iconNameTripFirst") : t("renameTripBody")}
+          </AppText>
           <SheetField
             value={tripName}
             onChangeText={setTripName}
@@ -727,6 +763,7 @@ export default function HistoryScreen() {
                 className="flex-row items-center justify-between gap-3 rounded-2xl px-4 py-3 active:opacity-80"
                 style={{ backgroundColor: colors.mist }}
               >
+                <HomeIcon kind="shop" name={trip.name} size={36} background={colors.paper} />
                 <View className="min-w-0 flex-1">
                   <AppText className="text-base font-semibold text-cove-ink" numberOfLines={1}>
                     {trip.name ?? formatTripWhen(trip.startedAt, locale)}
@@ -910,6 +947,7 @@ function TripInvoiceList({
           <View
             className="flex-row items-center justify-between gap-3"
           >
+            <HomeIcon kind="shop" name={trip.name} size={40} />
             <View className="min-w-0 flex-1">
               <AppText
                 className="text-base font-semibold text-cove-ink"
@@ -966,6 +1004,8 @@ function InvoiceView({
   count,
   onPressItem,
   onRename,
+  shopName,
+  onChangeIcon,
   onMoveItem,
   actions,
 }: {
@@ -980,6 +1020,10 @@ function InvoiceView({
   onPressItem: (item: Purchase) => void;
   /** Opened trip: rename it, or move one of its items to another trip. */
   onRename?: () => void;
+  /** The trip's name: its shop icon shows beside the title. */
+  shopName?: string | null;
+  /** Tap the shop icon to change it. */
+  onChangeIcon?: () => void;
   onMoveItem?: (item: Purchase) => void;
   /** Cost actions for an opened trip (scan / item prices / trip total). */
   actions?: ReactNode;
@@ -1003,6 +1047,24 @@ function InvoiceView({
       style={{ backgroundColor: scheme === "dark" ? colors.paper : colors.paper }}
     >
       <View className="flex-row items-center gap-2">
+        {onChangeIcon ? (
+          <Pressable
+            onPress={onChangeIcon}
+            accessibilityRole="button"
+            accessibilityLabel={t("iconChange")}
+            hitSlop={6}
+            className="me-1 active:opacity-75"
+          >
+            <HomeIcon kind="shop" name={shopName} size={46} />
+            <View
+              pointerEvents="none"
+              className="absolute h-[18px] w-[18px] items-center justify-center rounded-full bg-cove-accent"
+              style={{ end: -4, bottom: -4, borderWidth: 2, borderColor: colors.paper }}
+            >
+              <Ionicons name="pencil" size={9} color={colors.onAccent} />
+            </View>
+          </Pressable>
+        ) : null}
         <AppText className="min-w-0 flex-1 text-lg font-semibold text-cove-ink" numberOfLines={2}>
           {periodTitle}
         </AppText>

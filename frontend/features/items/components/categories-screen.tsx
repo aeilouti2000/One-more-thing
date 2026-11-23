@@ -9,11 +9,15 @@ import {
 } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { HomeIcon } from "@/components/ui/HomeIcon";
+import { IconSheet } from "@/components/ui/IconSheet";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { appFont, scaleFontSize, singleLineInput } from "@/constants/font";
 import { cardLift, tabBar, withAlpha } from "@/constants/theme";
 import { RequireSession } from "@/features/auth/components/require-session";
+import { resolveIcon } from "@/features/icons/resolve";
+import { useHomeIcons, useLoadIcons } from "@/features/icons/use-icons";
 import { useCategories, useCategoryLabel } from "@/features/items/providers/categories-provider";
 import {
   useSettingsShowBack,
@@ -49,6 +53,9 @@ function CategoriesBody() {
   const canAdd = Boolean(draft.trim()) && !busy;
   const dark = scheme === "dark";
   const inputSize = scaleFontSize(Number(singleLineInput.fontSize), scale);
+  const [iconFor, setIconFor] = useState<{ id: string; name: string } | null>(null);
+  // Icons can change on another phone: load them each time this screen opens.
+  useLoadIcons(true);
 
   async function add() {
     const name = draft.trim();
@@ -165,6 +172,7 @@ function CategoriesBody() {
               removing={removingId === item.id}
               disabled={busy || removingId != null}
               onDelete={item.id === "other" ? undefined : () => void remove(item.id)}
+              onChangeIcon={(name) => setIconFor({ id: item.id, name })}
               accent={colors.accent}
               muted={colors.muted}
               ink={colors.ink}
@@ -173,6 +181,11 @@ function CategoriesBody() {
             />
           ))}
       </View>
+      <IconSheet
+        target={iconFor ? { kind: "category", key: iconFor.id } : null}
+        title={iconFor?.name ?? ""}
+        onClose={() => setIconFor(null)}
+      />
     </Screen>
   );
 }
@@ -182,6 +195,7 @@ function CategoryRow({
   removing,
   disabled,
   onDelete,
+  onChangeIcon,
   accent,
   muted,
   ink,
@@ -192,6 +206,8 @@ function CategoryRow({
   removing: boolean;
   disabled: boolean;
   onDelete?: () => void;
+  /** Opens the icon sheet; gets the name as shown. */
+  onChangeIcon: (name: string) => void;
   accent: string;
   muted: string;
   ink: string;
@@ -202,6 +218,8 @@ function CategoryRow({
   const { t } = useI18n();
   const label = useCategoryLabel(item.id);
   const name = item.builtin ? label : item.name ?? item.id;
+  const icon = resolveIcon(useHomeIcons(), "category", item.id);
+  const { colors } = useTheme();
 
   return (
     <View
@@ -214,9 +232,34 @@ function CategoryRow({
         ...cardLift(glass, 2),
       }}
     >
-      <AppText numberOfLines={1} className="min-w-0 flex-1 text-base font-semibold text-cove-ink">
-        {name}
-      </AppText>
+      <Pressable
+        onPress={() => onChangeIcon(name)}
+        accessibilityRole="button"
+        accessibilityLabel={`${t("iconChange")}, ${name}`}
+        hitSlop={6}
+        className="active:opacity-75"
+      >
+        <HomeIcon kind="category" id={item.id} size={40} />
+        <View
+          pointerEvents="none"
+          className="absolute h-[18px] w-[18px] items-center justify-center rounded-full bg-cove-accent"
+          style={{ end: -4, bottom: -4, borderWidth: 2, borderColor: colors.paper }}
+        >
+          <Ionicons name="pencil" size={9} color={colors.onAccent} />
+        </View>
+      </Pressable>
+      <View className="min-w-0 flex-1">
+        <AppText numberOfLines={1} className="text-base font-semibold text-cove-ink">
+          {name}
+        </AppText>
+        <AppText numberOfLines={1} className="mt-0.5 text-xs text-cove-muted">
+          {icon.type === "image"
+            ? t("iconChosenImage")
+            : icon.chosen
+              ? t("iconChosenEmoji")
+              : t("iconDefault")}
+        </AppText>
+      </View>
       <View className="h-9 w-9 items-center justify-center">
         {onDelete ? (
           <Pressable
