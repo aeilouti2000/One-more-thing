@@ -517,6 +517,7 @@ export default function HistoryScreen() {
     renderPurchase: (purchase) => (
       <PurchaseRow
         purchase={purchase}
+        categoryIcon
         selected={wide && openItem?.id === purchase.id}
         onPress={() => setOpenItem(purchase)}
         onUndo={

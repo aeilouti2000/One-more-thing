@@ -1,3 +1,4 @@
+import { HomeIcon } from "@/components/ui/HomeIcon";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
@@ -46,6 +47,8 @@ type PurchaseRowProps = {
   lifted?: boolean;
   leading?: ReactNode;
   showCategory?: boolean;
+  /** History: the category's icon in place of a photo when the item has none. */
+  categoryIcon?: boolean;
 };
 
 export function PurchaseRow({
@@ -61,6 +64,7 @@ export function PurchaseRow({
   lifted = false,
   leading,
   showCategory = true,
+  categoryIcon = false,
 }: PurchaseRowProps) {
   const { t } = useI18n();
   const { household } = useHousehold();
@@ -175,6 +179,10 @@ export function PurchaseRow({
           {photoUri ? (
             <View pointerEvents="none">
               <ItemPhotoThumb uri={photoUri} size={44} radius={12} uploading={purchase.photoUploading} hash={purchase.imageHash} />
+            </View>
+          ) : categoryIcon ? (
+            <View pointerEvents="none">
+              <HomeIcon kind="category" id={purchase.category} size={44} radius={12} />
             </View>
           ) : null}
           <View pointerEvents="box-none" className="min-w-0 flex-1 gap-2.5">
