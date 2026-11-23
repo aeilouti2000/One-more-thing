@@ -14,8 +14,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 /**
  * One shopping trip on the Invoices page, drawn as a receipt: the shop's icon,
  * its name (or the time, for a trip with no name), the list, the total; under
- * a dashed tear line, the first three items' category icons, the count, and a
- * tag when some items have no price.
+ * that, the item count and a tag when some items have no price.
  */
 export function ReceiptCard({
   trip,
@@ -33,7 +32,6 @@ export function ReceiptCard({
   const when = formatTripWhen(trip.startedAt, locale);
   const list = listLabel(trip.listName ?? "", t("defaultList"));
   const unpriced = unpricedCount(trip);
-  const more = trip.itemCount - trip.preview.length;
   const warn = scheme === "dark" ? { bg: "#3a2a10", fg: "#f3c477" } : { bg: "#FFF1DC", fg: "#9A5B00" };
 
   return (
@@ -68,16 +66,8 @@ export function ReceiptCard({
         </AppText>
         <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color={colors.muted} />
       </View>
-      <View
-        className="mx-3"
-        style={{ borderTopWidth: 1.5, borderStyle: "dashed", borderColor: scheme === "dark" ? colors.line : colors.mist }}
-      />
-      <View className="flex-row items-center gap-1.5 px-3 pb-3 pt-2.5">
-        {trip.preview.map((item, index) => (
-          <HomeIcon key={`${item.name}-${index}`} kind="category" id={item.category} size={22} radius={8} />
-        ))}
-        <AppText className="ms-0.5 text-xs text-cove-muted" numberOfLines={1}>
-          {more > 0 ? `+${more} · ` : ""}
+      <View className="flex-row items-center gap-1.5 px-3 pb-3 pt-0.5">
+        <AppText className="text-xs text-cove-muted" numberOfLines={1}>
           {t("invoiceTripCount", { count: trip.itemCount })}
         </AppText>
         {unpriced > 0 ? (
