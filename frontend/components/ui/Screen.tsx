@@ -94,10 +94,30 @@ type ScreenProps = {
    * run (already moving, or canSwipe says no), so the caller can switch plainly.
    */
   slideRef?: RefObject<((direction: SwipeDirection) => boolean) | null>;
+  /**
+   * The page brings its own virtualized list (a FlatList) instead of the
+   * screen's ScrollView. The swipe between views still works; the list does
+   * its own padding and pull-to-refresh.
+   */
+  virtualized?: boolean;
 };
 
 export function useScreenSwipeGesture() {
   return useContext(ScreenSwipeGestureContext);
+}
+
+/**
+ * The swipe's slide and fade for one part of a virtualized page (a list row
+ * or the list's header), without the extra wrapper of SwipeSlideContent.
+ */
+export function useSwipeSlideStyle() {
+  const swipe = useContext(ScreenSwipeContext);
+  const translateX = swipe?.translateX;
+  const fade = swipe?.fade;
+  return useAnimatedStyle(() => ({
+    opacity: fade?.value ?? 1,
+    transform: [{ translateX: translateX?.value ?? 0 }],
+  }));
 }
 
 export function SwipeSlideContent({ children }: { children: ReactNode }) {
@@ -143,6 +163,7 @@ export function Screen({
   onSwipe,
   canSwipe,
   slideRef,
+  virtualized = false,
 }: ScreenProps) {
   const { colors, scheme } = useTheme();
   const { isRTL } = useI18n();
@@ -450,6 +471,20 @@ export function Screen({
     </View>
   );
 
+  const listBody = (
+    <View style={{ flex: 1, width: "100%" }}>
+      {onSwipe ? (
+        <GestureDetector gesture={listPan} enableContextMenu>
+          <View style={{ flex: 1, width: "100%" }} collapsable={false}>
+            {scrollContent}
+          </View>
+        </GestureDetector>
+      ) : (
+        children
+      )}
+    </View>
+  );
+
   const body = (
     <SafeAreaView
       className="flex-1 bg-cove-ice"
@@ -458,7 +493,9 @@ export function Screen({
     >
       <GlassBackdrop />
       {top ? <View style={{ zIndex: 2 }}>{top}</View> : null}
-      {scroll ? (
+      {virtualized ? (
+        listBody
+      ) : scroll ? (
         onSwipe ? (
           swipeBody
         ) : scrollY ? (

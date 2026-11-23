@@ -5,6 +5,7 @@ import { Dimensions, Modal, Pressable, ScrollView, TextInput, View } from "react
 import { AppText } from "@/components/ui/AppText";
 import { DialogGlass, FrostedFill } from "@/components/ui/BlurBackdrop";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { HomeIcon } from "@/components/ui/HomeIcon";
 import { singleLineInput } from "@/constants/font";
 import { floatedCardStyle, glassFieldStyle, withAlpha } from "@/constants/theme";
 import { useCategories, useCategoryLabel } from "@/features/items/providers/categories-provider";
@@ -127,7 +128,11 @@ export function CategoryFilter({
           className="h-14 flex-row items-center gap-2 overflow-hidden rounded-3xl border border-cove-line px-4 active:opacity-80"
         >
           <FrostedFill />
-          <Ionicons name="grid-outline" size={18} color={colors.muted} />
+          {filtered ? (
+            <HomeIcon kind="category" id={value} size={26} />
+          ) : (
+            <Ionicons name="grid-outline" size={18} color={colors.muted} />
+          )}
           <AppText numberOfLines={1} className="min-w-0 flex-1 text-base text-cove-ink">
             {filtered ? selectedLabel : t("categories")}
           </AppText>
@@ -234,6 +239,7 @@ export function CategoryFilter({
               {ordered.map((item) => (
                 <CategoryOption
                   key={item.id}
+                  iconId={item.id}
                   label={item.builtin ? undefined : item.name ?? item.id}
                   category={item.builtin ? item.id : undefined}
                   selected={selectable && value === item.id}
@@ -302,12 +308,15 @@ export function CategoryFilter({
 }
 
 function CategoryOption({
+  iconId,
   label,
   category,
   selected,
   onPress,
   onDelete,
 }: {
+  /** The category's icon; left out for "All". */
+  iconId?: string;
   label?: string;
   category?: string;
   selected: boolean;
@@ -330,6 +339,7 @@ function CategoryOption({
         backgroundColor: selected ? withAlpha(colors.accentText, 0.16) : "transparent",
       }}
     >
+      {iconId !== undefined ? <HomeIcon kind="category" id={iconId} size={28} /> : null}
       <AppText
         className={`min-w-0 flex-1 text-base ${selected ? "font-semibold" : "font-medium"} text-cove-ink`}
       >

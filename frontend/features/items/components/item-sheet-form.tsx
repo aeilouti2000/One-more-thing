@@ -7,6 +7,7 @@ import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from "react
 import { AppText } from "@/components/ui/AppText";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { getCategoryLabel } from "@/constants/categories";
+import { HomeIcon } from "@/components/ui/HomeIcon";
 import { type TranslationKey } from "@/constants/i18n";
 import { withAlpha } from "@/constants/theme";
 import type { PinInterval } from "@/features/items/api/pins";
@@ -448,6 +449,7 @@ export function ItemSheetForm(props: ItemSheetFormProps) {
           {categories.map((entry) => (
             <Chip
               key={entry.id}
+              iconCategory={entry.id}
               label={entry.builtin ? getCategoryLabel(entry.id, locale) : (entry.name ?? entry.id)}
               selected={category === entry.id}
               onPress={() => {
@@ -672,11 +674,14 @@ export function Chip({
   label,
   selected,
   compact = false,
+  iconCategory,
   onPress,
 }: {
   label: string;
   selected: boolean;
   compact?: boolean;
+  /** Shows this category's icon before the label. */
+  iconCategory?: string;
   onPress: () => void;
 }) {
   const { colors, scheme } = useTheme();
@@ -687,10 +692,11 @@ export function Chip({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={label}
-      className="justify-center rounded-full active:opacity-75"
+      className={`${iconCategory !== undefined ? "flex-row items-center gap-1.5" : ""} justify-center rounded-full active:opacity-75`}
       style={{
         height: compact ? 34 : 38,
         paddingHorizontal: compact ? 13 : 15,
+        ...(iconCategory !== undefined ? { paddingStart: compact ? 5 : 6 } : null),
         backgroundColor: selected
           ? colors.accent
           : dark
@@ -698,6 +704,15 @@ export function Chip({
             : withAlpha("#12141A", 0.05),
       }}
     >
+      {iconCategory !== undefined ? (
+        <HomeIcon
+          kind="category"
+          id={iconCategory}
+          size={compact ? 24 : 26}
+          radius={999}
+          background={selected ? withAlpha(colors.white, 0.22) : undefined}
+        />
+      ) : null}
       <AppText
         numberOfLines={1}
         className="text-[13px] font-semibold"
