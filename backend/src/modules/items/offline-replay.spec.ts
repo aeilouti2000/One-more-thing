@@ -60,6 +60,12 @@ describe("Changes sent again after being offline", () => {
       where.receiptId ? [] : rows.filter((row) => idsOf(where).includes(row.id)),
     ),
   };
+  const trips = { attachNewPurchases: jest.fn(async () => undefined), refreshTimes: jest.fn(async () => undefined) };
+  const products = {
+    recordPurchases: jest.fn(async () => undefined),
+    purchaseUndone: jest.fn(async () => undefined),
+    priceChanged: jest.fn(async () => undefined),
+  };
   const service = new ItemsService(
     itemsRepo as never,
     listsRepo as never,
@@ -69,6 +75,8 @@ describe("Changes sent again after being offline", () => {
     categories as never,
     receipts as never,
     itemRows as never,
+    trips as never,
+    products as never,
   );
 
   const milk = { id: "11111111-1111-4111-8111-111111111111", name: "Milk", quantity: 2, category: "dairy" };

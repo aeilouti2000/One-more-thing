@@ -51,6 +51,12 @@ describe("Bulk edits: category and unit for many items", () => {
         .map((row) => ({ id: row.id, homeId: row.homeId })),
     ),
   };
+  const trips = { attachNewPurchases: jest.fn(async () => undefined), refreshTimes: jest.fn(async () => undefined) };
+  const products = {
+    recordPurchases: jest.fn(async () => undefined),
+    purchaseUndone: jest.fn(async () => undefined),
+    priceChanged: jest.fn(async () => undefined),
+  };
   const service = new ItemsService(
     itemsRepo as never,
     {} as never,
@@ -60,6 +66,8 @@ describe("Bulk edits: category and unit for many items", () => {
     categories as never,
     {} as never,
     itemRows as never,
+    trips as never,
+    products as never,
   );
 
   const row = (id: string) => rows.find((entry) => entry.id === id) as ItemRow;

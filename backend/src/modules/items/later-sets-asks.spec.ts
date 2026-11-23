@@ -31,6 +31,12 @@ describe("Later shelf", () => {
   };
   const homes = { requireMembership: jest.fn(async () => ({ homeId: "h1" })) };
   const notifications = { notifyLaterBack: jest.fn() };
+  const trips = { attachNewPurchases: jest.fn(async () => undefined), refreshTimes: jest.fn(async () => undefined) };
+  const products = {
+    recordPurchases: jest.fn(async () => undefined),
+    purchaseUndone: jest.fn(async () => undefined),
+    priceChanged: jest.fn(async () => undefined),
+  };
   const service = new ItemsService(
     itemsRepo as never,
     {} as never,
@@ -40,6 +46,8 @@ describe("Later shelf", () => {
     {} as never,
     {} as never,
     itemRows as never,
+    trips as never,
+    products as never,
   );
 
   beforeEach(() => {

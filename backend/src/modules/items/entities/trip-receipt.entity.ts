@@ -37,4 +37,11 @@ export class TripReceipt {
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
+
+  /** First and last purchase of the trip (kept in step with its items). */
+  @Column({ name: "started_at", type: "timestamptz", default: () => "now()" })
+  startedAt: Date;
+
+  @Column({ name: "last_bought_at", type: "timestamptz", default: () => "now()" })
+  lastBoughtAt: Date;
 }

@@ -30,6 +30,8 @@ import { TypeormPinsRepository } from "./repo/pins-repo/typeorm-pins.repository"
 import { CategoriesService } from "./services/categories.service";
 import { ItemImagesService } from "./services/item-images.service";
 import { ItemsService } from "./services/items.service";
+import { ProductsService } from "./services/products.service";
+import { TripsService } from "./services/trips.service";
 import { PinsScheduler } from "./services/pins.scheduler";
 import { PinsService } from "./services/pins.service";
 import { SetsService } from "./services/sets.service";
@@ -64,6 +66,8 @@ import { ShopLocksService } from "./services/shop-locks.service";
   ],
   providers: [
     ItemsService,
+    TripsService,
+    ProductsService,
     ItemImagesService,
     PinsService,
     PinsScheduler,
@@ -78,6 +82,8 @@ import { ShopLocksService } from "./services/shop-locks.service";
   ],
   exports: [
     ItemsService,
+    TripsService,
+    ProductsService,
     PinsService,
     CategoriesService,
     ShopLocksService,

@@ -52,7 +52,15 @@ describe("Shopping trips: buying safely", () => {
   };
   const homes = { requireMembership: jest.fn(async () => ({ homeId: "h1" })) };
   const receipts = { find: jest.fn(async () => []) };
+  // Transactions run their work straight away; the fake manager reads the same rows.
+  const manager = {
+    find: jest.fn(async () => []),
+    findOne: jest.fn(async () => null),
+    update: jest.fn(async () => undefined),
+    query: jest.fn(async () => []),
+  };
   const itemRows = {
+    manager: { transaction: jest.fn(async (work: (m: typeof manager) => Promise<unknown>) => work(manager)) },
     // The items' own home: In(ids) arrives as a FindOperator.
     find: jest.fn(async ({ where }: { where: { id: { value: string[] } } }) =>
       rows.filter((entry) => where.id.value.includes(entry.id)).map((entry) => ({ id: entry.id, homeId: "h1" })),
@@ -63,6 +71,12 @@ describe("Shopping trips: buying safely", () => {
       return { ...row };
     }),
   };
+  const trips = { attachNewPurchases: jest.fn(async () => undefined), refreshTimes: jest.fn(async () => undefined) };
+  const products = {
+    recordPurchases: jest.fn(async () => undefined),
+    purchaseUndone: jest.fn(async () => undefined),
+    priceChanged: jest.fn(async () => undefined),
+  };
   const service = new ItemsService(
     itemsRepo as never,
     listsRepo as never,
@@ -72,6 +86,8 @@ describe("Shopping trips: buying safely", () => {
     {} as never,
     receipts as never,
     itemRows as never,
+    trips as never,
+    products as never,
   );
 
   beforeEach(() => {

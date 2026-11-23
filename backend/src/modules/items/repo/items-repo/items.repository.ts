@@ -1,3 +1,4 @@
+import type { EntityManager } from "typeorm";
 import type { Item, ItemCategory } from "../../entities/item.entity";
 
 export type NewItemInput = {
@@ -41,12 +42,15 @@ export interface IItemsRepository {
     userId: string,
     boughtAt: Date,
     cost: number | null,
+    /** Runs inside this transaction when given. */
+    manager?: EntityManager,
   ): Promise<number>;
   markNeededBoughtMany(
     homeId: string,
     userId: string,
     boughtAt: Date,
     entries: { id: string; cost: number | null }[],
+    manager?: EntityManager,
   ): Promise<number>;
   /** Sets or clears the "not found" mark on a needed item. Returns rows changed. */
   setNotFound(id: string, homeId: string, userId: string | null, at: Date | null): Promise<number>;

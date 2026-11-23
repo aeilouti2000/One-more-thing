@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, Repository } from "typeorm";
+import { In, Repository, type EntityManager } from "typeorm";
 import { User } from "../../../../users/user.entity";
 import { Item } from "../../entities/item.entity";
 import { applyNeededOrder, placeNeededItem, placeNeededItems } from "../../utils/item-order";
@@ -50,8 +50,9 @@ export class TypeormItemsRepository implements IItemsRepository {
     userId: string,
     boughtAt: Date,
     cost: number | null,
+    manager?: EntityManager,
   ) {
-    const result = await this.items
+    const result = await (manager ? manager.getRepository(Item) : this.items)
       .createQueryBuilder()
       .update(Item)
       .set({
@@ -155,6 +156,7 @@ export class TypeormItemsRepository implements IItemsRepository {
     userId: string,
     boughtAt: Date,
     entries: { id: string; cost: number | null }[],
+    manager?: EntityManager,
   ) {
     if (entries.length === 0) return 0;
     const cases = entries
@@ -167,7 +169,7 @@ export class TypeormItemsRepository implements IItemsRepository {
     const userParam = entries.length + 1;
     const timeParam = entries.length + 2;
     const homeParam = entries.length + 3;
-    const result: unknown = await this.items.query(
+    const result: unknown = await (manager ?? this.items.manager).query(
       `UPDATE items
        SET status = 'bought',
            urgent_before_bought = urgent,
