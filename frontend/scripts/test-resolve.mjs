@@ -11,6 +11,7 @@ const root = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
 const stubs = {
   "react-native": "scripts/test-stubs/react-native.mjs",
   "expo-sqlite/localStorage/install": "scripts/test-stubs/local-storage.mjs",
+  "expo-sqlite": "scripts/test-stubs/expo-sqlite.mjs",
 };
 
 registerHooks({

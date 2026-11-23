@@ -13,6 +13,8 @@ import {
 import { persistQueryClientSave, type PersistedClient } from "@tanstack/react-query-persist-client";
 import { AppState } from "react-native";
 import { keepsWaiting, retryWaitMs } from "@/features/offline/rules";
+import { RowStore } from "@/features/offline/row-store";
+import { openCacheDb } from "@/features/offline/sqlite-db";
 
 /**
  * Everything the app has loaded (homes, lists, items, pins, sets) and every
@@ -108,6 +110,21 @@ const persister = createSyncStoragePersister({
   throttleTime: SAVE_WAIT_MS,
 });
 
+/**
+ * The saved copy in SQLite tables, one row per item (see row-store.ts). Null
+ * when SQLite is not available (web, tests, or it failed to open): then the
+ * single saved text below is used, as before.
+ */
+const rowStore: RowStore | null = (() => {
+  const db = openCacheDb();
+  if (!db) return null;
+  try {
+    return new RowStore(db);
+  } catch {
+    return null;
+  }
+})();
+
 function storedUserId() {
   try {
     const raw = storage.getItem(SESSION_KEY);
@@ -139,14 +156,61 @@ function snapshot(): PersistedClient {
   };
 }
 
+/** Entries changed since the last write to the tables (value undefined: removed). */
+const dirty = new Map<string, { key: QueryKey; value: unknown }>();
+let outboxDirty = false;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+/** True while the saved copy is being put back: those writes are not saved again. */
+let restoring = false;
+
+function savedMutations() {
+  return dehydrate(queryClient, { shouldDehydrateQuery: () => false, shouldDehydrateMutation: WHAT_TO_SAVE.shouldDehydrateMutation })
+    .mutations;
+}
+
+/** Writes what changed to the tables, now. */
+function flushRows() {
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  if (!rowStore || !owner || (dirty.size === 0 && !outboxDirty)) return;
+  const changes = [...dirty.values()].map(({ key, value }) => ({ key: [...key], value }));
+  dirty.clear();
+  const mutations = outboxDirty ? savedMutations() : undefined;
+  outboxDirty = false;
+  try {
+    rowStore.save(owner, changes, mutations);
+  } catch {
+    // The phone's storage failed: the in-memory copy still works, and the next
+    // change tries again with everything.
+    for (const change of changes) dirty.set(JSON.stringify(change.key), change);
+    if (mutations) outboxDirty = true;
+  }
+}
+
+function markDirty(key: QueryKey, value: unknown) {
+  if (restoring) return;
+  dirty.set(JSON.stringify(key), { key, value });
+  if (!flushTimer) flushTimer = setTimeout(flushRows, SAVE_WAIT_MS);
+}
+
+function markOutboxDirty() {
+  if (restoring) return;
+  outboxDirty = true;
+  if (!flushTimer) flushTimer = setTimeout(flushRows, SAVE_WAIT_MS);
+}
+
 function save() {
   if (!owner) return;
+  if (rowStore) return;
   persistQueryClientSave({ queryClient, persister, buster: owner, dehydrateOptions: WHAT_TO_SAVE });
 }
 
 /** Writes now, without the short wait (the app is going to the background). */
 function saveNow() {
   if (!owner) return;
+  if (rowStore) return flushRows();
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(snapshot()));
   } catch {
@@ -196,7 +260,77 @@ function adoptLegacyCache(userId: string) {
   storage.removeItem(key);
 }
 
+/** Puts the copy saved in the tables back into memory. */
+function restoreRows(store: RowStore) {
+  let copy: ReturnType<RowStore["load"]>;
+  try {
+    copy = store.load();
+  } catch {
+    store.clear();
+    return;
+  }
+  const usable = copy.owner === owner && Date.now() - copy.savedAt < MAX_AGE_MS;
+  if (!usable) {
+    if (copy.owner !== null) store.clear();
+    return;
+  }
+  restoring = true;
+  try {
+    for (const entry of copy.entries) {
+      queryClient.setQueryData(entry.key, entry.value);
+      // The objects now in memory are the ones just read: the first change
+      // after this writes only what really changed.
+      store.adoptRestored(entry.key, queryClient.getQueryData(entry.key));
+    }
+    hydrate(queryClient, {
+      queries: [],
+      // Every saved change starts paused, so the queue sends them in order.
+      mutations: (copy.mutations as DehydratedState["mutations"]).map((mutation) => ({
+        ...mutation,
+        state: { ...mutation.state, isPaused: true },
+      })),
+    });
+  } catch {
+    queryClient.clear();
+    store.clear();
+  } finally {
+    restoring = false;
+  }
+}
+
+/**
+ * The first start with tables: what an older version saved as one text is put
+ * back, written into the tables in full, and only then removed.
+ */
+function moveTextCopyToRows(store: RowStore) {
+  if (!owner || storage.getItem(STORAGE_KEY) === null) return false;
+  restoreFromText();
+  try {
+    const entries = queryClient
+      .getQueryCache()
+      .getAll()
+      .filter((query) => query.state.status === "success" && query.state.data !== undefined)
+      .map((query) => ({ key: [...query.queryKey], value: query.state.data }));
+    store.save(owner, entries, savedMutations());
+    for (const entry of entries) store.adoptRestored(entry.key, entry.value);
+    persister.removeClient();
+  } catch {
+    // Kept as text: the next start tries again.
+  }
+  return true;
+}
+
 function restore() {
+  if (!owner) return;
+  if (rowStore) {
+    if (!moveTextCopyToRows(rowStore)) restoreRows(rowStore);
+    return;
+  }
+  restoreFromText();
+}
+
+/** The single saved text (older versions; web; when SQLite is not available). */
+function restoreFromText() {
   if (!owner) return;
   let saved: PersistedClient | undefined;
   try {
@@ -236,15 +370,23 @@ restore();
 // same data (the trip screen asks every few seconds) writes nothing.
 const lastData = new WeakMap<Query, unknown>();
 queryClient.getQueryCache().subscribe((event) => {
-  if (event.type === "removed") return save();
+  if (event.type === "removed") {
+    if (rowStore) markDirty(event.query.queryKey, undefined);
+    return save();
+  }
   if (event.type !== "added" && event.type !== "updated") return;
   const data = event.query.state.data;
   if (lastData.get(event.query) === data) return;
   lastData.set(event.query, data);
-  if (data !== undefined) save();
+  if (data === undefined) return;
+  if (rowStore) markDirty(event.query.queryKey, data);
+  save();
 });
 queryClient.getMutationCache().subscribe((event) => {
-  if (event.type === "added" || event.type === "removed" || event.type === "updated") save();
+  if (event.type === "added" || event.type === "removed" || event.type === "updated") {
+    if (rowStore) markOutboxDirty();
+    save();
+  }
 });
 AppState.addEventListener("change", (state) => {
   if (state !== "active") saveNow();
@@ -257,15 +399,21 @@ queryClient.mount();
 export function setCacheOwner(userId: string | null) {
   if (userId === owner) return;
   owner = userId;
+  dirty.clear();
+  outboxDirty = false;
   queryClient.clear();
   persister.removeClient();
+  rowStore?.clear();
   if (userId) adoptLegacyCache(userId);
 }
 
 /** Forgets everything saved on this phone for the signed-in person. */
 export function clearOfflineData() {
+  dirty.clear();
+  outboxDirty = false;
   queryClient.clear();
   persister.removeClient();
+  rowStore?.clear();
   const userId = owner ?? storedUserId();
   if (userId) storage.removeItem(`${LEGACY_PREFIX}${userId}`);
 }
