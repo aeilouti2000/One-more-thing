@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { fetchShopAsks, isOpenAsk, type ShopAsk } from "@/features/items/api/shop-asks";
+import { isOpenAsk, type ShopAsk } from "@/features/items/api/shop-asks";
 import { onListChanged } from "@/features/items/utils/list-sync";
+import { onSynced, syncHome } from "@/features/sync/engine";
 
 /**
  * The home's open "Anything missing?" questions, shared by the list (which
@@ -53,22 +54,37 @@ export function refreshShopAsks(homeId: string, options?: { force?: boolean }): 
   if (inflight?.homeId === homeId) return inflight.run;
   if (!options?.force && Date.now() - lastFetchAt < MIN_REFRESH_GAP_MS) return Promise.resolve();
 
-  const seen = localVersion;
   const run = (async () => {
-    const result = await fetchShopAsks(homeId);
+    // The questions come with the home's sync (see onSynced below).
+    const result = await syncHome(homeId);
     // A failed check keeps what is on screen, and the next one may try at once.
-    if (!result.asks || state.homeId !== homeId) return;
+    if (result.offline || result.error || state.homeId !== homeId) return;
     lastFetchAt = Date.now();
-    // Something changed here while it was on its way: its answer is older.
-    if (seen !== localVersion) return;
-    const open = result.asks.filter((ask) => isOpenAsk(ask));
-    if (!sameAsks(open, state.asks)) publish({ homeId, asks: open.length ? open : NONE });
+    // Questions end by time, not by a change: drop the ones that ended.
+    const open = state.asks.filter((ask) => isOpenAsk(ask));
+    if (open.length !== state.asks.length) publish({ homeId, asks: open.length ? open : NONE });
   })().finally(() => {
     if (inflight?.run === run) inflight = null;
   });
   inflight = { homeId, run };
   return run;
 }
+
+/**
+ * Every sync that changed something carries the home's open questions. One
+ * that started before a change made here (an answer just given) is older and
+ * is skipped.
+ */
+let syncSeen = localVersion;
+onSynced((homeId, answer) => {
+  if (!answer.asks || state.homeId !== homeId) return;
+  if (syncSeen !== localVersion) {
+    syncSeen = localVersion;
+    return;
+  }
+  const open = answer.asks.filter((ask) => isOpenAsk(ask));
+  if (!sameAsks(open, state.asks)) publish({ homeId, asks: open.length ? open : NONE });
+});
 
 /** The same, but only when that home is the one on screen (a notification may be about another). */
 export function refreshShopAsksIfShown(homeId: string) {

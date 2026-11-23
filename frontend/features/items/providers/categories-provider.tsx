@@ -11,6 +11,7 @@ import { AppState } from "react-native";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
 import { createCategory, deleteCategory, fetchCategories, type HomeCategory } from "@/features/items/api/categories";
 import { emitListChanged, onListChanged } from "@/features/items/utils/list-sync";
+import { syncHome } from "@/features/sync/engine";
 import { qk, queryClient, readCache } from "@/features/offline/query-client";
 import { useHousehold } from "@/features/homes/providers/household-provider";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -47,7 +48,11 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!homeId) return;
-    const load = () => void fetchCategories(homeId);
+    // Categories come with the home's sync; the old endpoint covers a failed sync.
+    const load = () =>
+      void syncHome(homeId).then((result) => {
+        if (result.error) void fetchCategories(homeId);
+      });
     load();
     // A partner may add or remove a category while this phone is open.
     const stopListening = onListChanged(load);

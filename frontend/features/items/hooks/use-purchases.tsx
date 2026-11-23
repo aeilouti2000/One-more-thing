@@ -1,3 +1,4 @@
+import { loadHomeItems } from "@/features/sync/engine";
 import {
   createContext,
   useCallback,
@@ -18,7 +19,6 @@ import {
   moveItems,
   putItem,
   reorderItems,
-  fetchHomeItems,
   markItemBought,
   markItemsBought,
   setItemNotFound,
@@ -228,7 +228,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     const run: Promise<void> = (async () => {
       do {
         again.current = false;
-        const result = await fetchHomeItems(activeHome);
+        const result = await loadHomeItems(activeHome);
         // Signed out or switched home meanwhile: nothing to show for this one.
         if (homeIdRef.current !== activeHome) return;
         // Keep what is on screen: one failed request (a busy server, a dropped

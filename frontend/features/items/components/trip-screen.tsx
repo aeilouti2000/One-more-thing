@@ -1,3 +1,5 @@
+import { qk, readCache } from "@/features/offline/query-client";
+import { lockFromSync } from "@/features/items/hooks/use-shop-lock";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import type { NavigationProp, ParamListBase } from "@react-navigation/native";
@@ -49,7 +51,6 @@ import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { listLabel } from "@/features/items/api/lists";
 import {
   claimShopLock,
-  fetchShopLock,
   firstName,
   heartbeatShopLock,
   releaseShopLock,
@@ -1163,13 +1164,13 @@ function TripBody() {
       const sub = BackHandler.addEventListener("hardwareBackPress", onHardwareBack);
       const timer = setInterval(() => {
         if (AppState.currentState !== "active") return;
-        void refresh();
-        // Shopping together: see who else is on this list.
-        if (shopTogether && homeId && listId && lockHeldRef.current) {
-          void fetchShopLock(homeId, listId).then((result) => {
-            if (result.lock) adoptLock(result.lock);
-          });
-        }
+        // One sync brings the list and who else is on it.
+        void refresh().then(() => {
+          // Shopping together: see who else is on this list.
+          if (shopTogether && homeId && listId && lockHeldRef.current && readCache(qk.locks(homeId))) {
+            adoptLock(lockFromSync(homeId, listId));
+          }
+        });
       }, refreshMs);
       return () => {
         sub.remove();

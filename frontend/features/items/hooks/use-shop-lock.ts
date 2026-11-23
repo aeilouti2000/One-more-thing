@@ -1,13 +1,31 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
-import {
-  fetchShopLock,
-  SHOP_LOCK_POLL_MS,
-  type ShopLock,
-} from "@/features/items/api/shop-locks";
+import { SHOP_LOCK_POLL_MS, type ShopLock } from "@/features/items/api/shop-locks";
+import { qk, readCache } from "@/features/offline/query-client";
+import { syncHome } from "@/features/sync/engine";
 
 /**
- * Polls the per-list shopping lock so other members see when someone is on a trip.
+ * Who is shopping a list, from the locks the last sync brought. A list missing
+ * there has nobody on it.
+ */
+export function lockFromSync(homeId: string, listId: string): ShopLock {
+  const locks = readCache<ShopLock[]>(qk.locks(homeId)) ?? [];
+  return (
+    locks.find((lock) => lock.listId === listId) ?? {
+      listId,
+      active: false,
+      shopperId: null,
+      shopperName: null,
+      isMine: false,
+      shoppers: [],
+    }
+  );
+}
+
+/**
+ * Keeps the per-list shopping lock fresh so other members see when someone is
+ * on a trip. It rides on the home's sync (one request for the list, the lock
+ * and the questions), every few seconds while shown.
  * No-ops when the home has a single member.
  */
 export function useShopLock(options: {
@@ -41,20 +59,24 @@ export function useShopLock(options: {
     const home = homeIdRef.current;
     const list = listIdRef.current;
     if (!home || !list) return null;
-    const result = await fetchShopLock(home, list);
+    const result = await syncHome(home);
     if (homeIdRef.current !== home || listIdRef.current !== list) return null;
-    if (result.lock) store(`${home}:${list}`, result.lock);
-    return result.lock;
+    // Offline, the last known lock may be stale: keep what is shown.
+    if (result.offline || result.error) return null;
+    const lock = lockFromSync(home, list);
+    store(`${home}:${list}`, lock);
+    return lock;
   }, [store]);
 
   useEffect(() => {
     if (!enabled || !homeId || !listId) return;
 
     let cancelled = false;
+    // What the last sync knew, at once; then a fresh look.
+    if (readCache(qk.locks(homeId))) store(`${homeId}:${listId}`, lockFromSync(homeId, listId));
     void (async () => {
-      const result = await fetchShopLock(homeId, listId);
+      await refresh();
       if (cancelled) return;
-      if (result.lock) store(`${homeId}:${listId}`, result.lock);
     })();
 
     const timer = setInterval(() => {

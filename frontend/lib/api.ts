@@ -296,7 +296,8 @@ async function request<T>(path: string, init: RequestInit = {}, auth = true, all
 }
 
 export const api = {
-  get: <T>(path: string, auth = true) => request<T>(path, {}, auth),
+  get: <T>(path: string, auth = true, headers?: Record<string, string>) =>
+    request<T>(path, headers ? { headers } : {}, auth),
   post: <T>(path: string, body?: unknown, auth = true) =>
     request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }, auth),
   patch: <T>(path: string, body: unknown) =>
