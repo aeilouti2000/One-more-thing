@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import { DomainError } from "../../common/domain.error";
 import { isValidTimezone } from "../../common/home-time";
 import { HomesService } from "../homes/services/homes.service";
+import { IconsService } from "../icons/icons.service";
 import { CategoriesService } from "../items/services/categories.service";
 import { ItemsService } from "../items/services/items.service";
 import { PinsService } from "../items/services/pins.service";
@@ -18,7 +19,7 @@ import { type ProductRow, SyncRepository, type TripRow } from "./sync.repository
  * - Otherwise: only the rows stamped after N, plus deletions.
  *
  * Items, products and trips can grow large, so only their changes are sent.
- * The rest (home and members, lists, categories, pins, sets, asks, shop locks)
+ * The rest (home and members, lists, categories, icons, pins, sets, asks, shop locks)
  * is small and sent whole whenever anything changed.
  *
  * The version is read before the rows. Changes to one home commit one after
@@ -37,6 +38,7 @@ export class SyncService {
     private readonly sets: SetsService,
     private readonly asks: ShopAsksService,
     private readonly locks: ShopLocksService,
+    private readonly icons: IconsService,
   ) {}
 
   async changes(userId: string, homeId: string, since: number | null, timezone?: string) {
@@ -71,7 +73,7 @@ export class SyncService {
     const deleted = full ? [] : await this.repo.deletions(homeId, since as number);
 
     const home = await this.homes.getOne(userId, homeId);
-    const [items, lists, categories, pins, sets, asks, locks] = await Promise.all([
+    const [items, lists, categories, pins, sets, asks, locks, icons] = await Promise.all([
       this.items.withNames(itemRows),
       this.items.lists(userId, homeId),
       this.categories.list(userId, homeId),
@@ -79,6 +81,7 @@ export class SyncService {
       this.sets.list(userId, homeId),
       this.asks.active(userId, homeId),
       this.locks.homeLocks(userId, homeId, home.tripShopTogether === true),
+      this.icons.forHome(homeId),
     ]);
 
     return {
@@ -92,6 +95,7 @@ export class SyncService {
       sets,
       asks,
       locks,
+      icons,
       items,
       products: products.map(toProduct),
       trips: trips.map(toTrip),
