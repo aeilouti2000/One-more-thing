@@ -194,7 +194,8 @@ describe("TripsAsRows migration", () => {
         [home.homeId],
       );
 
-      await early.migrate();
+      // Up to 032 only: 033 bumps every home's version on purpose (the History period notice).
+      await early.migrate(MIGRATIONS.slice(0, MIGRATIONS.findIndex((migration) => migration.name === "HistoryPeriod1740000000033")));
 
       const trips = await early.sql<{ names: string; name: string | null; total: string | null; started_at: Date }>(
         `select string_agg(i.name, ',' order by i.name) as names, r.name, r.total, r.started_at
@@ -265,6 +266,32 @@ describe("HomeProducts migration", () => {
           times_bought: 2,
         },
       ]);
+    } finally {
+      await early.drop();
+    }
+  });
+});
+
+describe("HistoryPeriod migration", () => {
+  it("moves existing homes to 3 months after a notice from 12, and starts new homes on 3", async () => {
+    const upTo = MIGRATIONS.findIndex((migration) => migration.name === "HistoryPeriod1740000000033");
+    const early = await createTestDatabase(MIGRATIONS.slice(0, upTo));
+    try {
+      const existing = await seedHome(early, "existing");
+      await early.migrate();
+      const [old] = await early.sql<Record<string, unknown>>(
+        `select history_months, history_months_before, history_months_changed_at > now() - interval '1 minute' as recent
+           from homes where id = $1`,
+        [existing.homeId],
+      );
+      expect(old).toEqual({ history_months: 3, history_months_before: 12, recent: true });
+      const created = await seedHome(early, "new");
+      const [fresh] = await early.sql<Record<string, unknown>>(
+        `select history_months, history_months_before, history_months_changed_at from homes where id = $1`,
+        [created.homeId],
+      );
+      expect(fresh).toEqual({ history_months: 3, history_months_before: null, history_months_changed_at: null });
+      await expect(early.sql(`update homes set history_months = 4 where id = $1`, [created.homeId])).rejects.toThrow();
     } finally {
       await early.drop();
     }

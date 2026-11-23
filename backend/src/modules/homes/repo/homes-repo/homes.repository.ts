@@ -1,3 +1,4 @@
+import type { HistoryPeriod } from "../../../plans/history-period";
 import type { HomePlan } from "../../../plans/plans";
 import type { Home, TripCostMode } from "../../entities/home.entity";
 import type { HomeMember, MemberRole } from "../../entities/home-member.entity";
@@ -30,6 +31,8 @@ export type Household = {
   monthlyRecap: boolean;
   /** The plan and what it allows; the app shows locks from it, the server enforces it. */
   plan: HomePlan;
+  /** How long History is kept: the host's choice, the period in force, a waiting change. */
+  history: HistoryPeriod;
   members: HouseholdMember[];
 };
 
@@ -46,6 +49,12 @@ export interface IHomesRepository {
   loadHome(homeId: string): Promise<Household>;
   /** Just the plan columns of a home. */
   loadPlan(homeId: string): Promise<{ plan: string; planUntil: Date | null } | null>;
+  /** Reads the plan and History columns under a row lock and writes what `change` returns (nothing for null). */
+  updateHistory(
+    homeId: string,
+    change: (home: Pick<Home, "plan" | "planUntil" | "historyMonths" | "historyMonthsBefore" | "historyMonthsChangedAt">) =>
+      Partial<Home> | null,
+  ): Promise<void>;
   listForUser(userId: string): Promise<HomeSummary[]>;
   createWithOwner(userId: string, homeName: string, listName: string): Promise<Household>;
   joinByCode(userId: string, inviteCode: string): Promise<Household>;

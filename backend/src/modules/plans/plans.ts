@@ -10,7 +10,7 @@ import { PIN_LIMIT } from "../items/entities/pin.entity";
  * limits the app had before plans, so no current user meets a new limit.
  */
 export type PlanLimits = {
-  /** Months of purchases kept before the current one; older months keep only their totals. */
+  /** The longest History a home may choose (months before the current one); see history-period.ts. */
   historyMonths: number;
   /** Item photos per home; null: no limit. */
   photosPerHome: number | null;

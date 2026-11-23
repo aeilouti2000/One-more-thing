@@ -237,3 +237,44 @@ describe("GET history/months", () => {
     expect(empty.body.state).toBe("none");
   });
 });
+
+describe("History by the home's period", () => {
+  /** Noon UTC on the 15th, `months` calendar months before this one. */
+  const monthsAgo = (months: number) => {
+    const now = new Date();
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, 15, 12)).toISOString();
+  };
+  const key = (iso: string) => iso.slice(0, 7);
+
+  async function homeWith(ages: number[]) {
+    const home = await newHome("UTC");
+    for (const age of ages) {
+      const at = monthsAgo(age);
+      await purchase(home, await trip(home, at), `${age} months`, at);
+    }
+    return home;
+  }
+
+  it("marks months older than 3 months archived and does not list their purchases", async () => {
+    const home = await homeWith([1, 5]);
+    const list = await get(home, "/months");
+    expect(list.body.months.map((row: { month: string; state: string }) => [row.month, row.state])).toEqual([
+      [key(monthsAgo(1)), "live"],
+      [key(monthsAgo(5)), "archived"],
+    ]);
+    const old = await get(home, `/purchases?month=${key(monthsAgo(5))}`);
+    expect(old.body.items).toEqual([]);
+    const search = await get(home, "/purchases?q=months");
+    expect(search.body.items.map((item: { name: string }) => item.name)).toEqual(["1 months"]);
+  });
+
+  it("keeps the older months live while a shorter period waits", async () => {
+    const home = await homeWith([1, 5]);
+    await api.call("PATCH", `/homes/${home.homeId}/history-settings`, { token: home.token, body: { historyMonths: 12 } });
+    await api.call("PATCH", `/homes/${home.homeId}/history-settings`, { token: home.token, body: { historyMonths: 3 } });
+    const list = await get(home, "/months");
+    expect(list.body.months.map((row: { state: string }) => row.state)).toEqual(["live", "live"]);
+    const old = await get(home, `/purchases?month=${key(monthsAgo(5))}`);
+    expect(old.body.items.map((item: { name: string }) => item.name)).toEqual(["5 months"]);
+  });
+});

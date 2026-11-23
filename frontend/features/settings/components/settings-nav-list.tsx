@@ -20,7 +20,7 @@ type NavId = "account" | "home-settings" | "preferences" | "permissions" | "abou
 /** Each main card, and the pages that live behind it. */
 const NAV_PAGES: Record<NavId, string[]> = {
   account: ["account"],
-  "home-settings": ["home-settings", "categories", "pins", "costs", "trips", "home-alerts"],
+  "home-settings": ["home-settings", "categories", "pins", "costs", "trips", "history", "home-alerts"],
   preferences: ["preferences", "notifications", "swipe-actions", "language", "appearance", "animations", "app-icon", "widgets"],
   permissions: ["permissions"],
   about: ["about", "whats-new", "features"],

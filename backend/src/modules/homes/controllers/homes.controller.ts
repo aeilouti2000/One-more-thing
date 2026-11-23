@@ -9,6 +9,7 @@ import {
   CreateHomeDto,
   JoinHomeDto,
   UpdateCostSettingsDto,
+  UpdateHistorySettingsDto,
   UpdateHomeNameDto,
   UpdateNotificationSettingsDto,
   UpdateTripSettingsDto,
@@ -86,6 +87,15 @@ export class HomesController {
     @Body() body: UpdateTripSettingsDto,
   ) {
     return this.homes.updateTripSettings(user.id, homeId, body);
+  }
+
+  @Patch(":homeId/history-settings")
+  updateHistorySettings(
+    @CurrentUser() user: User,
+    @Param("homeId", ParseUUIDPipe) homeId: string,
+    @Body() body: UpdateHistorySettingsDto,
+  ) {
+    return this.homes.updateHistorySettings(user.id, homeId, body.historyMonths);
   }
 
   @Patch(":homeId/notification-settings")

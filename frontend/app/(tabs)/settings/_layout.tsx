@@ -37,6 +37,7 @@ export default function SettingsLayout() {
     "whats-new",
     "features",
     "trips",
+    "history",
     "home-alerts",
     "swipe-actions",
     "categories",

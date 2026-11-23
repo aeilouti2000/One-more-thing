@@ -1,3 +1,4 @@
+import { historyPeriodOf } from "../../../plans/history-period";
 import { planOf } from "../../../plans/plans";
 import { randomBytes } from "crypto";
 import { HttpStatus, Injectable } from "@nestjs/common";
@@ -29,6 +30,20 @@ export class TypeormHomesRepository implements IHomesRepository {
     return this.dataSource.getRepository(Home).findOne({
       where: { id: homeId },
       select: { plan: true, planUntil: true },
+    });
+  }
+
+  updateHistory(homeId: string, change: Parameters<IHomesRepository["updateHistory"]>[1]) {
+    return this.dataSource.transaction(async (manager) => {
+      const homes = manager.getRepository(Home);
+      const home = await homes.findOne({
+        where: { id: homeId },
+        select: { id: true, plan: true, planUntil: true, historyMonths: true, historyMonthsBefore: true, historyMonthsChangedAt: true },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!home) throw new DomainError("HOME_NOT_FOUND", "Home not found", HttpStatus.NOT_FOUND);
+      const patch = change(home);
+      if (patch) await homes.update(homeId, patch);
     });
   }
 
@@ -290,6 +305,7 @@ export class TypeormHomesRepository implements IHomesRepository {
       .orderBy("member.created_at", "ASC")
       .getRawMany<{ id: string; role: MemberRole; name: string }>();
 
+    const plan = planOf(home);
     return {
       id: home.id,
       name: home.name,
@@ -310,7 +326,8 @@ export class TypeormHomesRepository implements IHomesRepository {
       tripEstimate: home.tripEstimate !== false,
       tripAskHome: home.tripAskHome !== false,
       monthlyRecap: home.monthlyRecap !== false,
-      plan: planOf(home),
+      plan,
+      history: historyPeriodOf(home, plan.limits.historyMonths),
       members: rows.map((row) => ({
         id: row.id,
         role: row.role,

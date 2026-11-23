@@ -87,6 +87,8 @@ export function formatAppError(
     ONLY_HOST_CAN_UPDATE_COSTS: "hostOnlyToast",
     ONLY_HOST_CAN_UPDATE_TRIPS: "hostOnlyToast",
     ONLY_HOST_CAN_UPDATE_NOTIFICATIONS: "hostOnlyToast",
+    ONLY_HOST_CAN_UPDATE_HISTORY: "hostOnlyToast",
+    HISTORY_PERIOD_LIMIT: "historyPeriodLimit",
     INVALID_COST: "errorInvalidCost",
     INVITE_CODE_FAILED: "errorInviteCodeBusy",
     NAME_REQUIRED: "errorEnterName",

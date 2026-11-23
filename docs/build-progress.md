@@ -93,3 +93,35 @@ The owner asked for a strict test of everything, then the release. What was chec
 - Render: `APP_LATEST_VERSION=2.9.3` and `APP_DOWNLOAD_URL` set to the new APK (deploy `dep-dc2a6s6tlv9c73cpkjhg`). `APP_MIN_VERSION` stays 2.6.0, so the update is offered, not forced.
 
 Still open after the release: the A52 before/after measurements (steps 1 and 18), the uptime monitor, the R2 bucket and photo copy, closing the database to the public internet, and the clean-up migration (step 25) once nobody is on 2.9.2.
+
+## History period (2026-11-24)
+
+Branch `history-period` from `main` (`7dd6062`), built in a separate checkout (`../One-more-thing-history-period`) so the uncommitted toast work in the main checkout stays untouched. Spec: `docs/history-period-spec.md`, mockup: `docs/history-period-mockup.html`. Not pushed, not merged, nothing deployed or released.
+
+**What was built**
+
+- Backend: migration 033 `HistoryPeriod` (three columns on `homes`, existing homes get `before = 12` and a change date of the migration, new homes 3 and nothing waiting); `modules/plans/history-period.ts` (`historyPeriodOf`, plus `historyChange`, the 4.3 rule as a pure function); `history` in every home answer (so also in the changes answer); `PATCH /api/homes/:homeId/history-settings` (host only, `ONLY_HOST_CAN_UPDATE_HISTORY`; above the plan `HISTORY_PERIOD_LIMIT`, 409 like `SET_LIMIT`), reading and writing under a row lock; History (`access()`, so purchases, search, trips, months list, month totals) and the clean-up job read the period in force. `GRACE_DAYS` now reads `HISTORY_NOTICE_DAYS`.
+- App: `history` on `Household` (missing from an older server: the row and screen are hidden); `home.historySettings` change through the outbox, with the server's rule mirrored (`features/homes/utils/history-period.ts`); "History" row in Home settings; `/settings/history` screen (chips, never-removed card, waiting notice with "Keep N months", confirmation sheet when shortening, locked pill for others); registered in the settings stack and the tablet nav list; the notice at the top of Purchases (closable, remembered per waiting change; "Change" for the host, "Only the host can change this" for others); "Keep more months" under a cleaned month for the host; English and Arabic texts; App features entry (`since: "2.9.3"`, as it ships by OTA on 2.9.3) and What's new line `whatsNew8`; `whatsNew7` no longer says "History keeps the last 12 months".
+
+**Tests**
+
+- Backend `npm test`: 135 passed (10 new in `history-period.spec.ts`).
+- Backend `npm run test:db` (Postgres 16, local Docker): 85 passed (12 new: `history-settings.db-spec.ts` 7, clean-up 2, History 2, migration 1).
+- App: `npm run test` 161 passed (8 new), `npm run lint` clean, `npm run typecheck` clean.
+- On a throwaway headless emulator (deleted afterwards; Expo Go, the branch's backend on a throwaway database, also deleted): Home settings row, the screen, the sheet (Sept 1 / Dec 24, correct), saving (server columns 3 / 12 / date), the notice in History, closing it (stays closed, comes back for a new change), "Keep more months" on an archived month, lengthening without a sheet, and the non-host views. Not checked on screen: Arabic, dark mode, tablet split.
+
+**Differences from the spec, and why**
+
+1. **Migration 033 does not use `omt.skip_sync`.** The `homes_version` trigger (migration 025, `omt_home_version`) bumps a home's version on every update of the row and does not read `omt.skip_sync`, so it would bump anyway. The bump is useful: every phone's next changes answer carries the home with its `history`. Because of this, the TripsAsRows migration test (which checked that 027 bumps nothing) now migrates only up to 032.
+2. **Messages use `ToastMessage`** (the app-wide message card), switched when the branch was merged with that work; on the branch alone it used `FormMessage`, since `ToastMessage` was not on `main` yet.
+3. **Dates follow the app's existing English format** ("Dec 24", "September 1"), like the other History dates (`Intl` with `en`), not the mockup's "24 Dec" / "1 September".
+4. **History notice wording** follows the mockup ("Purchases before September 1 will be removed. Each month's totals stay.") rather than the spec's shorter "Older purchases will be removed; month totals stay.", so it names the day like the settings notice and the sheet. The settings card is titled "Never removed" (mockup) rather than "What is never removed" (spec).
+5. **A waiting change whose date has passed counts as applied on the phone** (`historyNow`), even if the phone has not heard from the server since: nothing on the server changes on that date, so no new answer would come.
+6. **The other members get the change the way cost settings reach them**: the server bumps the home's version; the app refreshes the home on foreground and after its own changes (the app does not read `home` from the changes answer, for any setting).
+7. **Shortening again during a notice restarts the 30 days** (spec 4.3 as written: `before` = the period in force, `changed_at = now()`). Safe, and it can only delay a deletion.
+8. **No "NEW" tag on the Home settings row**: the mockup shows one, but `SettingsLinkCard` has no tag and the spec doesn't ask for it; App features tags the feature "New" (since 2.9.3).
+
+**Release state**
+
+- Merged into `main` as one commit on 2026-11-24 and published by OTA on runtime 2.9.3 (no version bump: `runtimeVersion` follows the app version, so a bump would cut 2.9.3 phones off the update).
+- The backend is not deployed: until it is, the server sends no `history`, so the app hides the setting and the notice. To turn it on: rehearse migration 033 on a fresh private copy of production (push tokens deleted first), then deploy. The 30-day notice for existing homes starts when 033 runs.

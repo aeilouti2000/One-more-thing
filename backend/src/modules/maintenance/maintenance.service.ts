@@ -3,14 +3,25 @@ import { DataSource, type EntityManager } from "typeorm";
 import { HOME_TZ_SQL } from "../../common/home-time";
 import { STORAGE, type Storage } from "../../common/storage/storage";
 import { summarizeMonth, type TripCategoryRow } from "../history/month-summary";
+import { HISTORY_NOTICE_DAYS, historyPeriodOf } from "../plans/history-period";
 import { planOf } from "../plans/plans";
 
 /** After a plan change, nothing is deleted for this long: a renewed plan gets its history back. */
-export const GRACE_DAYS = 30;
+export const GRACE_DAYS = HISTORY_NOTICE_DAYS;
 /** Deletion markers older than this are removed; a phone further behind gets a full copy. */
 export const MARKER_DAYS = 60;
 const HOMES_PER_BATCH = 500;
 const DELETE_BATCH = 1000;
+
+type HomeRow = {
+  id: string;
+  plan: string;
+  plan_until: Date | null;
+  plan_changed_at: Date;
+  history_months: number;
+  history_months_before: number | null;
+  history_months_changed_at: Date | null;
+};
 
 export type MaintenanceResult = {
   homes: number;
@@ -23,7 +34,7 @@ export type MaintenanceResult = {
 /**
  * The daily clean-up.
  *
- * For each home, every month older than its plan keeps is cleaned: the month's
+ * For each home, every month older than its History period (in force) is cleaned: the month's
  * totals are saved (home_months), then its purchases, their photos and its
  * trips are deleted. Products are never cleaned, so suggestions and last
  * prices survive. Phones never hold those months (they keep two), so the
@@ -48,9 +59,10 @@ export class MaintenanceService {
     const result: MaintenanceResult = { homes: 0, monthsCleaned: 0, itemsDeleted: 0, next: null };
     let cursor = after;
     while (Date.now() - started < budgetMs) {
-      const homes: { id: string; plan: string; plan_until: Date | null; plan_changed_at: Date }[] =
+      const homes: HomeRow[] =
         await this.dataSource.query(
-          `select id, plan, plan_until, plan_changed_at from homes
+          `select id, plan, plan_until, plan_changed_at,
+                  history_months, history_months_before, history_months_changed_at from homes
             where ($1::uuid is null or id > $1) order by id limit $2`,
           [cursor, HOMES_PER_BATCH],
         );
@@ -77,11 +89,19 @@ export class MaintenanceService {
     return result;
   }
 
-  /** Cleans the months a home's plan no longer keeps. */
-  async cleanHome(home: { id: string; plan: string; plan_until: Date | null; plan_changed_at: Date }) {
+  /** Cleans the months a home no longer keeps (its History period in force, which History also shows). */
+  async cleanHome(home: HomeRow) {
     const done = { months: 0, items: 0 };
     if (Date.now() - home.plan_changed_at.getTime() < GRACE_DAYS * 86_400_000) return done;
-    const { historyMonths } = planOf({ plan: home.plan, planUntil: home.plan_until }).limits;
+    const plan = planOf({ plan: home.plan, planUntil: home.plan_until });
+    const historyMonths = historyPeriodOf(
+      {
+        historyMonths: home.history_months,
+        historyMonthsBefore: home.history_months_before,
+        historyMonthsChangedAt: home.history_months_changed_at,
+      },
+      plan.limits.historyMonths,
+    ).months;
 
     const months: { month: string; start: Date; end: Date }[] = await this.dataSource.query(
       `with bounds as (

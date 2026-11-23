@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { HomeIcon } from "@/components/ui/HomeIcon";
 import type { MonthStats } from "@/features/items/api/history";
@@ -9,7 +9,7 @@ import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 /**
- * A month the plan no longer keeps: its purchases are cleaned, only the
+ * A month History no longer keeps: its purchases are cleaned, only the
  * totals saved when it was cleaned remain.
  */
 export function MonthArchiveCard({
@@ -17,11 +17,14 @@ export function MonthArchiveCard({
   title,
   currency,
   costsEnabled,
+  onKeepMore,
 }: {
   stats: MonthStats;
   title: string;
   currency: string;
   costsEnabled: boolean;
+  /** The host can choose a longer History period: a small link to it. */
+  onKeepMore?: () => void;
 }) {
   const { t } = useI18n();
   const { colors } = useTheme();
@@ -64,6 +67,18 @@ export function MonthArchiveCard({
           </>
         ) : null}
       </View>
+      {onKeepMore ? (
+        <Pressable
+          onPress={onKeepMore}
+          accessibilityRole="link"
+          accessibilityLabel={t("historyKeepMore")}
+          className="mb-3 self-center px-3 py-1.5 active:opacity-70"
+        >
+          <AppText className="text-sm font-semibold" style={{ color: colors.accentText }}>
+            {t("historyKeepMore")}
+          </AppText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

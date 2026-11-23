@@ -102,6 +102,18 @@ export class Home {
   @Column({ name: "monthly_recap", type: "boolean", default: true })
   monthlyRecap: boolean;
 
+  /** Months of History the host chose (3, 6 or 12; see modules/plans/history-period.ts). */
+  @Column({ name: "history_months", type: "smallint", default: 3 })
+  historyMonths: number;
+
+  /** While a shorter choice waits: the period still in force. */
+  @Column({ name: "history_months_before", type: "smallint", nullable: true })
+  historyMonthsBefore: number | null;
+
+  /** When the host chose a shorter period; it applies 30 days later. */
+  @Column({ name: "history_months_changed_at", type: "timestamptz", nullable: true })
+  historyMonthsChangedAt: Date | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt: Date;
 

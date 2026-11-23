@@ -127,3 +127,67 @@ describe("daily clean-up", () => {
     expect(response.status).toBe(404);
   });
 });
+
+/** Noon UTC on the 15th, `months` calendar months before this one. */
+function monthsAgo(months: number) {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, 15, 12));
+}
+
+async function homeBuying(monthsOld: number[]) {
+  const person = await api.signUp("Period");
+  const home = await api.call("POST", "/homes", { token: person.token, body: { name: "Home" } });
+  const homeId = home.body.id as string;
+  await api.t.sql(`update homes set timezone = 'UTC', plan_changed_at = now() - interval '400 days' where id = $1`, [homeId]);
+  const [list] = await api.t.sql<{ id: string }>(`select id from lists where home_id = $1`, [homeId]);
+  for (const age of monthsOld) {
+    const at = monthsAgo(age);
+    const [trip] = await api.t.sql<{ id: string }>(
+      `insert into trip_receipts (home_id, list_id, started_at, last_bought_at) values ($1, $2, $3, $3) returning id`,
+      [homeId, list.id, at],
+    );
+    await api.t.sql(
+      `insert into items (home_id, list_id, name, quantity, category, status, added_by, bought_by, bought_at, cost, receipt_id)
+       values ($1, $2, $3, 1, 'meat', 'bought', $4, $4, $5, 2, $6)`,
+      [homeId, list.id, `${age} months`, person.userId, at, trip.id],
+    );
+  }
+  return { ...person, homeId };
+}
+
+const namesOf = async (homeId: string) =>
+  (await api.t.sql<{ name: string }>(`select name from items where home_id = $1 order by bought_at desc`, [homeId])).map(
+    (row) => row.name,
+  );
+
+describe("daily clean-up by the History period", () => {
+  it("keeps 3 months on a new home: drops the 4- and 7-month-old purchases, keeping their totals", async () => {
+    const home = await homeBuying([2, 4, 7]);
+    await run();
+    expect(await namesOf(home.homeId)).toEqual(["2 months"]);
+    const months = await api.t.sql<{ month: string; item_count: number }>(
+      `select to_char(month, 'YYYY-MM') as month, item_count from home_months where home_id = $1 order by month`,
+      [home.homeId],
+    );
+    const key = (age: number) => monthsAgo(age).toISOString().slice(0, 7);
+    expect(months).toEqual([
+      { month: key(7), item_count: 1 },
+      { month: key(4), item_count: 1 },
+    ]);
+  });
+
+  it("keeps the old 12 months for 30 days after shortening to 3, then cleans", async () => {
+    const home = await homeBuying([2, 4, 7, 14]);
+    await api.t.sql(
+      `update homes set history_months = 3, history_months_before = 12,
+              history_months_changed_at = now() - interval '29 days' where id = $1`,
+      [home.homeId],
+    );
+    await run();
+    expect(await namesOf(home.homeId)).toEqual(["2 months", "4 months", "7 months"]);
+
+    await api.t.sql(`update homes set history_months_changed_at = now() - interval '31 days' where id = $1`, [home.homeId]);
+    await run();
+    expect(await namesOf(home.homeId)).toEqual(["2 months"]);
+  });
+});

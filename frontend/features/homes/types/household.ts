@@ -39,6 +39,18 @@ export type TripSettings = {
 
 export const TRIP_AUTO_END_HOURS = [2, 4, 8] as const;
 
+/** How long History is kept (backend modules/plans/history-period.ts). */
+export type HomeHistory = {
+  /** What the host chose: 3, 6 or 12 months. */
+  chosen: number;
+  /** In force now: what History shows and what the clean-up keeps. */
+  months: number;
+  /** A shorter period waiting for its date (ISO); null when none. */
+  pending: { months: number; from: string } | null;
+  /** What this home may choose (up to its plan's limit). */
+  options: number[];
+};
+
 export type Household = {
   id: string;
   name: string;
@@ -60,6 +72,8 @@ export type Household = {
   tripEstimate: boolean;
   tripAskHome: boolean;
   monthlyRecap: boolean;
+  /** Missing (null) from an older server: the History setting is hidden. */
+  history?: HomeHistory | null;
 };
 
 export type HomeSummary = {

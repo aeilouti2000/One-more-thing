@@ -2,7 +2,7 @@ import { useSyncStatus } from "@/features/offline/sync-status";
 import { useOnline } from "@/features/offline/network";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect, type Href } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -17,7 +17,11 @@ import { Screen, useSwipeSlideStyle } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SheetField } from "@/components/ui/SheetField";
 import { headerIconFrameStyle, iconSize, spacing } from "@/constants/theme";
+import { useAuth } from "@/features/auth/providers/auth-provider";
+import { HistoryPeriodNotice } from "@/features/homes/components/history-period-notice";
 import { useHousehold } from "@/features/homes/hooks/use-household";
+import { closeHistoryNotice, historyNoticeClosed } from "@/features/homes/utils/history-notice-storage";
+import { historyNow, noticeKey } from "@/features/homes/utils/history-period";
 import { useLoadIcons } from "@/features/icons/use-icons";
 import { fetchPurchasesPage, type HistoryTrip } from "@/features/items/api/history";
 import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeList } from "@/features/items/api/lists";
@@ -77,6 +81,7 @@ type PageModel = {
 export default function HistoryScreen() {
   const { bought, refresh, undoBought, addItem, deleteMany, renameTrip, moveToTrip } = usePurchases();
   const { household } = useHousehold();
+  const { user } = useAuth();
   const { t, locale, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
   const wide = useWideLayout();
@@ -99,6 +104,8 @@ export default function HistoryScreen() {
   const [undoId, setUndoId] = useState<string | null>(null);
   const [buyAgainId, setBuyAgainId] = useState<string | null>(null);
   const [openItem, setOpenItem] = useState<Purchase | null>(null);
+  /** The waiting History change this phone just closed the notice of (re-renders at once). */
+  const [closedNotice, setClosedNotice] = useState<string | null>(null);
   const [openTripId, setOpenTripId] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; itemIds: string[]; listId: string | null } | null>(null);
   const [tripName, setTripName] = useState("");
@@ -506,6 +513,25 @@ export default function HistoryScreen() {
     />
   );
 
+  const isHost =
+    household?.members.some((member) => member.id === user?.id && member.role === "owner") === true;
+  const history = household?.history ? historyNow(household.history, new Date(now)) : null;
+  const waitingKey = noticeKey(history);
+  const openHistorySettings = () => router.push("/settings/history" as Href);
+  const periodNotice =
+    history && homeId && waitingKey && closedNotice !== waitingKey && !historyNoticeClosed(homeId, waitingKey) ? (
+      <HistoryPeriodNotice
+        history={history}
+        action={isHost ? { label: t("historyNoticeChange"), onPress: openHistorySettings } : undefined}
+        footnote={isHost ? undefined : t("hostOnlyToast")}
+        onClose={() => {
+          closeHistoryNotice(homeId, waitingKey);
+          setClosedNotice(waitingKey);
+        }}
+      />
+    ) : null;
+  const canKeepMore = history !== null && isHost && history.chosen < Math.max(...history.options);
+
   const purchasesPage = usePurchasesPage({
     month,
     title,
@@ -527,6 +553,8 @@ export default function HistoryScreen() {
     onToggleSearch: toggleSearch,
     exporting: csvBusy || isExporting,
     onExport: costsEnabled ? () => void exportMonth() : undefined,
+    notice: periodNotice,
+    onKeepMore: canKeepMore ? openHistorySettings : undefined,
     top:
       month === thisMonth && !searching && !category && listId === "all" ? (
         <RecapCard purchases={bought} now={now} />

@@ -69,7 +69,9 @@ export function usePurchasesPage({
   onToggleSearch,
   exporting,
   onExport,
+  notice,
   top,
+  onKeepMore,
   renderPurchase,
 }: {
   month: string;
@@ -94,8 +96,12 @@ export function usePurchasesPage({
   onToggleSearch: () => void;
   exporting: boolean;
   onExport?: () => void;
+  /** Shown above everything, on every month (the History period notice). */
+  notice?: ReactNode;
   /** Shown first (the recap card of the current month). */
   top?: ReactNode;
+  /** The host can keep more months: a link under a cleaned month's summary. */
+  onKeepMore?: () => void;
   renderPurchase: (purchase: Purchase) => ReactElement;
 }) {
   const { t, locale } = useI18n();
@@ -112,6 +118,7 @@ export function usePurchasesPage({
 
   const header = (
     <View>
+      {searching ? null : notice}
       {top}
       <MonthHero
         title={title}
@@ -225,7 +232,15 @@ export function usePurchasesPage({
       case "empty":
         return <EmptyState title={row.title} message={row.body} />;
       case "archive":
-        return <MonthArchiveCard stats={row.stats} title={title} currency={currency} costsEnabled={costsEnabled} />;
+        return (
+          <MonthArchiveCard
+            stats={row.stats}
+            title={title}
+            currency={currency}
+            costsEnabled={costsEnabled}
+            onKeepMore={onKeepMore}
+          />
+        );
       case "end":
         return (
           <AppText className="px-2 pb-2 pt-1 text-center text-xs" style={{ color: colors.muted }}>

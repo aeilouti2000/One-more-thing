@@ -23,13 +23,13 @@ export type TripListRow = {
 /**
  * Reads for History. A purchase belongs to the month its trip started in, so
  * a trip is never split between two months (the app's rule). Every query is
- * cut at the plan's window: nothing before `cutoff` is shown.
+ * cut at the home's History period: nothing before `cutoff` is shown.
  */
 @Injectable()
 export class HistoryRepository {
   constructor(private readonly dataSource: DataSource) {}
 
-  /** Start of the month `month` ("YYYY-MM") and of the next, in the home's time zone, and the plan cutoff. */
+  /** Start of the month `month` ("YYYY-MM") and of the next, in the home's time zone, and the History cutoff. */
   async bounds(homeId: string, month: string | null, historyMonths: number) {
     const [year, mon] = month ? month.split("-").map(Number) : [null, null];
     const rows: { start: Date | null; end: Date | null; cutoff: Date; timezone: string }[] =
@@ -80,7 +80,7 @@ export class HistoryRepository {
     return query.getMany();
   }
 
-  /** Purchases whose name contains `text`, in every month the plan keeps. */
+  /** Purchases whose name contains `text`, in every month History keeps. */
   async search(homeId: string, text: string, cutoff: Date, cursor: Cursor | null, limit: number) {
     const pattern = `%${text.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
     const query = this.dataSource

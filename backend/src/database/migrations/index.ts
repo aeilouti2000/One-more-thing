@@ -32,6 +32,7 @@ import { PlansAndMonthStats1740000000029 } from "./1740000000029-PlansAndMonthSt
 import { PhotoStorage1740000000030 } from "./1740000000030-PhotoStorage";
 import { HomeIcons1740000000031 } from "./1740000000031-HomeIcons";
 import { TripLastBoughtIndex1740000000032 } from "./1740000000032-TripLastBoughtIndex";
+import { HistoryPeriod1740000000033 } from "./1740000000033-HistoryPeriod";
 
 /** Every migration, oldest first. The server runs the new ones when it starts. */
 export const MIGRATIONS: (new () => MigrationInterface)[] = [
@@ -68,4 +69,5 @@ export const MIGRATIONS: (new () => MigrationInterface)[] = [
   PhotoStorage1740000000030,
   HomeIcons1740000000031,
   TripLastBoughtIndex1740000000032,
+  HistoryPeriod1740000000033,
 ];

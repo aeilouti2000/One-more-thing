@@ -9,7 +9,7 @@ import { summarizeMonth } from "./month-summary";
 const money = (value: string | number | null) => (value === null ? null : Number(value));
 
 /**
- * History, one page at a time, cut at the home plan's window. Pages are read
+ * History, one page at a time, cut at the home's History period (the one in force). Pages are read
  * by cursor ("older than this row"), so page 50 costs what page 1 costs and a
  * purchase made while someone scrolls never shifts the rows.
  */
@@ -92,7 +92,7 @@ export class HistoryService {
   }
 
   /**
-   * A month's totals. Months the plan still keeps are summed from purchases;
+   * A month's totals. Months History still keeps are summed from purchases;
    * older months come from the totals saved when they were cleaned (or are
    * summed, while their purchases are still within the grace period).
    */
@@ -153,7 +153,8 @@ export class HistoryService {
 
   private async access(userId: string, homeId: string, month: string | null) {
     const household = await this.homes.getOne(userId, homeId);
-    const bounds = await this.repo.bounds(homeId, month, household.plan.limits.historyMonths);
+    // The period in force, not the plan's limit: the clean-up job keeps exactly these months.
+    const bounds = await this.repo.bounds(homeId, month, household.history.months);
     if (!bounds) throw new DomainError("HOME_NOT_FOUND", "Home not found", HttpStatus.NOT_FOUND);
     return { household, bounds };
   }

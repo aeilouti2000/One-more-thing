@@ -1,3 +1,4 @@
+import { historyChange } from "../../plans/history-period";
 import { type HomePlan, planOf } from "../../plans/plans";
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { isUniqueViolation } from "../../../common/db-errors";
@@ -146,6 +147,35 @@ export class HomesService {
     if (typeof input.tripEstimate === "boolean") patch.tripEstimate = input.tripEstimate;
     if (typeof input.tripAskHome === "boolean") patch.tripAskHome = input.tripAskHome;
     if (Object.keys(patch).length > 0) await this.homes.updateHome(homeId, patch);
+    return this.homes.loadHome(homeId);
+  }
+
+  /**
+   * The host chooses how long History is kept (spec: docs/history-period-spec.md 4.3).
+   * A shorter period waits 30 days; a longer one applies at once. The homes
+   * trigger moves the change counter, so the other phones get it with their
+   * next changes answer, like the other settings.
+   */
+  async updateHistorySettings(userId: string, homeId: string, historyMonths: number) {
+    const membership = await this.requireMembership(userId, homeId);
+    if (membership.role !== "owner") {
+      throw new DomainError(
+        "ONLY_HOST_CAN_UPDATE_HISTORY",
+        "Only the host can change how long History is kept",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    await this.homes.updateHistory(homeId, (home) => {
+      const limit = planOf(home).limits.historyMonths;
+      if (historyMonths > limit) {
+        throw new DomainError(
+          "HISTORY_PERIOD_LIMIT",
+          `Your plan keeps up to ${limit} months of History.`,
+          HttpStatus.CONFLICT,
+        );
+      }
+      return historyChange(home, limit, historyMonths);
+    });
     return this.homes.loadHome(homeId);
   }
 

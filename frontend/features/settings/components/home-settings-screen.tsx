@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { useHousehold } from "@/features/homes/hooks/use-household";
+import { useHistoryPeriodLabel } from "@/features/homes/components/history-period-notice";
+import { historyNow, shortDate } from "@/features/homes/utils/history-period";
 import { formatMoney } from "@/features/items/utils/currency";
 import {
   SettingsLinkCard,
@@ -20,7 +22,8 @@ import { useTheme } from "@/providers/ThemeProvider";
 export default function HomeSettingsScreen() {
   const { colors } = useTheme();
   const { household } = useHousehold();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const periodLabel = useHistoryPeriodLabel();
   const showBack = useSettingsShowBack();
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
@@ -46,6 +49,17 @@ export default function HomeSettingsScreen() {
   ]
     .filter(Boolean)
     .join(" · ");
+  // Missing from an older server: the setting is hidden.
+  const history = household.history ? historyNow(household.history) : null;
+  const historyBody = !history
+    ? null
+    : history.pending
+      ? t("historyKeepsPending", {
+          period: periodLabel(history.months),
+          next: periodLabel(history.pending.months),
+          date: shortDate(history.pending.from, locale),
+        })
+      : t("historyKeeps", { period: periodLabel(history.chosen) });
 
   return (
     <Screen tabBarInset={tabBarInset}>
@@ -86,6 +100,15 @@ export default function HomeSettingsScreen() {
           onPress={() => router.push("/settings/trips" as Href)}
           colors={colors}
         />
+        {historyBody ? (
+          <SettingsLinkCard
+            icon="time-outline"
+            title={t("historySettings")}
+            body={historyBody}
+            onPress={() => router.push("/settings/history" as Href)}
+            colors={colors}
+          />
+        ) : null}
         <SettingsLinkCard
           icon="notifications-outline"
           title={t("homeAlertsTitle")}

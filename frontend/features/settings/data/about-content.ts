@@ -13,6 +13,7 @@ export const WHATS_NEW: TranslationKey[] = [
   "whatsNew5",
   "whatsNew6",
   "whatsNew7",
+  "whatsNew8",
 ];
 
 export type AppFeature = {
@@ -104,6 +105,13 @@ export const APP_FEATURES: AppFeatureGroup[] = [
       { id: "quick", icon: "flash-outline", title: "featureQuickTitle", body: "featureQuickBody" },
       { id: "photos", icon: "image-outline", title: "featurePhotosTitle", body: "featurePhotosBody" },
       { id: "history", icon: "time-outline", title: "featureHistoryTitle", body: "featureHistoryBody" },
+      {
+        id: "history-period",
+        icon: "calendar-outline",
+        title: "featureHistoryPeriodTitle",
+        body: "featureHistoryPeriodBody",
+        since: "2.9.3",
+      },
     ],
   },
   {

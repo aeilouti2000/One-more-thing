@@ -10,6 +10,7 @@ import {
   MinLength,
   ValidateIf,
 } from "class-validator";
+import { HISTORY_PERIODS } from "../../plans/history-period";
 import { TRIP_AUTO_END_HOURS, TRIP_COST_MODES, type TripCostMode } from "../entities/home.entity";
 
 export const HOME_CURRENCIES = ["JOD", "USD", "EUR", "ILS", "SAR", "AED", "EGP", "GBP"] as const;
@@ -109,4 +110,9 @@ export class UpdateTripSettingsDto {
 export class UpdateNotificationSettingsDto {
   @IsBoolean()
   notificationsEnabled: boolean;
+}
+
+export class UpdateHistorySettingsDto {
+  @IsIn(HISTORY_PERIODS)
+  historyMonths: number;
 }

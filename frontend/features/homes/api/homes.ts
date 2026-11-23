@@ -8,6 +8,7 @@ import {
   writeCachedHousehold,
 } from "@/features/offline/saved";
 import type { CostSettings, HomeSummary, Household, TripSettings } from "@/features/homes/types/household";
+import { chooseHistory, readHistory } from "@/features/homes/utils/history-period";
 
 export function alreadyHasHome(message: string | null | undefined) {
   const value = (message ?? "").toLowerCase();
@@ -35,6 +36,7 @@ function withCostDefaults(home: Household): Household {
     tripEstimate: home.tripEstimate !== false,
     tripAskHome: home.tripAskHome !== false,
     monthlyRecap: home.monthlyRecap !== false,
+    history: readHistory(home.history),
   };
 }
 
@@ -110,6 +112,11 @@ const notificationSettingsChange = defineChange<
   api.patch<Household>(`/homes/${payload.homeId}/notification-settings`, payload.settings),
 );
 
+const historySettingsChange = defineChange<{ homeId: string; settings: { historyMonths: number } }, Household>(
+  "home.historySettings",
+  (payload) => api.patch<Household>(`/homes/${payload.homeId}/history-settings`, payload.settings),
+);
+
 /** The home as saved on this phone, when it is the one being changed. */
 function savedHome(homeId: string) {
   const home = readCache<Household | null>(qk.household());
@@ -144,9 +151,11 @@ async function changeSettings<S extends object>(
   kind: ChangeKind<{ homeId: string; settings: S }, Household>,
   homeId: string,
   settings: S,
+  /** How the home looks with the change; by default the settings copied onto it. */
+  apply: (home: Household) => Household = (home) => ({ ...home, ...settings }),
 ) {
   const before = savedHome(homeId);
-  const optimistic = before ? withCostDefaults({ ...before, ...settings }) : null;
+  const optimistic = before ? withCostDefaults(apply(before)) : null;
   if (optimistic) writeCachedHousehold(optimistic);
   const result = await perform(kind, { homeId, settings }, { action: "settings" });
   if (result.error) {
@@ -168,6 +177,13 @@ export function updateCostSettings(homeId: string, settings: Partial<CostSetting
 
 export function updateTripSettings(homeId: string, settings: Partial<TripSettings>) {
   return changeSettings(tripSettingsChange, homeId, settings);
+}
+
+/** The host chooses how long History is kept; a shorter period waits 30 days (spec 4.3, mirrored). */
+export function updateHistorySettings(homeId: string, historyMonths: number) {
+  return changeSettings(historySettingsChange, homeId, { historyMonths }, (home) =>
+    home.history ? { ...home, history: chooseHistory(home.history, historyMonths) } : home,
+  );
 }
 
 export function updateNotificationSettings(homeId: string, notificationsEnabled: boolean) {
