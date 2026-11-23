@@ -21,6 +21,7 @@ Owner's instructions for this run (2026-11-23):
 | 8 History endpoints | Done | Purchases (month, list, category, search, cursor), trips, one trip, month totals, months list. 11 end-to-end tests |
 | 9 Plans | Done | `early` plan (12 months, sets 20, pins 15, 100 icon images); every home response carries `plan`; sets and pins read their limits from it |
 | 10 Clean-up job | Done | `POST /api/internal/maintenance/run` (cron secret, advisory lock, ~20 s per call, `next` to continue) and `.github/workflows/maintenance.yml` daily at 01:30 UTC. Also removes old deletion markers (raising `sync_floor`), expired tokens and codes, finished questions. 6 end-to-end tests |
+| 11 Photo storage | Done | Storage layer (`db` default / `fs` / `s3`), two sizes + thumbhash, redirect to a signed address, migration 030, copy endpoint, storage trash. 7 photo tests in both modes. Packages: `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `thumbhash` (approved) |
 
 ## Differences from the spec, decided during the build
 
@@ -40,3 +41,7 @@ These follow the spec's intent; the spec will be updated to match before the rel
 12. **Month totals for months older than the plan keeps** are still shown (from saved totals, or summed while the purchases are in the grace period), marked `archived`.
 13. **The clean-up job also removes expired sign-in tokens, email codes and finished shopping questions**, which nothing removed before.
 14. **Every home's `plan_changed_at` starts at the deploy time**, so the job deletes nothing for the first 30 days. Nothing is older than 12 months before September 2027 anyway.
+15. **Photos stay in the database until storage is configured**: `STORAGE_DRIVER` defaults to `db` (today's behaviour), so the backend can be deployed before the R2 bucket exists. Set `STORAGE_DRIVER=s3` plus the five S3 values to switch.
+16. **No nightly bucket listing**: a trigger records the files of every deleted photo in `storage_trash`, and the daily job deletes exactly those. Cheaper and exact.
+17. **Photo keys have a `photos/` folder**: `homes/<homeId>/photos/<imageId>/full.jpg` (icons go under `homes/<homeId>/icons/`).
+18. **thumbhash is an ES-module-only package**: fine on Node 22.12+ (production image runs v22.23.4, checked); Jest converts it for tests.

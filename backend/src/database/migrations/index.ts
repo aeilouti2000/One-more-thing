@@ -29,6 +29,7 @@ import { SyncAndHistoryIndexes1740000000026 } from "./1740000000026-SyncAndHisto
 import { TripsAsRows1740000000027 } from "./1740000000027-TripsAsRows";
 import { HomeProducts1740000000028 } from "./1740000000028-HomeProducts";
 import { PlansAndMonthStats1740000000029 } from "./1740000000029-PlansAndMonthStats";
+import { PhotoStorage1740000000030 } from "./1740000000030-PhotoStorage";
 
 /** Every migration, oldest first. The server runs the new ones when it starts. */
 export const MIGRATIONS: (new () => MigrationInterface)[] = [
@@ -62,4 +63,5 @@ export const MIGRATIONS: (new () => MigrationInterface)[] = [
   TripsAsRows1740000000027,
   HomeProducts1740000000028,
   PlansAndMonthStats1740000000029,
+  PhotoStorage1740000000030,
 ];

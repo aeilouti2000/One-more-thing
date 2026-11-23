@@ -13,6 +13,10 @@ export class TypeormItemsRepository implements IItemsRepository {
     @InjectRepository(User) private readonly users: Repository<User>,
   ) {}
 
+  findImageHashes(imageIds: string[]): Promise<{ id: string; thumbhash: string | null }[]> {
+    return this.items.manager.query(`select id, thumbhash from item_images where id = any($1::uuid[])`, [imageIds]);
+  }
+
   findByHome(homeId: string) {
     return this.items.find({
       where: { homeId },

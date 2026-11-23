@@ -968,6 +968,9 @@ export class ItemsService {
       ? await this.receipts.find({ where: { id: In(receiptIds) } })
       : [];
     const receiptsById = new Map(receiptRows.map((receipt) => [receipt.id, receipt]));
+    const imageIds = [...new Set(rows.map((row) => row.imageId).filter((id): id is string => Boolean(id)))];
+    const hashes = imageIds.length ? await this.items.findImageHashes(imageIds) : [];
+    const hashById = new Map(hashes.map((image) => [image.id, image.thumbhash]));
 
     return rows.map((row) => ({
       id: row.id,
@@ -986,6 +989,8 @@ export class ItemsService {
       receiptTotal: receiptAmount(row.receiptId ? receiptsById.get(row.receiptId) : undefined),
       receiptName: (row.receiptId ? receiptsById.get(row.receiptId)?.name : null) ?? null,
       imageId: row.imageId ?? null,
+      /** Blurred placeholder shown while the photo loads. */
+      imageHash: row.imageId ? (hashById.get(row.imageId) ?? null) : null,
       addedBy: row.addedBy,
       boughtBy: row.boughtBy,
       addedByName: names.get(row.addedBy) ?? "Member",

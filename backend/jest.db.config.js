@@ -9,6 +9,8 @@ module.exports = {
   testTimeout: 60000,
   transform: {
     // The project's own TypeScript settings; types are checked by `npm run typecheck`.
-    "^.+\\.(t|j)s$": ["ts-jest", { tsconfig: "tsconfig.json", diagnostics: false }],
+    "^.+\\.(t|j)s$": ["ts-jest", { tsconfig: { ...require("./tsconfig.json").compilerOptions, allowJs: true }, diagnostics: false }],
   },
+  // thumbhash ships only as an ES module; Node 22 loads it, Jest needs it converted.
+  transformIgnorePatterns: ["/node_modules/(?!thumbhash/)"],
 };

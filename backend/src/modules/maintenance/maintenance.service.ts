@@ -1,6 +1,7 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { DataSource, type EntityManager } from "typeorm";
 import { HOME_TZ_SQL } from "../../common/home-time";
+import { STORAGE, type Storage } from "../../common/storage/storage";
 import { summarizeMonth, type TripCategoryRow } from "../history/month-summary";
 import { planOf } from "../plans/plans";
 
@@ -35,7 +36,10 @@ export type MaintenanceResult = {
 export class MaintenanceService {
   private readonly logger = new Logger(MaintenanceService.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    @Inject(STORAGE) private readonly storage: Storage | null,
+  ) {}
 
   async run(after: string | null, budgetMs = 20_000): Promise<MaintenanceResult> {
     const started = Date.now();
@@ -160,7 +164,24 @@ export class MaintenanceService {
     }
   }
 
-  /** Once per run: old deletion markers, expired sign-in tokens, codes and finished questions. */
+  /** Deletes the files of deleted photos and icons (recorded by triggers in storage_trash). */
+  async emptyStorageTrash() {
+    if (!this.storage) return 0;
+    let removed = 0;
+    for (;;) {
+      const rows: { key: string }[] = await this.dataSource.query(
+        `select key from storage_trash order by created_at limit 1000`,
+      );
+      if (rows.length === 0) return removed;
+      const keys = rows.map((row) => row.key);
+      await this.storage.delete(keys);
+      await this.dataSource.query(`delete from storage_trash where key = any($1::text[])`, [keys]);
+      removed += keys.length;
+      if (rows.length < 1000) return removed;
+    }
+  }
+
+  /** Once per run: old deletion markers, emptied storage, expired sign-in tokens, codes and finished questions. */
   private async housekeeping() {
     await this.dataSource.transaction(async (manager) => {
       // Phones that synced before the oldest marker kept are sent a full copy (sync_floor).
@@ -175,6 +196,7 @@ export class MaintenanceService {
         [MARKER_DAYS],
       );
     });
+    await this.emptyStorageTrash();
     await this.dataSource.query(`delete from refresh_tokens where expires_at < now() - interval '1 day'`);
     await this.dataSource.query(`delete from email_codes where expires_at < now() - interval '1 day'`);
     await this.dataSource.transaction(async (manager) => {

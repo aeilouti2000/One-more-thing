@@ -85,6 +85,43 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   EXPO_ACCESS_TOKEN = "";
+
+  /**
+   * Where photos are kept:
+   * - "db": inside Postgres, as before (the default until object storage is set up)
+   * - "fs": a folder on this machine (development and tests)
+   * - "s3": an S3-compatible bucket such as Cloudflare R2 (production)
+   */
+  @IsOptional()
+  @IsIn(["db", "fs", "s3"])
+  STORAGE_DRIVER: "db" | "fs" | "s3" = "db";
+
+  /** Folder for the "fs" driver. */
+  @IsOptional()
+  @IsString()
+  STORAGE_DIR = ".storage";
+
+  /** For "s3", e.g. https://<account id>.r2.cloudflarestorage.com */
+  @IsOptional()
+  @IsString()
+  S3_ENDPOINT = "";
+
+  /** "auto" for Cloudflare R2. */
+  @IsOptional()
+  @IsString()
+  S3_REGION = "auto";
+
+  @IsOptional()
+  @IsString()
+  S3_BUCKET = "";
+
+  @IsOptional()
+  @IsString()
+  S3_ACCESS_KEY_ID = "";
+
+  @IsOptional()
+  @IsString()
+  S3_SECRET_ACCESS_KEY = "";
 }
 
 export function validateEnv(config: Record<string, unknown>) {
@@ -94,6 +131,12 @@ export function validateEnv(config: Record<string, unknown>) {
   const errors = validateSync(validated, { skipMissingProperties: false });
   if (errors.length > 0) {
     throw new Error(errors.map((error) => Object.values(error.constraints ?? {}).join(", ")).join("; "));
+  }
+  if (validated.STORAGE_DRIVER === "s3") {
+    const missing = (["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const).filter(
+      (key) => !validated[key],
+    );
+    if (missing.length > 0) throw new Error(`STORAGE_DRIVER=s3 needs ${missing.join(", ")}`);
   }
   return validated;
 }

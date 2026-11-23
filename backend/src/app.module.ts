@@ -4,6 +4,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { UserThrottlerGuard } from "./common/user-throttler.guard";
 import { CommonModule } from "./common/common.module";
+import { StorageModule } from "./common/storage/storage.module";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RefreshToken } from "./modules/auth/entities/refresh-token.entity";
@@ -80,6 +81,7 @@ import { User } from "./users/user.entity";
       },
     }),
     CommonModule,
+    StorageModule,
     AuthModule,
     HomesModule,
     ItemsModule,

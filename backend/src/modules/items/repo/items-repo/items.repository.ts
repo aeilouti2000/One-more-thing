@@ -24,6 +24,8 @@ export type ItemPatch = Partial<
 >;
 
 export interface IItemsRepository {
+  /** The placeholder hash of each photo (see ItemImage.thumbhash). */
+  findImageHashes(imageIds: string[]): Promise<{ id: string; thumbhash: string | null }[]>;
   findByHome(homeId: string): Promise<Item[]>;
   insert(input: NewItemInput): Promise<Item>;
   /**

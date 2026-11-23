@@ -10,13 +10,18 @@ import { createTestDatabase, type TestDatabase } from "./test-database";
  */
 export type TestApi = {
   t: TestDatabase;
-  call: <T = any>(method: string, path: string, options?: { token?: string; body?: unknown; headers?: Record<string, string> }) => Promise<{ status: number; body: T }>;
+  call: <T = any>(
+    method: string,
+    path: string,
+    options?: { token?: string; body?: unknown; form?: FormData; headers?: Record<string, string>; redirect?: RequestRedirect },
+  ) => Promise<{ status: number; body: T; headers: Headers; raw?: Buffer }>;
+  base: string;
   /** Signs up a new person and returns their access token and id. */
   signUp: (name?: string) => Promise<{ token: string; userId: string }>;
   close: () => Promise<void>;
 };
 
-export async function startTestApi(): Promise<TestApi> {
+export async function startTestApi(options: { env?: Record<string, string> } = {}): Promise<TestApi> {
   const t = await createTestDatabase();
   const url = (t.db.options as { url: string }).url;
   Object.assign(process.env, {
@@ -26,6 +31,8 @@ export async function startTestApi(): Promise<TestApi> {
     JWT_ACCESS_SECRET: "test-access-secret-0123456789abcdef",
     CRON_SECRET: "test-cron-secret",
     CORS_ORIGINS: "",
+    STORAGE_DRIVER: "db",
+    ...options.env,
   });
   // Imported here so the env above is in place when the config is validated.
   const { AppModule } = await import("../../app.module");
@@ -38,8 +45,9 @@ export async function startTestApi(): Promise<TestApi> {
   Logger.overrideLogger(["error"]);
 
   const call: TestApi["call"] = async (method, path, options = {}) => {
-    const response = await fetch(`${base}${path}`, {
+    const response = await fetch(path.startsWith("http") ? path : `${base}${path}`, {
       method,
+      redirect: options.redirect ?? "follow",
       headers: {
         ...(options.body !== undefined ? { "content-type": "application/json" } : {}),
         ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
@@ -47,10 +55,15 @@ export async function startTestApi(): Promise<TestApi> {
         "x-forwarded-for": `10.0.${randomBytes(1)[0]}.${randomBytes(1)[0]}`,
         ...options.headers,
       },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: options.form ?? (options.body !== undefined ? JSON.stringify(options.body) : undefined),
     });
+    const type = response.headers.get("content-type") ?? "";
+    if (!type.includes("json")) {
+      const raw = Buffer.from(await response.arrayBuffer());
+      return { status: response.status, body: null as never, headers: response.headers, raw };
+    }
     const text = await response.text();
-    return { status: response.status, body: text ? JSON.parse(text) : null };
+    return { status: response.status, body: text ? JSON.parse(text) : null, headers: response.headers };
   };
 
   const signUp: TestApi["signUp"] = async (name = "Tester") => {
@@ -63,6 +76,7 @@ export async function startTestApi(): Promise<TestApi> {
 
   return {
     t,
+    base,
     call,
     signUp,
     close: async () => {
