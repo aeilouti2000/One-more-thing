@@ -1,3 +1,5 @@
+import { useHousehold } from "@/features/homes/hooks/use-household";
+import { productLines, useProducts } from "@/features/sync/products";
 import { useMemo, useState } from "react";
 import { ScrollView } from "react-native";
 import { FloatedCard } from "@/components/ui/FloatedCard";
@@ -40,7 +42,11 @@ export function AddItemCard({
   onSaved,
   presentation = "sheet",
 }: AddItemCardProps) {
-  const { addItem, bought, needed } = usePurchases();
+  const { addItem, bought: windowBought, needed } = usePurchases();
+  const { household } = useHousehold();
+  const products = useProducts(household?.id);
+  // Recent picks look through everything ever bought (products), not only this window.
+  const bought = useMemo(() => [...productLines(products), ...windowBought], [products, windowBought]);
   const { t } = useI18n();
   const amountLabel = useAmountLabel();
   const [name, setName] = useState("");

@@ -1,3 +1,5 @@
+import { formatAppError } from "@/lib/errors";
+import { loadMonthPurchases, monthOnPhone } from "@/features/sync/month-purchases";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -116,7 +118,18 @@ export default function CostsSettingsScreen() {
 
   async function onExport(month: string) {
     setExportError(null);
-    const result = await exportItems(boughtInMonth(purchases, month), month);
+    // A month older than the phone keeps is loaded from the server first.
+    const homeId = household?.id;
+    let source = purchases;
+    if (homeId && !monthOnPhone(homeId, month)) {
+      try {
+        source = await loadMonthPurchases(homeId, month);
+      } catch (error) {
+        setExportError(formatAppError(error));
+        return;
+      }
+    }
+    const result = await exportItems(boughtInMonth(source, month), month);
     if (result.error) setExportError(result.error);
   }
 

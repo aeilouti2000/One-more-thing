@@ -1,3 +1,4 @@
+import { productLines, useProducts } from "@/features/sync/products";
 import { caretColors, caretGap } from "@/constants/text";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useIsFocused } from "expo-router";
@@ -285,9 +286,11 @@ export default function ItemsScreen() {
     const key = normalizeName(typed);
     return laterItems.find((item) => normalizeName(item.name) === key) ?? null;
   }, [laterItems, typed]);
+  // Everything ever bought is remembered in the home's products (synced), not only this window.
+  const products = useProducts(household?.id);
   const suggestions = useMemo(
-    () => suggestItems(purchases, typed, { exclude: listItems.map((item) => item.name) }),
-    [listItems, purchases, typed],
+    () => suggestItems([...productLines(products), ...purchases], typed, { exclude: listItems.map((item) => item.name) }),
+    [listItems, products, purchases, typed],
   );
   const headerButton = {
     backgroundColor: scheme === "dark" ? colors.accent : colors.white,

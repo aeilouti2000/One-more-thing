@@ -1,3 +1,5 @@
+import { useHousehold } from "@/features/homes/hooks/use-household";
+import { productLines, useProducts } from "@/features/sync/products";
 import { InlinePane, useReverseRows } from "@/components/ui/InlinePane";
 import { caretColors, caretGap } from "@/constants/text";
 import { usePurchasesData } from "@/features/items/hooks/use-purchases";
@@ -112,6 +114,8 @@ export function CostEntrySheet({
   const [pendingLineId, setPendingLineId] = useState<string | null>(null);
   const symbol = currencySymbol(currency);
   const { purchases } = usePurchasesData();
+  const { household } = useHousehold();
+  const products = useProducts(household?.id);
   // Only real items with no price yet (not the trip-total row).
   const lastPrices = useMemo(() => {
     const found: LastPrices = {};
@@ -119,11 +123,13 @@ export function CostEntrySheet({
       if (item.initialCost !== null && item.initialCost !== undefined) continue;
       const own = purchases.find((purchase) => purchase.id === item.id);
       if (!own) continue;
-      const remembered = lastPrice(purchases, item.name, item.id, own);
+      // This window first (it can leave out the item itself), then everything ever bought.
+      const remembered =
+        lastPrice(purchases, item.name, item.id, own) ?? lastPrice(productLines(products), item.name, undefined, own);
       if (remembered) found[item.id] = remembered;
     }
     return found;
-  }, [items, purchases]);
+  }, [items, products, purchases]);
   const sessionKey = useMemo(() => itemsIdentity(items), [items]);
   const [seenSession, setSeenSession] = useState({
     visible: false,

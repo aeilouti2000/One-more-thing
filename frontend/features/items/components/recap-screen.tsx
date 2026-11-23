@@ -1,3 +1,4 @@
+import { useOlderMonths } from "@/features/sync/month-purchases";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useMemo, useState, type ReactNode } from "react";
@@ -57,7 +58,9 @@ function RecapBody() {
     typeof params.month === "string" && MONTH_RE.test(params.month)
       ? params.month
       : previousMonth(currentMonth());
-  const recap = useMemo(() => summarizeRecap(purchases, month), [month, purchases]);
+  // Months older than the phone keeps are loaded once from the server.
+  const older = useOlderMonths(household?.id, [month, previousMonth(month)]);
+  const recap = useMemo(() => summarizeRecap([...purchases, ...older], month), [month, older, purchases]);
 
   const costs = household?.costsEnabled === true && recap.priced;
   const currency = household?.currency ?? "JOD";

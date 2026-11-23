@@ -1,3 +1,4 @@
+import { productLines, useProducts } from "@/features/sync/products";
 import { qk, readCache } from "@/features/offline/query-client";
 import { lockFromSync } from "@/features/items/hooks/use-shop-lock";
 import { Ionicons } from "@expo/vector-icons";
@@ -265,7 +266,9 @@ function TripBody() {
 
   const costsEnabled = household?.costsEnabled === true;
   const currency = household?.currency ?? "JOD";
-  const prices = useMemo(() => lastPrices(bought), [bought]);
+  const products = useProducts(homeId);
+  // Last prices come from everything ever bought (products), not only this window.
+  const prices = useMemo(() => lastPrices([...productLines(products), ...bought]), [bought, products]);
   const lastPriceLabel = useCallback(
     (item: Purchase) => {
       if (!costsEnabled) return null;

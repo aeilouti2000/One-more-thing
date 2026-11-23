@@ -1,3 +1,4 @@
+import { productLines, useProducts } from "@/features/sync/products";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -127,7 +128,11 @@ function SetsBody() {
 
   const costs = household?.costsEnabled === true;
   const currency = household?.currency ?? "JOD";
-  const prices = useMemo(() => (costs ? lastPrices(bought) : null), [bought, costs]);
+  const products = useProducts(homeId);
+  const prices = useMemo(
+    () => (costs ? lastPrices([...productLines(products), ...bought]) : null),
+    [bought, costs, products],
+  );
   const estimate = useCallback(
     (set: ItemSet) => {
       if (!prices) return null;
