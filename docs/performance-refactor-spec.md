@@ -44,6 +44,20 @@ These go beyond, or differ from, what was discussed. The owner approved all ten 
 
 New backend packages, approved by the owner on 2026-11-23: `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `thumbhash`. No new app packages are planned; any other new package needs the owner's approval first.
 
+## 2b. Changes made during the build
+
+The build followed this spec; where it had to differ, the reason is in `docs/build-progress.md` ("Differences from the spec"). The ones that change a contract:
+
+- **Changes answer:** small sets (home with members, lists, categories, icons, pins, sets, asks, locks) are sent whole whenever anything changed; only items, products and trips come as changes, and `deleted` lists only those three kinds. Expired shop locks are removed by the request itself. A changed trip resends its items.
+- **Access:** someone outside a home gets 403 (the API's existing rule), not 404.
+- **Item rows** also carry `sortOrder` and `imageHash`.
+- **History:** a purchase belongs to the month its trip started (lists and totals alike); no CSV export endpoint (the app builds the CSV from `history/purchases` pages); no "Scanned" tag.
+- **Photos:** `STORAGE_DRIVER` defaults to `db` (photos stay in Postgres until R2 is configured); keys are `homes/<homeId>/photos/<imageId>/{full,thumb}.jpg`; deleted photos' files are listed in `storage_trash` by a trigger and removed by the daily job (no bucket listing).
+- **Icons:** one module and table (`home_icons`) for categories and shops; in `db` mode the image is kept in the row.
+- **Clean-up job** also removes expired sign-in tokens, email codes and finished questions.
+- **App storage (D2a):** SQLite holds the saved copy row by row; screens keep reading the in-memory cache.
+- **Migrations** run one transaction each.
+
 ## 3. Database
 
 All migrations are additive. Version 2.9.2 keeps working after each one. Files continue the existing numbering in `backend/src/database/migrations/` and are registered in `backend/src/app.module.ts`.
