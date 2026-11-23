@@ -6,12 +6,15 @@ import helmet from "helmet";
 import { AppModule } from "./app.module";
 import type { AppConfig } from "./config/env";
 import { HttpExceptionFilter } from "./common/http-exception.filter";
+import { requestLog } from "./common/request-log";
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // Render's proxy is in front: take the client IP from X-Forwarded-For (one
   // hop), so rate limits apply per user instead of to everyone at once.
   app.set("trust proxy", 1);
+  // One line per request: route, status, milliseconds (see common/request-log.ts).
+  app.use(requestLog());
   const config = app.get(ConfigService<AppConfig, true>);
   const origins = config
     .get("CORS_ORIGINS", { infer: true })

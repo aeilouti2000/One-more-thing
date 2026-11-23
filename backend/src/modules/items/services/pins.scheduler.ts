@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { JOB_LOCKS, JobLock } from "../../../common/job-lock";
 import { ItemsService } from "./items.service";
 import { PinsService } from "./pins.service";
 
@@ -13,6 +14,7 @@ export class PinsScheduler implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly pins: PinsService,
     private readonly items: ItemsService,
+    private readonly jobLock: JobLock,
   ) {}
 
   onModuleInit() {
@@ -28,21 +30,32 @@ export class PinsScheduler implements OnModuleInit, OnModuleDestroy {
     if (this.running) return;
     this.running = true;
     try {
+      // Every server instance has this timer; the lock lets one of them do the work.
+      await this.jobLock.runExclusive(JOB_LOCKS.pins, () => this.runDue());
+    } catch (error) {
+      this.logger.warn(
+        `Could not run the pins tick: ${error instanceof Error ? error.message : "unknown"}`,
+      );
+    } finally {
+      this.running = false;
+    }
+  }
+
+  /** Adds due pins, then returns parked items whose day has come. Also used by the cron endpoint. */
+  async runDue() {
+    try {
       await this.pins.materializeDueHomes();
     } catch (error) {
       this.logger.warn(
         `Could not add due pins: ${error instanceof Error ? error.message : "unknown"}`,
       );
     }
-    // Parked items whose day has come return on the same beat.
     try {
       await this.items.releaseDueLater();
     } catch (error) {
       this.logger.warn(
         `Could not return Later items: ${error instanceof Error ? error.message : "unknown"}`,
       );
-    } finally {
-      this.running = false;
     }
   }
 }

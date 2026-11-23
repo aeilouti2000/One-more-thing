@@ -8,7 +8,10 @@ name: Pins tick
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # Every 5 minutes. The free Render server sleeps after 15 idle minutes, and
+    # GitHub often starts scheduled runs late, so 5 keeps it awake even when a
+    # run is delayed or skipped. A free uptime monitor on /api/health does the same.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions: {}
