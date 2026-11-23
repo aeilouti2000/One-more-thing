@@ -15,6 +15,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
+import { KEEP_MOTION } from "@/lib/motion";
 import { useTheme } from "@/providers/ThemeProvider";
 
 /**
@@ -244,9 +245,14 @@ export function LaunchIntro({ ready }: { ready: boolean }) {
       finishDrawing();
       return;
     }
-    clock.value = withTiming(DRAW_MS, { duration: DRAW_MS, easing: Easing.linear }, (ok) => {
-      if (ok) runOnJS(finishDrawing)();
-    });
+    // KEEP_MOTION (here and below): the launch drawing plays with animations off too.
+    clock.value = withTiming(
+      DRAW_MS,
+      { duration: DRAW_MS, easing: Easing.linear, reduceMotion: KEEP_MOTION },
+      (ok) => {
+        if (ok) runOnJS(finishDrawing)();
+      },
+    );
   }, [clock, nativeHidden, reduceMotion]);
 
   useEffect(() => {
@@ -271,6 +277,7 @@ export function LaunchIntro({ ready }: { ready: boolean }) {
     // Dip: a slow, small shrink, like winding up.
     // Burst: accelerate past the viewer, much faster than the dip.
     scale.value = withSequence(
+      KEEP_MOTION,
       withTiming(DIP_SCALE, { duration: DIP_MS, easing: Easing.inOut(Easing.quad) }),
       withTiming(BURST_SCALE, { duration: BURST_MS, easing: Easing.in(Easing.cubic) }, (ok) => {
         if (ok) runOnJS(finish)();
@@ -280,11 +287,13 @@ export function LaunchIntro({ ready }: { ready: boolean }) {
     backdrop.value = withDelay(
       DIP_MS + BURST_MS * 0.45,
       withTiming(0, { duration: BURST_MS * 0.25, easing: Easing.out(Easing.quad) }),
+      KEEP_MOTION,
     );
     // ...and the logo is gone before it finishes growing past the screen.
     logo.value = withDelay(
       DIP_MS + BURST_MS * 0.55,
       withTiming(0, { duration: BURST_MS * 0.3, easing: Easing.in(Easing.quad) }),
+      KEEP_MOTION,
     );
   }, [backdrop, logo, reduceMotion, scale, start]);
 

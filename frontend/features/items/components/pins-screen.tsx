@@ -23,13 +23,13 @@ import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { ShimmerBlock } from "@/components/ui/ShimmerBlock";
 import { getCategoryLabel } from "@/constants/categories";
-import { tabBar, withAlpha } from "@/constants/theme";
+import { cardLift, tabBar, withAlpha } from "@/constants/theme";
 import { useCategories } from "@/features/items/providers/categories-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
 import { resolvePreferredListId } from "@/features/items/utils/list-storage";
 import { fetchLists, listLabel, type HomeList } from "@/features/items/api/lists";
-import { readCachedLists, readCachedPins } from "@/features/offline/profile-cache";
+import { readCachedLists, readCachedPins } from "@/features/offline/saved";
 import { pinnedNotice } from "@/features/items/utils/pin-notice";
 import {
   createPin,
@@ -46,6 +46,7 @@ import {
 } from "@/features/settings/hooks/use-settings-chrome";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import type { TranslationKey } from "@/constants/i18n";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
 
@@ -72,7 +73,8 @@ function PinsBody() {
   const { household } = useHousehold();
   const { t, locale, isRTL } = useI18n();
   const { categories } = useCategories();
-  const { colors, scheme, shadow } = useTheme();
+  const { colors, glass, scheme, shadow } = useTheme();
+  const motionOff = useMotionOff();
   const showBack = useSettingsShowBack({ nested: true });
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
@@ -506,7 +508,9 @@ function PinsBody() {
               <Animated.View
                 key={pin.id}
                 entering={
-                  revealing
+                  motionOff
+                    ? undefined
+                    : revealing
                     ? FadeInDown.delay(Math.min(index, 8) * 30)
                         .duration(420)
                         .easing(Easing.out(Easing.cubic))
@@ -522,7 +526,7 @@ function PinsBody() {
                   shadowOpacity: scheme === "dark" ? 0.28 : 0.08,
                   shadowRadius: 10,
                   shadowOffset: { width: 0, height: 4 },
-                  elevation: 2,
+                  ...cardLift(glass, 2),
                 }}
               >
                 <View className="flex-row items-center gap-3">

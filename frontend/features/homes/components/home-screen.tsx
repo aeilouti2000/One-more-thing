@@ -1,4 +1,7 @@
 import { InviteCodeField } from "@/features/homes/components/invite-code-field";
+import { NeedsInternetTag, useNeedsInternet } from "@/features/offline/components/needs-internet";
+import { isOnline } from "@/features/offline/network";
+import { showNeedsInternet } from "@/features/offline/sync-status";
 import { fullInviteCode, isInviteComplete } from "@/features/homes/utils/invite-code";
 import { Ionicons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
@@ -123,6 +126,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
 
   async function removeSelectedMember() {
     if (!memberHomeId || !memberToRemove) return;
+    if (!isOnline()) return showNeedsInternet();
 
     setIsRemovingMember(true);
     setMemberError(null);
@@ -147,6 +151,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
       return;
     }
 
+    if (!isOnline()) return showNeedsInternet();
     setIsCreating(true);
     setCreateError(null);
     const result = await createHome(homeName, t("defaultList"));
@@ -170,6 +175,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
     }
     const code = fullInviteCode(inviteCode);
 
+    if (!isOnline()) return showNeedsInternet();
     setIsJoining(true);
     setJoinError(null);
     const result = await joinHome(code);
@@ -188,6 +194,8 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
 
   async function openHome(homeId: string) {
     if (!household || homeId === household.id || switchingId) return;
+    // Switching, joining, creating, leaving: only the server can do these.
+    if (!isOnline()) return showNeedsInternet();
     setSwitchingId(homeId);
     setFloatMessage(null);
     const result = await switchHome(homeId);
@@ -204,6 +212,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
 
   async function leaveSelectedHome() {
     if (!leaveHomeId) return;
+    if (!isOnline()) return showNeedsInternet();
     setIsLeaving(true);
     setLeaveError(null);
     const result = await leaveHome(leaveHomeId);
@@ -233,6 +242,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
 
   async function deleteSelectedHome() {
     if (!deleteHomeId) return;
+    if (!isOnline()) return showNeedsInternet();
     setIsDeletingHome(true);
     setDeleteError(null);
     const result = await deleteHome(deleteHomeId);
@@ -611,6 +621,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                 title={t("addAHome")}
                 summary={t("addAHomeSummary")}
                 href={"/home/add" as Href}
+                needsInternet
               />
             </View>
           </View>
@@ -622,6 +633,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
               title={t("addAHome")}
               summary={t("addAHomeSummary")}
               href={"/home/add" as Href}
+              needsInternet
             />
           </View>
         )}
@@ -771,28 +783,43 @@ function HubLink({
   title,
   summary,
   href,
+  needsInternet,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   summary: string;
   href: Href;
+  /** Only the server can do what this page is for: dimmed and tagged offline. */
+  needsInternet?: boolean;
 }) {
   const { colors } = useTheme();
   const { isRTL } = useI18n();
+  const { offline } = useNeedsInternet();
+  const blocked = needsInternet === true && offline;
   return (
     <Pressable
-      onPress={() => router.push(href)}
+      onPress={() => (blocked ? showNeedsInternet() : router.push(href))}
       accessibilityRole="button"
       accessibilityLabel={title}
+      accessibilityState={{ disabled: blocked }}
       className="flex-row items-center gap-3 overflow-hidden rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
     >
-      <SettingsCardIcon icon={icon} colors={colors} />
-      <SettingsCardCopy title={title} body={summary} bodyLines={1} />
-      <Ionicons
-        name={isRTL ? "chevron-back" : "chevron-forward"}
-        size={iconSize.sm}
-        color={colors.ink}
-      />
+      <View
+        className="min-w-0 flex-1 flex-row items-center gap-3"
+        style={blocked ? { opacity: 0.4 } : undefined}
+      >
+        <SettingsCardIcon icon={icon} colors={colors} />
+        <SettingsCardCopy title={title} body={summary} bodyLines={1} />
+      </View>
+      {blocked ? (
+        <NeedsInternetTag />
+      ) : (
+        <Ionicons
+          name={isRTL ? "chevron-back" : "chevron-forward"}
+          size={iconSize.sm}
+          color={colors.ink}
+        />
+      )}
     </Pressable>
   );
 }
@@ -862,7 +889,7 @@ function CurrentHomeCard({
               style={{
                 backgroundColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
                 borderWidth: 2,
-                borderColor: colors.paper,
+                borderColor: colors.overlay,
                 marginStart: index === 0 ? 0 : -8,
               }}
             >

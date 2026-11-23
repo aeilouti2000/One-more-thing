@@ -12,9 +12,13 @@ import { fetchPins, type Pin } from "@/features/items/api/pins";
 import type { Purchase } from "@/features/items/types/purchase";
 import { resolvePreferredListId } from "@/features/items/utils/list-storage";
 import { emitListChanged } from "@/features/items/utils/list-sync";
-import { writeCachedItems } from "@/features/offline/profile-cache";
+// Every kind of waiting change must be known here too: this file also runs
+// with no screen (the widget's background task).
+import "@/features/offline/changes";
 import { invoiceForBuy, planPinAdd, UNDO_WINDOW_MS } from "@/features/widgets/actions";
 import { buildWidgetSnapshot } from "@/features/widgets/snapshot";
+import { readWidgetStyle } from "@/features/widgets/widget-prefs";
+import type { WidgetStylePrefs } from "@/features/widgets/widget-style";
 import { readSession } from "@/lib/api";
 import { isOfflineError, isOfflineMessage } from "@/lib/errors";
 import { readStoredLocale } from "@/lib/language-storage";
@@ -37,6 +41,7 @@ import {
 export type WidgetLook = {
   locale: Locale;
   theme: { preference: ThemePreference; accent: string; surfaceDepth: SurfaceDepth };
+  style: WidgetStylePrefs;
 };
 
 /** The language and colours as last saved: used when no screen is mounted. */
@@ -48,6 +53,7 @@ export function storedWidgetLook(): WidgetLook {
       accent: readStoredAccent(),
       surfaceDepth: readStoredSurfaceDepth(),
     },
+    style: readWidgetStyle(),
   };
 }
 
@@ -72,6 +78,7 @@ export function publishWidgets(data: WidgetData, look: WidgetLook = storedWidget
         now: new Date(),
         locale: look.locale,
         theme: look.theme,
+        style: look.style,
         user: data.user,
         household,
         items: data.items,
@@ -135,7 +142,9 @@ async function sendActions(household: Household, userId: string): Promise<Sent> 
         continue;
       }
       const receiptId = invoiceForBuy(household, items, item, new Date());
-      const result = await markItemBought(item.id, null, receiptId);
+      // Sent directly, not through the waiting queue: the widget keeps its own
+      // list of taps and sends them again itself.
+      const result = await markItemBought(item.id, null, receiptId, { direct: true });
       settle(action, result.error, sent);
       if (!result.error) item.status = "bought";
       continue;
@@ -159,23 +168,26 @@ async function sendActions(household: Household, userId: string): Promise<Sent> 
     if (plan.kind === "exists") {
       sent.done.push(action.id);
     } else if (plan.kind === "restore") {
-      const result = await clearItemsLater([plan.itemId]);
+      const result = await clearItemsLater([plan.itemId], { direct: true });
       settle(action, result.error, sent);
       if (!result.error) {
         const parked = items.find((entry) => entry.id === plan.itemId);
         if (parked) parked.laterAt = undefined;
       }
     } else {
-      const result = await addItem({
-        homeId: household.id,
-        userId,
-        name: pin.name,
-        quantity: pin.quantity,
-        category: pin.category,
-        unit: pin.unit,
-        urgent: pin.urgent,
-        listId: plan.listId,
-      });
+      const result = await addItem(
+        {
+          homeId: household.id,
+          userId,
+          name: pin.name,
+          quantity: pin.quantity,
+          category: pin.category,
+          unit: pin.unit,
+          urgent: pin.urgent,
+          listId: plan.listId,
+        },
+        { direct: true },
+      );
       settle(action, result.error, sent);
       // So a second pin of the same name in this run sees it is on the list.
       if (result.item) items.push(result.item);
@@ -226,8 +238,7 @@ async function runSync(): Promise<{ retry: boolean }> {
   if (!readSession()) {
     publishSignedOut();
   } else if (fresh && readSession()?.user.id === user.id) {
-    // The app opens on this copy, so it starts with what the widget shows.
-    if (!itemsResult.offline) writeCachedItems(household.id, itemsResult.items);
+    // fetchHomeItems saved this copy, so the app opens with what the widget shows.
     publishWidgets({
       user,
       household,

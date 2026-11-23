@@ -12,6 +12,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
+import { cardLift } from "@/constants/theme";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -38,9 +39,10 @@ import { usePurchasesData } from "@/features/items/hooks/use-purchases";
 import { formatMoney } from "@/features/items/utils/currency";
 import { readStoredListId } from "@/features/items/utils/list-storage";
 import { lastPrices, priceOf } from "@/features/items/utils/trip-helpers";
-import { readCachedLists } from "@/features/offline/profile-cache";
+import { readCachedLists } from "@/features/offline/saved";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 
 /** How long "Added" stays on a card's button. */
 const ADDED_MS = 1800;
@@ -57,6 +59,7 @@ function SetsBody() {
   const { household } = useHousehold();
   const { bought } = usePurchasesData();
   const { t } = useI18n();
+  const motionOff = useMotionOff();
   const homeId = household?.id ?? null;
 
   const [sets, setSets] = useState<ItemSet[]>(() => (homeId ? (cachedSets(homeId) ?? []) : []));
@@ -191,7 +194,7 @@ function SetsBody() {
           <View className="h-[104px] rounded-3xl bg-cove-paper opacity-40" />
         </View>
       ) : sets.length === 0 ? (
-        <Animated.View entering={FadeIn.duration(220)}>
+        <Animated.View entering={motionOff ? undefined : FadeIn.duration(220)}>
           <EmptyState title={t("setsEmpty")} message={t("setsEmptyBody")} />
         </Animated.View>
       ) : (
@@ -252,7 +255,8 @@ const SetCard = memo(function SetCard({
   onAdd: (set: ItemSet) => void;
 }) {
   const { t, isRTL } = useI18n();
-  const { colors, scheme } = useTheme();
+  const { colors, glass, scheme } = useTheme();
+  const motionOff = useMotionOff();
   const count = t("setItemsCount", { count: set.items.length });
   const meta = estimate ? `${count} · ${t("setAbout")} ${estimate}` : count;
   const addLabel =
@@ -261,14 +265,16 @@ const SetCard = memo(function SetCard({
   return (
     <Animated.View
       entering={
-        reveal
+        motionOff
+          ? undefined
+          : reveal
           ? FadeInDown.delay(Math.min(index, 8) * 30)
               .duration(420)
               .easing(Easing.out(Easing.cubic))
           : FadeIn.duration(200)
       }
-      exiting={FadeOut.duration(150)}
-      layout={LinearTransition.duration(200)}
+      exiting={motionOff ? undefined : FadeOut.duration(150)}
+      layout={motionOff ? undefined : LinearTransition.duration(200)}
     >
       <View
         className="rounded-3xl bg-cove-paper px-4 py-4"
@@ -277,7 +283,7 @@ const SetCard = memo(function SetCard({
           shadowOpacity: scheme === "dark" ? 0.28 : 0.08,
           shadowRadius: 10,
           shadowOffset: { width: 0, height: 4 },
-          elevation: 2,
+          ...cardLift(glass, 2),
         }}
       >
         <Pressable

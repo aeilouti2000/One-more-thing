@@ -8,6 +8,7 @@ import type { Purchase } from "@/features/items/types/purchase";
 import { formatLaterDay } from "@/features/items/utils/later-dates";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 
 type LaterShelfProps = {
   /** Parked items of the list on screen, soonest to return first. */
@@ -32,12 +33,13 @@ export const LaterShelf = memo(function LaterShelf({
 }: LaterShelfProps) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
+  const motionOff = useMotionOff();
   if (items.length === 0) return null;
 
   return (
     <Animated.View
-      entering={FadeIn.duration(220)}
-      layout={LinearTransition.duration(200)}
+      entering={motionOff ? undefined : FadeIn.duration(220)}
+      layout={motionOff ? undefined : LinearTransition.duration(200)}
       className="mt-4 gap-2.5"
     >
       <Pressable
@@ -69,9 +71,9 @@ export const LaterShelf = memo(function LaterShelf({
             return (
               <Animated.View
                 key={item.id}
-                entering={FadeIn.duration(180)}
-                exiting={FadeOut.duration(140)}
-                layout={LinearTransition.duration(200)}
+                entering={motionOff ? undefined : FadeIn.duration(180)}
+                exiting={motionOff ? undefined : FadeOut.duration(140)}
+                layout={motionOff ? undefined : LinearTransition.duration(200)}
                 className="flex-row items-center gap-3 rounded-3xl bg-cove-paper py-3.5 ps-[18px] pe-3"
                 style={{ opacity: 0.92 }}
               >

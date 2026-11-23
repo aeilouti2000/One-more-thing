@@ -27,6 +27,7 @@ import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { spacing, tabBar, withAlpha } from "@/constants/theme";
 import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useTabBarCenter } from "@/components/ui/TabBarVisibility";
+import { useMotionOff } from "@/providers/MotionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 const CONTENT_PAD = 16;
@@ -83,6 +84,7 @@ export function GlassTabBar({
   const wide = useWideLayout();
   const { colors, scheme, shadow } = useTheme();
   const center = useTabBarCenter();
+  const motionOff = useMotionOff();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const count = state.routes.length;
   const gapAfter = Math.ceil(count / 2) - 1;
@@ -420,8 +422,8 @@ export function GlassTabBar({
         {center ? (
           <Animated.View
             pointerEvents="box-none"
-            entering={ZoomIn.duration(MOVE_MS)}
-            exiting={ZoomOut.duration(180)}
+            entering={motionOff ? undefined : ZoomIn.duration(MOVE_MS)}
+            exiting={motionOff ? undefined : ZoomOut.duration(180)}
           >
             {center}
           </Animated.View>

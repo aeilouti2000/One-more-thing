@@ -2,6 +2,8 @@ import type { ItemCategory } from "../../entities/item.entity";
 import type { Pin, PinInterval } from "../../entities/pin.entity";
 
 export type NewPinInput = {
+  /** Made on the phone; left out, the database makes one. */
+  id?: string;
   homeId: string;
   listId: string | null;
   name: string;

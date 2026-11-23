@@ -12,8 +12,9 @@ import { AppState } from "react-native";
 import { formatAppError, isOfflineError, isOfflineMessage } from "@/lib/errors";
 import { createWakeRetry } from "@/lib/wake-retry";
 import { fetchMyHomes, fetchMyHousehold } from "@/features/homes/api/homes";
-import { readCachedHousehold, writeCachedHousehold } from "@/features/offline/profile-cache";
+import { readCachedHousehold, writeCachedHousehold } from "@/features/offline/saved";
 import { useAuth } from "@/features/auth/providers/auth-provider";
+import { onOutboxEvent } from "@/features/offline/outbox";
 import type { HomeSummary, Household } from "@/features/homes/types/household";
 
 type HouseholdContextValue = {
@@ -160,6 +161,15 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       void refreshRef.current();
     });
     return () => subscription.remove();
+  }, [userId]);
+
+  // Changes that waited offline were sent (or the connection came back): the
+  // home's name and options may differ from what this phone assumed.
+  useEffect(() => {
+    if (!userId) return;
+    return onOutboxEvent((event) => {
+      if (event.type === "settled") void refreshRef.current();
+    });
   }, [userId]);
 
   useEffect(() => {

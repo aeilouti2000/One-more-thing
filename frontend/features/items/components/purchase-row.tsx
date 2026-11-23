@@ -10,10 +10,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
+import { cardLift } from "@/constants/theme";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { formatMoney } from "@/features/items/utils/currency";
 import { useCategoryLabel } from "@/features/items/providers/categories-provider";
+import { KEEP_MOTION } from "@/lib/motion";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Purchase } from "@/features/items/types/purchase";
 import { ItemPhotoThumb, itemPhotoUri } from "./item-photo";
@@ -36,6 +39,11 @@ type PurchaseRowProps = {
   onChangeQuantity?: (quantity: number) => void;
   quantityBusy?: boolean;
   selected?: boolean;
+  /**
+   * The copy that follows the finger while a row is dragged. It stays solid
+   * in the glass theme, so the rows it passes over do not show through it.
+   */
+  lifted?: boolean;
   leading?: ReactNode;
   showCategory?: boolean;
 };
@@ -50,13 +58,15 @@ export function PurchaseRow({
   onChangeQuantity,
   quantityBusy = false,
   selected = false,
+  lifted = false,
   leading,
   showCategory = true,
 }: PurchaseRowProps) {
   const { t } = useI18n();
   const { household } = useHousehold();
   const categoryLabel = useCategoryLabel(purchase.category);
-  const { colors, scheme } = useTheme();
+  const { colors, glass, scheme } = useTheme();
+  const motionOff = useMotionOff();
   const photoUri = itemPhotoUri(purchase);
   const showsStepper = !selected && Boolean(onChangeQuantity) && purchase.status === "needed";
   const isUrgent = purchase.urgent && purchase.status !== "bought";
@@ -104,17 +114,22 @@ export function PurchaseRow({
     borderBottomRightRadius: CARD_RADIUS,
   };
 
+  const surface = glass && lifted ? colors.overlay : selected ? colors.mist : colors.paper;
+  // A glass row is one see-through layer: the layer below paints it, and it
+  // casts no shadow (the shadow would show through it).
+  const seeThrough = glass && !lifted;
+
   return (
     <View
       pointerEvents="box-none"
       style={{
         ...cardRadius,
-        backgroundColor: selected ? colors.mist : colors.paper,
+        backgroundColor: seeThrough ? "transparent" : surface,
         shadowColor: scheme === "dark" ? "#000000" : colors.ink,
         shadowOpacity: selected ? 0 : scheme === "dark" ? 0.22 : 0.045,
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 3 },
-        elevation: selected ? 0 : 1,
+        ...cardLift(seeThrough, selected ? 0 : 1),
       }}
     >
       <View
@@ -122,7 +137,7 @@ export function PurchaseRow({
         style={{
           ...cardRadius,
           overflow: "hidden",
-          backgroundColor: selected ? colors.mist : colors.paper,
+          backgroundColor: surface,
         }}
       >
       <Pressable
@@ -202,7 +217,7 @@ export function PurchaseRow({
                 </Pressable>
               ) : showsStepper && onChangeQuantity ? (
                 <Animated.View
-                  entering={FadeIn.duration(140)}
+                  entering={motionOff ? undefined : FadeIn.duration(140)}
                   pointerEvents="box-none"
                   className="flex-row items-center gap-1.5"
                 >
@@ -348,7 +363,16 @@ function UrgentChip({ label }: { label: string }) {
   const breath = useSharedValue(0);
 
   useEffect(() => {
-    breath.set(withRepeat(withTiming(1, { duration: 1800, easing: Easing.out(Easing.quad) }), -1));
+    breath.set(
+      withRepeat(
+        withTiming(1, { duration: 1800, easing: Easing.out(Easing.quad) }),
+        -1,
+        false,
+        undefined,
+        // "Urgent" keeps breathing with animations off: it is a status, not decoration.
+        KEEP_MOTION,
+      ),
+    );
   }, [breath]);
 
   const ring = useAnimatedStyle(() => ({

@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.widget.RemoteViews
+import kotlin.math.roundToInt
 
 /**
  * Colours a widget. When the app follows the phone's theme, Android 12+ is
@@ -29,6 +30,14 @@ internal class Painter(context: Context, snapshot: Snapshot?) {
     }
   }
 
+  private val glass = snapshot?.glass
+  /** A glass widget: see-through, with a bright rim. */
+  val isGlass: Boolean = glass != null
+  /** How solid (0–1) each see-through part is; 1 on ordinary widgets. */
+  val bgAlpha: Float = glass?.bg ?: 1f
+  val surfaceAlpha: Float = glass?.surface ?: 1f
+  val trackAlpha: Float = glass?.track ?: 1f
+
   fun text(views: RemoteViews, viewId: Int, pick: (Palette) -> Int) {
     if (both && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       views.setColorInt(viewId, "setTextColor", pick(light), pick(dark))
@@ -46,6 +55,16 @@ internal class Painter(context: Context, snapshot: Snapshot?) {
     }
   }
 
+  /**
+   * Recolours a white shape and sets how solid it is. The colour filter
+   * replaces the white entirely, so the see-through part has to be the
+   * image's own alpha. Always set: list rows are reused.
+   */
+  fun fill(views: RemoteViews, viewId: Int, alpha: Float, pick: (Palette) -> Int) {
+    tint(views, viewId, pick)
+    views.setInt(viewId, "setImageAlpha", (alpha.coerceIn(0f, 1f) * 255).roundToInt())
+  }
+
   fun image(views: RemoteViews, viewId: Int, draw: (Palette) -> Bitmap) {
     if (both && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       views.setIcon(
@@ -59,6 +78,10 @@ internal class Painter(context: Context, snapshot: Snapshot?) {
     }
   }
 }
+
+/** The same colour, `alpha` (0–1) solid. */
+internal fun withAlpha(color: Int, alpha: Float): Int =
+  (color and 0x00FFFFFF) or ((alpha.coerceIn(0f, 1f) * 255).roundToInt() shl 24)
 
 /** The budget ring: a grey track with the used part drawn over it from the top. */
 internal fun drawRing(context: Context, fraction: Float, color: Int, track: Int): Bitmap {

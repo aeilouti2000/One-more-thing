@@ -328,6 +328,7 @@ function ReorderRow({
   onLayout: (height: number) => void;
   children: ReactNode;
 }) {
+  const { glass } = useTheme();
   const top = useSharedValue(firstTop);
 
   // Where this row should rest: its slot, moved aside while another row is
@@ -370,7 +371,8 @@ function ReorderRow({
     return {
       transform: [{ translateY: draggingThis ? top.value + dragY.value : top.value }],
       zIndex: draggingThis ? 20 : 0,
-      elevation: draggingThis && !hidden ? 12 : 0,
+      // A shadow would show through a glass row.
+      elevation: glass ? 0 : draggingThis && !hidden ? 12 : 0,
       opacity: hidden ? 0 : 1,
     };
   });

@@ -6,6 +6,7 @@ import { GlassTabBar } from "@/components/ui/GlassTabBar";
 import { TabBarVisibility, useTabBarVisibility } from "@/components/ui/TabBarVisibility";
 import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export default function TabsLayout() {
@@ -29,6 +30,7 @@ function TabScreens() {
   const settingsSectionOpen = useSettingsSectionOpen();
   const { t } = useI18n();
   const { colors } = useTheme();
+  const motionOff = useMotionOff();
 
   return (
     <RequireSession requireHome>
@@ -39,8 +41,10 @@ function TabScreens() {
         screenOptions={{
           headerShown: false,
           // A quick cross-fade between tabs instead of a hard cut.
+          // Animations off: the fade stays and only its length drops to 0.
+          // Switching to "none" while tabs are mounted leaves a faded-out tab blank.
           animation: "fade",
-          transitionSpec: { animation: "timing", config: { duration: 160 } },
+          transitionSpec: { animation: "timing", config: { duration: motionOff ? 0 : 160 } },
           sceneStyle: { backgroundColor: colors.ice },
         }}
       >

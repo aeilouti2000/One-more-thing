@@ -1,3 +1,5 @@
+import { translate } from "@/constants/i18n";
+import { isOnline } from "@/features/offline/network";
 import { api, ApiError } from "@/lib/api";
 import { formatAppError } from "@/lib/errors";
 
@@ -38,6 +40,8 @@ export function isOpenAsk(ask: ShopAsk, now = Date.now()) {
 }
 
 export async function fetchShopAsks(homeId: string) {
+  // Asked every few seconds: with no connection, answer at once.
+  if (!isOnline()) return { asks: null as ShopAsk[] | null, error: translate("errorNetwork") };
   try {
     const asks = await api.get<ShopAsk[]>(`/homes/${homeId}/shop-asks`);
     return { asks, error: null as string | null };

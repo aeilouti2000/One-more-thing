@@ -73,7 +73,8 @@ internal object WidgetRenderer {
 
   private fun base(context: Context, painter: Painter, snapshot: Snapshot?, layout: Int): RemoteViews {
     val views = RemoteViews(context.packageName, layout)
-    painter.tint(views, R.id.hw_bg) { it.bg }
+    painter.fill(views, R.id.hw_bg, painter.bgAlpha) { it.bg }
+    views.setViewVisibility(R.id.hw_edge, if (painter.isGlass) View.VISIBLE else View.GONE)
     if (snapshot != null) {
       // The app's own language decides the direction, not the phone's.
       views.setInt(
@@ -161,7 +162,9 @@ internal object WidgetRenderer {
       "warn" -> { palette -> palette.warn }
       else -> { palette -> palette.fill }
     }
-    painter.image(views, R.id.hw_ring) { drawRing(context, data.fraction, tone(it), it.track) }
+    painter.image(views, R.id.hw_ring) {
+      drawRing(context, data.fraction, tone(it), withAlpha(it.track, painter.trackAlpha))
+    }
     views.setTextViewText(R.id.hw_center, data.center)
     views.setTextViewText(R.id.hw_center_sub, data.centerSub)
     views.setTextViewText(R.id.hw_line1, data.line1)

@@ -28,18 +28,25 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BlurBackdrop } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, DialogGlass } from "@/components/ui/BlurBackdrop";
 import { translate } from "@/constants/i18n";
 import { withAlpha } from "@/constants/theme";
 import { useWideLayout } from "@/hooks/use-wide-layout";
+import { isMotionOff, KEEP_MOTION, motionOffOnUI } from "@/lib/motion";
 import { useTheme } from "@/providers/ThemeProvider";
 
 const OPEN_MS = 300;
 const CLOSE_MS = 220;
+/**
+ * Animations off: a sheet dragged shut waits where the finger left it until it
+ * closes. This is only the safety net for one that never does.
+ */
+const DRAG_RETURN_WAIT_MS = 2000;
 const SHEET_RADIUS = 28;
 /** Drag past this (or flick faster than DISMISS_VELOCITY) to close. */
 const DISMISS_DISTANCE = 110;
@@ -174,7 +181,12 @@ export function BottomSheet({
   );
 
   function requestClose() {
-    if (lockedRef.current) return;
+    if (lockedRef.current) {
+      // Animations off: a drag may have left the sheet waiting to close (see
+      // the pan gesture). A locked sheet stays open, so put it back at once.
+      if (isMotionOff()) drag.set(0);
+      return;
+    }
     Keyboard.dismiss();
     onCloseRef.current();
   }
@@ -199,7 +211,15 @@ export function BottomSheet({
         runOnJS(requestClose)();
       }
       // Spring back; if closing, the visible=false animation takes over.
-      drag.set(withSpring(0, { damping: 22, stiffness: 260 }));
+      // Animations off: there is no animation to take over, and "springing"
+      // back at once would show the sheet fully open for a moment before it
+      // goes. So it stays where the finger left it until it closes; opening
+      // it again starts from zero. requestClose puts a locked sheet back.
+      drag.set(
+        shouldClose && motionOffOnUI.value
+          ? withDelay(DRAG_RETURN_WAIT_MS, withTiming(0, { duration: 0 }), KEEP_MOTION)
+          : withSpring(0, { damping: 22, stiffness: 260 }),
+      );
     },
   });
 
@@ -215,7 +235,7 @@ export function BottomSheet({
   if (!mounted) return null;
 
   const keyboardOpen = keyboardHeight > 0;
-  const surface = dark ? colors.paper : colors.white;
+  const surface = dark ? colors.overlay : colors.white;
   const edge = dark ? withAlpha(colors.white, 0.1) : withAlpha("#12141A", 0.08);
 
   return (
@@ -252,6 +272,7 @@ export function BottomSheet({
                 sheetStyle,
               ]}
             >
+              <DialogGlass />
               <GestureDetector gesture={pan}>
                 <View
                   style={styles.grabZone}

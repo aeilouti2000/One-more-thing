@@ -1,6 +1,12 @@
 import { getCategoryLabel } from "@/constants/categories";
 import { translate, type Locale, type TranslationKey } from "@/constants/i18n";
-import { getColors, type SurfaceDepth, type ThemeColors } from "@/constants/theme";
+import {
+  getColors,
+  hexToHsl,
+  hslToHex,
+  type SurfaceDepth,
+  type ThemeColors,
+} from "@/constants/theme";
 import type { Household } from "@/features/homes/types/household";
 import type { Pin } from "@/features/items/api/pins";
 import type { Purchase } from "@/features/items/types/purchase";
@@ -12,6 +18,12 @@ import {
   TRIP_TOTALS,
 } from "@/features/items/utils/insights";
 import { isUnsavedId } from "@/features/widgets/actions";
+import {
+  WIDGET_GLASS_CLARITY_STEPS,
+  type WidgetGlassTint,
+  type WidgetStylePrefs,
+} from "@/features/widgets/widget-style";
+import type { ThemePreference } from "@/lib/theme-storage";
 
 /**
  * Everything the home screen widgets show, as one plain object. The widgets
@@ -48,6 +60,11 @@ export type WidgetSnapshot = {
   themeMode: "light" | "dark" | "system";
   light: WidgetPalette;
   dark: WidgetPalette;
+  /**
+   * Only for glass widgets: how solid (0–1) the background, the tiles on it
+   * and the budget ring's track are drawn. The colours themselves stay solid.
+   */
+  glass?: { bg: number; surface: number; track: number };
   messageTitle: string;
   messageBody: string;
   list: Section<{ id: string; name: string; flag: string; detail: string }>;
@@ -72,7 +89,9 @@ export type WidgetSnapshot = {
 export type WidgetSnapshotInput = {
   now: Date;
   locale: Locale;
-  theme: { preference: "light" | "dark" | "system"; accent: string; surfaceDepth: SurfaceDepth };
+  theme: { preference: ThemePreference; accent: string; surfaceDepth: SurfaceDepth };
+  /** The Widgets page's own look, separate from the app's theme. */
+  style: WidgetStylePrefs;
   /** null: nobody is signed in. */
   user: { id: string } | null;
   /** null: signed in, but not in a home. */
@@ -128,6 +147,87 @@ export function widgetPalette(colors: ThemeColors, scheme: "light" | "dark"): Wi
     warn: dark ? "#E6B450" : "#B7791F",
     danger: dark ? "#F07178" : "#C2414A",
     track: mix(colors.paper, colors.muted, 0.2),
+  };
+}
+
+/** The most and the least solid a glass widget's background gets. */
+const GLASS_BG_ALPHA = { solid: 0.9, clear: 0.5 };
+/** Tiles and the ring's track: a faint wash over the glass. */
+const GLASS_SURFACE_ALPHA = 0.14;
+const GLASS_TRACK_ALPHA = 0.22;
+
+const GLASS_THEME_MODE: Record<WidgetGlassTint, WidgetSnapshot["themeMode"]> = {
+  auto: "system",
+  light: "light",
+  dark: "dark",
+};
+
+/**
+ * A glass widget's colours for one tint. The wallpaper behind it is unknown,
+ * so text is near white on the dark tint and near black on the light one.
+ * That reads on most wallpapers; at the most see-through settings a very
+ * bright wallpaper under the dark tint (or a very dark one under the light
+ * tint) leaves the smaller grey text faint, which is what the slider is for.
+ */
+function glassWidgetPalette(colors: ThemeColors, scheme: "light" | "dark"): WidgetPalette {
+  const themed = widgetPalette(colors, scheme);
+  const { h, s } = hexToHsl(colors.accent);
+  const tint = s < 12 ? 0 : 32;
+  if (scheme === "dark") {
+    return {
+      ...themed,
+      bg: hslToHex(h, tint, 9),
+      surface: "#FFFFFF",
+      ink: "#F6F8FB",
+      muted: hslToHex(h, tint * 0.5, 82),
+      track: "#FFFFFF",
+    };
+  }
+  const ink = hslToHex(h, tint, 10);
+  return {
+    ...themed,
+    bg: "#FFFFFF",
+    surface: ink,
+    ink,
+    muted: hslToHex(h, tint * 0.7, 24),
+    // The accent itself is too pale to read on see-through white.
+    accent: colors.accentDeep,
+    track: ink,
+  };
+}
+
+/**
+ * Both themes' colours and how the widgets switch between them: the part of
+ * the snapshot that the Widgets page also draws its preview from.
+ */
+export function widgetLook({
+  theme,
+  style,
+}: Pick<WidgetSnapshotInput, "theme" | "style">): Pick<
+  WidgetSnapshot,
+  "themeMode" | "light" | "dark" | "glass"
+> {
+  const light = getColors("light", theme.accent, theme.surfaceDepth);
+  const dark = getColors("dark", theme.accent, theme.surfaceDepth);
+  if (style.style !== "glass") {
+    return {
+      // The app's glass theme is drawn on dark.
+      themeMode: theme.preference === "glass" ? "dark" : theme.preference,
+      light: widgetPalette(light, "light"),
+      dark: widgetPalette(dark, "dark"),
+    };
+  }
+  const clarity = style.clarity / (WIDGET_GLASS_CLARITY_STEPS - 1);
+  const bg = GLASS_BG_ALPHA.solid + (GLASS_BG_ALPHA.clear - GLASS_BG_ALPHA.solid) * clarity;
+  return {
+    themeMode: GLASS_THEME_MODE[style.tint],
+    light: glassWidgetPalette(light, "light"),
+    dark: glassWidgetPalette(dark, "dark"),
+    glass: {
+      bg: Math.round(bg * 100) / 100,
+      surface: GLASS_SURFACE_ALPHA,
+      track: GLASS_TRACK_ALPHA,
+    },
   };
 }
 
@@ -395,14 +495,9 @@ function emptySection<T>(): Section<T> {
 }
 
 export function buildWidgetSnapshot(input: WidgetSnapshotInput): WidgetSnapshot {
-  const { locale, theme, household } = input;
+  const { locale, household } = input;
   const t = (key: TranslationKey) => translate(key, undefined, locale);
-  const shell = {
-    rtl: locale === "ar",
-    themeMode: theme.preference,
-    light: widgetPalette(getColors("light", theme.accent, theme.surfaceDepth), "light"),
-    dark: widgetPalette(getColors("dark", theme.accent, theme.surfaceDepth), "dark"),
-  };
+  const shell = { rtl: locale === "ar", ...widgetLook(input) };
   const blank = {
     list: emptySection<WidgetSnapshot["list"]["items"][number]>(),
     pins: emptySection<WidgetSnapshot["pins"]["items"][number]>(),

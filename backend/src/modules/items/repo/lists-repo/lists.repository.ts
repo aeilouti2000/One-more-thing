@@ -12,7 +12,7 @@ export interface IListsRepository {
   findFirstActive(homeId: string): Promise<ShoppingList | null>;
   findByIds(ids: string[]): Promise<ShoppingList[]>;
   historyWithBoughtItems(homeId: string): Promise<HistoryListRow[]>;
-  insert(homeId: string, name: string): Promise<ShoppingList>;
+  insert(homeId: string, name: string, id?: string): Promise<ShoppingList>;
   save(list: ShoppingList): Promise<ShoppingList>;
   countActive(homeId: string): Promise<number>;
 }

@@ -3,7 +3,7 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { floatedCardStyle, withAlpha } from "@/constants/theme";
+import { cardLift, floatedCardStyle, withAlpha } from "@/constants/theme";
 import { shareNeededText } from "@/features/items/utils/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -16,7 +16,7 @@ type InviteCodeCardProps = {
 
 export function InviteCodeCard({ code, homeName, onCopied }: InviteCodeCardProps) {
   const { t, isRTL } = useI18n();
-  const { colors, scheme } = useTheme();
+  const { colors, glass, scheme } = useTheme();
   const dark = scheme === "dark";
 
   async function copyCode() {
@@ -42,7 +42,12 @@ export function InviteCodeCard({ code, homeName, onCopied }: InviteCodeCardProps
   return (
     <View
       className="overflow-hidden px-5 py-5"
-      style={floatedCardStyle(scheme, colors)}
+      style={[
+        floatedCardStyle(scheme, colors),
+        // That style is a dialog's, solid in Glass. This card sits in the
+        // page, so it is see-through like the cards around it.
+        glass ? { backgroundColor: colors.paper, ...cardLift(true, 0) } : null,
+      ]}
     >
       <View
         className="flex-row items-center gap-3"

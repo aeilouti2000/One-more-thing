@@ -2,6 +2,9 @@ export type ThemeScheme = "light" | "dark";
 
 export type SurfaceDepth = "soft" | "default" | "deep" | "true";
 
+/** How see-through the glass theme's cards are. */
+export type GlassFrost = "clear" | "frosted" | "milky";
+
 export type ThemeColors = {
   ice: string;
   paper: string;
@@ -16,6 +19,11 @@ export type ThemeColors = {
   onAccent: string;
   soft: string;
   deep: string;
+  /**
+   * A solid surface for what covers other content: sheets, dialogs, menus.
+   * The same as `paper`, except in Glass, where `paper` is see-through.
+   */
+  overlay: string;
   white: string;
   transparent: string;
 };
@@ -23,6 +31,8 @@ export type ThemeColors = {
 export const DEFAULT_ACCENT: string;
 export const DEFAULT_SURFACE_DEPTH: SurfaceDepth;
 export const SURFACE_DEPTH_LEVELS: readonly SurfaceDepth[];
+export const DEFAULT_GLASS_FROST: GlassFrost;
+export const GLASS_FROST_LEVELS: readonly GlassFrost[];
 
 export const colors: ThemeColors;
 export const lightColors: ThemeColors;
@@ -33,14 +43,30 @@ export function getColors(
   accentHex?: string,
   surfaceDepth?: SurfaceDepth,
 ): ThemeColors;
+/**
+ * The glass theme's colours. Its surfaces (`paper`, `mist`, `soft`, `line`)
+ * are see-through "rgba()" values, not hex.
+ */
+export function getGlassColors(accentHex?: string, frost?: GlassFrost): ThemeColors;
+/** The glass theme's page background: a style for a plain, absolutely filled View. */
+export function glassBackdropStyle(accentHex?: string): {
+  backgroundColor: string;
+  backgroundImage: {
+    type: "linear-gradient";
+    direction: string;
+    colorStops: { color: string; positions: string[] }[];
+  }[];
+};
 export function getCssVars(palette: ThemeColors): Record<string, string>;
 export function normalizeHex(value: string | null | undefined): string | null;
 export function normalizeSurfaceDepth(
   value: string | null | undefined,
 ): SurfaceDepth;
+export function normalizeGlassFrost(value: string | null | undefined): GlassFrost;
 export function hexToHsl(hex: string): { h: number; s: number; l: number };
 export function hslToHex(h: number, s: number, l: number): string;
-export function withAlpha(hex: string, alpha: number): string;
+/** `color` may be a hex or an "rgba()"; a see-through colour keeps its own alpha too. */
+export function withAlpha(color: string, alpha: number): string;
 
 export function glassFieldStyle(
   scheme: ThemeScheme,
@@ -50,6 +76,15 @@ export function glassFieldStyle(
   backgroundColor: string;
   borderColor: string;
 };
+
+/**
+ * How far a card is lifted off the page: spread it last in the card's style.
+ * A see-through (glass) card gets no shadow at all.
+ */
+export function cardLift(
+  seeThrough: boolean,
+  elevation: number,
+): { elevation: number; shadowOpacity?: number };
 
 export function floatedCardStyle(
   scheme: ThemeScheme,

@@ -8,6 +8,7 @@ import { firstName } from "@/features/items/api/shop-locks";
 import type { ShopAsk, ShopAskReply } from "@/features/items/api/shop-asks";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 
 type ShopAskCardProps = {
   ask: ShopAsk;
@@ -25,15 +26,16 @@ type ShopAskCardProps = {
 export function ShopAskCard({ ask, busy, error, onAdd, onReply }: ShopAskCardProps) {
   const { t } = useI18n();
   const { colors } = useTheme();
+  const motionOff = useMotionOff();
   const name = firstName(ask.askedByName) || t("partner");
   // Once they added something, the second button closes the question instead.
   const added = ask.myAdded > 0;
 
   return (
     <Animated.View
-      entering={FadeIn.duration(220)}
-      exiting={FadeOut.duration(160)}
-      layout={LinearTransition.duration(200)}
+      entering={motionOff ? undefined : FadeIn.duration(220)}
+      exiting={motionOff ? undefined : FadeOut.duration(160)}
+      layout={motionOff ? undefined : LinearTransition.duration(200)}
       className="mb-3 rounded-3xl bg-cove-paper px-4 py-3.5"
     >
       <View className="flex-row items-center gap-3">

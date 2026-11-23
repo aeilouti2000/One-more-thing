@@ -9,6 +9,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
+import { KEEP_MOTION } from "@/lib/motion";
 
 /** A rounded placeholder bar with a light sheen sweeping across it. */
 export function ShimmerBlock({
@@ -28,6 +29,9 @@ export function ShimmerBlock({
       withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.cubic) }),
       -1,
       false,
+      undefined,
+      // Still sweeps with animations off: it is how loading looks alive.
+      KEEP_MOTION,
     );
   }, [travel]);
   const sheen = useAnimatedStyle(() => ({

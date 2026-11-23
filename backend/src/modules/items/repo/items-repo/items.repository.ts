@@ -1,6 +1,8 @@
 import type { Item, ItemCategory } from "../../entities/item.entity";
 
 export type NewItemInput = {
+  /** Made on the phone; left out, the database makes one. */
+  id?: string;
   homeId: string;
   listId: string;
   name: string;

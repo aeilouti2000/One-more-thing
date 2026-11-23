@@ -15,6 +15,9 @@ class HomeWidgetsModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("HomeWidgets")
 
+    /** This build draws see-through ("glass") widgets; the app offers them only then. */
+    Constant("supportsGlass") { true }
+
     /** New data for the widgets, as JSON text. Redraws them when it changed. */
     Function("setSnapshot") { json: String ->
       val context = context ?: return@Function

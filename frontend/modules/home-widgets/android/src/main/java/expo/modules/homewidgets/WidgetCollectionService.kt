@@ -100,7 +100,9 @@ private class CollectionFactory(
     views.setViewVisibility(R.id.hw_tile_glyph, if (onList) View.INVISIBLE else View.VISIBLE)
     views.setViewVisibility(R.id.hw_tile_check, if (onList) View.VISIBLE else View.GONE)
     // On the list: a filled tile with a tick, like a pressed button.
-    painter.tint(views, R.id.hw_tile_bg) { if (onList) it.fill else it.surface }
+    painter.fill(views, R.id.hw_tile_bg, if (onList) 1f else painter.surfaceAlpha) {
+      if (onList) it.fill else it.surface
+    }
     painter.tint(views, R.id.hw_tile_check) { it.onFill }
     painter.text(views, R.id.hw_tile_glyph) { it.accent }
     painter.text(views, R.id.hw_row_name) { if (onList) it.onFill else it.ink }

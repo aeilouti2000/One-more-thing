@@ -25,6 +25,7 @@ import { scaleFontSize } from "@/constants/font";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { withAlpha } from "@/constants/theme";
+import { KEEP_MOTION } from "@/lib/motion";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { TextInputHandle } from "@/lib/native-refs";
 
@@ -93,6 +94,9 @@ export function QuickAddBar({
       ),
       -1,
       false,
+      undefined,
+      // The typing caret blinks with animations off too, like any caret.
+      KEEP_MOTION,
     ));
     return () => cancelAnimation(caret);
   }, [showHint, caret]);
@@ -110,6 +114,8 @@ export function QuickAddBar({
   function promptForName() {
     inputRef.current?.focus();
     shakeX.set(withSequence(
+      // The shake says "type a name first", so it stays with animations off.
+      KEEP_MOTION,
       withTiming(-6, { duration: 40 }),
       withTiming(6, { duration: 50 }),
       withTiming(-5, { duration: 45 }),

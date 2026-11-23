@@ -40,10 +40,10 @@ import { ItemDetailCard } from "@/features/items/components/item-detail-card";
 import { PurchaseRow } from "@/features/items/components/purchase-row";
 import { QuickAddBar } from "@/features/items/components/quick-add-bar";
 import { ReorderableList } from "@/features/items/components/reorderable-list";
+import { DialogGlass } from "@/components/ui/BlurBackdrop";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { ItemsFab } from "@/features/items/components/items-fab";
 import { ShopAskCard } from "@/features/items/components/shop-ask-card";
-import { isUnsavedItemId } from "@/features/items/api/items";
 import { replyShopAsk, type ShopAskReply } from "@/features/items/api/shop-asks";
 import { adoptShopAsk, dropShopAsk, useShopAsks } from "@/features/items/hooks/use-shop-asks";
 import { LaterSheet } from "@/features/items/components/later-sheet";
@@ -83,7 +83,7 @@ import {
   resolvePreferredListId,
   writeStoredListId,
 } from "@/features/items/utils/list-storage";
-import { readCachedLists, writeCachedLists } from "@/features/offline/profile-cache";
+import { readCachedLists, writeCachedLists } from "@/features/offline/saved";
 import {
   createPin,
   fetchPins,
@@ -123,10 +123,13 @@ import { getCategoryLabel } from "@/constants/categories";
 import type { Purchase, PurchaseCategory } from "@/features/items/types/purchase";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
+import { isMotionOff } from "@/lib/motion";
 import type { ViewHandle } from "@/lib/native-refs";
 
 export default function ItemsScreen() {
   const { household, refresh: refreshHome } = useHousehold();
+  const motionOff = useMotionOff();
   const {
     needed,
     later,
@@ -596,7 +599,7 @@ export default function ItemsScreen() {
   const savedOnAskedList = useMemo(
     () =>
       openAskListId
-        ? needed.filter((item) => item.listId === openAskListId && !isUnsavedItemId(item.id)).length
+        ? needed.filter((item) => item.listId === openAskListId).length
         : 0,
     [needed, openAskListId],
   );
@@ -786,9 +789,11 @@ export default function ItemsScreen() {
 
   useEffect(() => {
     if (isChoosingList || !listMenuMounted) return;
-    const timer = setTimeout(() => setListMenuMounted(false), 220);
+    // The wait covers the menu's exit animations. With animations off there are
+    // none, and an invisible menu left up would swallow the next tap.
+    const timer = setTimeout(() => setListMenuMounted(false), motionOff ? 0 : 220);
     return () => clearTimeout(timer);
-  }, [isChoosingList, listMenuMounted]);
+  }, [isChoosingList, listMenuMounted, motionOff]);
 
   const homeId = household?.id ?? null;
   const [listsHomeId, setListsHomeId] = useState<string | null | undefined>(undefined);
@@ -1241,7 +1246,7 @@ export default function ItemsScreen() {
               <HeaderInfoShimmer color={headerFg} />
             ) : (
               <Animated.View
-                entering={FadeIn.duration(220)}
+                entering={motionOff ? undefined : FadeIn.duration(220)}
                 className="mt-1 flex-row items-center gap-2"
               >
                 <AppText
@@ -1416,7 +1421,7 @@ export default function ItemsScreen() {
                 : t("searchNotOnList", { name: typed })}
             </AppText>
           ) : (
-          <Animated.View entering={FadeIn.duration(240)}>
+          <Animated.View entering={motionOff ? undefined : FadeIn.duration(240)}>
             <EmptyState
               title={t("nothingToBuy")}
               message={t("nothingToBuyBody")}
@@ -1424,7 +1429,7 @@ export default function ItemsScreen() {
           </Animated.View>
           )
         ) : (
-          <Animated.View entering={FadeIn.duration(280)}>
+          <Animated.View entering={motionOff ? undefined : FadeIn.duration(280)}>
           <ReorderableList
             items={shownItems}
             // A filtered list would save a partial order.
@@ -1437,6 +1442,7 @@ export default function ItemsScreen() {
                 <PurchaseRow
                   purchase={purchase}
                   showCategory={false}
+                  lifted
                   leading={handle}
                   selected={
                     selectedIds.has(purchase.id) ||
@@ -1714,8 +1720,8 @@ export default function ItemsScreen() {
         <View className="flex-1" style={{ direction: isRTL ? "rtl" : "ltr" }}>
           {isChoosingList ? (
             <Animated.View
-              entering={FadeIn.duration(160)}
-              exiting={FadeOut.duration(160)}
+              entering={motionOff ? undefined : FadeIn.duration(160)}
+              exiting={motionOff ? undefined : FadeOut.duration(160)}
               style={StyleSheet.absoluteFill}
             >
               <Pressable
@@ -1731,15 +1737,15 @@ export default function ItemsScreen() {
           ) : null}
           {isChoosingList ? (
             <Animated.View
-              entering={SlideInUp.duration(220)}
-              exiting={SlideOutUp.duration(180)}
+              entering={motionOff ? undefined : SlideInUp.duration(220)}
+              exiting={motionOff ? undefined : SlideOutUp.duration(180)}
               style={{
                 position: "absolute",
                 top: 0,
                 left: 0,
                 right: 0,
                 maxHeight: windowHeight * 0.72,
-                backgroundColor: colors.paper,
+                backgroundColor: colors.overlay,
                 borderBottomLeftRadius: 28,
                 borderBottomRightRadius: 28,
                 paddingTop: insets.top + 12,
@@ -1751,6 +1757,9 @@ export default function ItemsScreen() {
                 elevation: 8,
               }}
             >
+              <DialogGlass
+                style={{ borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}
+              />
               <View className="flex-row items-center justify-between px-5 pb-2">
                 <AppText className="text-base font-semibold text-cove-ink">
                   {t("yourLists")}
@@ -1991,7 +2000,8 @@ function RowEntrance({
 }) {
   // Read once at mount: rows added later in the same list don't re-animate.
   const [entering] = useState(() => {
-    if (!from) return undefined;
+    // Animations off: rows are simply there, with no hidden first frame.
+    if (!from || isMotionOff()) return undefined;
     const base = from === "right" ? FadeInRight : FadeInLeft;
     return base
       .delay(Math.min(index, ENTRANCE_MAX_STAGGERED) * ENTRANCE_STAGGER_MS)

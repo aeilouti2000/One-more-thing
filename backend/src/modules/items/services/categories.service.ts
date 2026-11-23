@@ -46,8 +46,11 @@ export class CategoriesService {
     ];
   }
 
-  async create(userId: string, homeId: string, name: string) {
+  /** `id` is made on the phone: sending the same create twice gives back the first category. */
+  async create(userId: string, homeId: string, name: string, id?: string) {
     await this.homes.requireMembership(userId, homeId);
+    const already = id ? await this.categories.findCustomInHome(id, homeId) : null;
+    if (already) return { id: already.id, name: already.name, builtin: false };
     const trimmed = name.trim().replace(/\s+/g, " ");
     if (!trimmed) {
       throw new DomainError("CATEGORY_NAME_REQUIRED", "Enter a category name.", HttpStatus.BAD_REQUEST);
@@ -57,7 +60,7 @@ export class CategoriesService {
       throw new DomainError("CATEGORY_EXISTS", "That category already exists.", HttpStatus.CONFLICT);
     }
     try {
-      const saved = await this.categories.insert(homeId, trimmed);
+      const saved = await this.categories.insert(homeId, trimmed, id);
       return { id: saved.id, name: saved.name, builtin: false };
     } catch (error) {
       // Two phones adding the same name at once: the second one loses politely.

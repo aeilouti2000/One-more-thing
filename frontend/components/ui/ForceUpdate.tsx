@@ -1,6 +1,7 @@
 import { Linking, View } from "react-native";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppLogo } from "@/components/ui/AppLogo";
+import { GlassBackdrop } from "@/components/ui/GlassBackdrop";
 import { AppText } from "@/components/ui/AppText";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -20,6 +21,7 @@ export function ForceUpdate({ downloadUrl, onLater }: ForceUpdateProps) {
       className="flex-1 items-center justify-center px-8"
       style={{ backgroundColor: colors.ice }}
     >
+      <GlassBackdrop />
       <AppLogo size={88} />
       <AppText className="mt-6 text-center text-2xl font-semibold text-cove-ink">
         {t(onLater ? "updateAvailable" : "updateRequired")}

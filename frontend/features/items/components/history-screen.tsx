@@ -23,7 +23,7 @@ import { ItemDetailCard } from "@/features/items/components/item-detail-card";
 import { TripInvoiceCosts } from "@/features/items/components/trip-invoice-costs";
 import { PurchaseRow } from "@/features/items/components/purchase-row";
 import { AppText } from "@/components/ui/AppText";
-import { BlurBackdrop, GlassFill } from "@/components/ui/BlurBackdrop";
+import { BlurBackdrop, DialogGlass, GlassFill } from "@/components/ui/BlurBackdrop";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
@@ -46,11 +46,12 @@ import { AppTextField } from "@/components/ui/AppTextField";
 import { SheetField } from "@/components/ui/SheetField";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { fetchHistoryLists, fetchLists, listLabel, type HistoryList, type HomeList } from "@/features/items/api/lists";
-import { readCachedHistoryLists, readCachedLists } from "@/features/offline/profile-cache";
+import { readCachedHistoryLists, readCachedLists } from "@/features/offline/saved";
 import { canUndoBought } from "@/features/items/utils/share-list";
 import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import {
   floatedCardStyle,
   headerActionStyle,
@@ -1249,10 +1250,17 @@ function OptionMenu({
   onClose: () => void;
 }) {
   const { colors, scheme, shadow } = useTheme();
+  const motionOff = useMotionOff();
   const frame = menuFrame(anchor, isRTL);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={motionOff ? "none" : "fade"}
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
       <View className="flex-1">
         <BlurBackdrop onPress={onClose} />
         <View
@@ -1274,6 +1282,7 @@ function OptionMenu({
             style={[floatedCardStyle(scheme, colors), { maxHeight: frame.maxHeight }]}
           >
             <GlassFill soft neutral />
+            <DialogGlass />
             <ScrollView
               bounces={false}
               style={{ flexGrow: 0, maxHeight: frame.maxHeight }}

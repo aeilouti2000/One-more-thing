@@ -32,7 +32,9 @@ import {
 } from "@/features/items/components/item-sheet-form";
 import { useCategories } from "@/features/items/providers/categories-provider";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
+import { KEEP_MOTION } from "@/lib/motion";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export type SelectionAction =
@@ -355,7 +357,12 @@ function ActionPager({
             withTiming(0, { duration: 320 }),
           ),
           3,
+          false,
+          undefined,
+          // The nudge is the only sign of a second page, so it stays with animations off.
+          KEEP_MOTION,
         ),
+        KEEP_MOTION,
       ),
     );
   }, [hint]);
@@ -506,8 +513,12 @@ function ChoiceRow({
 }) {
   const { colors, scheme } = useTheme();
   const { t, isRTL } = useI18n();
+  const motionOff = useMotionOff();
   return (
-    <Animated.View entering={FadeIn.duration(180)} style={styles.choices}>
+    <Animated.View
+      entering={motionOff ? undefined : FadeIn.duration(180)}
+      style={styles.choices}
+    >
       <Pressable
         disabled={disabled}
         onPress={onBack}

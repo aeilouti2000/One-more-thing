@@ -26,7 +26,9 @@ import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { useSetTabBarCenter } from "@/components/ui/TabBarVisibility";
 import { firstName } from "@/features/items/api/shop-locks";
 import { withAlpha } from "@/constants/theme";
+import { KEEP_MOTION } from "@/lib/motion";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 const FAB_SIZE = 56;
@@ -96,6 +98,7 @@ export function ItemsFab(props: Props) {
   const { t } = useI18n();
   const setCenter = useSetTabBarCenter();
   const focused = useIsFocused();
+  const motionOff = useMotionOff();
   const [open, setOpen] = useState(false);
   const dark = scheme === "dark";
 
@@ -148,8 +151,8 @@ export function ItemsFab(props: Props) {
 
   return (
     <Animated.View
-      entering={FadeIn.duration(hint ? 260 : 160)}
-      exiting={FadeOut.duration(MENU_OUT_MS)}
+      entering={motionOff ? undefined : FadeIn.duration(hint ? 260 : 160)}
+      exiting={motionOff ? undefined : FadeOut.duration(MENU_OUT_MS)}
       style={[StyleSheet.absoluteFill, { zIndex: 25 }]}
     >
       <Pressable
@@ -187,6 +190,7 @@ function ItemsFabCluster({
 }) {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const motionOff = useMotionOff();
 
   const turn = useSharedValue(open ? 1 : 0);
   // Arrow follows a swipe on the + a little, as a hint of what it does.
@@ -232,14 +236,24 @@ function ItemsFabCluster({
     flashed.current = true;
     // Ring blinks twice as the chip appears.
     pulse.set(0);
+    // KEEP_MOTION: the chip is information, so it shows with animations off too.
+    // Without it the whole sequence would be skipped and the count never seen.
     pulse.set(
       withDelay(
         COUNT_FLASH_DELAY_MS + 120,
-        withRepeat(withTiming(1, { duration: 900, easing: Easing.out(Easing.quad) }), 2, false),
+        withRepeat(
+          withTiming(1, { duration: 900, easing: Easing.out(Easing.quad) }),
+          2,
+          false,
+          undefined,
+          KEEP_MOTION,
+        ),
+        KEEP_MOTION,
       ),
     );
     flash.set(
       withSequence(
+        KEEP_MOTION,
         withDelay(COUNT_FLASH_DELAY_MS, withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) })),
         withDelay(COUNT_FLASH_HOLD_MS, withTiming(0, { duration: 320, easing: Easing.in(Easing.cubic) })),
       ),
@@ -274,6 +288,9 @@ function ItemsFabCluster({
         ),
         -1,
         false,
+        undefined,
+        // The hint teaches a gesture by showing it, so it keeps moving.
+        KEEP_MOTION,
       ),
     );
   }, [hand, hint]);
@@ -359,7 +376,10 @@ function ItemsFabCluster({
 
       {hint ? (
         <View pointerEvents="none" style={styles.hintWrap}>
-          <Animated.View entering={FadeIn.duration(260)} style={styles.hintInner}>
+          <Animated.View
+            entering={motionOff ? undefined : FadeIn.duration(260)}
+            style={styles.hintInner}
+          >
             <View style={[styles.hintBubble, { backgroundColor: colors.accent }]}>
               <AppText className="text-sm font-semibold" style={{ color: colors.onAccent }}>
                 {t("fabSwipeHint")}
@@ -398,7 +418,7 @@ function ItemsFabCluster({
             <View
               style={[
                 styles.countChip,
-                { borderColor: withAlpha(colors.accentText, 0.7), backgroundColor: colors.paper },
+                { borderColor: withAlpha(colors.accentText, 0.7), backgroundColor: colors.overlay },
               ]}
             >
               <Animated.View
@@ -473,7 +493,7 @@ function GhostPill({
           borderWidth: 1,
           borderStyle: "dashed",
           borderColor: withAlpha(colors.accentText, 0.8),
-          backgroundColor: withAlpha(colors.paper, 0.85),
+          backgroundColor: withAlpha(colors.overlay, 0.85),
         },
       ]}
     >

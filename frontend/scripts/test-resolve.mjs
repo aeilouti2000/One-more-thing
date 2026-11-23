@@ -7,8 +7,17 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
 
+// Native modules the tested code imports, replaced by small stand-ins.
+const stubs = {
+  "react-native": "scripts/test-stubs/react-native.mjs",
+  "expo-sqlite/localStorage/install": "scripts/test-stubs/local-storage.mjs",
+};
+
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (stubs[specifier]) {
+      return nextResolve(pathToFileURL(resolvePath(root, stubs[specifier])).href, context);
+    }
     let base = null;
     if (specifier.startsWith("@/")) {
       base = resolvePath(root, specifier.slice(2));

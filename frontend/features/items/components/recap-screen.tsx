@@ -21,6 +21,7 @@ import { summarizeRecap, type MonthRecap } from "@/features/items/utils/recap";
 import { shareNeededText } from "@/features/items/utils/share-list";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -47,6 +48,7 @@ function RecapBody() {
   const { user } = useAuth();
   const { t, locale, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
+  const motionOff = useMotionOff();
   const categoryLabel = useCategoryLabeler();
   const [shareError, setShareError] = useState<string | null>(null);
 
@@ -132,7 +134,7 @@ function RecapBody() {
         <View className="gap-3">
           {costs ? (
             <Animated.View
-              entering={FadeInDown.duration(260)}
+              entering={motionOff ? undefined : FadeInDown.duration(260)}
               className="rounded-3xl bg-cove-paper px-4 py-4"
             >
               <AppText className="text-sm text-cove-muted">{t("recapSpent")}</AppText>
@@ -148,7 +150,7 @@ function RecapBody() {
           ) : null}
 
           <Animated.View
-            entering={FadeInDown.duration(260).delay(costs ? 70 : 0)}
+            entering={motionOff ? undefined : FadeInDown.duration(260).delay(costs ? 70 : 0)}
             className="rounded-3xl bg-cove-paper px-4 py-1"
           >
             {rows.map((row, index) => (

@@ -1,21 +1,25 @@
 import "@/features/auth/utils/session-storage";
 import {
   DEFAULT_ACCENT,
+  DEFAULT_GLASS_FROST,
   DEFAULT_SURFACE_DEPTH,
+  normalizeGlassFrost,
   normalizeHex,
   normalizeSurfaceDepth,
+  type GlassFrost,
   type SurfaceDepth,
   type ThemeScheme,
 } from "@/constants/theme";
 
 /**
- * The user's own choice: "system" (follow the phone) until they pick light or
- * dark. A new key on purpose — the old one was written on every launch, so it
+ * The user's own choice: "system" (follow the phone) until they pick light,
+ * dark or glass. A new key on purpose — the old one was written on every launch, so it
  * can't tell a real choice from the old dark default.
  */
 const THEME_PREFERENCE_KEY = "one-more-thing.theme-preference";
 const THEME_ACCENT_STORAGE_KEY = "one-more-thing.theme-accent";
 const THEME_SURFACE_DEPTH_STORAGE_KEY = "one-more-thing.theme-surface-depth";
+const THEME_GLASS_FROST_STORAGE_KEY = "one-more-thing.theme-glass-frost";
 
 function storage() {
   try {
@@ -28,12 +32,13 @@ function storage() {
   return null;
 }
 
-export type ThemePreference = ThemeScheme | "system";
+/** "glass" is a third look, drawn on the dark scheme. */
+export type ThemePreference = ThemeScheme | "system" | "glass";
 
 export function readStoredThemePreference(): ThemePreference {
   try {
     const value = storage()?.getItem(THEME_PREFERENCE_KEY);
-    if (value === "light" || value === "dark") return value;
+    if (value === "light" || value === "dark" || value === "glass") return value;
     return "system";
   } catch {
     return "system";
@@ -83,5 +88,21 @@ export function writeStoredSurfaceDepth(depth: SurfaceDepth) {
     );
   } catch {
     // Keep the active in-memory depth when persistence is unavailable.
+  }
+}
+
+export function readStoredGlassFrost(): GlassFrost {
+  try {
+    return normalizeGlassFrost(storage()?.getItem(THEME_GLASS_FROST_STORAGE_KEY));
+  } catch {
+    return DEFAULT_GLASS_FROST;
+  }
+}
+
+export function writeStoredGlassFrost(frost: GlassFrost) {
+  try {
+    storage()?.setItem(THEME_GLASS_FROST_STORAGE_KEY, normalizeGlassFrost(frost));
+  } catch {
+    // Keep the active in-memory level when persistence is unavailable.
   }
 }

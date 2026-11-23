@@ -12,6 +12,7 @@ import { recapMonthToOffer, summarizeRecap } from "@/features/items/utils/recap"
 import { dismissRecap, recapDismissed } from "@/features/items/utils/recap-storage";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 
 /**
  * "Your October recap is ready": offered at the top of History for the first
@@ -21,6 +22,7 @@ export function RecapCard({ purchases, now }: { purchases: Purchase[]; now: numb
   const { household } = useHousehold();
   const { t, locale } = useI18n();
   const { colors } = useTheme();
+  const motionOff = useMotionOff();
   const homeId = household?.id ?? null;
   const month = household?.monthlyRecap === false ? null : recapMonthToOffer(new Date(now));
   // Closing it is remembered on the phone; this only hides it right away.
@@ -39,9 +41,9 @@ export function RecapCard({ purchases, now }: { purchases: Purchase[]; now: numb
 
   return (
     <Animated.View
-      entering={FadeIn.duration(220)}
-      exiting={FadeOut.duration(160)}
-      layout={LinearTransition.duration(200)}
+      entering={motionOff ? undefined : FadeIn.duration(220)}
+      exiting={motionOff ? undefined : FadeOut.duration(160)}
+      layout={motionOff ? undefined : LinearTransition.duration(200)}
       className="mb-3 flex-row items-center gap-3 rounded-3xl bg-cove-mist py-3 ps-4 pe-2"
     >
       <Pressable

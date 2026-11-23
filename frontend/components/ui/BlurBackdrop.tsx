@@ -3,6 +3,7 @@ import { createContext, useContext, useRef, type ReactNode, type RefObject } fro
 import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useTabBlurTarget } from "@/components/ui/TabBlurTarget";
 import { withAlpha } from "@/constants/theme";
+import { useWideLayout } from "@/hooks/use-wide-layout";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { ViewHandle } from "@/lib/native-refs";
 
@@ -33,13 +34,20 @@ function SolidFrost({
   style,
   soft = false,
   neutral = false,
+  floating = true,
 }: {
   style?: StyleProp<ViewStyle>;
   soft?: boolean;
   neutral?: boolean;
+  /**
+   * Over other content (a dialog, a dock): solid in every theme. False for a
+   * card that sits in the page, which is see-through in Glass like the rest.
+   */
+  floating?: boolean;
 }) {
   const { scheme, colors } = useTheme();
   const dark = scheme === "dark";
+  const surface = floating ? colors.overlay : colors.paper;
 
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
@@ -49,13 +57,13 @@ function SolidFrost({
           {
             backgroundColor: neutral
               ? dark
-                ? colors.paper
+                ? surface
                 : colors.white
               : soft
                 ? dark
-                  ? colors.paper
+                  ? surface
                   : "rgba(255, 255, 255, 0.96)"
-                : colors.paper,
+                : surface,
           },
         ]}
       />
@@ -160,7 +168,7 @@ export function GlassFill({
           StyleSheet.absoluteFill,
           {
             backgroundColor: neutral
-              ? withAlpha(dark ? colors.paper : colors.white, dark ? 0.88 : 0.92)
+              ? withAlpha(dark ? colors.overlay : colors.white, dark ? 0.88 : 0.92)
               : withAlpha(
                   colors.accentText,
                   soft ? (dark ? 0.06 : 0.08) : dark ? 0.22 : 0.24,
@@ -176,7 +184,7 @@ export function FrostedFill() {
   const { scheme } = useTheme();
 
   if (Platform.OS === "android") {
-    return <SolidFrost soft />;
+    return <SolidFrost soft floating={false} />;
   }
 
   return (
@@ -193,6 +201,47 @@ export function FrostedFill() {
         ]}
       />
     </>
+  );
+}
+
+/** Android 12 and newer can blur the page from a dialog's own window; older ones cannot. */
+const CAN_BLUR_FROM_DIALOG = Platform.OS === "android" && Number(Platform.Version) >= 31;
+
+/**
+ * Turns a dialog's surface into frosted glass in the glass theme: the page
+ * under the dialog shows through it, blurred. Put it first inside the
+ * surface (the view with the dialog's solid colour), and only in a dialog
+ * that has its own window (a Modal): a blur drawn inside the page it blurs
+ * crashes Android. A surface with rounded corners that does not clip its
+ * children passes the same corners as `style`.
+ *
+ * Renders nothing, leaving the solid surface, in the other themes, on
+ * Android 11 and older, and in the wide (unfolded) layout: two pages sit side
+ * by side there and only one of them can be blurred.
+ */
+export function DialogGlass({ style }: { style?: StyleProp<ViewStyle> }) {
+  const { colors, glass } = useTheme();
+  const screenTarget = useTabBlurTarget();
+  const wide = useWideLayout();
+  if (!glass || !CAN_BLUR_FROM_DIALOG || wide || !screenTarget) return null;
+
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.clip, style]}>
+      <BlurView
+        pointerEvents="none"
+        intensity={70}
+        tint="systemUltraThinMaterialDark"
+        blurReductionFactor={2}
+        blurMethod="dimezisBlurViewSdk31Plus"
+        blurTarget={screenTarget}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Enough of the dialog's own colour for its text to read on any page. */}
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(colors.overlay, 0.42) }]}
+      />
+    </View>
   );
 }
 
@@ -215,4 +264,5 @@ export function BlurBackdrop({ onPress, disabled = false }: BlurBackdropProps) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  clip: { overflow: "hidden" },
 });

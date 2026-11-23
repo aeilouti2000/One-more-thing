@@ -1,10 +1,12 @@
 import { api, ApiError } from "@/lib/api";
 import { formatAppError, isOfflineError } from "@/lib/errors";
+import { defineChange, hasPending, perform, type ChangeKind } from "@/features/offline/outbox";
+import { qk, readCache, writeCache } from "@/features/offline/query-client";
 import {
   readCachedHousehold,
   writeCachedHomes,
   writeCachedHousehold,
-} from "@/features/offline/profile-cache";
+} from "@/features/offline/saved";
 import type { CostSettings, HomeSummary, Household, TripSettings } from "@/features/homes/types/household";
 
 export function alreadyHasHome(message: string | null | undefined) {
@@ -37,8 +39,14 @@ function withCostDefaults(home: Household): Household {
 }
 
 export async function fetchMyHousehold(): Promise<Household | null> {
+  // A change to the home's options made on this phone is still waiting: the
+  // server's copy would not have it yet.
+  if (hasPending()) {
+    const cached = readCachedHousehold();
+    if (cached?.household) return cached.household;
+  }
   try {
-    // Caller (refresh / adoptHome) writes the profile cache after it commits the
+    // Caller (refresh / adoptHome) writes the saved copy after it commits the
     // result, so an in-flight GET cannot overwrite a newer adoptHome write.
     return withCostDefaults(await api.get<Household>("/homes/mine"));
   } catch (error) {
@@ -81,57 +89,97 @@ export async function joinHome(code: string) {
   }
 }
 
+const renameChange = defineChange<{ homeId: string; name: string }>("home.rename", (payload) =>
+  api.patch(`/homes/${payload.homeId}`, { name: payload.name }),
+);
+
+const costSettingsChange = defineChange<{ homeId: string; settings: Partial<CostSettings> }, Household>(
+  "home.costSettings",
+  (payload) => api.patch<Household>(`/homes/${payload.homeId}/cost-settings`, payload.settings),
+);
+
+const tripSettingsChange = defineChange<{ homeId: string; settings: Partial<TripSettings> }, Household>(
+  "home.tripSettings",
+  (payload) => api.patch<Household>(`/homes/${payload.homeId}/trip-settings`, payload.settings),
+);
+
+const notificationSettingsChange = defineChange<
+  { homeId: string; settings: { notificationsEnabled: boolean } },
+  Household
+>("home.notificationSettings", (payload) =>
+  api.patch<Household>(`/homes/${payload.homeId}/notification-settings`, payload.settings),
+);
+
+/** The home as saved on this phone, when it is the one being changed. */
+function savedHome(homeId: string) {
+  const home = readCache<Household | null>(qk.household());
+  return home && home.id === homeId ? home : null;
+}
+
 export async function updateHomeName(homeId: string, name: string) {
   const homeName = name.trim();
   if (!homeName) {
     return { error: formatAppError(new ApiError("Family name is required", "FAMILY_NAME_REQUIRED")) };
   }
 
-  try {
-    await api.patch(`/homes/${homeId}`, { name: homeName });
-    return { error: null };
-  } catch (error) {
-    return { error: formatAppError(error) };
+  const before = savedHome(homeId);
+  const homesBefore = readCache<HomeSummary[]>(qk.homes());
+  if (before) writeCache<Household | null>(qk.household(), { ...before, name: homeName });
+  writeCache<HomeSummary[]>(qk.homes(), (homes) =>
+    homes?.map((home) => (home.id === homeId ? { ...home, name: homeName } : home)),
+  );
+  const result = await perform(renameChange, { homeId, name: homeName }, {
+    action: "settings",
+    title: homeName,
+  });
+  if (result.error) {
+    if (before) writeCache<Household | null>(qk.household(), before);
+    if (homesBefore) writeCache<HomeSummary[]>(qk.homes(), homesBefore);
   }
+  return { error: result.error };
 }
 
-export async function updateCostSettings(homeId: string, settings: Partial<CostSettings>) {
-  try {
-    const home = withCostDefaults(
-      await api.patch<Household>(`/homes/${homeId}/cost-settings`, settings),
-    );
+/** A change to the home's options: on the phone at once, then sent. */
+async function changeSettings<S extends object>(
+  kind: ChangeKind<{ homeId: string; settings: S }, Household>,
+  homeId: string,
+  settings: S,
+) {
+  const before = savedHome(homeId);
+  const optimistic = before ? withCostDefaults({ ...before, ...settings }) : null;
+  if (optimistic) writeCachedHousehold(optimistic);
+  const result = await perform(kind, { homeId, settings }, { action: "settings" });
+  if (result.error) {
+    if (before) writeCachedHousehold(before);
+    return { home: null, error: result.error };
+  }
+  if (result.data) {
+    const home = withCostDefaults(result.data);
     writeCachedHousehold(home);
     return { home, error: null };
-  } catch (error) {
-    return { home: null, error: formatAppError(error) };
   }
+  // Waiting for a connection: the screen shows the choice already.
+  return { home: optimistic, error: optimistic ? null : formatAppError(null) };
 }
 
-export async function updateTripSettings(homeId: string, settings: Partial<TripSettings>) {
-  try {
-    const home = withCostDefaults(
-      await api.patch<Household>(`/homes/${homeId}/trip-settings`, settings),
-    );
-    writeCachedHousehold(home);
-    return { home, error: null };
-  } catch (error) {
-    return { home: null, error: formatAppError(error) };
-  }
+export function updateCostSettings(homeId: string, settings: Partial<CostSettings>) {
+  return changeSettings(costSettingsChange, homeId, settings);
 }
 
-export async function updateNotificationSettings(homeId: string, notificationsEnabled: boolean) {
-  try {
-    const home = withCostDefaults(
-      await api.patch<Household>(`/homes/${homeId}/notification-settings`, { notificationsEnabled }),
-    );
-    writeCachedHousehold(home);
-    return { home, error: null };
-  } catch (error) {
-    return { home: null, error: formatAppError(error) };
-  }
+export function updateTripSettings(homeId: string, settings: Partial<TripSettings>) {
+  return changeSettings(tripSettingsChange, homeId, settings);
+}
+
+export function updateNotificationSettings(homeId: string, notificationsEnabled: boolean) {
+  return changeSettings(notificationSettingsChange, homeId, { notificationsEnabled });
 }
 
 export async function fetchMyHomes() {
+  // A rename made on this phone is still waiting: keep showing it.
+  if (hasPending()) {
+    const cached = readCachedHousehold();
+    if (cached) return { homes: cached.homes, error: null, offline: false };
+  }
   try {
     const homes = await api.get<HomeSummary[]>("/homes");
     writeCachedHomes(homes);

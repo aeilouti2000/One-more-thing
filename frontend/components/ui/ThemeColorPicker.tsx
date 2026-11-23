@@ -15,6 +15,7 @@ import {
   DEFAULT_ACCENT,
   DEFAULT_SURFACE_DEPTH,
   getColors,
+  getGlassColors,
   hexToHsl,
   withAlpha,
 } from "@/constants/theme";
@@ -95,7 +96,10 @@ const THUMB = 22;
 
 export function ThemeColorPicker() {
   const { t } = useI18n();
-  const { accent, colors, scheme, setAccent, surfaceDepth, setSurfaceDepth } = useTheme();
+  const { accent, colors, glass, glassFrost, scheme, setAccent, surfaceDepth, setSurfaceDepth } =
+    useTheme();
+  // Surface depth darkens the dark theme's solid cards; glass has none.
+  const showsDepth = scheme === "dark" && !glass;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Hsv>(() => hexToHsv(accent));
   const [draftAccent, setDraftAccent] = useState(accent);
@@ -111,8 +115,11 @@ export function ThemeColorPicker() {
 
   const draftHex = useMemo(() => hsvToHex(draft), [draft]);
   const draftPalette = useMemo(
-    () => getColors(scheme, draftHex, surfaceDepth),
-    [scheme, draftHex, surfaceDepth],
+    () =>
+      glass
+        ? getGlassColors(draftHex, glassFrost)
+        : getColors(scheme, draftHex, surfaceDepth),
+    [glass, glassFrost, scheme, draftHex, surfaceDepth],
   );
   const pureHue = useMemo(() => hsvToHex({ h: draft.h, s: 1, v: 1 }), [draft.h]);
   const dirty = draftHex.toUpperCase() !== accent.toUpperCase();
@@ -321,7 +328,7 @@ export function ThemeColorPicker() {
         ) : null}
       </View>
 
-      {scheme === "dark" ? (
+      {showsDepth ? (
         <View className="mt-5">
           <AppText className="text-sm font-medium text-cove-muted">{t("surfaceDepth")}</AppText>
           <AppText className="mt-1 text-sm text-cove-muted">{t("surfaceDepthBody")}</AppText>
@@ -454,7 +461,7 @@ export function ThemeColorPicker() {
             </View>
           </View>
 
-          {scheme === "dark" ? (
+          {showsDepth ? (
             <View className="mt-4">
               <AppText className="mb-2 text-sm font-medium text-cove-muted">
                 {t("surfaceDepth")}

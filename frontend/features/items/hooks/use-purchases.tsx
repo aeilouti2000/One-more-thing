@@ -8,13 +8,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import { Alert } from "react-native";
 import {
   addItem as insertItem,
-  trackUnsavedItem,
+  cachedItems,
   deleteItems,
   moveItems,
+  putItem,
   reorderItems,
   fetchHomeItems,
   markItemBought,
@@ -39,7 +41,6 @@ import {
   type UpdateItemInput,
 } from "@/features/items/api/items";
 import { translate } from "@/constants/i18n";
-import { createWakeRetry } from "@/lib/wake-retry";
 import {
   emitListChanged,
   onListChanged,
@@ -47,13 +48,14 @@ import {
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 import { maybeAskForPush } from "@/features/notifications/api/push";
-import { readCachedItems, writeCachedItems } from "@/features/offline/profile-cache";
+import { newId } from "@/features/offline/ids";
+import { qk, queryClient } from "@/features/offline/query-client";
 import type {
   Purchase,
   PurchaseCategory,
-  PurchaseStatus,
 } from "@/features/items/types/purchase";
 import { normalizeName } from "@/features/items/utils/insights";
+import { changedDetails } from "@/features/items/utils/optimistic";
 import { latestInvoiceThisMonth } from "@/features/items/utils/trips";
 
 type AddItemValues = Omit<NewItemInput, "homeId" | "userId"> & {
@@ -166,219 +168,104 @@ function toEntries(entries: BoughtCostEntry[] | string[]): BoughtCostEntry[] {
   return entries as BoughtCostEntry[];
 }
 
+const NO_ITEMS: Purchase[] = [];
+type Result = { error: string | null };
+
+/**
+ * The home's items for every screen. The list itself lives in the TanStack
+ * Query cache (saved on the phone); this provider reads it from there and
+ * turns each action into a change that is shown at once and sent now or, with
+ * no internet, when the connection returns (see features/offline/outbox).
+ */
 export function PurchasesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { household, isLoading: isHomeLoading } = useHousehold();
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const inflightRef = useRef<Promise<void> | null>(null);
-  const wantedRef = useRef(0);
-  const revision = useRef(0);
-  const pendingWrites = useRef(0);
-  const refreshAfterWrites = useRef(false);
-  /** The last server answer put on screen, to recognise an identical one. */
-  const lastApplied = useRef<{ homeId: string; revision: number; payload: string } | null>(null);
-  const refreshRef = useRef<() => unknown>(() => undefined);
-  const [wakeRetry] = useState(createWakeRetry);
   const homeId = household?.id ?? null;
   const homeIdRef = useRef(homeId);
-  const purchasesRef = useRef(purchases);
+  const [error, setError] = useState<string | null>(null);
+  /** The home whose first load has ended (with data or with an error). */
+  const [loadedHome, setLoadedHome] = useState<string | null>(null);
   const [trackedHomeId, setTrackedHomeId] = useState(homeId);
+  const inflight = useRef<{ homeId: string; run: Promise<void> } | null>(null);
+  const again = useRef(false);
 
   useEffect(() => {
     homeIdRef.current = homeId;
   }, [homeId]);
 
-  useEffect(() => {
-    purchasesRef.current = purchases;
-  }, [purchases]);
-
   if (homeId !== trackedHomeId) {
     setTrackedHomeId(homeId);
     setError(null);
-    if (!homeId) {
-      setPurchases([]);
-      setIsLoading(false);
-    } else {
-      const cached = readCachedItems(homeId);
-      setPurchases(cached ?? []);
-      setIsLoading(cached === null);
-    }
   }
 
-  const rememberItems = useCallback((items: Purchase[]) => {
+  // Only a window onto the saved copy: loading is done by refresh() below,
+  // which also keeps a change in progress from being overwritten.
+  const { data } = useQuery<Purchase[]>(
+    {
+      queryKey: qk.items(homeId ?? "none"),
+      queryFn: () => cachedItems(homeId ?? "none") ?? NO_ITEMS,
+      enabled: false,
+    },
+    queryClient,
+  );
+  const purchases = homeId ? (data ?? NO_ITEMS) : NO_ITEMS;
+  const isLoading = Boolean(homeId) && data === undefined && loadedHome !== homeId;
+
+  /** The list as it is this instant (also right after a change, before a render). */
+  const current = useCallback(() => {
     const activeHome = homeIdRef.current;
-    if (!activeHome) return;
-    // A photo still uploading only exists on this phone for now.
-    writeCachedItems(
-      activeHome,
-      items.map((item) => {
-        if (!item.localImageUri && !item.photoUploading) return item;
-        const { localImageUri: _local, photoUploading: _busy, ...rest } = item;
-        return rest;
-      }),
-    );
+    return (activeHome ? cachedItems(activeHome) : undefined) ?? NO_ITEMS;
   }, []);
 
-  /** Changes rows on screen and in the offline copy, from the same new list. */
-  const applyAndRemember = useCallback(
-    (change: (item: Purchase) => Purchase) => {
-      setPurchases((current) => current.map(change));
-      // The ref still holds the list from before this update.
-      rememberItems(purchasesRef.current.map(change));
-    },
-    [rememberItems],
-  );
-
   const refresh = useCallback(() => {
-    wantedRef.current += 1;
-    if (inflightRef.current) return inflightRef.current;
-
-    const slot: { current: Promise<void> | null } = { current: null };
-    const run = (async () => {
-      // Callers in the same turn share this fetch. A later call still runs again.
-      await Promise.resolve();
-      try {
-        while (true) {
-          const ticket = wantedRef.current;
-          const seen = revision.current;
-          const activeHome = homeIdRef.current ?? homeId;
-          if (!activeHome) {
-            if (wantedRef.current !== ticket) continue;
-            setPurchases([]);
-            setError(null);
-            setIsLoading(false);
-          } else {
-            const { items, error: fetchError, offline } =
-              await fetchHomeItems(activeHome);
-            if (homeIdRef.current !== activeHome) {
-              // Signed out or left the home meanwhile: nothing left to load.
-              if (!homeIdRef.current) break;
-              continue;
-            }
-            if (pendingWrites.current > 0) {
-              // A write is still on its way; its result must not be overwritten.
-              // Run again once it lands, so a failed write is still rolled back.
-              refreshAfterWrites.current = true;
-              setIsLoading(false);
-              break;
-            }
-            if (revision.current !== seen || wantedRef.current !== ticket)
-              continue;
-            // Showing the saved copy: keep asking until the server has woken.
-            if (offline) wakeRetry.stale();
-            else wakeRetry.fresh();
-            if (fetchError) {
-              // Keep what is on screen: one failed request (a busy server, a
-              // dropped connection) must not look like an empty list.
-              setError(fetchError);
-            } else {
-              // The trip screen asks every few seconds. When the server's
-              // answer is the one already on screen (and nothing changed here
-              // since), skip the re-render and the write to the phone's cache.
-              const payload = JSON.stringify(items);
-              const last = lastApplied.current;
-              const unchanged =
-                last !== null &&
-                last.homeId === activeHome &&
-                last.revision === revision.current &&
-                last.payload === payload;
-              if (!unchanged) {
-                setPurchases((current) => keepLocalPhotos(items, current));
-                writeCachedItems(activeHome, items);
-                lastApplied.current = { homeId: activeHome, revision: revision.current, payload };
-              }
-              setError(null);
-            }
-            setIsLoading(false);
-          }
-          if (wantedRef.current !== ticket || homeIdRef.current !== activeHome)
-            continue;
-          break;
-        }
-      } finally {
-        if (inflightRef.current === slot.current) inflightRef.current = null;
-      }
-    })();
-
-    slot.current = run;
-    inflightRef.current = run;
+    const activeHome = homeIdRef.current;
+    if (!activeHome) return Promise.resolve();
+    if (inflight.current?.homeId === activeHome) {
+      // Callers share the load in progress; one more runs after it.
+      again.current = true;
+      return inflight.current.run;
+    }
+    const run: Promise<void> = (async () => {
+      do {
+        again.current = false;
+        const result = await fetchHomeItems(activeHome);
+        // Signed out or switched home meanwhile: nothing to show for this one.
+        if (homeIdRef.current !== activeHome) return;
+        // Keep what is on screen: one failed request (a busy server, a dropped
+        // connection) must not look like an empty list.
+        setError(result.error);
+        setLoadedHome(activeHome);
+      } while (again.current);
+    })().finally(() => {
+      if (inflight.current?.run === run) inflight.current = null;
+    });
+    inflight.current = { homeId: activeHome, run };
     return run;
-  }, [homeId]);
+  }, []);
 
+  // Another screen changed the list, a waiting change was sent, or the
+  // connection came back: load the server's version.
   useEffect(() => onListChanged(() => void refresh()), [refresh]);
 
-  useEffect(() => {
-    refreshRef.current = refresh;
-    wakeRetry.setRun(refresh);
-  }, [refresh, wakeRetry]);
-  // Another home, signed out, or the provider is gone: nothing to ask again for.
-  useEffect(() => () => wakeRetry.cancel(), [homeId, wakeRetry]);
-
-  const noteLocalChange = useCallback(() => {
-    revision.current += 1;
-    pendingWrites.current += 1;
-    let closed = false;
-    return () => {
-      if (closed) return;
-      closed = true;
-      // A fetch that started before this write finished may predate it.
-      revision.current += 1;
-      pendingWrites.current = Math.max(0, pendingWrites.current - 1);
-      if (pendingWrites.current === 0 && refreshAfterWrites.current) {
-        refreshAfterWrites.current = false;
-        void refresh();
-      }
-    };
-  }, [refresh]);
+  /** After a refused change the screen goes back to what the server has. */
+  const settle = useCallback(
+    async (result: Result, changed = true): Promise<Result> => {
+      if (result.error) await refresh();
+      else if (changed) emitListChanged();
+      return { error: result.error };
+    },
+    [refresh],
+  );
 
   const setItemPhoto = useCallback(
     async (id: string, photo: PickedPhoto | null) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
-      const previous = purchasesRef.current.find((item) => item.id === id);
-      setPurchases((current) =>
-        current.map((item) =>
-          item.id === id
-            ? photo
-              ? { ...item, localImageUri: photo.uri, photoUploading: true }
-              : { ...item, imageId: null, localImageUri: undefined }
-            : item,
-        ),
-      );
-      let result: { item: Purchase | null; error: string | null };
-      try {
-        result = photo ? await uploadItemImage(id, photo) : await removeItemImage(id);
-      } finally {
-        endLocalChange();
-      }
-      if (result.error || !result.item) {
-        setPurchases((current) =>
-          current.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  imageId: previous?.imageId ?? null,
-                  localImageUri: undefined,
-                  photoUploading: false,
-                }
-              : item,
-          ),
-        );
-        return { error: result.error ?? translate("errorGeneric") };
-      }
-      const imageId = result.item.imageId ?? null;
-      // Keep showing the local file while it is the same photo the server has
-      // (see keepLocalPhotos), so the thumbnail doesn't blink after upload.
-      const withId = (item: Purchase) =>
-        item.id === id ? { ...item, imageId, photoUploading: false } : item;
-      setPurchases((current) => current.map(withId));
-      rememberItems(purchasesRef.current.map(withId));
+      const result = photo ? await uploadItemImage(id, photo) : await removeItemImage(id);
+      if (result.error) return { error: result.error };
       emitListChanged();
       return { error: null };
     },
-    [noteLocalChange, rememberItems, user],
+    [user],
   );
 
   const addItem = useCallback(
@@ -393,7 +280,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       // from a suggestion, a pin's "add now") brings that one back instead of
       // making a twin that would be joined by the parked one on its day.
       const wantedName = normalizeName(values.name);
-      const parked = purchasesRef.current.find(
+      const parked = current().find(
         (item) =>
           item.status === "needed" &&
           Boolean(item.laterAt) &&
@@ -401,136 +288,57 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
           normalizeName(item.name) === wantedName,
       );
       if (parked) {
-        const endParkedChange = noteLocalChange();
-        const back = (item: Purchase) =>
-          item.id === parked.id ? { ...item, laterAt: undefined, laterUntil: undefined } : item;
-        setPurchases((current) => current.map(back));
-        let restored: { error: string | null };
-        try {
-          restored = await clearItemsLater([parked.id]);
-        } finally {
-          endParkedChange();
-        }
-        if (restored.error) {
-          await refresh();
-          return { error: restored.error };
-        }
-        rememberItems(purchasesRef.current.map(back));
-        emitListChanged();
+        const restored = await settle(await clearItemsLater([parked.id]));
+        if (restored.error) return { error: restored.error };
         return { error: null, restored: true };
       }
 
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-      const optimistic: Purchase = {
-        id: tempId,
-        name: values.name.trim(),
-        quantity: values.quantity,
-        unit: values.unit?.trim() || undefined,
-        category: values.category,
-        notes: values.notes?.trim() || undefined,
-        status: "needed",
-        urgent: values.urgent === true,
-        cost: null,
-        localImageUri: values.photo?.uri,
-        photoUploading: Boolean(values.photo),
-        listId: values.listId,
-        addedByName: user.name,
-        addedById: user.id,
-        createdAt: new Date().toISOString(),
-      };
-
-      const endLocalChange = noteLocalChange();
-      setPurchases((current) => placeNeededLocally(current, optimistic));
-
       const { photo, ...fields } = values;
-      let result: { item: Purchase | null; error: string | null };
-      try {
-        const saving = insertItem({
-          ...fields,
-          homeId: household.id,
-          userId: user.id,
-        });
-        // Anything done to the row before it is saved waits for its real id.
-        trackUnsavedItem(
-          tempId,
-          saving.then((saved) => saved.item?.id ?? null),
-        );
-        result = await saving;
-      } finally {
-        endLocalChange();
-      }
-
+      const id = newId();
+      const result = await insertItem({
+        ...fields,
+        id,
+        homeId: household.id,
+        userId: user.id,
+        addedByName: user.name,
+        // The row shows the picked photo while it uploads.
+        localImageUri: photo?.uri,
+      });
       if (result.error) {
-        setPurchases((current) => current.filter((item) => item.id !== tempId));
         await refresh();
         return { error: result.error };
       }
-
-      if (result.item) {
-        const created: Purchase = photo
-          ? { ...result.item, localImageUri: photo.uri, photoUploading: true }
-          : result.item;
-        setPurchases((current) =>
-          current.map((item) => (item.id === tempId ? created : item)),
-        );
-        if (photo) {
-          // The sheet closes now; the row shows the local photo while it uploads.
-          void setItemPhoto(created.id, photo).then((upload) => {
-            if (upload.error) Alert.alert(translate("itemPhoto"), upload.error);
-          });
-        }
-        rememberItems(
-          purchasesRef.current.map((item) =>
-            item.id === tempId ? created : item,
-          ),
-        );
-      } else {
-        emitListChanged();
+      if (photo) {
+        // The sheet closes now; the upload follows the item (also offline).
+        void setItemPhoto(id, photo).then((upload) => {
+          if (upload.error) Alert.alert(translate("itemPhoto"), upload.error);
+        });
       }
       // A shared list is when alerts start to matter: ask once, softly.
       if (household.members.length > 1) void maybeAskForPush();
       return { error: null };
     },
-    [household, noteLocalChange, refresh, rememberItems, setItemPhoto, user],
+    [current, household, refresh, setItemPhoto, settle, user],
   );
 
   const invoiceFor = useCallback(
     (itemId: string | undefined, options?: BuyOptions) => {
       if (!itemId || !options?.joinInvoice) return null;
       if (household?.costsEnabled !== true || household.tripCostMode !== "total") return null;
-      const item = purchasesRef.current.find((entry) => entry.id === itemId);
+      const items = current();
+      const item = items.find((entry) => entry.id === itemId);
       if (!item) return null;
       // Same list only, so an invoice stays one shop's trip for that list.
-      return latestInvoiceThisMonth(purchasesRef.current, new Date(), item.listId ?? null);
+      return latestInvoiceThisMonth(items, new Date(), item.listId ?? null);
     },
-    [household],
+    [current, household],
   );
 
   const markBought = useCallback(
     async (id: string, cost?: number | null, options?: BuyOptions) => {
       if (!user) return { error: translate("errorNeedLogin") };
       const receiptId = invoiceFor(id, options);
-      const endLocalChange = noteLocalChange();
-      const boughtAt = new Date().toISOString();
-      setPurchases((current) =>
-        current.map((item) =>
-          item.id === id && item.status === "needed"
-            ? {
-                ...item,
-                status: "bought",
-                urgent: false,
-                boughtAt,
-                cost: cost ?? null,
-              }
-            : item,
-        ),
-      );
-      let result: Awaited<ReturnType<typeof markItemBought>>;
-      try {
-        result = await markItemBought(id, cost, receiptId);
-      } finally {
-        endLocalChange();
-      }
+      const result = await markItemBought(id, cost, receiptId);
       if (result.error) {
         await refresh();
         return { error: result.error };
@@ -541,147 +349,64 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         server && server.boughtById && server.boughtById !== user.id
           ? (server.boughtByName ?? translate("partner"))
           : null;
-      if (takenBy && server) {
-        setPurchases((current) => current.map((item) => (item.id === id ? server : item)));
-      }
+      if (takenBy && server) putItem(server);
       // Joining an invoice changes its total and name on the server: reload.
       if (receiptId || takenBy) await refresh();
-      else {
-        applyAndRemember((item) =>
-          item.id === id && server?.boughtById
-            ? { ...item, boughtById: server.boughtById }
-            : item,
-        );
-      }
       return { error: null, takenBy };
     },
-    [invoiceFor, noteLocalChange, refresh, rememberItems, user],
+    [invoiceFor, refresh, user],
   );
 
   const setNotFound = useCallback(
     async (id: string, notFound: boolean) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
-      const notFoundAt = new Date().toISOString();
-      setPurchases((current) =>
-        current.map((item) =>
-          item.id === id && item.status === "needed"
-            ? notFound
-              ? { ...item, notFoundAt, notFoundById: user.id, notFoundByName: user.name ?? undefined }
-              : { ...item, notFoundAt: undefined, notFoundById: undefined, notFoundByName: undefined }
-            : item,
-        ),
-      );
-      let result: Awaited<ReturnType<typeof setItemNotFound>>;
-      try {
-        result = await setItemNotFound(id, notFound);
-      } finally {
-        endLocalChange();
-      }
-      if (result.error) {
-        await refresh();
-        return { error: result.error };
-      }
-      const server = result.item;
-      applyAndRemember((item) => (server && item.id === id ? server : item));
-      emitListChanged();
-      return { error: null };
+      const result = await setItemNotFound(id, notFound);
+      if (result.item) putItem(result.item);
+      return settle(result);
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [settle, user],
   );
 
   const updateItem = useCallback(
     async (id: string, values: UpdateItemInput) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
-      const previous = purchasesRef.current.find((item) => item.id === id);
+      const previous = current().find((item) => item.id === id);
       const becameUrgent =
         !!previous &&
         !previous.urgent &&
         values.urgent === true &&
         previous.status === "needed";
-
-      setPurchases((current) =>
-        current.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                name: values.name,
-                quantity: values.quantity,
-                category: values.category,
-                urgent: values.urgent === true,
-                notes: values.notes ?? item.notes,
-                unit:
-                  typeof values.unit === "string"
-                    ? values.unit.trim() || undefined
-                    : item.unit,
-              }
-            : item,
-        ),
-      );
-
-      let result: { error: string | null };
-      try {
-        result = await updateItemDetails(id, values);
-      } finally {
-        endLocalChange();
-      }
-      if (result.error) await refresh();
-      else {
-        rememberItems(purchasesRef.current);
-        if (becameUrgent) emitListChanged();
-      }
-      return result;
+      // Only what changed is sent, so a partner's edit of another field stays.
+      const result = await updateItemDetails(id, changedDetails(previous, values));
+      return settle(result, becameUrgent);
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [current, settle, user],
   );
 
   const updateCost = useCallback(
     async (id: string, cost: number | null) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const onInvoice = Boolean(purchasesRef.current.find((item) => item.id === id)?.receiptId);
-      const endLocalChange = noteLocalChange();
-      setPurchases((current) =>
-        current.map((item) => (item.id === id ? { ...item, cost } : item)),
-      );
-      let result: { error: string | null };
-      try {
-        result = await updateItemCost(id, cost);
-      } finally {
-        endLocalChange();
-      }
+      const onInvoice = Boolean(current().find((item) => item.id === id)?.receiptId);
+      const result = await updateItemCost(id, cost);
       // Its price is part of the invoice total, which the server just changed.
       if (result.error || onInvoice) await refresh();
-      else rememberItems(purchasesRef.current);
-      return result;
+      return { error: result.error };
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [current, refresh, user],
   );
 
   const saveTripTotal = useCallback(
     async (input: { total: number; itemIds: string[]; listId?: string | null }) => {
       const currentHomeId = homeIdRef.current;
       if (!user || !currentHomeId) return { error: translate("errorNeedLogin"), receiptId: null };
-      const endLocalChange = noteLocalChange();
-      let result: Awaited<ReturnType<typeof createTripReceipt>>;
-      try {
-        result = await createTripReceipt(currentHomeId, input);
-      } finally {
-        endLocalChange();
-      }
+      const result = await createTripReceipt(currentHomeId, input);
       if (result.error || !result.receipt) {
+        await refresh();
         return { error: result.error ?? translate("errorGeneric"), receiptId: null };
       }
-      const receipt = result.receipt;
-      const ids = new Set(input.itemIds);
-      applyAndRemember((item) =>
-        ids.has(item.id)
-          ? { ...item, receiptId: receipt.id, receiptTotal: Number(receipt.total) }
-          : item,
-      );
-      return { error: null, receiptId: receipt.id };
+      return { error: null, receiptId: result.receipt.id };
     },
-    [noteLocalChange, rememberItems, user],
+    [refresh, user],
   );
 
   const ensureInvoice = useCallback(
@@ -713,17 +438,11 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       name: string,
     ) => {
       if (!user) return { error: translate("errorNeedLogin"), receiptId: null };
-      const endLocalChange = noteLocalChange();
-      let result: { error: string | null; receiptId: string | null };
-      try {
-        result = await ensureInvoice(trip, name);
-      } finally {
-        endLocalChange();
-      }
+      const result = await ensureInvoice(trip, name);
       await refresh();
       return result;
     },
-    [ensureInvoice, noteLocalChange, refresh, user],
+    [ensureInvoice, refresh, user],
   );
 
   const moveToTrip = useCallback(
@@ -732,90 +451,43 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       trip: { receiptId: string | null; itemIds: string[]; listId?: string | null },
     ) => {
       if (!user) return { error: translate("errorNeedLogin"), receiptId: null };
-      const endLocalChange = noteLocalChange();
-      let result: { error: string | null; receiptId: string | null };
-      try {
-        // A trip without an invoice gets one first, so the item has somewhere to go.
-        result = await ensureInvoice(trip);
-        if (!result.error && result.receiptId) {
-          const moved = await moveItemToReceipt(itemId, result.receiptId);
-          result = { error: moved.error, receiptId: result.receiptId };
-        }
-      } finally {
-        endLocalChange();
+      // A trip without an invoice gets one first, so the item has somewhere to go.
+      let result = await ensureInvoice(trip);
+      if (!result.error && result.receiptId) {
+        const moved = await moveItemToReceipt(itemId, result.receiptId);
+        result = { error: moved.error, receiptId: result.receiptId };
       }
       await refresh();
       return result;
     },
-    [ensureInvoice, noteLocalChange, refresh, user],
+    [ensureInvoice, refresh, user],
   );
 
   const updateCosts = useCallback(
     async (entries: { id: string; cost: number | null }[]) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
-      const costs = new Map(entries.map((entry) => [entry.id, entry.cost]));
-      setPurchases((current) =>
-        current.map((item) =>
-          costs.has(item.id) ? { ...item, cost: costs.get(item.id) } : item,
-        ),
+      const results = await Promise.all(
+        entries.map((entry) => updateItemCost(entry.id, entry.cost)),
       );
-      let failed: { error: string | null } | undefined;
-      try {
-        const results = await Promise.all(
-          entries.map((entry) => updateItemCost(entry.id, entry.cost)),
-        );
-        failed = results.find((result) => result.error);
-      } finally {
-        endLocalChange();
-      }
+      const failed = results.find((result) => result.error);
       if (failed?.error) {
         await refresh();
         return { error: failed.error };
       }
-      rememberItems(purchasesRef.current);
       return { error: null };
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [refresh, user],
   );
 
   const undoBought = useCallback(
     async (id: string, options?: { onlyMine?: boolean }) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const onInvoice = Boolean(purchasesRef.current.find((item) => item.id === id)?.receiptId);
-      const endLocalChange = noteLocalChange();
-      setPurchases((current) =>
-        current.map((item) =>
-          item.id === id && item.status === "bought"
-            ? {
-                ...item,
-                status: "needed",
-                boughtAt: undefined,
-                boughtById: undefined,
-                boughtByName: undefined,
-                cost: null,
-                receiptId: null,
-                receiptTotal: null,
-                receiptName: null,
-              }
-            : item,
-        ),
-      );
-      let result: { error: string | null };
-      try {
-        result = await undoItemBought(id, options);
-      } finally {
-        endLocalChange();
-      }
-      if (result.error) await refresh();
-      else {
-        if (onInvoice) await refresh();
-        else rememberItems(purchasesRef.current);
-        emitListChanged();
-      }
-      return result;
+      const onInvoice = Boolean(current().find((item) => item.id === id)?.receiptId);
+      const result = await undoItemBought(id, options);
+      if (!result.error && onInvoice) await refresh();
+      return settle(result);
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [current, refresh, settle, user],
   );
 
   const markManyBought = useCallback(
@@ -823,209 +495,75 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       if (!user) return { error: translate("errorNeedLogin") };
       const prepared = toEntries(entries);
       const receiptId = invoiceFor(prepared[0]?.id, options);
-      const endLocalChange = noteLocalChange();
-      const costs = new Map(
-        prepared.map((entry) => [entry.id, entry.cost ?? null]),
-      );
-      const boughtAt = new Date().toISOString();
-      setPurchases((current) =>
-        current.map((item) =>
-          costs.has(item.id) && item.status === "needed"
-            ? {
-                ...item,
-                status: "bought",
-                urgent: false,
-                boughtAt,
-                cost: costs.get(item.id) ?? null,
-              }
-            : item,
-        ),
-      );
-      let result: { error: string | null };
-      try {
-        result = await markItemsBought(prepared, receiptId);
-      } finally {
-        endLocalChange();
-      }
+      const result = await markItemsBought(prepared, receiptId);
       if (result.error || receiptId) await refresh();
-      else rememberItems(purchasesRef.current);
-      return result;
+      return { error: result.error };
     },
-    [invoiceFor, noteLocalChange, refresh, rememberItems, user],
+    [invoiceFor, refresh, user],
   );
 
   const deleteMany = useCallback(
     async (ids: string[]) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
-      const removing = new Set(ids);
-      setPurchases((current) =>
-        current.filter((item) => !removing.has(item.id)),
-      );
-      let result: { error: string | null };
-      try {
-        result = await deleteItems(ids);
-      } finally {
-        endLocalChange();
-      }
-      if (result.error) await refresh();
-      else rememberItems(purchasesRef.current);
-      return result;
+      return settle(await deleteItems(ids), false);
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [settle, user],
   );
 
   const moveMany = useCallback(
     async (ids: string[], listId: string) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
-      const moving = new Set(ids);
-      setPurchases((current) =>
-        current.map((item) =>
-          moving.has(item.id) ? { ...item, listId } : item,
-        ),
-      );
-      let result: { error: string | null };
-      try {
-        result = await moveItems(ids, listId);
-      } finally {
-        endLocalChange();
-      }
-      if (result.error) await refresh();
-      else {
-        rememberItems(purchasesRef.current);
-        emitListChanged();
-      }
-      return result;
+      return settle(await moveItems(ids, listId));
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [settle, user],
   );
 
   const setManyUrgent = useCallback(
     async (ids: string[], urgent: boolean) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
-      const selected = new Set(ids);
-      setPurchases((current) =>
-        current.map((item) =>
-          selected.has(item.id) && item.status === "needed"
-            ? { ...item, urgent }
-            : item,
-        ),
-      );
-      let result: { error: string | null };
-      try {
-        result = await setItemsUrgent(ids, urgent);
-      } finally {
-        endLocalChange();
-      }
-      if (result.error) await refresh();
-      else {
-        rememberItems(purchasesRef.current);
-        emitListChanged();
-      }
-      return result;
+      return settle(await setItemsUrgent(ids, urgent));
     },
-    [noteLocalChange, refresh, rememberItems, user],
-  );
-
-  /** Change one field on many needed items: shown at once, undone by a refresh if the save fails. */
-  const patchManyNeeded = useCallback(
-    async (
-      ids: string[],
-      patch: Partial<Purchase>,
-      save: () => Promise<{ error: string | null }>,
-    ) => {
-      if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
-      const selected = new Set(ids);
-      setPurchases((current) =>
-        current.map((item) =>
-          selected.has(item.id) && item.status === "needed"
-            ? { ...item, ...patch }
-            : item,
-        ),
-      );
-      let result: { error: string | null };
-      try {
-        result = await save();
-      } finally {
-        endLocalChange();
-      }
-      if (result.error) await refresh();
-      else {
-        rememberItems(purchasesRef.current);
-        emitListChanged();
-      }
-      return result;
-    },
-    [noteLocalChange, refresh, rememberItems, user],
+    [settle, user],
   );
 
   const setManyCategory = useCallback(
-    (ids: string[], category: PurchaseCategory) =>
-      patchManyNeeded(ids, { category }, () => setItemsCategory(ids, category)),
-    [patchManyNeeded],
+    async (ids: string[], category: PurchaseCategory) => {
+      if (!user) return { error: translate("errorNeedLogin") };
+      return settle(await setItemsCategory(ids, category));
+    },
+    [settle, user],
   );
 
   const setManyUnit = useCallback(
-    (ids: string[], unit: string) => {
-      const value = unit.trim();
-      return patchManyNeeded(ids, { unit: value || undefined }, () =>
-        setItemsUnit(ids, value),
-      );
+    async (ids: string[], unit: string) => {
+      if (!user) return { error: translate("errorNeedLogin") };
+      return settle(await setItemsUnit(ids, unit));
     },
-    [patchManyNeeded],
+    [settle, user],
   );
 
   const setManyLater = useCallback(
-    (ids: string[], until: Date | null) => {
-      const laterUntil = until ? until.toISOString() : undefined;
-      return patchManyNeeded(ids, { laterAt: new Date().toISOString(), laterUntil }, () =>
-        setItemsLater(ids, laterUntil ?? null),
-      );
+    async (ids: string[], until: Date | null) => {
+      if (!user) return { error: translate("errorNeedLogin") };
+      return settle(await setItemsLater(ids, until ? until.toISOString() : null));
     },
-    [patchManyNeeded],
+    [settle, user],
   );
 
   const bringBackMany = useCallback(
-    (ids: string[]) =>
-      patchManyNeeded(ids, { laterAt: undefined, laterUntil: undefined }, () =>
-        clearItemsLater(ids),
-      ),
-    [patchManyNeeded],
+    async (ids: string[]) => {
+      if (!user) return { error: translate("errorNeedLogin") };
+      return settle(await clearItemsLater(ids));
+    },
+    [settle, user],
   );
 
   const reorderNeeded = useCallback(
     async (ids: string[]) => {
       if (!user) return { error: translate("errorNeedLogin") };
-      const endLocalChange = noteLocalChange();
-
-      setPurchases((current) => {
-        const neededRows = current.filter((item) => item.status === "needed");
-        const boughtRows = current.filter((item) => item.status === "bought");
-        const byId = new Map(neededRows.map((item) => [item.id, item]));
-        const moving = new Set(ids);
-        const queue = ids.filter((id) => byId.has(id));
-        const nextNeeded = neededRows.map((item) => {
-          if (!moving.has(item.id)) return item;
-          const id = queue.shift();
-          return (id && byId.get(id)) || item;
-        });
-        return [...nextNeeded, ...boughtRows];
-      });
-
-      let result: { error: string | null };
-      try {
-        result = await reorderItems(ids);
-      } finally {
-        endLocalChange();
-      }
-      if (result.error) await refresh();
-      else rememberItems(purchasesRef.current);
-      return result;
+      return settle(await reorderItems(ids), false);
     },
-    [noteLocalChange, refresh, rememberItems, user],
+    [settle, user],
   );
 
   const needed = useMemo(
@@ -1146,39 +684,4 @@ export function usePurchases(): UsePurchasesResult {
   }
 
   return value;
-}
-
-/**
- * A photo picked on this phone stays on screen from the local file while the
- * server still has that same photo; it avoids a blank flash after upload.
- */
-function keepLocalPhotos(next: Purchase[], current: Purchase[]): Purchase[] {
-  const local = new Map(
-    current
-      .filter((item) => item.localImageUri && item.imageId && !item.photoUploading)
-      .map((item) => [item.id, item]),
-  );
-  if (local.size === 0) return next;
-  return next.map((item) => {
-    const mine = local.get(item.id);
-    return mine && mine.imageId === item.imageId
-      ? { ...item, localImageUri: mine.localImageUri }
-      : item;
-  });
-}
-
-/** Mirror backend placeNeeded: urgent at top, else after the urgent block. */
-function placeNeededLocally(purchases: Purchase[], item: Purchase): Purchase[] {
-  const needed = purchases.filter((row) => row.status === "needed");
-  const bought = purchases.filter((row) => row.status === "bought");
-  if (item.urgent) return [item, ...needed, ...bought];
-  // Below the urgent rows of its own list (the server orders each list by itself).
-  const sameList = (row: Purchase) => !item.listId || row.listId === item.listId;
-  let index = needed.findIndex((row) => sameList(row) && !row.urgent);
-  if (index === -1) {
-    const lastOfList = needed.findLastIndex(sameList);
-    index = lastOfList === -1 ? needed.length : lastOfList + 1;
-  }
-  const nextNeeded = [...needed.slice(0, index), item, ...needed.slice(index)];
-  return [...nextNeeded, ...bought];
 }

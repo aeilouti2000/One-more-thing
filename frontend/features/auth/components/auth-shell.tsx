@@ -38,6 +38,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppLogo } from "@/components/ui/AppLogo";
 import { AppText } from "@/components/ui/AppText";
+import { GlassBackdrop } from "@/components/ui/GlassBackdrop";
 import {
   INTRO_MS,
   WelcomeShowcase,
@@ -246,7 +247,8 @@ export function AuthShell({ children }: { children: ReactNode }) {
     [reportWelcomeHeight],
   );
 
-  const sheetColor = colors.paper;
+  // The sheet slides over the brand and the showcase, so it is solid in Glass too.
+  const sheetColor = colors.overlay;
   const toolTint = dark
     ? withAlpha("#FFFFFF", 0.08)
     : withAlpha(colors.ink, 0.06);
@@ -263,6 +265,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
           locations={[0, 0.32, 0.68, 1]}
           style={StyleSheet.absoluteFill}
         />
+        <GlassBackdrop />
 
         {/* Big brand, centered in the space above the Welcome sheet */}
         <Animated.View

@@ -43,8 +43,20 @@ export class SetsService {
     return rows.map(toView);
   }
 
-  async create(userId: string, homeId: string, input: { name: string; items: SetItemInput[] }) {
+  /** `id` is made on the phone: sending the same create twice gives back the first set. */
+  async create(
+    userId: string,
+    homeId: string,
+    input: { id?: string; name: string; items: SetItemInput[] },
+  ) {
     await this.homes.requireMembership(userId, homeId);
+    const already = input.id ? await this.sets.findOne({ where: { id: input.id } }) : null;
+    if (already) {
+      if (already.homeId !== homeId) {
+        throw new DomainError("ID_TAKEN", "That id is already in use.", HttpStatus.CONFLICT);
+      }
+      return toView(already);
+    }
     const count = await this.sets.count({ where: { homeId } });
     if (count >= SET_LIMIT) {
       throw new DomainError(
@@ -55,6 +67,7 @@ export class SetsService {
     }
     const saved = await this.sets.save(
       this.sets.create({
+        ...(input.id ? { id: input.id } : {}),
         homeId,
         name: cleanName(input.name),
         items: cleanItems(input.items),

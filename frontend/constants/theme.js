@@ -1,6 +1,8 @@
 const DEFAULT_ACCENT = "#2196F3";
 const DEFAULT_SURFACE_DEPTH = "default";
 const SURFACE_DEPTH_LEVELS = ["soft", "default", "deep", "true"];
+const DEFAULT_GLASS_FROST = "frosted";
+const GLASS_FROST_LEVELS = ["clear", "frosted", "milky"];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -9,6 +11,11 @@ function clamp(value, min, max) {
 function normalizeSurfaceDepth(value) {
   if (SURFACE_DEPTH_LEVELS.includes(value)) return value;
   return DEFAULT_SURFACE_DEPTH;
+}
+
+function normalizeGlassFrost(value) {
+  if (GLASS_FROST_LEVELS.includes(value)) return value;
+  return DEFAULT_GLASS_FROST;
 }
 
 /** 0 = soft (lifted), 1 = true dark. */
@@ -39,14 +46,38 @@ function normalizeHex(value) {
   return `#${hex.toUpperCase()}`;
 }
 
-function hexToRgb(hex) {
-  const normalized = normalizeHex(hex) ?? DEFAULT_ACCENT;
-  const value = normalized.slice(1);
+const RGBA_PATTERN =
+  /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/;
+
+/**
+ * Channels and alpha of "#RGB", "#RRGGBB", "rgb()" or "rgba()". Glass
+ * surfaces are see-through, so a palette colour is not always a hex.
+ * Null when the text is not a colour.
+ */
+function parseColor(value) {
+  const hex = normalizeHex(value);
+  if (hex) {
+    return {
+      r: parseInt(hex.slice(1, 3), 16),
+      g: parseInt(hex.slice(3, 5), 16),
+      b: parseInt(hex.slice(5, 7), 16),
+      a: 1,
+    };
+  }
+  const match = typeof value === "string" ? value.trim().match(RGBA_PATTERN) : null;
+  if (!match) return null;
   return {
-    r: parseInt(value.slice(0, 2), 16),
-    g: parseInt(value.slice(2, 4), 16),
-    b: parseInt(value.slice(4, 6), 16),
+    r: clamp(Number(match[1]), 0, 255),
+    g: clamp(Number(match[2]), 0, 255),
+    b: clamp(Number(match[3]), 0, 255),
+    a: match[4] === undefined ? 1 : clamp(Number(match[4]), 0, 1),
   };
+}
+
+/** The channels of a colour; a see-through colour's alpha is left out. */
+function hexToRgb(color) {
+  const { r, g, b } = parseColor(color) ?? parseColor(DEFAULT_ACCENT);
+  return { r, g, b };
 }
 
 function rgbToHex(r, g, b) {
@@ -117,9 +148,10 @@ function mixHex(from, to, amount) {
   );
 }
 
-function withAlpha(hex, alpha) {
-  const { r, g, b } = hexToRgb(hex);
-  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`;
+/** A see-through colour stays see-through: its own alpha is multiplied in. */
+function withAlpha(color, alpha) {
+  const { r, g, b, a } = parseColor(color) ?? parseColor(DEFAULT_ACCENT);
+  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1) * a})`;
 }
 
 function relativeLuminance(hex) {
@@ -155,6 +187,8 @@ function accentTextFor(accentHex, scheme) {
 function withOnAccent(palette, scheme = "light") {
   return {
     ...palette,
+    // Light and dark surfaces are solid already; only Glass needs its own.
+    overlay: palette.paper,
     onAccent: onAccentFor(palette.accent),
     accentText: accentTextFor(palette.accent, scheme),
   };
@@ -252,6 +286,108 @@ function mixHexLightness(from, to, amount) {
   return from + (to - from) * clamp(amount, 0, 1);
 }
 
+/** How much white each glass layer carries, per frost level. */
+const GLASS_WASH = {
+  clear: { paper: 0.055, mist: 0.09, line: 0.12 },
+  frosted: { paper: 0.09, mist: 0.13, line: 0.16 },
+  milky: { paper: 0.15, mist: 0.19, line: 0.22 },
+};
+
+/** The hue the glass theme is built around, and how strongly it shows. */
+function glassTint(accentHex) {
+  const { h, s } = hexToHsl(normalizeHex(accentHex) ?? DEFAULT_ACCENT);
+  // A grey pick gives smoked glass with no colour of its own.
+  return { h, sat: s < 12 ? 0 : clamp(s * 0.55, 26, 46) };
+}
+
+/** Lightness of the near-black shade the page fades into. */
+const GLASS_BASE_LIGHTNESS = 7;
+
+/** How bright accent-coloured text must be to read on a lit glass card. */
+const GLASS_ACCENT_TEXT_LUMINANCE = 0.55;
+
+/**
+ * The accent for text and icons on glass: the same hue, lightened until it
+ * reads on a card with the page's colour showing through it. Blues and purples need
+ * a lot of lifting; yellows and greens are bright enough nearly as they are.
+ */
+function glassAccentText(accentHex) {
+  const { h, s, l } = hexToHsl(normalizeHex(accentHex) ?? DEFAULT_ACCENT);
+  if (s < 12) return hslToHex(0, 0, 86);
+  const sat = clamp(s, 45, 90);
+  for (let lightness = clamp(l, 50, 90); lightness < 90; lightness += 2) {
+    const color = hslToHex(h, sat, lightness);
+    if (relativeLuminance(color) >= GLASS_ACCENT_TEXT_LUMINANCE) return color;
+  }
+  return hslToHex(h, sat, 90);
+}
+
+/**
+ * Glass: the dark theme's text and accent, on see-through surfaces. `ice` is
+ * the solid colour under the page's fade (see glassBackdropStyle); `paper`, `mist`,
+ * `soft` and `line` are washes of white that let it show through.
+ */
+function buildGlassColors(accentHex, frost = DEFAULT_GLASS_FROST) {
+  const dark = buildColors("dark", accentHex, DEFAULT_SURFACE_DEPTH);
+  const { h, sat } = glassTint(accentHex);
+  const wash = GLASS_WASH[normalizeGlassFrost(frost)];
+  return {
+    ...dark,
+    ice: hslToHex(h, sat, GLASS_BASE_LIGHTNESS),
+    deep: hslToHex(h, sat, GLASS_BASE_LIGHTNESS - 2),
+    // Sheets, dialogs and menus cover other content, so they stay solid.
+    overlay: hslToHex(h, sat * 0.7, 13),
+    paper: withAlpha("#FFFFFF", wash.paper),
+    mist: withAlpha("#FFFFFF", wash.mist),
+    soft: withAlpha("#FFFFFF", wash.paper * 0.6),
+    line: withAlpha("#FFFFFF", wash.line),
+    // Both brighter than dark mode's: they also have to read at the bright top of the page.
+    muted: hslToHex(h, sat * 0.5, 77),
+    accentText: glassAccentText(accentHex),
+  };
+}
+
+/** How strongly the theme colour shows at the top of the page, before the limit below. */
+const GLASS_FADE_STRENGTH = 0.47;
+/** Brightest the fade may make the page, so white text on it stays readable. */
+const GLASS_FADE_LUMINANCE = 0.13;
+/** How much of that strength is left at each point down the page. */
+const GLASS_FADE_STOPS = [
+  { at: "0%", share: 1 },
+  { at: "34%", share: 0.5 },
+  { at: "68%", share: 0.13 },
+  // The same colour at zero alpha: fading to "transparent" turns grey.
+  { at: "100%", share: 0 },
+];
+
+/**
+ * The page background of the glass theme: the theme colour at the top of the
+ * page, fading straight down into a near-black shade of the same hue.
+ * A style object for a plain View.
+ */
+function glassBackdropStyle(accentHex) {
+  const { h, sat } = glassTint(accentHex);
+  const color = sat === 0 ? hslToHex(0, 0, 62) : hslToHex(h, 80, 52);
+  // Yellows and greens are far brighter than blues at the same strength.
+  const strength = Math.min(
+    GLASS_FADE_STRENGTH,
+    GLASS_FADE_LUMINANCE / relativeLuminance(color),
+  );
+  return {
+    backgroundColor: hslToHex(h, sat, GLASS_BASE_LIGHTNESS),
+    backgroundImage: [
+      {
+        type: "linear-gradient",
+        direction: "to bottom",
+        colorStops: GLASS_FADE_STOPS.map((stop) => ({
+          color: withAlpha(color, Math.round(strength * stop.share * 100) / 100),
+          positions: [stop.at],
+        })),
+      },
+    ],
+  };
+}
+
 const lightColors = buildColors("light", DEFAULT_ACCENT);
 const darkColors = buildColors("dark", DEFAULT_ACCENT);
 const colors = lightColors;
@@ -333,6 +469,19 @@ function getColors(
   return buildColors(scheme, accentHex, surfaceDepth);
 }
 
+function getGlassColors(accentHex = DEFAULT_ACCENT, frost = DEFAULT_GLASS_FROST) {
+  return buildGlassColors(accentHex, frost);
+}
+
+/**
+ * How far a card is lifted off the page, as style: spread it last. A
+ * see-through (glass) card casts no shadow, because Android draws the shadow
+ * under the whole card, where it shows through as a grey slab.
+ */
+function cardLift(seeThrough, elevation) {
+  return seeThrough ? { elevation: 0, shadowOpacity: 0 } : { elevation };
+}
+
 /** Outer floated sheet corner radius. */
 const floatedRadius = 20;
 /**
@@ -364,7 +513,7 @@ function floatedCardStyle(scheme, palette = getColors(scheme)) {
     borderRadius: floatedRadius,
     borderWidth: 1,
     borderColor: dark ? withAlpha(palette.white, 0.1) : withAlpha("#12141A", 0.08),
-    backgroundColor: dark ? palette.paper : palette.white,
+    backgroundColor: dark ? palette.overlay : palette.white,
     shadowColor: "#12141A",
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: dark ? 0.48 : 0.14,
@@ -459,14 +608,20 @@ module.exports = {
   colors,
   lightColors,
   darkColors,
+  DEFAULT_GLASS_FROST,
+  GLASS_FROST_LEVELS,
   getColors,
+  getGlassColors,
+  glassBackdropStyle,
   getCssVars,
   normalizeHex,
   normalizeSurfaceDepth,
+  normalizeGlassFrost,
   hexToHsl,
   hslToHex,
   withAlpha,
   glassFieldStyle,
+  cardLift,
   floatedCardStyle,
   floatedSectionStyle,
   floatedRadius,

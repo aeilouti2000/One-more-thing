@@ -19,6 +19,7 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppLogo } from "@/components/ui/AppLogo";
 import { AppText } from "@/components/ui/AppText";
+import { GlassBackdrop } from "@/components/ui/GlassBackdrop";
 import { scaleFontSize, singleLineInput } from "@/constants/font";
 import { hexToHsl, hslToHex, withAlpha } from "@/constants/theme";
 import { preserveSpaces } from "@/constants/text";
@@ -100,6 +101,7 @@ export function AuthFrame({
       ]}
     >
       <StatusBar style={dark ? "light" : "dark"} />
+      <GlassBackdrop />
 
       <KeyboardAvoidingView
         style={styles.flex}

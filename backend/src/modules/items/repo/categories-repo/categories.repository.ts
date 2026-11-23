@@ -5,7 +5,7 @@ export interface ICategoriesRepository {
   findHidden(homeId: string): Promise<HiddenCategory[]>;
   findCustom(homeId: string): Promise<CustomCategory[]>;
   findCustomByName(homeId: string, name: string): Promise<CustomCategory | null>;
-  insert(homeId: string, name: string): Promise<CustomCategory>;
+  insert(homeId: string, name: string, id?: string): Promise<CustomCategory>;
   findCustomInHome(categoryId: string, homeId: string): Promise<CustomCategory | null>;
   hide(homeId: string, categoryId: string): Promise<void>;
   deleteCustom(categoryId: string, homeId: string): Promise<void>;

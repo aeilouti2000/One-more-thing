@@ -173,6 +173,7 @@ export default function AccountSettingsScreen() {
           summary={displayName}
           onPress={() => router.push("/settings/account-name" as Href)}
           colors={colors}
+          needsInternet
         />
         <SettingsNavCard
           icon="at-outline"
@@ -180,6 +181,7 @@ export default function AccountSettingsScreen() {
           summary={displayUsername}
           onPress={() => router.push("/settings/account-username" as Href)}
           colors={colors}
+          needsInternet
         />
         <SettingsNavCard
           icon="mail-outline"
@@ -187,6 +189,7 @@ export default function AccountSettingsScreen() {
           summary={emailSummary}
           onPress={() => router.push("/settings/account-email" as Href)}
           colors={colors}
+          needsInternet
         />
         <SettingsNavCard
           icon="lock-closed-outline"
@@ -194,6 +197,7 @@ export default function AccountSettingsScreen() {
           summary={hasPassword ? t("changePassword") : t("setPassword")}
           onPress={() => router.push("/settings/account-password" as Href)}
           colors={colors}
+          needsInternet
         />
         <SettingsNavCard
           icon="log-out-outline"

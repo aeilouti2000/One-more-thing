@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
 import { useAuth } from "@/features/auth/providers/auth-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
 import { fetchLists, type HomeList } from "@/features/items/api/lists";
 import { fetchPins, type Pin } from "@/features/items/api/pins";
 import { usePurchasesData } from "@/features/items/hooks/use-purchases";
-import { readCachedLists, readCachedPins } from "@/features/offline/profile-cache";
+import { readCachedLists, readCachedPins } from "@/features/offline/saved";
 import { publishWidgets, syncWidgets } from "@/features/widgets/sync";
-import { readWidgetBackground } from "@/features/widgets/widget-prefs";
+import {
+  readWidgetBackground,
+  readWidgetStyle,
+  subscribeWidgetStyle,
+} from "@/features/widgets/widget-prefs";
 import {
   readWidgetActions,
   setWidgetBackgroundSync,
@@ -31,13 +35,14 @@ export function WidgetPublisher() {
   const { purchases, isLoading: isItemsLoading } = usePurchasesData();
   const { preference, accent, surfaceDepth } = useTheme();
   const { locale } = useI18n();
+  const style = useSyncExternalStore(subscribeWidgetStyle, readWidgetStyle, readWidgetStyle);
   const userId = user?.id ?? null;
   const homeId = household?.id ?? null;
   const extrasAt = useRef(0);
 
   const publish = useCallback(() => {
     if (!widgetsAvailable || isAuthLoading) return;
-    const look = { locale, theme: { preference, accent, surfaceDepth } };
+    const look = { locale, theme: { preference, accent, surfaceDepth }, style };
     if (!userId) {
       publishWidgets({ user: null, household: null, items: [], lists: [], pins: [] }, look);
       return;
@@ -71,6 +76,7 @@ export function WidgetPublisher() {
     locale,
     preference,
     purchases,
+    style,
     surfaceDepth,
     userId,
   ]);

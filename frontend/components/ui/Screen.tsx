@@ -32,9 +32,11 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { GlassBackdrop } from "@/components/ui/GlassBackdrop";
 import { TabBlurSurface } from "@/components/ui/TabBlurTarget";
 import { spacing, tabBar } from "@/constants/theme";
 import { SETTINGS_MASTER_WIDTH } from "@/lib/layout";
+import { isMotionOff, motionOffOnUI } from "@/lib/motion";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -268,11 +270,23 @@ export function Screen({
     commitSwipeRef.current(direction, true);
   }
 
+  /**
+   * Animations off: the new view simply replaces the old one. Fading out
+   * first would leave the page empty for a few frames, which reads as a fade.
+   */
+  function swapNow(direction: SwipeDirection) {
+    swipeRef.current?.(direction);
+  }
+
   useEffect(() => {
     if (!slideRef) return;
     slideRef.current = (direction) => {
       if (!swipeRef.current || isAnimating.get()) return false;
       if (canSwipeRef.current?.(direction) === false) return false;
+      if (isMotionOff()) {
+        swapNow(direction);
+        return true;
+      }
       isAnimating.set(true);
       // Fade through with a short drift: the old view leaves, the new one
       // arrives from the other side. Nothing crosses the whole screen, so it
@@ -305,7 +319,8 @@ export function Screen({
     activeOffsetX: [-SWIPE_ACTIVE_X, SWIPE_ACTIVE_X],
     failOffsetY: [-SWIPE_FAIL_Y, SWIPE_FAIL_Y],
     onUpdate: (event) => {
-      if (isAnimating.value) return;
+      // Animations off: the page stays put under the finger and swaps on release.
+      if (isAnimating.value || motionOffOnUI.value) return;
       const goingNext = event.translationX < 0;
       const allowed = goingNext ? canNext.value === 1 : canPrev.value === 1;
       translateX.set(allowed ? event.translationX : 0);
@@ -334,6 +349,12 @@ export function Screen({
 
       if (!allowed) {
         runOnJS(callRejectSwipe)();
+        return;
+      }
+
+      if (motionOffOnUI.value) {
+        translateX.set(0);
+        runOnJS(swapNow)(direction);
         return;
       }
 
@@ -435,6 +456,7 @@ export function Screen({
       style={{ backgroundColor: colors.ice }}
       edges={safeTop && !top ? ["top"] : []}
     >
+      <GlassBackdrop />
       {top ? <View style={{ zIndex: 2 }}>{top}</View> : null}
       {scroll ? (
         onSwipe ? (

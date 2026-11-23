@@ -1,7 +1,8 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import "@/features/auth/utils/session-storage";
-import { clearCurrentProfileCache } from "@/features/offline/profile-cache";
+import { reportRequestFailed, reportRequestOk, startNetworkWatch } from "@/features/offline/network";
+import { clearOfflineData, setCacheOwner } from "@/features/offline/query-client";
 import { readSecureTokens, writeSecureTokens } from "@/lib/secure-tokens";
 import { withTimeout } from "@/lib/with-timeout";
 
@@ -32,6 +33,8 @@ function resolveApiUrl() {
 }
 
 const API_URL = resolveApiUrl();
+// Answers without sign-in: used to find out when the server is reachable again.
+startNetworkWatch(`${API_URL}/health`);
 const REQUEST_TIMEOUT_MS = 20000;
 /** Photo uploads can be slow on mobile data. */
 const UPLOAD_TIMEOUT_MS = 60000;
@@ -163,6 +166,8 @@ function loadSession(): AuthSession | null {
 
 function writeSession(session: AuthSession) {
   sessionCache = session;
+  // Another person's saved lists and waiting changes never carry over.
+  setCacheOwner(session.user.id);
   const secured = writeSecureTokens({
     accessToken: session.accessToken,
     refreshToken: session.refreshToken,
@@ -173,6 +178,7 @@ function writeSession(session: AuthSession) {
 
 function clearSession() {
   sessionCache = null;
+  setCacheOwner(null);
   writeSecureTokens(null);
   removeStorage(SESSION_KEY);
   emit(null);
@@ -207,14 +213,16 @@ async function refreshSession() {
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ refreshToken: current.refreshToken }),
     });
+    reportRequestOk();
   } catch {
+    reportRequestFailed();
     return false;
   }
 
   if (response.status === 401) {
     // The session is over (ended elsewhere, or expired): leave nothing of the
     // account on this phone.
-    clearCurrentProfileCache();
+    clearOfflineData();
     clearSession();
     return false;
   }
@@ -254,7 +262,10 @@ async function request<T>(path: string, init: RequestInit = {}, auth = true, all
       },
       isForm ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
     );
+    reportRequestOk();
   } catch (error) {
+    // No answer at all: the app works from its saved copy until one arrives.
+    reportRequestFailed();
     throw new ApiError(error instanceof Error ? error.message : "Network request failed", "NETWORK");
   }
 
@@ -397,7 +408,7 @@ export async function changePassword(
     if (session) await refreshStoredProfile(session);
     return false;
   }
-  clearCurrentProfileCache();
+  clearOfflineData();
   clearSession();
   return true;
 }
@@ -412,14 +423,14 @@ export async function updateProfile(input: { name?: string; email?: string }) {
 
 export async function deleteAccount(proof: { password?: string; googleIdToken?: string }) {
   await api.delete("/auth/me", proof);
-  clearCurrentProfileCache();
+  clearOfflineData();
   clearSession();
 }
 
 /** `pushToken`: this phone's notification device, removed along with the session. */
 export async function signOut(pushToken?: string | null) {
   const session = readSession();
-  clearCurrentProfileCache();
+  clearOfflineData();
   clearSession();
   if (!session) return;
   await api

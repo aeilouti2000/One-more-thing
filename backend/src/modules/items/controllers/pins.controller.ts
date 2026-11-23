@@ -32,6 +32,7 @@ export class PinsController {
             user.id,
             homeId,
             {
+              id: body.itemId,
               name: body.name,
               quantity: body.quantity,
               category: body.category,

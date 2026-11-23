@@ -97,9 +97,11 @@ import { pickReceiptPhoto, interpretReceiptPhoto, type ReceiptScan } from "@/fea
 import { translate } from "@/constants/i18n";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Purchase } from "@/features/items/types/purchase";
 import type { ViewHandle } from "@/lib/native-refs";
+import { isOnline, onOnlineChange } from "@/features/offline/network";
 
 const ROW_GAP = 12;
 const CHECK_SIZE = iconSize.md;
@@ -466,6 +468,8 @@ function TripBody() {
   );
 
   const lockHeldRef = useRef(false);
+  /** The phone lost its connection during this trip (no signal in the shop). */
+  const offlineGapRef = useRef(false);
   const newTripClaimedRef = useRef(false);
   // Others shopping this list right now (shopping together).
   const partnersNow = useMemo(
@@ -693,10 +697,17 @@ function TripBody() {
       const beat = () => {
         if (AppState.currentState !== "active") return;
         if (!lockHeldRef.current) return;
+        if (!isOnline()) {
+          // No signal: the trip goes on from this phone, and what is bought is
+          // sent later. The list is taken back when the connection returns.
+          offlineGapRef.current = true;
+          return;
+        }
         void heartbeatShopLock(homeId, listId).then(async (result) => {
           // The trip ended while this was on its way: don't take the list back.
           if (cancelled || !lockHeldRef.current) return;
           if (result.lock?.isMine) {
+            offlineGapRef.current = false;
             adoptLock(result.lock);
             return;
           }
@@ -706,11 +717,20 @@ function TripBody() {
             return;
           }
           if (retry.lock?.isMine) {
+            offlineGapRef.current = false;
             adoptLock(retry.lock);
             return;
           }
+          if (!retry.lock && !isOnline()) offlineGapRef.current = true;
           if (retry.lock?.active && !retry.lock.isMine) {
             lockHeldRef.current = false;
+            if (offlineGapRef.current) {
+              // Someone started shopping this list while this phone had no
+              // signal. Nobody is sent away mid-shop: both trips go on, and
+              // everything either of them bought is kept.
+              adoptLock(retry.lock);
+              return;
+            }
             setActionError(
               t("shopLockedToast", {
                 name: firstName(retry.lock.shopperName) || t("partner"),
@@ -727,11 +747,17 @@ function TripBody() {
       const appState = AppState.addEventListener("change", (state) => {
         if (state === "active") beat();
       });
+      // The connection is back: take the list again before someone else does.
+      const stopWatching = onOnlineChange((online) => {
+        if (online) beat();
+        else offlineGapRef.current = true;
+      });
 
       return () => {
         cancelled = true;
         clearInterval(timer);
         appState.remove();
+        stopWatching();
         if (lockHeldRef.current) {
           lockHeldRef.current = false;
           void releaseShopLock(homeId, listId);
@@ -2084,8 +2110,9 @@ function UndoToast({ name, onUndo }: { name: string; onUndo: () => void }) {
   const { t } = useI18n();
   const { colors, scheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const motionOff = useMotionOff();
   const dark = scheme === "dark";
-  const surface = dark ? colors.paper : colors.ink;
+  const surface = dark ? colors.overlay : colors.ink;
   const text = dark ? colors.ink : colors.paper;
   // In light mode the bar is dark blue, so the accent blue would vanish on it.
   const action = dark ? colors.accentText : colors.paper;
@@ -2095,8 +2122,8 @@ function UndoToast({ name, onUndo }: { name: string; onUndo: () => void }) {
       style={{ position: "absolute", left: 16, right: 16, bottom: insets.bottom + 16, zIndex: 40 }}
     >
       <Animated.View
-        entering={FadeInDown.duration(220)}
-        exiting={FadeOutDown.duration(180)}
+        entering={motionOff ? undefined : FadeInDown.duration(220)}
+        exiting={motionOff ? undefined : FadeOutDown.duration(180)}
         style={{
           flexDirection: "row",
           alignItems: "center",

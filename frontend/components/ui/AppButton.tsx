@@ -49,14 +49,16 @@ export function AppButton({
   style,
   labelStyle,
 }: AppButtonProps) {
-  const { colors, scheme } = useTheme();
+  const { colors, glass, scheme } = useTheme();
   const dark = scheme === "dark";
   const inactive = disabled && !loading;
   const neutral = dark ? withAlpha(colors.white, 0.06) : withAlpha("#12141A", 0.05);
+  // Glass lightens accentText so text reads on it; a filled button keeps the accent itself.
+  const primaryFill = glass ? colors.accent : colors.accentText;
 
   const surface: ViewStyle =
     variant === "primary"
-      ? { backgroundColor: inactive ? neutral : (fill?.background ?? colors.accentText) }
+      ? { backgroundColor: inactive ? neutral : (fill?.background ?? primaryFill) }
       : variant === "secondary"
         ? {
             backgroundColor: inactive ? neutral : withAlpha(colors.accentText, dark ? 0.16 : 0.1),

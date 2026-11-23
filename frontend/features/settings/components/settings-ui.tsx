@@ -27,6 +27,8 @@ import Animated, {
 import { Pressable, Switch, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { iconSize, withAlpha } from "@/constants/theme";
+import { NeedsInternetTag, useNeedsInternet } from "@/features/offline/components/needs-internet";
+import { showNeedsInternet } from "@/features/offline/sync-status";
 import {
   readSwipeActions,
   subscribeSwipeActions,
@@ -36,7 +38,9 @@ import {
   type SwipeAction,
   type SwipeActionPrefs,
 } from "@/features/items/utils/swipe-actions";
+import { KEEP_MOTION } from "@/lib/motion";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export function CardBlock({ children }: { children: ReactNode }) {
@@ -47,6 +51,91 @@ export function CardBlock({ children }: { children: ReactNode }) {
 
 export function SettingsSection({ children }: { children: ReactNode }) {
   return <View className="gap-3">{children}</View>;
+}
+
+/** A group of settings under a small heading. */
+export function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <View className="gap-2.5">
+      <AppText className="px-1 text-xs font-bold uppercase tracking-widest text-cove-muted">
+        {title}
+      </AppText>
+      {children}
+    </View>
+  );
+}
+
+/** Corner radius of the picture inside a SettingsChoiceTile. */
+const CHOICE_TILE_RADIUS = 18;
+
+/**
+ * One of a few looks to pick from: a picture of it (the children), its name
+ * and a tick when chosen. Put two to a `flex-row gap-3` View, inside a View
+ * with accessibilityRole="radiogroup": the tiles share the row's width.
+ */
+export function SettingsChoiceTile({
+  label,
+  selected,
+  onPress,
+  children,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  const { colors, glass } = useTheme();
+  // Glass cards are barely there, so an unselected tile needs a visible edge.
+  const edge = selected ? colors.accentText : glass ? colors.line : "transparent";
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      accessibilityLabel={label}
+      className="min-w-0 flex-1 active:opacity-85"
+    >
+      <View
+        style={{
+          borderRadius: CHOICE_TILE_RADIUS + 6,
+          padding: 6,
+          backgroundColor: colors.paper,
+          borderWidth: 2,
+          borderColor: edge,
+        }}
+      >
+        <View style={{ borderRadius: CHOICE_TILE_RADIUS, overflow: "hidden" }}>{children}</View>
+        <View className="flex-row items-center justify-between gap-1.5 px-2 pb-1.5 pt-3">
+          {/* One line that shrinks on narrow tiles instead of wrapping into the check. */}
+          <AppText
+            className="text-base font-semibold text-cove-ink"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            style={{ flex: 1, minWidth: 0 }}
+          >
+            {label}
+          </AppText>
+          <View
+            style={{
+              flexShrink: 0,
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: selected ? 0 : 1.5,
+              borderColor: withAlpha(colors.muted, 0.5),
+              backgroundColor: selected ? colors.accent : "transparent",
+            }}
+          >
+            {selected ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : null}
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
 }
 
 export function SettingsCardIcon({
@@ -97,35 +186,67 @@ export function SettingsCardCopy({
   );
 }
 
+/**
+ * A title and a line of explanation above a control that fills the card's
+ * width. (SettingsCardCopy is for the text beside an icon or a switch: in a
+ * column it would collapse.)
+ */
+export function SettingsCardHeading({ title, body }: { title: string; body: string }) {
+  return (
+    <View className="gap-1">
+      <AppText className="text-base font-semibold text-cove-ink">{title}</AppText>
+      <AppText className="text-sm text-cove-muted">{body}</AppText>
+    </View>
+  );
+}
+
 export function SettingsNavCard({
   icon,
   title,
   summary,
   onPress,
   colors,
+  needsInternet = false,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   summary: string;
   onPress: () => void;
   colors: { mist: string; accent: string; accentText: string; ink: string; muted: string };
+  /**
+   * Only the server can do this. With no connection the card stays in place,
+   * dimmed and tagged, and a tap says why instead of opening it.
+   */
+  needsInternet?: boolean;
 }) {
   const { isRTL } = useI18n();
+  const { offline } = useNeedsInternet();
+  const blocked = needsInternet && offline;
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={blocked ? showNeedsInternet : onPress}
       accessibilityRole="button"
       accessibilityLabel={title}
+      accessibilityState={{ disabled: blocked }}
       className="flex-row items-center gap-3 overflow-hidden rounded-3xl bg-cove-paper px-4 py-4 active:opacity-80"
     >
-      <SettingsCardIcon icon={icon} colors={colors} />
-      <SettingsCardCopy title={title} body={summary} bodyLines={1} />
-      <Ionicons
-        name={isRTL ? "chevron-back" : "chevron-forward"}
-        size={iconSize.sm}
-        color={colors.ink}
-      />
+      <View
+        className="min-w-0 flex-1 flex-row items-center gap-3"
+        style={blocked ? { opacity: 0.4 } : undefined}
+      >
+        <SettingsCardIcon icon={icon} colors={colors} />
+        <SettingsCardCopy title={title} body={summary} bodyLines={1} />
+      </View>
+      {blocked ? (
+        <NeedsInternetTag />
+      ) : (
+        <Ionicons
+          name={isRTL ? "chevron-back" : "chevron-forward"}
+          size={iconSize.sm}
+          color={colors.ink}
+        />
+      )}
     </Pressable>
   );
 }
@@ -184,7 +305,8 @@ export function HostOnly({
   children: ReactNode;
 }) {
   const { t, isRTL } = useI18n();
-  const { colors, scheme } = useTheme();
+  const { colors, glass, scheme } = useTheme();
+  const motionOff = useMotionOff();
   const shake = useSharedValue(0);
   const [tipShown, setTipShown] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -200,6 +322,8 @@ export function HostOnly({
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
     shake.set(
       withSequence(
+        // The shake says "only the host can change this", so it stays with animations off.
+        KEEP_MOTION,
         withTiming(-5, { duration: 50 }),
         withTiming(5, { duration: 70 }),
         withTiming(-4, { duration: 70 }),
@@ -226,15 +350,16 @@ export function HostOnly({
         </Pressable>
         {tipShown ? (
           <Animated.View
-            entering={FadeInDown.duration(160)}
-            exiting={FadeOut.duration(160)}
+            entering={motionOff ? undefined : FadeInDown.duration(160)}
+            exiting={motionOff ? undefined : FadeOut.duration(160)}
             pointerEvents="none"
             className="absolute flex-row items-center gap-1.5 rounded-xl px-3 py-1.5"
             style={{
               bottom: "100%",
               marginBottom: 6,
               [isRTL ? "left" : "right"]: 12,
-              backgroundColor: scheme === "dark" ? colors.mist : colors.ink,
+              // Floats over the next card, so it is solid in Glass too.
+              backgroundColor: glass ? colors.overlay : scheme === "dark" ? colors.mist : colors.ink,
               shadowColor: "#000000",
               shadowOpacity: 0.3,
               shadowRadius: 10,
@@ -417,7 +542,7 @@ const PREVIEW_PULL = 0.44;
 /** A small item card that swipes itself, showing the same lanes as the list. */
 function SwipePreview({ left, right }: { left: SwipeAction; right: SwipeAction }) {
   const { t } = useI18n();
-  const { colors } = useTheme();
+  const { colors, glass } = useTheme();
   // -1 = pulled left, 1 = pulled right.
   const pull = useSharedValue(0);
   const width = useSharedValue(0);
@@ -435,7 +560,12 @@ function SwipePreview({ left, right }: { left: SwipeAction; right: SwipeAction }
           withDelay(700, withTiming(0, { duration: 1 })),
         ),
         -1,
+        false,
+        undefined,
+        // This preview exists to show the swipe, so it plays with animations off too.
+        KEEP_MOTION,
       ),
+      KEEP_MOTION,
     );
     return () => cancelAnimation(pull);
   }, [pull]);
@@ -493,7 +623,12 @@ function SwipePreview({ left, right }: { left: SwipeAction; right: SwipeAction }
       <Animated.View
         className="flex-1 flex-row items-center gap-3 rounded-2xl px-4"
         style={[
-          { backgroundColor: colors.mist, borderWidth: 1, borderColor: withAlpha(colors.muted, 0.18) },
+          {
+            // Solid in Glass too: the lanes lie under this card and would show through it.
+            backgroundColor: glass ? colors.overlay : colors.mist,
+            borderWidth: 1,
+            borderColor: withAlpha(colors.muted, 0.18),
+          },
           cardStyle,
         ]}
       >

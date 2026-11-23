@@ -1,4 +1,5 @@
 import "@/features/auth/utils/session-storage";
+import { defineChange, hasPending, perform } from "@/features/offline/outbox";
 import { api } from "@/lib/api";
 import { formatAppError } from "@/lib/errors";
 
@@ -61,6 +62,8 @@ function remember(prefs: NotificationPrefs) {
 }
 
 export async function fetchNotificationPrefs() {
+  // A choice made on this phone is still waiting to be sent: keep showing it.
+  if (hasPending()) return { prefs: readCachedNotificationPrefs(), error: null };
   try {
     const prefs = remember(clean(await api.get<NotificationPrefs>("/notifications/preferences")));
     return { prefs, error: null };
@@ -69,13 +72,18 @@ export async function fetchNotificationPrefs() {
   }
 }
 
+const prefsChange = defineChange<Partial<NotificationPrefs>, NotificationPrefs>(
+  "notifications.prefs",
+  (patch) => api.patch<NotificationPrefs>("/notifications/preferences", patch),
+);
+
 export async function updateNotificationPrefs(patch: Partial<NotificationPrefs>) {
-  try {
-    const prefs = remember(
-      clean(await api.patch<NotificationPrefs>("/notifications/preferences", patch)),
-    );
-    return { prefs, error: null };
-  } catch (error) {
-    return { prefs: null, error: formatAppError(error) };
+  const before = readCachedNotificationPrefs();
+  const optimistic = remember(clean({ ...before, ...patch }));
+  const result = await perform(prefsChange, patch, { action: "settings" });
+  if (result.error) {
+    remember(before);
+    return { prefs: null, error: result.error };
   }
+  return { prefs: result.data ? remember(clean(result.data)) : optimistic, error: null };
 }

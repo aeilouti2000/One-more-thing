@@ -53,8 +53,8 @@ export class TypeormListsRepository implements IListsRepository {
       .getRawMany<HistoryListRow>();
   }
 
-  insert(homeId: string, name: string) {
-    return this.lists.save(this.lists.create({ homeId, name, deletedAt: null }));
+  insert(homeId: string, name: string, id?: string) {
+    return this.lists.save(this.lists.create({ ...(id ? { id } : {}), homeId, name, deletedAt: null }));
   }
 
   save(list: ShoppingList) {

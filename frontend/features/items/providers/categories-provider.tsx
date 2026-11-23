@@ -4,14 +4,14 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppState } from "react-native";
 import { PURCHASE_CATEGORIES, getCategoryLabel } from "@/constants/categories";
 import { createCategory, deleteCategory, fetchCategories, type HomeCategory } from "@/features/items/api/categories";
 import { emitListChanged, onListChanged } from "@/features/items/utils/list-sync";
-import { readCachedCategories, writeCachedCategories } from "@/features/offline/profile-cache";
+import { qk, queryClient, readCache } from "@/features/offline/query-client";
 import { useHousehold } from "@/features/homes/providers/household-provider";
 import { useI18n } from "@/providers/LanguageProvider";
 
@@ -31,25 +31,23 @@ const builtinCategories: HomeCategory[] = PURCHASE_CATEGORIES.map((item) => ({
 
 export function CategoriesProvider({ children }: { children: ReactNode }) {
   const { household } = useHousehold();
-  const [categories, setCategories] = useState<HomeCategory[]>(builtinCategories);
   const homeId = household?.id;
-  const [trackedHomeId, setTrackedHomeId] = useState(homeId);
 
-  if (homeId !== trackedHomeId) {
-    setTrackedHomeId(homeId);
-    if (!homeId) setCategories(builtinCategories);
-    else setCategories(readCachedCategories<HomeCategory>(homeId) ?? builtinCategories);
-  }
+  // A window onto the copy saved on the phone: it follows every load and every
+  // change made here, also the ones still waiting for a connection.
+  const { data } = useQuery<HomeCategory[]>(
+    {
+      queryKey: qk.categories(homeId ?? "none"),
+      queryFn: () => readCache<HomeCategory[]>(qk.categories(homeId ?? "none")) ?? builtinCategories,
+      enabled: false,
+    },
+    queryClient,
+  );
+  const categories = homeId ? (data ?? builtinCategories) : builtinCategories;
 
   useEffect(() => {
     if (!homeId) return;
-    let cancelled = false;
-    const load = () => {
-      void fetchCategories(homeId).then((result) => {
-        if (cancelled || result.error) return;
-        setCategories(result.categories);
-      });
-    };
+    const load = () => void fetchCategories(homeId);
     load();
     // A partner may add or remove a category while this phone is open.
     const stopListening = onListChanged(load);
@@ -57,7 +55,6 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       if (state === "active") load();
     });
     return () => {
-      cancelled = true;
       stopListening();
       appState.remove();
     };
@@ -66,15 +63,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   const addCategory = useCallback(
     async (name: string) => {
       if (!homeId) return null;
-      const result = await createCategory(homeId, name);
-      if (result.category) {
-        setCategories((current) => {
-          const next = [...current, result.category];
-          writeCachedCategories(homeId, next);
-          return next;
-        });
-      }
-      return result.error;
+      return (await createCategory(homeId, name)).error;
     },
     [homeId],
   );
@@ -83,15 +72,8 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       if (!homeId) return null;
       const result = await deleteCategory(homeId, id);
-      if (!result.error) {
-        setCategories((current) => {
-          const next = current.filter((item) => item.id !== id);
-          writeCachedCategories(homeId, next);
-          return next;
-        });
-        // The server moved its items to "Other": show them there right away.
-        emitListChanged();
-      }
+      // Its items moved to "Other": every screen showing them reloads.
+      if (!result.error) emitListChanged();
       return result.error;
     },
     [homeId],

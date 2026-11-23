@@ -24,9 +24,9 @@ services:
       - key: APP_MIN_VERSION
         value: "2.6.0"
       - key: APP_LATEST_VERSION
-        value: "2.9.1"
+        value: "2.9.2"
       - key: APP_DOWNLOAD_URL
-        value: "https://expo.dev/artifacts/eas/w3bPJCjzVOXvrTwcIpsz0-01q_wItjaxZMoyIoTjqOU.apk"
+        value: "https://expo.dev/artifacts/eas/-91mqFOJ4Jr__tRfRJuGBPmQ6riG8AyMY2LdvjpC1yk.apk"
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: BREVO_API_KEY

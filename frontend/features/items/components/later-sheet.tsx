@@ -18,6 +18,7 @@ import {
 } from "@/features/items/utils/later-dates";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 
 type LaterSheetProps = {
   visible: boolean;
@@ -35,6 +36,7 @@ type LaterSheetProps = {
 export function LaterSheet({ visible, name, count, busy, error, onPick, onClose }: LaterSheetProps) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
+  const motionOff = useMotionOff();
   // "Another day" opens a small day stepper in place of a calendar.
   const [days, setDays] = useState<number | null>(null);
   const [wasVisible, setWasVisible] = useState(visible);
@@ -89,7 +91,10 @@ export function LaterSheet({ visible, name, count, busy, error, onPick, onClose 
             }}
           />
         ) : (
-          <Animated.View entering={FadeIn.duration(160)} className="gap-3 rounded-2xl bg-cove-mist p-3">
+          <Animated.View
+            entering={motionOff ? undefined : FadeIn.duration(160)}
+            className="gap-3 rounded-2xl bg-cove-mist p-3"
+          >
             <View className="flex-row items-center gap-3">
               <StepButton
                 icon="remove"

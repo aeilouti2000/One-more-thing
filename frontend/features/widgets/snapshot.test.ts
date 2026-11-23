@@ -85,6 +85,7 @@ function input(fields: Partial<WidgetSnapshotInput> = {}): WidgetSnapshotInput {
     now: NOW,
     locale: "en",
     theme: { preference: "system", accent: "#2196F3", surfaceDepth: "default" },
+    style: { style: "theme", tint: "auto", clarity: 2 },
     user: { id: "me" },
     household: home,
     items: [],
@@ -279,6 +280,42 @@ test("colours: both themes are sent, opaque, and follow the accent", () => {
   }
   assert.notEqual(blue.dark.fill, green.dark.fill);
   assert.equal(blue.light.bg, "#FFFFFF");
+});
+
+test("the app's glass theme draws ordinary widgets in their dark colours", () => {
+  const glass = buildWidgetSnapshot(
+    input({ theme: { preference: "glass", accent: "#2196F3", surfaceDepth: "default" } }),
+  );
+  const dark = buildWidgetSnapshot(
+    input({ theme: { preference: "dark", accent: "#2196F3", surfaceDepth: "default" } }),
+  );
+  assert.equal(glass.themeMode, "dark");
+  assert.equal(glass.glass, undefined);
+  assert.deepEqual(glass.dark, dark.dark);
+});
+
+test("glass widgets: solid colours, with how see-through they are sent apart", () => {
+  const glass = (style: Partial<WidgetSnapshotInput["style"]> = {}) =>
+    buildWidgetSnapshot(input({ style: { style: "glass", tint: "auto", clarity: 2, ...style } }));
+
+  const auto = glass();
+  assert.equal(auto.themeMode, "system");
+  assert.equal(glass({ tint: "light" }).themeMode, "light");
+  assert.equal(glass({ tint: "dark" }).themeMode, "dark");
+  for (const palette of [auto.light, auto.dark]) {
+    for (const value of Object.values(palette)) assert.match(value, /^#[0-9A-F]{6}$/i);
+  }
+  // Light text on the dark tint, dark text on the light one.
+  assert.equal(auto.dark.ink, "#F6F8FB");
+  assert.equal(auto.light.bg, "#FFFFFF");
+  assert.notEqual(auto.light.ink, auto.dark.ink);
+
+  // The slider runs from nearly solid to half see-through.
+  assert.equal(glass({ clarity: 0 }).glass?.bg, 0.9);
+  assert.equal(auto.glass?.bg, 0.7);
+  assert.equal(glass({ clarity: 4 }).glass?.bg, 0.5);
+  // Ordinary widgets carry no glass settings at all.
+  assert.equal(buildWidgetSnapshot(input()).glass, undefined);
 });
 
 test("short numbers for a small widget", () => {

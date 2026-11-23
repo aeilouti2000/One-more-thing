@@ -19,9 +19,12 @@ import { withAlpha } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { SWIPE_ACTION_TONE, type SwipeAction } from "@/features/items/utils/swipe-actions";
 import { CARD_RADIUS } from "@/features/items/components/purchase-row";
+import { useTheme } from "@/providers/ThemeProvider";
 
 /** How far the card must be pulled, as a share of its width, for the action to run. */
 const COMMIT_RATIO = 0.4;
+/** Glass: the space left between the card and the action lane beside it. */
+const GLASS_LANE_GAP = 6;
 const RETURN_MS = 220;
 const FLY_MS = 200;
 /** A flown-off card comes back if its row is still there (the action was cancelled). */
@@ -196,16 +199,22 @@ function ActionLane({
   width: SharedValue<number>;
   armed: SharedValue<number>;
 }) {
+  const { glass } = useTheme();
   const solid = SWIPE_ACTION_TONE[action].solid;
   const soft = withAlpha(solid, 0.22);
   const sign = side === "left" ? 1 : -1;
 
   const laneStyle = useAnimatedStyle(() => {
     const pulled = (sign * travel.value) / Math.max(width.value, 1);
-    return {
+    const look = {
       opacity: interpolate(pulled, [0, 0.06], [0, 1], Extrapolation.CLAMP),
       backgroundColor: interpolateColor(armed.value, [0, 1], [soft, solid]),
     };
+    if (!glass) return look;
+    // A glass card is see-through, so the lane cannot lie under it: it covers
+    // only the strip the card has moved off, like a pill beside the card.
+    const hidden = width.value - Math.max(0, sign * travel.value - GLASS_LANE_GAP);
+    return side === "left" ? { ...look, right: hidden } : { ...look, left: hidden };
   });
   const iconStyle = useAnimatedStyle(() => {
     const pulled = (sign * travel.value) / Math.max(width.value, 1);
@@ -233,6 +242,8 @@ function ActionLane({
           gap: 8,
           paddingHorizontal: 18,
         },
+        // The icon and label are cut off by the lane's edge while it is narrow.
+        glass ? { overflow: "hidden" } : null,
         laneStyle,
       ]}
     >

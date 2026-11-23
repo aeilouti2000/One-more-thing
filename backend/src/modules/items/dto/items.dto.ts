@@ -25,7 +25,15 @@ import { PIN_INTERVALS, type PinInterval } from "../entities/pin.entity";
 /** Most ids one bulk request may carry. */
 const MAX_BULK_ITEMS = 500;
 
+/**
+ * `id` on a create: the phone made the id itself, so a change saved without
+ * internet can be sent again later without making a second copy.
+ */
 export class CreateItemDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   @Trim()
   @IsString()
   @MinLength(1)
@@ -61,25 +69,30 @@ export class CreateItemDto {
   listId?: string;
 }
 
+/** Only the fields sent are changed, so two phones editing different fields both keep theirs. */
 export class UpdateItemDto {
+  @IsOptional()
   @Trim()
   @IsString()
   @MinLength(1)
   @MaxLength(120)
-  name: string;
+  name?: string;
 
+  @IsOptional()
   @IsNumber()
   @Min(1)
   @Max(9999)
-  quantity: number;
+  quantity?: number;
 
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(40)
-  category: ItemCategory;
+  category?: ItemCategory;
 
+  @IsOptional()
   @IsBoolean()
-  urgent: boolean;
+  urgent?: boolean;
 
   @IsOptional()
   @IsString()
@@ -155,6 +168,11 @@ export class UpdateItemCostDto {
 }
 
 export class CreateTripReceiptDto {
+  /** The id a new invoice gets (made on the phone). */
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   /** Null/omitted: an invoice without a total yet (e.g. only named). */
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
@@ -221,6 +239,11 @@ export class CreatePinDto extends CreateItemDto {
   @IsOptional()
   @IsBoolean()
   addNow?: boolean;
+
+  /** The id of the item "add now" puts on the list (made on the phone). */
+  @IsOptional()
+  @IsUUID()
+  itemId?: string;
 }
 
 export class UpdatePinDto {
@@ -331,6 +354,10 @@ export class MoveItemsDto {
 }
 
 export class CreateCategoryDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   @Trim()
   @IsString()
   @MinLength(1)
@@ -339,6 +366,11 @@ export class CreateCategoryDto {
 }
 
 export class CreateListDto {
+  /** Only read when creating a list. */
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   @Trim()
   @IsString()
   @MinLength(1)
@@ -398,6 +430,10 @@ export class SetItemDto {
 }
 
 export class CreateSetDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   @Trim()
   @IsString()
   @MinLength(1)

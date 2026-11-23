@@ -52,6 +52,20 @@ internal class Palette(
   }
 }
 
+/**
+ * Glass widgets: how solid (0–1) the background, the tiles on it and the
+ * budget ring's track are drawn. Sent apart from the colours, which stay
+ * opaque (see parseColor).
+ */
+internal class Glass(json: JSONObject) {
+  val bg: Float = alpha(json, "bg")
+  val surface: Float = alpha(json, "surface")
+  val track: Float = alpha(json, "track")
+
+  private fun alpha(json: JSONObject, key: String): Float =
+    json.optDouble(key, 1.0).let { if (it.isNaN()) 1.0 else it }.toFloat().coerceIn(0f, 1f)
+}
+
 internal fun parseColor(value: String?, otherwise: Int): Int {
   if (value.isNullOrEmpty()) return otherwise
   return try {
@@ -113,6 +127,8 @@ internal class Snapshot(json: JSONObject) {
   val themeMode: String = json.optString("themeMode", "system")
   val light: Palette = Palette.from(json.optJSONObject("light"), Palette.LIGHT)
   val dark: Palette = Palette.from(json.optJSONObject("dark"), Palette.DARK)
+  /** Null: ordinary widgets, every shape solid. */
+  val glass: Glass? = json.optJSONObject("glass")?.let(::Glass)
   val messageTitle: String = json.optString("messageTitle")
   val messageBody: String = json.optString("messageBody")
 

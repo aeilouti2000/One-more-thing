@@ -1,3 +1,5 @@
+import { translate } from "@/constants/i18n";
+import { isOnline } from "@/features/offline/network";
 import { api } from "@/lib/api";
 import { formatAppError } from "@/lib/errors";
 
@@ -18,7 +20,17 @@ export const SHOP_LOCK_HEARTBEAT_MS = 15_000;
 /** While someone else shops the same list, the trip checks for news this often. */
 export const SHOP_TOGETHER_REFRESH_MS = 3000;
 
+/**
+ * Who is shopping a list is only known to the server. With no connection these
+ * answer at once (instead of each waiting for a request to give up): they are
+ * asked every few seconds.
+ */
+function offline() {
+  return { lock: null as ShopLock | null, error: translate("errorNetwork") as string | null };
+}
+
 export async function fetchShopLock(homeId: string, listId: string) {
+  if (!isOnline()) return offline();
   try {
     const lock = await api.get<ShopLock>(`/homes/${homeId}/lists/${listId}/shop-lock`);
     return { lock, error: null as string | null };
@@ -33,6 +45,7 @@ export async function claimShopLock(
   listId: string,
   options?: { newTrip?: boolean },
 ) {
+  if (!isOnline()) return offline();
   try {
     const lock = await api.post<ShopLock>(
       `/homes/${homeId}/lists/${listId}/shop-lock`,
@@ -53,6 +66,7 @@ export async function claimShopLock(
 }
 
 export async function heartbeatShopLock(homeId: string, listId: string) {
+  if (!isOnline()) return offline();
   try {
     const lock = await api.post<ShopLock>(`/homes/${homeId}/lists/${listId}/shop-lock/heartbeat`);
     return { lock, error: null as string | null };

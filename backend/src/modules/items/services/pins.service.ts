@@ -57,6 +57,8 @@ export class PinsService {
     userId: string,
     homeId: string,
     input: {
+      /** Made on the phone: sending the same create twice gives back the first pin. */
+      id?: string;
       name: string;
       quantity: number;
       category: ItemCategory;
@@ -70,6 +72,13 @@ export class PinsService {
     createItem: (notify: boolean) => Promise<unknown>,
   ) {
     await this.homes.requireMembership(userId, homeId);
+    const already = input.id ? await this.pins.findById(input.id) : null;
+    if (already) {
+      if (already.homeId !== homeId) {
+        throw new DomainError("ID_TAKEN", "That id is already in use.", HttpStatus.CONFLICT);
+      }
+      return toView(already);
+    }
     await this.categories.assertUsable(homeId, input.category);
     const list = await this.resolveList(homeId, input.listId);
     await this.assertRoom(homeId, list.id);
@@ -81,6 +90,7 @@ export class PinsService {
       utcOffsetMin: input.utcOffsetMin ?? 0,
     };
     const pin = await this.pins.insert({
+      ...(input.id ? { id: input.id } : {}),
       homeId,
       listId: list.id,
       name: input.name.trim(),

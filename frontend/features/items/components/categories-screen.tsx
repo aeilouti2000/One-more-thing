@@ -12,7 +12,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { appFont, scaleFontSize, singleLineInput } from "@/constants/font";
-import { tabBar, withAlpha } from "@/constants/theme";
+import { cardLift, tabBar, withAlpha } from "@/constants/theme";
 import { RequireSession } from "@/features/auth/components/require-session";
 import { useCategories, useCategoryLabel } from "@/features/items/providers/categories-provider";
 import {
@@ -35,7 +35,7 @@ export default function CategoriesScreen() {
 
 function CategoriesBody() {
   const { t, isRTL } = useI18n();
-  const { colors, scheme } = useTheme();
+  const { colors, glass, scheme } = useTheme();
   const { scale } = useFontScale();
   const showBack = useSettingsShowBack({ nested: true });
   const tabBarInset = useSettingsTabBarInset();
@@ -96,7 +96,7 @@ function CategoriesBody() {
           shadowOpacity: dark ? 0.36 : 0.1,
           shadowRadius: 16,
           shadowOffset: { width: 0, height: 3 },
-          elevation: 1,
+          ...cardLift(glass, 1),
         }}
       >
         <View className="flex-row items-center gap-2.5 px-3.5 py-2.5">
@@ -169,6 +169,7 @@ function CategoriesBody() {
               muted={colors.muted}
               ink={colors.ink}
               dark={dark}
+              glass={glass}
             />
           ))}
       </View>
@@ -185,6 +186,7 @@ function CategoryRow({
   muted,
   ink,
   dark,
+  glass,
 }: {
   item: HomeCategory;
   removing: boolean;
@@ -194,6 +196,8 @@ function CategoryRow({
   muted: string;
   ink: string;
   dark: boolean;
+  /** The glass theme is on: the card is see-through and casts no shadow. */
+  glass: boolean;
 }) {
   const { t } = useI18n();
   const label = useCategoryLabel(item.id);
@@ -207,7 +211,7 @@ function CategoryRow({
         shadowOpacity: dark ? 0.28 : 0.08,
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 4 },
-        elevation: 2,
+        ...cardLift(glass, 2),
       }}
     >
       <AppText numberOfLines={1} className="min-w-0 flex-1 text-base font-semibold text-cove-ink">

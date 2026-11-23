@@ -7,8 +7,11 @@ import { AppText } from "@/components/ui/AppText";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { firstName } from "@/features/items/api/shop-locks";
 import type { ShopAsk } from "@/features/items/api/shop-asks";
+import { NeedsInternetTag, useNeedsInternet } from "@/features/offline/components/needs-internet";
+import { showNeedsInternet } from "@/features/offline/sync-status";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 
 /** With more people than this, the answers start folded to one line. */
 const OPEN_BY_DEFAULT_UP_TO = 3;
@@ -27,7 +30,9 @@ type AskHomeCardProps = {
  */
 export function AskHomeCard({ ask, asking, error, onAsk }: AskHomeCardProps) {
   const { t, isRTL } = useI18n();
-  const { colors, scheme } = useTheme();
+  const { colors, glass, scheme } = useTheme();
+  const motionOff = useMotionOff();
+  const { offline } = useNeedsInternet();
   const [open, setOpen] = useState<boolean | null>(null);
   // "4 min ago" moves on by itself while the card is on screen.
   const [now, setNow] = useState(() => Date.now());
@@ -44,6 +49,33 @@ export function AskHomeCard({ ask, asking, error, onAsk }: AskHomeCardProps) {
       <Ionicons name="chatbubbles-outline" size={21} color={colors.accentText} />
     </View>
   );
+
+  if (!ask && offline) {
+    // Asking reaches the others through the server: with no connection the
+    // card stays in place, dimmed, and a tap says why.
+    return (
+      <Pressable
+        onPress={showNeedsInternet}
+        accessibilityRole="button"
+        accessibilityLabel={t("askHomeButton")}
+        accessibilityState={{ disabled: true }}
+        className="mb-3 rounded-3xl bg-cove-paper px-4 py-3.5"
+      >
+        <View className="flex-row items-center gap-3">
+          <View className="min-w-0 flex-1 flex-row items-center gap-3" style={{ opacity: 0.4 }}>
+            {icon}
+            <View className="min-w-0 flex-1">
+              <AppText className="text-base font-semibold text-cove-ink">{t("askHomeTitle")}</AppText>
+              <AppText className="mt-0.5 text-sm text-cove-muted" numberOfLines={1}>
+                {t("askHomeBody")}
+              </AppText>
+            </View>
+          </View>
+          <NeedsInternetTag />
+        </View>
+      </Pressable>
+    );
+  }
 
   if (!ask) {
     return (
@@ -70,7 +102,8 @@ export function AskHomeCard({ ask, asking, error, onAsk }: AskHomeCardProps) {
             <View
               className="h-12 w-12 items-center justify-center rounded-full"
               style={{
-                backgroundColor: colors.accentText,
+                // Glass lightens accentText for text; a button keeps the accent itself.
+                backgroundColor: glass ? colors.accent : colors.accentText,
                 shadowColor: colors.accentText,
                 shadowOpacity: scheme === "dark" ? 0.45 : 0.35,
                 shadowRadius: 10,
@@ -106,8 +139,8 @@ export function AskHomeCard({ ask, asking, error, onAsk }: AskHomeCardProps) {
 
   return (
     <Animated.View
-      entering={FadeIn.duration(200)}
-      layout={LinearTransition.duration(200)}
+      entering={motionOff ? undefined : FadeIn.duration(200)}
+      layout={motionOff ? undefined : LinearTransition.duration(200)}
       className="mb-3 rounded-3xl bg-cove-paper px-4 py-3.5"
     >
       <Pressable
@@ -133,7 +166,10 @@ export function AskHomeCard({ ask, asking, error, onAsk }: AskHomeCardProps) {
       </Pressable>
 
       {expanded ? (
-        <Animated.View entering={FadeIn.duration(160)} className="mt-3 gap-2.5">
+        <Animated.View
+          entering={motionOff ? undefined : FadeIn.duration(160)}
+          className="mt-3 gap-2.5"
+        >
           {ask.replies.map((reply) => {
             const name = firstName(reply.name) || reply.name;
             const added = reply.added > 0;

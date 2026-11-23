@@ -11,6 +11,7 @@ import { itemImageUrl, type PickedPhoto } from "@/features/items/api/items";
 import { pickItemPhoto, type PhotoSource } from "@/features/items/utils/pick-photo";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 
 /** What to show for an item's photo: the local file while it uploads, else the server copy. */
 export function itemPhotoUri(item: { imageId?: string | null; localImageUri?: string } | null) {
@@ -31,6 +32,7 @@ export function ItemPhotoThumb({
   uploading?: boolean;
 }) {
   const { colors, scheme } = useTheme();
+  const motionOff = useMotionOff();
   return (
     <View
       style={{
@@ -45,7 +47,7 @@ export function ItemPhotoThumb({
         source={{ uri }}
         style={{ width: "100%", height: "100%" }}
         contentFit="cover"
-        transition={150}
+        transition={motionOff ? null : 150}
         cachePolicy="memory-disk"
         recyclingKey={uri}
         accessibilityIgnoresInvertColors
@@ -79,11 +81,12 @@ export function ItemPhotoViewer({
 }) {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const motionOff = useMotionOff();
   return (
     <Modal
       visible={uri !== null}
       transparent
-      animationType="fade"
+      animationType={motionOff ? "none" : "fade"}
       statusBarTranslucent
       navigationBarTranslucent
       onRequestClose={onClose}
@@ -99,7 +102,7 @@ export function ItemPhotoViewer({
             source={{ uri }}
             style={{ flex: 1, marginTop: insets.top + 56, marginBottom: insets.bottom + 24 }}
             contentFit="contain"
-            transition={120}
+            transition={motionOff ? null : 120}
             cachePolicy="memory-disk"
             accessibilityLabel={title}
           />

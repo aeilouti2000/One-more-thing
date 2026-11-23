@@ -5,8 +5,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SettingsMasterPane } from "@/features/settings/components/settings-master-pane";
 import { useWideLayout } from "@/hooks/use-wide-layout";
 import { SETTINGS_MASTER_WIDTH } from "@/lib/layout";
+import { INSTANT_STACK_TRANSITION } from "@/lib/motion";
 import { spacing } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 /** Keep in sync with ScreenHeader split minHeight body + bottom pad. */
@@ -18,6 +20,7 @@ export default function SettingsLayout() {
   const { isRTL } = useI18n();
   const insets = useSafeAreaInsets();
   const wide = useWideLayout();
+  const motionOff = useMotionOff();
   const headerBandHeight =
     insets.top + spacing.xl + SPLIT_HEADER_BODY + SPLIT_HEADER_PAD_BOTTOM;
 
@@ -43,6 +46,7 @@ export default function SettingsLayout() {
     "costs",
     "language",
     "appearance",
+    "animations",
     "app-icon",
     "widgets",
   ];
@@ -57,6 +61,8 @@ export default function SettingsLayout() {
         screenOptions={{
           headerShown: false,
           animation: wide ? "fade" : "slide_from_right",
+          // Only with animations off; otherwise the key is absent, as it always was.
+          ...(motionOff ? { transitionSpec: INSTANT_STACK_TRANSITION } : null),
           cardStyle: { backgroundColor: colors.ice },
         }}
       >
@@ -68,7 +74,7 @@ export default function SettingsLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          animation: wide ? "fade" : "slide_from_right",
+          animation: motionOff ? "none" : wide ? "fade" : "slide_from_right",
           contentStyle: { backgroundColor: colors.ice },
           fullScreenGestureShadowEnabled: false,
         }}

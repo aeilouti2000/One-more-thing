@@ -28,8 +28,8 @@ export class TypeormCategoriesRepository implements ICategoriesRepository {
       .getOne();
   }
 
-  insert(homeId: string, name: string) {
-    return this.custom.save(this.custom.create({ homeId, name }));
+  insert(homeId: string, name: string, id?: string) {
+    return this.custom.save(this.custom.create({ ...(id ? { id } : {}), homeId, name }));
   }
 
   findCustomInHome(categoryId: string, homeId: string) {

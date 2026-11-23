@@ -15,18 +15,23 @@ import {
   DEFAULT_SURFACE_DEPTH,
   getColors,
   getCssVars,
+  getGlassColors,
+  normalizeGlassFrost,
   normalizeHex,
   normalizeSurfaceDepth,
   shadow as baseShadow,
+  type GlassFrost,
   type SurfaceDepth,
   type ThemeColors,
   type ThemeScheme,
 } from "@/constants/theme";
 import {
   readStoredAccent,
+  readStoredGlassFrost,
   readStoredSurfaceDepth,
   readStoredThemePreference,
   writeStoredAccent,
+  writeStoredGlassFrost,
   writeStoredSurfaceDepth,
   writeStoredThemePreference,
   type ThemePreference,
@@ -34,17 +39,24 @@ import {
 import { setAppNightMode } from "@/modules/app-night-mode/src";
 
 type ThemeContextValue = {
-  /** The theme in use: the phone's, unless the user picked one. */
+  /** The theme in use: the phone's, unless the user picked one. Glass counts as dark. */
   scheme: ThemeScheme;
+  /**
+   * The glass theme is on: `colors.paper`, `mist`, `soft` and `line` are
+   * see-through, and pages draw a GlassBackdrop behind their content.
+   */
+  glass: boolean;
   preference: ThemePreference;
   setPreference: (preference: ThemePreference) => void;
   accent: string;
   surfaceDepth: SurfaceDepth;
+  glassFrost: GlassFrost;
   colors: ThemeColors;
   shadow: typeof baseShadow;
   setScheme: (scheme: ThemeScheme) => void;
   setAccent: (accent: string) => void;
   setSurfaceDepth: (depth: SurfaceDepth) => void;
+  setGlassFrost: (frost: GlassFrost) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -55,20 +67,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     readStoredThemePreference,
   );
   const system = useSystemColorScheme();
+  const glass = preference === "glass";
   const scheme: ThemeScheme =
     preference === "system"
       ? system === "dark"
         ? "dark"
         : "light"
-      : preference;
+      : glass
+        ? "dark"
+        : preference;
   const [accent, setAccentState] = useState(readStoredAccent);
   const [surfaceDepth, setSurfaceDepthState] = useState<SurfaceDepth>(
     readStoredSurfaceDepth,
   );
+  const [glassFrost, setGlassFrostState] = useState<GlassFrost>(readStoredGlassFrost);
 
   const colors = useMemo(
-    () => getColors(scheme, accent, surfaceDepth),
-    [scheme, accent, surfaceDepth],
+    () =>
+      glass
+        ? getGlassColors(accent, glassFrost)
+        : getColors(scheme, accent, surfaceDepth),
+    [glass, scheme, accent, surfaceDepth, glassFrost],
   );
   const themeVars = useMemo(() => vars(getCssVars(colors)), [colors]);
   const shadow = useMemo(
@@ -76,8 +95,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       ...baseShadow,
       color: scheme === "dark" ? "#000000" : colors.ink,
       opacity: scheme === "dark" ? 0.4 : baseShadow.opacity,
+      // Android draws a shadow under the whole view: through glass it shows as a grey slab.
+      elevation: glass ? 0 : baseShadow.elevation,
     }),
-    [scheme, colors.ink],
+    [glass, scheme, colors.ink],
   );
 
   useEffect(() => {
@@ -99,14 +120,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     ).document;
     webDocument?.documentElement.classList.toggle("dark", scheme === "dark");
     // Android shows its launch splash before any JS runs; this is how it learns the app's theme.
-    setAppNightMode(preference);
+    setAppNightMode(preference === "system" ? "system" : scheme);
 
     writeStoredAccent(accent);
     writeStoredSurfaceDepth(surfaceDepth);
+    writeStoredGlassFrost(glassFrost);
     void SystemUI.setBackgroundColorAsync(colors.ice).catch(() => {
       // Web and some devices do not support a system background color.
     });
-  }, [scheme, preference, accent, surfaceDepth, colors.ice, setColorScheme]);
+  }, [scheme, preference, accent, surfaceDepth, glassFrost, colors.ice, setColorScheme]);
 
   const setPreference = useCallback((next: ThemePreference) => {
     setPreferenceState(next);
@@ -127,30 +149,40 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setSurfaceDepthState(normalizeSurfaceDepth(next) ?? DEFAULT_SURFACE_DEPTH);
   }, []);
 
+  const setGlassFrost = useCallback((next: GlassFrost) => {
+    setGlassFrostState(normalizeGlassFrost(next));
+  }, []);
+
   const value = useMemo(
     () => ({
       scheme,
+      glass,
       preference,
       setPreference,
       accent,
       surfaceDepth,
+      glassFrost,
       colors,
       shadow,
       setScheme,
       setAccent,
       setSurfaceDepth,
+      setGlassFrost,
     }),
     [
       scheme,
+      glass,
       preference,
       setPreference,
       accent,
       surfaceDepth,
+      glassFrost,
       colors,
       shadow,
       setScheme,
       setAccent,
       setSurfaceDepth,
+      setGlassFrost,
     ],
   );
 

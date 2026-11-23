@@ -67,7 +67,7 @@ export class ItemsController {
     @Param("homeId", ParseUUIDPipe) homeId: string,
     @Body() body: CreateListDto,
   ) {
-    return this.items.createList(user.id, homeId, body.name);
+    return this.items.createList(user.id, homeId, body.name, body.id);
   }
 
   @Patch("homes/:homeId/lists/:listId")
@@ -137,7 +137,7 @@ export class ItemsController {
     @Param("homeId", ParseUUIDPipe) homeId: string,
     @Body() body: CreateCategoryDto,
   ) {
-    return this.categories.create(user.id, homeId, body.name);
+    return this.categories.create(user.id, homeId, body.name, body.id);
   }
 
   @Delete("homes/:homeId/categories/:categoryId")

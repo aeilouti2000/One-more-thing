@@ -26,10 +26,12 @@ import {
   formatMoney,
   parseCostInput,
 } from "@/features/items/utils/currency";
+import { isMotionOff } from "@/lib/motion";
 import type { ViewHandle } from "@/lib/native-refs";
 import { useFontScale } from "@/providers/FontScaleProvider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 
 /** A view's place on screen, as `measureInWindow` reports it. */
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -65,8 +67,10 @@ function useCountTo(value: number) {
     const start = current.current;
     if (start === value) return;
     const startedAt = Date.now();
+    // Animations off: no counting, the first frame already shows the new amount.
+    const instant = isMotionOff();
     let frame = requestAnimationFrame(function step() {
-      const progress = Math.min(1, (Date.now() - startedAt) / COUNT_MS);
+      const progress = instant ? 1 : Math.min(1, (Date.now() - startedAt) / COUNT_MS);
       const next = progress < 1 ? start + (value - start) * (1 - (1 - progress) ** 3) : value;
       current.current = next;
       setShown(next);
@@ -386,7 +390,8 @@ function PriceLine({
   onSkip: (id: string) => void;
 }) {
   const { t, isRTL } = useI18n();
-  const { colors, scheme } = useTheme();
+  const { colors, glass, scheme } = useTheme();
+  const motionOff = useMotionOff();
   const { scale } = useFontScale();
   const dark = scheme === "dark";
   const danger = dark ? "#F07178" : "#C2414A";
@@ -418,7 +423,10 @@ function PriceLine({
   }
 
   return (
-    <Animated.View entering={FadeIn.duration(220)} className="flex-row items-center gap-2">
+    <Animated.View
+      entering={motionOff ? undefined : FadeIn.duration(220)}
+      className="flex-row items-center gap-2"
+    >
       <AppText numberOfLines={1} className="min-w-0 flex-1 text-sm font-semibold text-cove-ink">
         {entry.name}
       </AppText>
@@ -487,7 +495,8 @@ function PriceLine({
       >
         <View
           className="h-10 w-10 items-center justify-center rounded-full"
-          style={{ backgroundColor: colors.accentText }}
+          // Glass lightens accentText for text; a button keeps the accent itself.
+          style={{ backgroundColor: glass ? colors.accent : colors.accentText }}
         >
           <Ionicons name="checkmark" size={20} color={colors.onAccent} />
         </View>
@@ -554,7 +563,8 @@ export function Flyer({ flight, onDone }: { flight: Flight; onDone: (key: string
           left: flight.from.x,
           top: flight.from.y,
           zIndex: 30,
-          backgroundColor: colors.paper,
+          // Flies over the page, so it is solid in every theme.
+          backgroundColor: colors.overlay,
         },
         row
           ? {

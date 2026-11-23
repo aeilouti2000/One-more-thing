@@ -1,6 +1,31 @@
 {
+  "workbench.colorCustomizations": {
+    "sash.hoverBorder": "#555c64",
+    "statusBar.background": "#74b962",
+    "statusBarItem.hoverBackground": "#1b3718",
+    "statusBarItem.remoteBackground": "#1b3718",
+    "titleBar.activeBackground": "#74b962",
+    "titleBar.inactiveBackground": "#1857a499",
+    "statusBar.debuggingBackground": "#1857a4",
+    "activityBar.activeBackground": "#1b3718",
+    "activityBar.background": "#74b962",
+    "activityBar.inactiveForeground": "#e7e7e799",
+    "activityBarTop.activeBackground": "#74b962",
+    "activityBarTop.background": "#74b962",
+    "activityBarTop.inactiveForeground": "#e7e7e799",
+    "commandCenter.border": "#e7e7e799",
+    "statusBar.foreground": "#000000",
+    "titleBar.activeForeground": "#000000",
+    "titleBar.inactiveForeground": "#140a0a99",
+    "activityBar.activeBorder": "#000000",
+    "activityBarTop.activeBorder": "#000000",
+    "statusBar.inactiveBackground": "#1857a4"
+  },
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "json.schemaDownload.enable": true,
   "typescript.tsdk": "backend/node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
-  "typescript.tsserver.experimental.enableProjectDiagnostics": true
+  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "window.title": "【OMT】 One-more-thing  ·  ${dirty}${activeEditorShort}"
 }

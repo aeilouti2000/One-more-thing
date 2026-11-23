@@ -8,6 +8,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/readex-pro";
 import { AppState, Modal, Platform } from "react-native";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
@@ -19,7 +20,12 @@ import { ForceUpdate } from "@/components/ui/ForceUpdate";
 import { LaunchIntro } from "@/components/ui/LaunchIntro";
 import { ProblemScreen } from "@/components/ui/ProblemScreen";
 import { translate } from "@/constants/i18n";
-import { clearCurrentProfileCache } from "@/features/offline/profile-cache";
+// Loads every kind of change that can wait offline, and sends what is left
+// from the last run.
+import "@/features/offline/changes";
+import { OfflineNotices } from "@/features/offline/components/offline-notices";
+import { SyncSheet } from "@/features/offline/components/sync-sheet";
+import { clearOfflineData, queryClient } from "@/features/offline/query-client";
 import { logError } from "@/lib/errors";
 import {
   checkAppUpdate,
@@ -36,13 +42,18 @@ import { NotificationsProvider } from "@/features/notifications/providers/notifi
 import { WidgetPublisher } from "@/features/widgets/widget-publisher";
 import { FontScaleProvider } from "@/providers/FontScaleProvider";
 import { LanguageProvider } from "@/providers/LanguageProvider";
+import { MotionConfig, useMotionOff } from "@/providers/MotionProvider";
 import { ThemeProvider, useTheme } from "@/providers/ThemeProvider";
 
 function ThemedNavigation() {
   const { colors, scheme } = useTheme();
+  // Animations off: pages replace each other at once. On: every line below is as it was.
+  const motionOff = useMotionOff();
 
   const deeper = {
-    animation: Platform.OS === "android" ? "ios_from_right" : "slide_from_right",
+    animation: motionOff
+      ? "none"
+      : Platform.OS === "android" ? "ios_from_right" : "slide_from_right",
     fullScreenGestureShadowEnabled: false,
   } as const;
 
@@ -53,7 +64,7 @@ function ThemedNavigation() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.ice },
-          animation: "fade",
+          animation: motionOff ? "none" : "fade",
         }}
       >
         <Stack.Screen name="index" />
@@ -63,8 +74,8 @@ function ThemedNavigation() {
         <Stack.Screen name="join-home" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="trip" />
-        <Stack.Screen name="pins" options={{ animation: "fade" }} />
-        <Stack.Screen name="sets" options={{ animation: "fade" }} />
+        <Stack.Screen name="pins" options={{ animation: motionOff ? "none" : "fade" }} />
+        <Stack.Screen name="sets" options={{ animation: motionOff ? "none" : "fade" }} />
         {/* Going deeper slides in from the side; changing context fades. */}
         <Stack.Screen name="legal" options={deeper} />
         <Stack.Screen name="recap" options={deeper} />
@@ -82,6 +93,7 @@ const REOPEN_AFTER_MS = 15_000;
 function UpdateGate() {
   const [release, setRelease] = useState<AppUpdate | null>(null);
   const backgroundedAt = useRef<number | null>(null);
+  const motionOff = useMotionOff();
 
   useEffect(() => {
     let active = true;
@@ -124,7 +136,7 @@ function UpdateGate() {
       <ThemedNavigation />
       <Modal
         visible={release !== null}
-        animationType="fade"
+        animationType={motionOff ? "none" : "fade"}
         statusBarTranslucent
         navigationBarTranslucent
         onRequestClose={later}
@@ -164,7 +176,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       // Saved data from an older version can be what breaks the page.
       secondaryLabel={translate("crashClearAndRetry")}
       onSecondary={() => {
-        clearCurrentProfileCache();
+        clearOfflineData();
         void retry();
       }}
     />
@@ -182,6 +194,7 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
+    <QueryClientProvider client={queryClient}>
     <LanguageProvider>
       <FontScaleProvider>
         <ThemeProvider>
@@ -191,6 +204,7 @@ export default function RootLayout() {
                 <CategoriesProvider>
                 <PurchasesProvider>
                 <GestureHandlerRootView style={{ flex: 1 }}>
+                  <MotionConfig />
                   <DragOverlayProvider>
                     <BlurScreen>
                       <TabBlurProvider>
@@ -198,6 +212,8 @@ export default function RootLayout() {
                       </TabBlurProvider>
                     </BlurScreen>
                   </DragOverlayProvider>
+                  <SyncSheet />
+                  <OfflineNotices />
                   <AppLaunchIntro />
                   <WidgetPublisher />
                 </GestureHandlerRootView>
@@ -209,5 +225,6 @@ export default function RootLayout() {
         </ThemeProvider>
       </FontScaleProvider>
     </LanguageProvider>
+    </QueryClientProvider>
   );
 }

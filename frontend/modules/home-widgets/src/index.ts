@@ -21,6 +21,8 @@ export type WidgetStatus = Record<WidgetKind, number> & {
 };
 
 type HomeWidgetsNative = {
+  /** True on builds whose widgets can draw the glass style. Missing on older ones. */
+  supportsGlass?: boolean;
   setSnapshot(json: string): void;
   getPendingActions(): string;
   completeActions(ids: string[]): void;
@@ -38,6 +40,12 @@ const native: HomeWidgetsNative | null =
 
 /** False where there are no widgets: everything below then does nothing. */
 export const widgetsAvailable = native !== null;
+
+/**
+ * The installed app can draw see-through widgets. False on a build from
+ * before that existed: those paint every colour solid.
+ */
+export const widgetGlassAvailable = native?.supportsGlass === true;
 
 /** Hands the widgets what to show. They redraw only when it changed. */
 export function setWidgetSnapshot(json: string) {

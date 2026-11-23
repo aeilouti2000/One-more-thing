@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/AppText";
 import { headerActionStyle, iconSize, spacing } from "@/constants/theme";
+import { SyncStatusButton } from "@/features/offline/components/sync-status-button";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -45,9 +46,11 @@ export function ScreenHeader({
   compact = false,
   splitJoin,
 }: ScreenHeaderProps) {
-  const { colors, scheme } = useTheme();
+  const { colors, glass, scheme } = useTheme();
   const { isRTL, t } = useI18n();
   const insets = useSafeAreaInsets();
+  // Glass has no band: the title sits straight on the page's backdrop.
+  const band = glass ? "" : scheme === "dark" ? "bg-cove-deep" : "bg-cove-accent";
   const headerFg = scheme === "dark" ? colors.ink : colors.onAccent;
   const backAction = headerActionStyle(scheme, colors);
   const padTop = (compact ? spacing.lg : spacing.xl) + insets.top;
@@ -58,7 +61,7 @@ export function ScreenHeader({
     <View
       className={`overflow-hidden px-4 ${
         compact ? "pb-4" : "mb-6 pb-7"
-      } ${scheme === "dark" ? "bg-cove-deep" : "bg-cove-accent"}`}
+      } ${band}`}
       style={{
         paddingTop: padTop,
         ...(flush ? { marginTop: -spacing.sm } : null),
@@ -135,6 +138,8 @@ export function ScreenHeader({
             )}
           </View>
         </View>
+        {/* Only there while offline or while changes wait to be sent. */}
+        <SyncStatusButton />
         {right}
       </View>
       {footer ? <View className="mt-4">{footer}</View> : null}

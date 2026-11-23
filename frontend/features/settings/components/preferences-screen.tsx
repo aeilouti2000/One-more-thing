@@ -9,6 +9,8 @@ import {
   type SwipeActionPrefs,
 } from "@/features/items/utils/swipe-actions";
 import { canUsePush, readPushEnabled } from "@/features/notifications/api/push";
+import { animationsLabel } from "@/features/settings/components/animations-settings-screen";
+import { THEME_LABELS } from "@/features/settings/data/theme-labels";
 import { canChangeAppIcon, currentAppIcon } from "@/lib/app-icon";
 import {
   SettingsLinkCard,
@@ -22,12 +24,14 @@ import {
 } from "@/features/settings/hooks/use-settings-chrome";
 import { readWidgetStatus, widgetCount, widgetsAvailable } from "@/modules/home-widgets/src";
 import { useI18n } from "@/providers/LanguageProvider";
+import { useAnimationsSetting } from "@/providers/MotionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
 /** Personal choices: they follow this person, not the home. */
 export default function PreferencesScreen() {
-  const { colors, scheme, preference } = useTheme();
+  const { colors, preference } = useTheme();
   const { t, locale } = useI18n();
+  const { off: animationsOff } = useAnimationsSetting();
   const showBack = useSettingsShowBack();
   const tabBarInset = useSettingsTabBarInset();
   const splitJoin = useSettingsSplitJoin("detail");
@@ -48,8 +52,7 @@ export default function PreferencesScreen() {
   const appIcon = currentAppIcon();
   const appIconLabel =
     appIcon === "system" ? t("themeSystem") : appIcon === "light" ? t("light") : t("dark");
-  const themeLabel =
-    preference === "system" ? t("themeSystem") : scheme === "dark" ? t("dark") : t("light");
+  const themeLabel = t(THEME_LABELS[preference]);
 
   return (
     <Screen tabBarInset={tabBarInset}>
@@ -93,6 +96,13 @@ export default function PreferencesScreen() {
           title={t("appearance")}
           body={`${themeLabel} · ${t("textSize")}`}
           onPress={() => router.push("/settings/appearance" as Href)}
+          colors={colors}
+        />
+        <SettingsLinkCard
+          icon="flash-outline"
+          title={t("animations")}
+          body={animationsLabel(animationsOff, t)}
+          onPress={() => router.push("/settings/animations" as Href)}
           colors={colors}
         />
         {canChangeAppIcon() ? (

@@ -1,6 +1,7 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, IsNull, Not, type Repository } from "typeorm";
+import { isUniqueViolation } from "../../../common/db-errors";
 import { DomainError } from "../../../common/domain.error";
 import { HomesService } from "../../homes/services/homes.service";
 import { NotificationsService } from "../../notifications/services/notifications.service";
@@ -92,26 +93,47 @@ export class ItemsService {
   async add(
     userId: string,
     homeId: string,
-    input: { name: string; quantity: number; category: ItemCategory; unit?: string; notes?: string; urgent?: boolean; listId?: string },
+    input: {
+      /** Made on the phone: sending the same add twice gives back the first item. */
+      id?: string;
+      name: string;
+      quantity: number;
+      category: ItemCategory;
+      unit?: string;
+      notes?: string;
+      urgent?: boolean;
+      listId?: string;
+    },
     options?: { notify?: boolean },
   ) {
     await this.homes.requireMembership(userId, homeId);
+    const already = input.id ? await this.itemWithId(input.id, homeId) : null;
+    if (already) return (await this.withNames([already]))[0];
     await this.categories.assertUsable(homeId, input.category);
     const list = await this.resolveList(homeId, input.listId);
-    const item = await this.items.insert({
-      homeId,
-      listId: list.id,
-      name: input.name.trim(),
-      quantity: input.quantity,
-      category: input.category,
-      unit: blankToNull(input.unit),
-      notes: blankToNull(input.notes),
-      status: "needed",
-      urgent: input.urgent === true,
-      addedBy: userId,
-      boughtBy: null,
-      boughtAt: null,
-    });
+    let item: Item;
+    try {
+      item = await this.items.insert({
+        ...(input.id ? { id: input.id } : {}),
+        homeId,
+        listId: list.id,
+        name: input.name.trim(),
+        quantity: input.quantity,
+        category: input.category,
+        unit: blankToNull(input.unit),
+        notes: blankToNull(input.notes),
+        status: "needed",
+        urgent: input.urgent === true,
+        addedBy: userId,
+        boughtBy: null,
+        boughtAt: null,
+      });
+    } catch (error) {
+      // The same add arrived twice at once: the other one saved it.
+      const saved = input.id && isUniqueViolation(error) ? await this.itemWithId(input.id, homeId) : null;
+      if (!saved) throw error;
+      return (await this.withNames([saved]))[0];
+    }
     await this.items.placeNeeded(homeId, item.id, item.urgent ? "top" : "after-urgent", item.listId);
     const [view] = await this.withNames([item]);
     if (options?.notify !== false) {
@@ -131,25 +153,25 @@ export class ItemsService {
     userId: string,
     itemId: string,
     input: {
-      name: string;
-      quantity: number;
-      category: ItemCategory;
-      urgent: boolean;
+      name?: string;
+      quantity?: number;
+      category?: ItemCategory;
+      urgent?: boolean;
       notes?: string;
       unit?: string;
     },
   ) {
     const item = await this.requireItem(userId, itemId);
-    await this.categories.assertUsable(item.homeId, input.category);
+    if (input.category !== undefined) await this.categories.assertUsable(item.homeId, input.category);
     const needed = item.status === "needed";
-    const becameUrgent = !item.urgent && input.urgent && needed;
-    const changes: ItemPatch = {
-      name: input.name.trim(),
-      quantity: input.quantity,
-      category: input.category,
-    };
+    const becameUrgent = !item.urgent && input.urgent === true && needed;
+    // Only what was sent: a field left out keeps whatever another phone set.
+    const changes: ItemPatch = {};
+    if (input.name !== undefined) changes.name = input.name.trim();
+    if (input.quantity !== undefined) changes.quantity = input.quantity;
+    if (input.category !== undefined) changes.category = input.category;
     // A bought item keeps no urgent mark (it comes back with the one it had).
-    if (needed) changes.urgent = input.urgent;
+    if (needed && input.urgent !== undefined) changes.urgent = input.urgent;
     if (input.notes !== undefined) changes.notes = blankToNull(input.notes);
     if (input.unit !== undefined) changes.unit = blankToNull(input.unit);
     await this.items.patch(item.id, item.homeId, changes);
@@ -313,7 +335,14 @@ export class ItemsService {
   async createReceipt(
     userId: string,
     homeId: string,
-    input: { total?: number | null; name?: string | null; itemIds: string[]; listId?: string | null },
+    input: {
+      /** Made on the phone: the id a new invoice gets, or the invoice to re-price. */
+      id?: string;
+      total?: number | null;
+      name?: string | null;
+      itemIds: string[];
+      listId?: string | null;
+    },
   ) {
     await this.homes.requireMembership(userId, homeId);
     const total = normalizeCost(input.total);
@@ -336,6 +365,39 @@ export class ItemsService {
         ? ((await this.receipts.findOne({ where: { id: previousReceiptIds[0] } }))?.name ?? null)
         : null;
     const name = input.name === undefined ? previousName : blankToNull(input.name ?? undefined);
+    // The invoice the phone named already exists (the same request sent twice,
+    // or a re-price of it): update that one and put these items on it.
+    const named = input.id ? await this.receipts.findOne({ where: { id: input.id } }) : null;
+    if (named) {
+      if (named.homeId !== homeId) throw idTaken();
+      const saved = await this.receipts.manager.transaction(async (manager) => {
+        if (total !== null) named.total = total;
+        if (input.name !== undefined) named.name = name;
+        const kept = await manager.save(named);
+        await manager.update(Item, { id: In(itemIds) }, { receiptId: kept.id });
+        const emptied = previousReceiptIds.filter((id) => id !== kept.id);
+        if (emptied.length > 0) {
+          await manager.query(
+            `delete from trip_receipts r
+              where r.id = any($1::uuid[])
+                and not exists (select 1 from items i where i.receipt_id = r.id)`,
+            [emptied],
+          );
+        }
+        return kept;
+      });
+      const linked = await this.itemRows.find({ where: { id: In(itemIds) } });
+      return {
+        receipt: {
+          id: saved.id,
+          listId: saved.listId,
+          total: saved.total,
+          name: saved.name,
+          createdAt: saved.createdAt,
+        },
+        items: await this.withNames(linked),
+      };
+    }
     // The same invoice re-priced (all its items, nothing else): update it in
     // place, so its id, name and date stay the same.
     if (previousReceiptIds.length === 1 && rows.every((row) => row.receiptId === previousReceiptIds[0])) {
@@ -365,7 +427,14 @@ export class ItemsService {
     // One transaction: never leave a receipt without items or items half-moved.
     const receipt = await this.receipts.manager.transaction(async (manager) => {
       const saved = await manager.save(
-        manager.create(TripReceipt, { homeId, listId, total, name, createdBy: userId }),
+        manager.create(TripReceipt, {
+          ...(input.id ? { id: input.id } : {}),
+          homeId,
+          listId,
+          total,
+          name,
+          createdBy: userId,
+        }),
       );
       await manager.update(Item, { id: In(itemIds) }, { receiptId: saved.id });
       // Re-entering a trip's total replaces its old receipt: drop receipts that
@@ -538,12 +607,15 @@ export class ItemsService {
   }
 
   async removeMany(userId: string, ids: string[]) {
-    const uniqueIds = [...new Set(ids)];
+    // Already gone (deleted on another phone, or this request sent twice) is
+    // what was asked for: only the items still there are checked and removed.
+    const present = await this.itemRows.find({
+      where: { id: In([...new Set(ids)]) },
+      select: { id: true, homeId: true },
+    });
+    if (present.length === 0) return { deleted: 0 };
+    const uniqueIds = present.map((row) => row.id);
     const membership = { homeId: await this.homeOfItems(userId, uniqueIds) };
-    const owned = await this.items.countInHome(uniqueIds, membership.homeId);
-    if (owned !== uniqueIds.length) {
-      throw new DomainError("ITEM_NOT_FOUND", "Item not found", HttpStatus.NOT_FOUND);
-    }
     const invoiced = await this.itemRows.find({
       where: { id: In(uniqueIds), homeId: membership.homeId, receiptId: Not(IsNull()) },
     });
@@ -738,13 +810,21 @@ export class ItemsService {
     }));
   }
 
-  async createList(userId: string, homeId: string, name: string) {
+  /** `id` is made on the phone: sending the same create twice gives back the first list. */
+  async createList(userId: string, homeId: string, name: string, id?: string) {
     await this.homes.requireMembership(userId, homeId);
+    if (id) {
+      const [existing] = await this.shoppingLists.findByIds([id]);
+      if (existing) {
+        if (existing.homeId !== homeId) throw idTaken();
+        return { id: existing.id, homeId: existing.homeId, name: existing.name };
+      }
+    }
     const trimmed = name.trim();
     if (!trimmed) {
       throw new DomainError("LIST_NAME_REQUIRED", "Enter a list name.", HttpStatus.BAD_REQUEST);
     }
-    const row = await this.shoppingLists.insert(homeId, trimmed);
+    const row = await this.shoppingLists.insert(homeId, trimmed, id);
     return { id: row.id, homeId: row.homeId, name: row.name };
   }
 
@@ -788,6 +868,13 @@ export class ItemsService {
       throw new DomainError("LIST_NOT_FOUND", "List not found", HttpStatus.NOT_FOUND);
     }
     return list;
+  }
+
+  /** The item a phone already saved under this id, if any (never another home's). */
+  private async itemWithId(id: string, homeId: string) {
+    const row = await this.itemRows.findOne({ where: { id } });
+    if (row && row.homeId !== homeId) throw idTaken();
+    return row;
   }
 
   /** The item as the app sees it, after checking the user may touch it. */
@@ -889,6 +976,11 @@ export class ItemsService {
       laterUntil: row.status === "needed" && row.laterAt ? (row.laterUntil ?? null) : null,
     }));
   }
+}
+
+/** A phone-made id that already belongs to something in another home. */
+function idTaken() {
+  return new DomainError("ID_TAKEN", "That id is already in use.", HttpStatus.CONFLICT);
 }
 
 function blankToNull(value: string | undefined) {

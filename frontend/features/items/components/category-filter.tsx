@@ -3,13 +3,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRef, useState } from "react";
 import { Dimensions, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { FrostedFill } from "@/components/ui/BlurBackdrop";
+import { DialogGlass, FrostedFill } from "@/components/ui/BlurBackdrop";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { singleLineInput } from "@/constants/font";
 import { floatedCardStyle, glassFieldStyle, withAlpha } from "@/constants/theme";
 import { useCategories, useCategoryLabel } from "@/features/items/providers/categories-provider";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import type { PurchaseCategory } from "@/features/items/types/purchase";
 import type { ViewHandle } from "@/lib/native-refs";
 
@@ -42,6 +43,7 @@ export function CategoryFilter({
 }: CategoryFilterProps) {
   const { t, isRTL } = useI18n();
   const { colors, scheme } = useTheme();
+  const motionOff = useMotionOff();
   const { categories, addCategory, removeCategory } = useCategories();
   const triggerRef = useRef<ViewHandle>(null);
   const [selfAnchor, setSelfAnchor] = useState<Anchor | null>(null);
@@ -183,7 +185,7 @@ export function CategoryFilter({
       <Modal
         visible={open}
         transparent
-        animationType="fade"
+        animationType={motionOff ? "none" : "fade"}
         statusBarTranslucent
         onRequestClose={onClose}
       >
@@ -215,6 +217,7 @@ export function CategoryFilter({
               },
             ]}
           >
+            <DialogGlass style={{ borderRadius: 16 }} />
             <ScrollView
               keyboardShouldPersistTaps="handled"
               bounces={false}

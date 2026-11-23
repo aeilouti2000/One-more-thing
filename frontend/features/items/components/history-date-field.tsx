@@ -2,10 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Dimensions, Modal, Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { GlassFill } from "@/components/ui/BlurBackdrop";
+import { DialogGlass, GlassFill } from "@/components/ui/BlurBackdrop";
 import { floatedCardStyle } from "@/constants/theme";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useMotionOff } from "@/providers/MotionProvider";
 import type { ViewHandle } from "@/lib/native-refs";
 
 type HistoryDateFieldProps = {
@@ -30,6 +31,7 @@ export function HistoryDateField({
 }: HistoryDateFieldProps) {
   const { t, locale } = useI18n();
   const { colors, scheme } = useTheme();
+  const motionOff = useMotionOff();
   const [open, setOpen] = useState(false);
   const [anchorTop, setAnchorTop] = useState(0);
   const rowRef = useRef<ViewHandle>(null);
@@ -127,7 +129,7 @@ export function HistoryDateField({
       <Modal
         visible={open}
         transparent
-        animationType="fade"
+        animationType={motionOff ? "none" : "fade"}
         statusBarTranslucent
         onRequestClose={() => setOpen(false)}
       >
@@ -158,6 +160,7 @@ export function HistoryDateField({
             ]}
           >
           <GlassFill soft neutral />
+          <DialogGlass />
           <View className="mb-3 flex-row items-center justify-between">
             <Pressable
               onPress={() => setCursor(shiftMonth(cursor, -1))}
