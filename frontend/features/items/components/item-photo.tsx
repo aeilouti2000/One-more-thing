@@ -13,11 +13,17 @@ import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useMotionOff } from "@/providers/MotionProvider";
 
-/** What to show for an item's photo: the local file while it uploads, else the server copy. */
-export function itemPhotoUri(item: { imageId?: string | null; localImageUri?: string } | null) {
+/**
+ * What to show for an item's photo: the local file while it uploads, else the
+ * server copy ("thumb" for small rows, "full" for the viewer and detail).
+ */
+export function itemPhotoUri(
+  item: { imageId?: string | null; localImageUri?: string } | null,
+  size: "full" | "thumb" = "full",
+) {
   if (!item) return null;
   if (item.localImageUri) return item.localImageUri;
-  return item.imageId ? itemImageUrl(item.imageId) : null;
+  return item.imageId ? itemImageUrl(item.imageId, size) : null;
 }
 
 export function ItemPhotoThumb({
@@ -25,11 +31,14 @@ export function ItemPhotoThumb({
   size,
   radius = 12,
   uploading = false,
+  hash,
 }: {
   uri: string;
   size: number;
   radius?: number;
   uploading?: boolean;
+  /** Blurred placeholder (thumbhash) shown until the photo has loaded. */
+  hash?: string | null;
 }) {
   const { colors, scheme } = useTheme();
   const motionOff = useMotionOff();
@@ -45,6 +54,8 @@ export function ItemPhotoThumb({
     >
       <Image
         source={{ uri }}
+        placeholder={hash ? { thumbhash: hash } : undefined}
+        placeholderContentFit="cover"
         style={{ width: "100%", height: "100%" }}
         contentFit="cover"
         transition={motionOff ? null : 150}

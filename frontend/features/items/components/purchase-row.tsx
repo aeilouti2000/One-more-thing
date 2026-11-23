@@ -67,7 +67,7 @@ export function PurchaseRow({
   const categoryLabel = useCategoryLabel(purchase.category);
   const { colors, glass, scheme } = useTheme();
   const motionOff = useMotionOff();
-  const photoUri = itemPhotoUri(purchase);
+  const photoUri = itemPhotoUri(purchase, "thumb");
   const showsStepper = !selected && Boolean(onChangeQuantity) && purchase.status === "needed";
   const isUrgent = purchase.urgent && purchase.status !== "bought";
   // The row shows only a small quantity chip; tapping it opens the − / +
@@ -174,7 +174,7 @@ export function PurchaseRow({
           ) : null}
           {photoUri ? (
             <View pointerEvents="none">
-              <ItemPhotoThumb uri={photoUri} size={44} radius={12} uploading={purchase.photoUploading} />
+              <ItemPhotoThumb uri={photoUri} size={44} radius={12} uploading={purchase.photoUploading} hash={purchase.imageHash} />
             </View>
           ) : null}
           <View pointerEvents="box-none" className="min-w-0 flex-1 gap-2.5">

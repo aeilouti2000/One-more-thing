@@ -1725,6 +1725,7 @@ function TripCheckRow({
         ? t("notFoundByYou")
         : t("notFoundBy", { name: firstName(notFoundLabel) || t("partner") });
   const photoUri = itemPhotoUri(item);
+  const thumbUri = itemPhotoUri(item, "thumb");
   const [viewingPhoto, setViewingPhoto] = useState(false);
   const locked = useRef(false);
   const cardRef = useRef<ViewHandle>(null);
@@ -2008,7 +2009,7 @@ function TripCheckRow({
                   hitSlop={6}
                   className="active:opacity-80"
                 >
-                  <ItemPhotoThumb uri={photoUri} size={52} radius={14} />
+                  <ItemPhotoThumb uri={thumbUri ?? photoUri} size={52} radius={14} hash={item.imageHash} />
                 </Pressable>
               ) : null}
             </View>

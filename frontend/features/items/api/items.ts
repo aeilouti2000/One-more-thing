@@ -708,9 +708,13 @@ export type PickedPhoto = {
   fileName?: string | null;
 };
 
-/** Where <Image> loads an item photo from. */
-export function itemImageUrl(imageId: string) {
-  return apiUrl(`/item-images/${imageId}`);
+/**
+ * Where <Image> loads an item photo from. "thumb" is the 256 px copy for list
+ * rows. The server answers with a short-lived redirect to the file; this
+ * address itself never changes, so the phone's image cache keeps working.
+ */
+export function itemImageUrl(imageId: string, size: "full" | "thumb" = "full") {
+  return apiUrl(`/item-images/${imageId}${size === "thumb" ? "?size=thumb" : ""}`);
 }
 
 /** Photos waiting to be uploaded live here, where the phone never clears them. */
