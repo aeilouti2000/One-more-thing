@@ -571,6 +571,144 @@ Rule: **add the new beside the old, move the app over, then remove the old.** Th
 
 Deferred, each with its own trigger: the Frankfurt move, a custom domain, billing and the paywall, server-sent events, a second server, the first iOS build.
 
+## Step 12 results (2026-11-23): the lab and the load test
+
+Everything here was measured on the performance lab (`docs/perf-lab/`), rebuilt through the real migrations: Postgres 16 in Docker, 30,000 homes, 5.1 million items (4.9 million purchases), parallel query off. Never on production. The lesson files that print every plan are `docs/perf-lab/s12-*.sql`; the load test is `docs/perf-lab/load-test.mjs`.
+
+### How to read the numbers
+
+- **Pages** is how many 8 kB blocks Postgres touched to answer (the `Buffers:` line of a plan). On production's small database most pages are not in memory and each one is a trip to the disk, so pages are the cost that matters, more than the milliseconds measured on this fast machine.
+- **A good query touches a few pages per row it returns.** About 3 pages to find one row by its key (two index levels and the row) is the floor. When a query touches hundreds of pages and returns three rows, it is reading rows only to throw them away. That is the sign of a missing or wrong index.
+- **Time** is the time inside Postgres (`Execution Time`), with the data already in memory.
+
+### What the lab cannot show exactly (read the tables with this in mind)
+
+1. **A home's purchases sit together on disk in the lab.** Migration 027 rewrote every item, and the rewrite put each home's rows next to each other (the busy home's 720 purchases are on 78 pages). In a real, mixed table they could be on up to 720 pages. Queries that fetch many items of one home (full copy, product refresh, months list) cost more in real life than here; index-led queries for a page of 30 barely change.
+2. **The lab has about one trip per purchase** (4.3 million trips for 4.9 million purchases), because the seed scatters purchase times at random. Real people buy 5 to 10 things per trip. Every number that reads trips is therefore a worst case, about five times too high.
+3. **Postgres here has 128 MB of memory for data** (`shared_buffers`, Docker's default). Production has less and runs on 0.1 CPU, so production times will be slower; the page counts are what carry over.
+
+### The migrations at 5 million rows
+
+| Migration | Lab (4.9 M purchases) | Production (399 items, rehearsed in step 4) |
+| --- | --- | --- |
+| 027 `TripsAsRows` | **20 min 51 s** (made 4.3 M trips; the slow part is the one `update` that gives every purchase its trip) | 0.19 s for 025 to 029 together |
+| 028 `HomeProducts` | **about 3 min 50 s** (028 to 031 together; 1.5 M products) | (included above) |
+| 032 `TripLastBoughtIndex` (new, see below) | 4 s (4.3 M trips; the index is 167 MB) | instant |
+
+These migrations run **once**, on today's production data, where they take well under a second. 21 minutes at 5 million rows is a note for the future (for example, if the grouping ever had to be run again on a large database, it should be done in batches), not a blocker for this release.
+
+### Pages and time per query
+
+Busy home = lab home 2 (720 purchases a year, 30 needed items). 3-year home = lab home 1 (2,160 purchases over three years). "Since N" means about 20 items, 5 products, 3 trips and 5 deletions changed: a phone that was away for a few minutes. Numbers are with migration 032 in place; "before" is shown where it changed.
+
+**Changes endpoint** (`s12-changes.sql`)
+
+| Query | Rows | Pages | Time | Verdict |
+| --- | --- | --- | --- | --- |
+| Every request: the user (token check) | 1 | 3 | 0.04 ms | floor |
+| Every request: membership | 1 | 3 | 0.03 ms | floor |
+| Every request: remove expired shop locks | 0 | 38 | 0.05 ms | fine (tiny table) |
+| **"Nothing changed"**: the home row | 1 | **3** | 0.03 ms | floor; matches the spec's 3 pages |
+| Items changed since N, busy / 3-year | 20 | 8 / 4 | 0.09 / 0.05 ms | good |
+| Items of the 3 trips that changed | 3 | 13 | 0.08 ms | good |
+| Products changed since N | 5 | 5 | 0.05 ms | good |
+| Trips in the window changed since N, busy home | 3 | **655 before, 105 after** | 0.80 → 0.18 ms | was a missing index, fixed |
+| Same, 3-year home | 3 | **1,881 before, 98 after** | 3.4 → 0.52 ms | was a missing index, fixed |
+| Deletion markers since N | 5 | 4 | 0.05 ms | good |
+| Full copy: items (needed + 2-month window) | 140 | 100 | 0.55 ms | good |
+| Full copy: trips of the window | 104 | 655 → 105 | 0.94 → 0.20 ms | fixed with the same index |
+| Full copy: products | 176 | 8 | 0.14 ms | good |
+
+**History** (`s12-history.sql`, busy home, last month)
+
+| Query | Rows | Pages | Time | Verdict |
+| --- | --- | --- | --- | --- |
+| Purchases, page 1 | 31 | 179 | 0.5–0.7 ms | fine, see note A |
+| Purchases, page 2 by cursor | 31 | 159 | 0.44 ms | fine (page 20 costs what page 2 costs) |
+| Purchases, one category | 8 | 116 | 0.21 ms | fine |
+| Search "tom", every kept month | 31 | 97 | 0.73 ms | good |
+| Search with no match (worst case), busy / 3-year | 0 | 91 / 95 | 0.69 / 0.82 ms | good: the plan cutoff keeps it to 12 months |
+| Trips page with counts and preview | 21 | 264 | 0.82 ms | fine |
+| Month totals (rows by trip and category) | 67 | 314 | 0.92 ms | fine |
+| Months list, busy home | 649 | 3,321 | 5.9 ms | **watch**, see note B |
+| Months list, 3-year home | 1,898 | 9,730 | 19.3 ms | **watch**, see note B |
+
+**Writes on a purchase** (`s12-writes.sql`)
+
+| Query | Rows | Pages | Time | Verdict |
+| --- | --- | --- | --- | --- |
+| Find the open trip of the list (every purchase), busy home | 0–1 | **658 before, 3 after** | 1.4 → 0.04 ms | was a missing index, fixed |
+| Same, 3-year home | 0–1 | **1,881 before, 3 after** | 4.1 → 0.05 ms | was a missing index, fixed |
+| Set the trip's times from its items | 1 | 106 | 0.84 ms | fine (most of it is the trigger and index upkeep) |
+| Product upsert | 1 | 36 | 0.33 ms | good, see note C |
+| Product refresh after undo or price change | 1 | 201 | 3.7 ms | **watch**, see note D |
+
+**Clean-up job** (`s12-cleanup.sql`)
+
+| Query | Rows | Pages | Time | Verdict |
+| --- | --- | --- | --- | --- |
+| Probe a home with nothing to clean (almost every home, every day) | 0 | 13 | 0.42 ms | good: 30,000 homes cost about 13 seconds of reading a day |
+| Probe the 3-year home (24 old months) | 24 | 628 | 2.9 ms | fine: it reads the old trips it is about to delete |
+| One delete batch's select (one old month) | 40 | 172 | 0.52 ms | fine |
+
+### Finding: the trip lookups read every trip the home ever had (fixed, migration 032)
+
+Two frequent queries ask about a trip's **last** purchase time: "is there a trip of this list whose last purchase was in the last 90 minutes?" (every purchase) and "which trips of the window changed?" (every changes answer with rows). The only index on a home's trips, `trip_receipts_home_started_idx`, is sorted by **start** time. So Postgres fetched every trip of the home and threw nearly all of them away: the plan says `Rows Removed by Filter: 649` for a query that returns nothing. The cost grows with the home's history: 658 pages for the busy home, 1,881 for the 3-year home, on **every purchase**.
+
+Fix: one more index, sorted by last purchase time.
+
+```sql
+create index trip_receipts_home_last_idx on trip_receipts (home_id, last_bought_at desc);
+```
+
+| | Before | After |
+| --- | --- | --- |
+| Open trip on purchase, busy home | 658 pages, 1.4 ms | 3 pages, 0.04 ms |
+| Open trip on purchase, 3-year home | 1,881 pages, 4.1 ms | 3 pages, 0.05 ms |
+| Changed trips of the window, busy home | 655 pages | 105 pages |
+| Changed trips of the window, 3-year home | 1,881 pages | 98 pages |
+
+It went into a **new migration, 032 `TripLastBoughtIndex`**, and not into 027: the development and rehearsal databases have already run 027 and would silently miss an index added there. A test (`backend/src/database/trip-indexes.db-spec.ts`) checks that both queries are answered from the new index; it fails without migration 032. Its cost: one more index to update when a trip changes (a trip changes once per purchase), and 167 MB in the lab (about a third of the trips table). The lesson `s12-trip-index.sql` shows the plans without and with it.
+
+The changed-trips query still reads the window's trips (105 pages) to return 3. An index on `(home_id, version)`, like the one items and products have, would bring that to about 3 pages; it is not worth a second index while the window holds a few dozen real trips (note 2 above).
+
+### Notes
+
+- **A. A History page reads 179 pages, not the spec's 34.** The spec measured the page before decision 11 (a purchase belongs to the month its trip started). The page now checks each row's trip: 39 pages for the items (the spec's number) plus 4 per row for the trip. In the lab every purchase has its own trip; with real trips of 5 to 10 items the trip pages repeat and it drops to about 60. 0.5 ms; no index can remove this.
+- **B. The months list reads the home's whole history each time History opens**: every trip and every purchase, to total each month (3,321 pages for the busy home, 9,730 for the 3-year home). It is not a missing index: it really needs every row. A rewrite that groups the purchases first was tried and saved little (2,679 pages). It is bounded by the clean-up job (12 months kept), and real homes have about five times fewer trips. Watch it in the request log; if it shows up, keep a month row per home up to date or let the phone keep the list.
+- **C. The first write on a new database connection is slow** (566 pages, 7 ms for the product upsert, against 36 pages and 0.3 ms after). The first time a connection fires a trigger, Postgres compiles the trigger function and plans its queries. The API keeps its connections open, so only the warm number matters; the lesson file warms up first.
+- **D. Undo and price changes re-read the home's purchases of that name** to find the newest one. There is no index on the normalised name, so it reads every kept purchase of the home (about 750 rows, 201 pages here, more in a mixed table) and applies the name-key function to each. 3.7 ms, only on undo and price change, and bounded by the 12 months kept. Not worth an index now.
+
+### Load test: the local API on the lab database
+
+Setup: the API built from this branch (`node dist/main.js`, one Node process, database pool of 10) on port 3997, pointed at `omt_perf`. Each virtual phone is a different lab user with a real signed access token (the API allows 120 requests a minute per user). The Postman CLI's performance runner needs a Postman account login, which this machine does not have, so the load comes from a small Node script (`load-test.mjs`, no packages). The Postman CLI does run the smoke collection (`load-smoke.postman_collection.json`) without a login: 6 requests, 19 assertions, all passed.
+
+Pass mark (spec section 8): no errors, and 95% of requests under 200 ms.
+
+| Scenario | Requests | p50 | p95 | max | Errors | Under 200 ms | Result |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| (a) 200 phones asking "what changed" every 3 s, 60 s | 4,000 | 7.4 ms | 10.5 ms | 38 ms | 0 | 100% | pass |
+| … the purchase made every 2 s meanwhile | 30 | 39 ms | 72 ms | 75 ms | 0 | 100% | |
+| (b) 50 phones paging History by cursor, 60 s | 2,947 | 18 ms | 34 ms | 104 ms | 0 | 100% | pass |
+| (c) 50 phones marking bought, about 1 a second each, 60 s | 2,934 | 22 ms | 32 ms | 73 ms | 0 | 100% | pass |
+| (c) again, 180 s | 8,753 | 24 ms | 33 ms | 764 ms | 0 | 99.3% | pass |
+| All three at once, 120 s (164 requests a second) | 19,656 | 9–31 ms | 31 / 62 / 97 ms | 313 ms | 0 | 98.9–100% | pass |
+
+In the combined run the three p95 values are changes / History / mark bought.
+
+**Two runs of scenario (c) did not pass** (p95 879 ms and 842 ms, no errors). Both times all requests slowed down for 20 to 30 seconds and then went back to about 30 ms (p95 per 10 seconds: `48 40 1236 1107 185 34 31 34 31 26`). The 180-second run caught a short one while recording the machine: at that moment the whole 20-core machine was 94–97% busy, with 31–47 processes waiting for a processor, against 74% idle on average. The emulator VMs' share of the processor doubled at the same moment (7% to 16%), and 15 GB of swap was in use. The test's own load is steady and cannot fill 20 cores, so the stalls come from other work on this shared machine, not from the API or the database: no query was slow (the API logs every query over 200 ms, and logged none). Writes feel a stall most, because each purchase holds a database connection for its whole transaction and 50 phones share 10 connections. To be sure, rerun scenario (c) on a quiet machine.
+
+**First open (a full copy) is the expensive request.** One costs about 30 ms and sends about 180 kB (needed items, two months of purchases, 176 products, 104 trips). Twenty at the same moment take about 200–450 ms each, because the work is mostly in the one Node process (building and sending the answer), not in the database. Phones only do this on first open, after a reinstall, or when they fall behind the clean-up window, so it is not part of the pass mark; but if many phones ever open at once (after a release), this is the request that will queue.
+
+### Step 12 against its "done when"
+
+| Target | Result |
+| --- | --- |
+| "Nothing changed" reads 3 pages | 3 pages |
+| History page of 30 reads about 34 pages | 179 (note A: the trip-month rule adds 4 pages per row; 39 for the items themselves) |
+| Load test: no errors, 95% under 200 ms | Met in every run except two runs of (c) slowed by other work on this machine (above) |
+| Index problems found | One, fixed in migration 032 with a test |
+
 ## 6. Reading list
 
 Added as each decision is discussed.
