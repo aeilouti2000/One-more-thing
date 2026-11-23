@@ -1170,7 +1170,7 @@ function TripBody() {
         // One sync brings the list and who else is on it.
         void refresh().then(() => {
           // Shopping together: see who else is on this list.
-          if (shopTogether && homeId && listId && lockHeldRef.current && readCache(qk.locks(homeId))) {
+          if (shopTogether && homeId && listId && lockHeldRef.current && isOnline() && readCache(qk.locks(homeId))) {
             adoptLock(lockFromSync(homeId, listId));
           }
         });

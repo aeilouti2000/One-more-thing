@@ -8,7 +8,7 @@ import type { ShopLock } from "@/features/items/api/shop-locks";
 import type { Purchase } from "@/features/items/types/purchase";
 import { isOnline, probeNow } from "@/features/offline/network";
 import { changeEpoch, hasPending, noteStaleRead } from "@/features/offline/outbox";
-import { qk, readCache, writeCache } from "@/features/offline/query-client";
+import { cacheOwner, qk, queryClient, readCache, writeCache } from "@/features/offline/query-client";
 import { deletedOf, mergeItems, mergeProducts, mergeTrips } from "@/features/sync/apply";
 import type { ChangesAnswer, HomeIconRow, Product, SyncState, Trip } from "@/features/sync/types";
 import { api, ApiError } from "@/lib/api";
@@ -24,8 +24,8 @@ export type SyncResult = {
 
 const QUIET: SyncResult = { changed: false, offline: false, error: null };
 
-/** Parts of an answer that live outside the query cache (questions). */
-type SyncListener = (homeId: string, answer: ChangesAnswer) => void;
+/** Parts of an answer that live outside the query cache (questions). `startedAt`: when the request left. */
+type SyncListener = (homeId: string, answer: ChangesAnswer, startedAt: number) => void;
 const listeners = new Set<SyncListener>();
 
 /** Called with every answer that changed something. Returns the unsubscribe. */
@@ -38,6 +38,22 @@ export function onSynced(listener: SyncListener) {
 
 const inflight = new Map<string, Promise<SyncResult>>();
 const again = new Set<string>();
+
+/**
+ * Set when this phone's copy may differ from the server in a way no change
+ * will ever correct: a change shown here was refused there. The next sync then
+ * asks for a full copy instead of "what changed", which puts every row right.
+ */
+let fullCopyNeeded = false;
+
+export function requireFullSync() {
+  fullCopyNeeded = true;
+}
+
+// Any change the server refused (sent at once or after waiting offline).
+queryClient.getMutationCache().subscribe((event) => {
+  if (event.type === "updated" && event.mutation.state.status === "error") requireFullSync();
+});
 
 /**
  * Brings this phone's copy of a home up to date: asks the server what changed
@@ -88,9 +104,13 @@ async function syncOnce(homeId: string): Promise<SyncResult> {
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const state = readCache<SyncState>(qk.syncState(homeId));
+    const full = fullCopyNeeded;
     // The version is trusted only together with the copy it describes.
-    const since = state && readCache<Purchase[]>(qk.items(homeId)) !== undefined ? state.version : null;
+    const since =
+      !full && state && readCache<Purchase[]>(qk.items(homeId)) !== undefined ? state.version : null;
     const started = changeEpoch();
+    const startedAt = Date.now();
+    const owner = cacheOwner();
     let answer: ChangesAnswer;
     try {
       const zone = timezone();
@@ -105,6 +125,8 @@ async function syncOnce(homeId: string): Promise<SyncResult> {
       }
       return { changed: false, offline: isOfflineError(error), error: isOfflineError(error) ? null : formatAppError(error) };
     }
+    // Signed out, or someone else signed in, while this was on its way.
+    if (cacheOwner() !== owner) return QUIET;
     if (hasPending() && readCache(qk.items(homeId)) !== undefined) {
       noteStaleRead();
       return QUIET;
@@ -113,7 +135,8 @@ async function syncOnce(homeId: string): Promise<SyncResult> {
     if (changeEpoch() !== started && attempt === 0) continue;
     if (answer.items === undefined) return QUIET;
     applyAnswer(homeId, answer);
-    for (const listener of listeners) listener(homeId, answer);
+    if (full && answer.full) fullCopyNeeded = false;
+    for (const listener of listeners) listener(homeId, answer, startedAt);
     return { changed: true, offline: false, error: null };
   }
   return QUIET;
@@ -146,6 +169,7 @@ export function applyAnswer(homeId: string, answer: ChangesAnswer) {
   if (answer.sets) writeCache<ItemSet[]>(qk.sets(homeId), answer.sets.map(toSet));
   if (answer.icons) writeCache<HomeIconRow[]>(qk.icons(homeId), answer.icons);
   if (answer.locks) writeCache<ShopLock[]>(qk.locks(homeId), answer.locks);
+  if (answer.asks) writeCache<ShopAsk[]>(qk.asks(homeId), answer.asks);
   writeCache<SyncState>(qk.syncState(homeId), { version: answer.version, windowStart });
 }
 
@@ -173,5 +197,5 @@ export function asksOf(answer: ChangesAnswer): ShopAsk[] | undefined {
 export async function loadHomeItems(homeId: string) {
   const result = await syncHome(homeId);
   const items = readCache<Purchase[]>(qk.items(homeId));
-  return { items: items ?? ([] as Purchase[]), error: items ? null : result.error, offline: result.offline };
+  return { items: items ?? ([] as Purchase[]), error: result.error, offline: result.offline };
 }

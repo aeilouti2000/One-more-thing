@@ -4,6 +4,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { UserThrottlerGuard } from "./common/user-throttler.guard";
 import { CommonModule } from "./common/common.module";
+import { SlowQueryLogger } from "./common/slow-query-logger";
 import { StorageModule } from "./common/storage/storage.module";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -78,6 +79,7 @@ import { User } from "./users/user.entity";
           migrationsRun: true,
           // Any query slower than this is written to the log with its SQL.
           maxQueryExecutionTime: 200,
+          logger: new SlowQueryLogger(),
         };
       },
     }),

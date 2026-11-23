@@ -59,10 +59,13 @@ export class SyncRepository {
   }
 
   async setTimezone(homeId: string, timezone: string) {
-    await this.dataSource.query(`update homes set timezone = $2 where id = $1 and timezone is null`, [
-      homeId,
-      timezone,
-    ]);
+    // Only a zone Postgres itself knows: every month boundary is computed with it.
+    await this.dataSource.query(
+      `update homes set timezone = $2
+        where id = $1 and timezone is null
+          and exists (select 1 from pg_timezone_names where name = $2)`,
+      [homeId, timezone],
+    );
   }
 
   /** Needed and parked items, plus purchases inside the window. */

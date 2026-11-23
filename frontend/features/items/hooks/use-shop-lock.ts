@@ -1,3 +1,4 @@
+import { isOnline } from "@/features/offline/network";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { SHOP_LOCK_POLL_MS, type ShopLock } from "@/features/items/api/shop-locks";
@@ -72,8 +73,9 @@ export function useShopLock(options: {
     if (!enabled || !homeId || !listId) return;
 
     let cancelled = false;
-    // What the last sync knew, at once; then a fresh look.
-    if (readCache(qk.locks(homeId))) store(`${homeId}:${listId}`, lockFromSync(homeId, listId));
+    // What the last sync knew, at once; then a fresh look. Not offline: a lock
+    // saved hours ago would block shopping for as long as there is no signal.
+    if (isOnline() && readCache(qk.locks(homeId))) store(`${homeId}:${listId}`, lockFromSync(homeId, listId));
     void (async () => {
       await refresh();
       if (cancelled) return;

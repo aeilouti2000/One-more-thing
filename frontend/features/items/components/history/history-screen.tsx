@@ -1,3 +1,5 @@
+import { useSyncStatus } from "@/features/offline/sync-status";
+import { useOnline } from "@/features/offline/network";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
@@ -183,11 +185,19 @@ export default function HistoryScreen() {
   // This month and last month are on the phone anyway (the saved items): offline,
   // before their pages were ever loaded, they are shown from there.
   const onPhone = month === thisMonth || month === previousMonth();
+  // Offline, or with changes still waiting to be sent, the server's pages are
+  // behind what was done on this phone (a purchase made without signal): the
+  // phone's own items are the truth for these two months.
+  const online = useOnline();
+  const syncStatus = useSyncStatus();
+  const phoneAhead = onPhone && (!online || syncStatus.count > 0);
   const stats =
-    monthStats.stats ??
-    (onPhone && monthStats.waitingOffline ? localStats(bought, month, household?.monthlyBudget ?? null) : null);
+    (phoneAhead ? null : monthStats.stats) ??
+    (onPhone && (phoneAhead || monthStats.waitingOffline)
+      ? localStats(bought, month, household?.monthlyBudget ?? null)
+      : monthStats.stats);
   const purchasesList =
-    onPhone && !serverPurchases.loaded && serverPurchases.waitingOffline && !(searching && query)
+    onPhone && (phoneAhead || (!serverPurchases.loaded && serverPurchases.waitingOffline)) && !(searching && query)
       ? {
           ...serverPurchases,
           purchases: localPurchases(bought, month, { listId: filterListId, category }),
@@ -197,10 +207,13 @@ export default function HistoryScreen() {
         }
       : serverPurchases;
   const tripsList =
-    onPhone && !serverTrips.loaded && serverTrips.waitingOffline
+    onPhone && (phoneAhead || (!serverTrips.loaded && serverTrips.waitingOffline))
       ? { ...serverTrips, trips: localTrips(bought, month, filterListId), loaded: true, hasMore: false, waitingOffline: false }
       : serverTrips;
-  const localTrip = !serverTrip.detail && serverTrip.waitingOffline && openTripId ? localTripItems(bought, openTripId) : null;
+  const localTrip =
+    openTripId && (phoneAhead || (!serverTrip.detail && serverTrip.waitingOffline))
+      ? localTripItems(bought, openTripId)
+      : null;
   const tripDetail = localTrip
     ? {
         ...serverTrip,
@@ -369,8 +382,11 @@ export default function HistoryScreen() {
     if (!renaming || tripBusy) return;
     setTripBusy(true);
     setTripError(null);
+    // A trip built from purchases not yet on the server has no invoice: its id
+    // is its first item's. Naming it then creates the invoice from its items.
+    const unsynced = bought.some((item) => item.id === renaming.id);
     const result = await renameTrip(
-      { receiptId: renaming.id, itemIds: renaming.itemIds, listId: renaming.listId },
+      { receiptId: unsynced ? null : renaming.id, itemIds: renaming.itemIds, listId: renaming.listId },
       tripName,
     );
     setTripBusy(false);

@@ -106,3 +106,32 @@ test("clear forgets everything", () => {
   const loaded = new RowStore(db).load();
   assert.deepEqual([loaded.entries.length, loaded.mutations.length, loaded.owner], [0, 0, null]);
 });
+
+test("after a failed write, the next save writes every row again and leaves no stale row", () => {
+  const db = memoryDb();
+  const store = new RowStore(db);
+  const a = item("a");
+  const b = item("b");
+  store.save("u", [{ key: KEY, value: [a, b] }]);
+
+  // The disk fails in the middle of the next save: nothing of it is kept.
+  const run = db.runSync;
+  let calls = 0;
+  db.runSync = (sql, params) => {
+    calls += 1;
+    if (calls === 2) throw new Error("disk full");
+    return run(sql, params);
+  };
+  const c = item("c");
+  assert.throws(() => store.save("u", [{ key: KEY, value: [a, c] }]), /disk full/);
+  db.runSync = run;
+  assert.deepEqual(
+    db.getAllSync<{ id: string }>(`select id from list_rows order by id`).map((row) => row.id),
+    ["a", "b"],
+  );
+
+  // The retry holds the same objects; without the reset it would skip them.
+  store.save("u", [{ key: KEY, value: [a, c] }]);
+  const loaded = new RowStore(db).load();
+  assert.deepEqual(loaded.entries.find((entry) => entry.key[0] === "items")?.value, [a, c]);
+});

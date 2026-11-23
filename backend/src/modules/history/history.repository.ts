@@ -20,9 +20,6 @@ export type TripListRow = {
   preview: { name: string; category: string; imageId: string | null }[];
 };
 
-/** A trip may run past midnight: purchases are looked for this far around a month. */
-const TRIP_SPAN = "interval '2 days'";
-
 /**
  * Reads for History. A purchase belongs to the month its trip started in, so
  * a trip is never split between two months (the app's rule). Every query is
@@ -63,9 +60,11 @@ export class HistoryRepository {
       .createQueryBuilder("item")
       .innerJoin("trip_receipts", "trip", "trip.id = item.receipt_id")
       .where("item.home_id = :homeId and item.status = 'bought'", { homeId })
-      .andWhere(`item.bought_at >= cast(:start as timestamptz) - ${TRIP_SPAN}`, { start: range.start })
-      .andWhere(`item.bought_at < cast(:end as timestamptz) + ${TRIP_SPAN}`, { end: range.end })
-      .andWhere("trip.started_at >= :start and trip.started_at < :end", { start: range.start, end: range.end })
+      // By the trip's month only: an item can join an invoice days after it started.
+      .andWhere("trip.home_id = :homeId and trip.started_at >= :start and trip.started_at < :end", {
+        start: range.start,
+        end: range.end,
+      })
       .andWhere("trip.started_at >= :cutoff", { cutoff: range.cutoff })
       .orderBy("item.bought_at", "DESC")
       .addOrderBy("item.id", "DESC")

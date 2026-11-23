@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Purchase } from "@/features/items/types/purchase";
-import { deletedOf, mergeItems, mergeTrips } from "@/features/sync/apply";
+import { deletedOf, mergeItems, mergeTrips, monthOfWindowStart, withOlderMonths } from "@/features/sync/apply";
 import type { Trip } from "@/features/sync/types";
 
 const WINDOW = "2026-10-01T00:00:00.000Z";
@@ -113,4 +113,23 @@ test("deletedOf picks one kind", () => {
   ];
   assert.deepEqual(deletedOf(deleted, "item"), ["1", "3"]);
   assert.deepEqual(deletedOf(undefined, "item"), []);
+});
+
+test("older months add only purchases the phone does not hold", () => {
+  const mine = [item("a", { status: "bought", quantity: 5 })];
+  const merged = withOlderMonths(mine, [item("a", { status: "bought", quantity: 1 }), item("b", { status: "bought" })]);
+  assert.deepEqual(merged.map((row) => [row.id, row.quantity]), [["a", 5], ["b", 1]]);
+  assert.equal(withOlderMonths(mine, []), mine);
+});
+
+test("the window's month is the home's month, wherever the phone is", () => {
+  // 1 October 00:00 in Amman (UTC+3) is 30 September 21:00 UTC.
+  const windowStart = "2026-09-30T21:00:00.000Z";
+  const zone = process.env.TZ;
+  for (const tz of ["Asia/Amman", "America/Los_Angeles", "Pacific/Auckland", "UTC"]) {
+    process.env.TZ = tz;
+    assert.equal(monthOfWindowStart(windowStart), "2026-10", tz);
+  }
+  process.env.TZ = zone;
+  assert.equal(monthOfWindowStart("not a date"), null);
 });

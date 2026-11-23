@@ -139,6 +139,17 @@ export class RowStore {
 
   /** Saves changed entries (value undefined: removed) and, when given, the whole outbox. */
   save(owner: string, changes: { key: unknown[]; value: unknown }[], mutations?: unknown[]) {
+    try {
+      return this.saveAll(owner, changes, mutations);
+    } catch (error) {
+      // The transaction rolled back, so nothing of it is on disk: forget what
+      // was believed written, and the next save writes every row again.
+      this.written.clear();
+      throw error;
+    }
+  }
+
+  private saveAll(owner: string, changes: { key: unknown[]; value: unknown }[], mutations?: unknown[]) {
     let writes = 0;
     this.db.withTransactionSync(() => {
       for (const { key, value } of changes) {
@@ -181,8 +192,15 @@ export class RowStore {
   }
 
   private saveList(text: string, key: unknown[], rows: { id: string }[]) {
-    const before = this.written.get(text) ?? { rows: new Map<string, unknown>(), order: "" };
+    let before = this.written.get(text);
     let writes = 0;
+    if (!before) {
+      // Nothing is known about this list on disk (first save, or after a failed
+      // one): start it clean, so no row from before can linger.
+      this.db.runSync(`delete from list_rows where list_key = ?`, [text]);
+      before = { rows: new Map<string, unknown>(), order: "" };
+      writes += 1;
+    }
     const seen = new Set<string>();
     for (const row of rows) {
       seen.add(row.id);

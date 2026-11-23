@@ -32,7 +32,8 @@ export function useHistoryPurchases(
       getNextPageParam: (last: PurchasesPage) => last.next ?? undefined,
       enabled: Boolean(homeId),
       networkMode: "online",
-      ...(search ? { gcTime: SEARCH_KEEP_MS } : null),
+      // Search results are for the moment: dropped soon, never saved to the phone.
+      ...(search ? { gcTime: SEARCH_KEEP_MS, meta: { persist: false } } : null),
     },
     queryClient,
   );

@@ -14,7 +14,7 @@ import { undoDeadline } from "../utils/shopping";
 import { CategoriesService } from "./categories.service";
 import { PinsService } from "./pins.service";
 import { ProductsService } from "./products.service";
-import { TripsService } from "./trips.service";
+import { TRIP_GAP_MS, TripsService } from "./trips.service";
 
 export type ItemView = {
   id: string;
@@ -398,7 +398,10 @@ export class ItemsService {
       const existing = others === 0
         ? await this.receipts.findOne({ where: { id: previousReceiptIds[0], homeId } })
         : null;
-      if (existing) {
+      // A phone that made its own id for this invoice (and may have queued a
+      // rename for it while offline) must find it under that id: a trip nobody
+      // priced or named is replaced below, not updated in place.
+      if (existing && !(input.id && isAutoTrip(existing))) {
         // "No total" from a phone that hasn't seen the invoice yet keeps the saved one.
         if (total !== null) existing.total = total;
         existing.name = name;
@@ -541,6 +544,11 @@ export class ItemsService {
     const receipt = await manager.findOne(TripReceipt, { where: { id: receiptId, homeId } });
     // A stale invoice (deleted meanwhile) leaves the items to the 90-minute rule.
     if (!receipt) return;
+    // The app names "this month's latest invoice" for purchases made from the
+    // list. Now that every purchase has a trip, that id may be a trip nobody
+    // priced or named, days old: only a real invoice, or a trip still going
+    // on, takes the purchase. Anything else is left to the 90-minute rule.
+    if (isAutoTrip(receipt) && boughtAt.getTime() - receipt.lastBoughtAt.getTime() > TRIP_GAP_MS) return;
     const rows = await manager.find(Item, {
       where: { id: In(itemIds), homeId, status: "bought" },
     });
@@ -1017,6 +1025,11 @@ function blankToNull(value: string | undefined) {
 }
 
 type TripReceiptManager = Repository<TripReceipt>["manager"];
+
+/** A trip the server made by itself for loose purchases: nobody priced, named or created it. */
+function isAutoTrip(receipt: TripReceipt) {
+  return receipt.createdBy === null && receipt.name === null && (receipt.total === null || receipt.total === undefined);
+}
 
 function receiptAmount(receipt: TripReceipt | undefined) {
   if (!receipt || receipt.total === null || receipt.total === undefined) return null;

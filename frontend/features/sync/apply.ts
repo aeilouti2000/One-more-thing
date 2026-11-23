@@ -78,3 +78,24 @@ export function mergeProducts(current: Product[] | undefined, incoming: Product[
 export function deletedOf(deleted: { type: string; id: string }[] | undefined, type: string) {
   return (deleted ?? []).filter((row) => row.type === type).map((row) => row.id);
 }
+
+/**
+ * "YYYY-MM" of the month a window start belongs to. The window starts at
+ * midnight in the HOME's time zone; a day and a half later it is the same
+ * month in every zone, so a phone elsewhere in the world agrees.
+ */
+export function monthOfWindowStart(windowStart: string) {
+  const at = new Date(Date.parse(windowStart) + 36 * 3600_000);
+  if (Number.isNaN(at.getTime())) return null;
+  return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * The phone's purchases plus older months loaded from the server, each
+ * purchase once (the phone's copy wins: it may hold a change not yet sent).
+ */
+export function withOlderMonths(purchases: Purchase[], older: Purchase[]): Purchase[] {
+  if (older.length === 0) return purchases;
+  const have = new Set(purchases.map((item) => item.id));
+  return [...purchases, ...older.filter((item) => !have.has(item.id))];
+}

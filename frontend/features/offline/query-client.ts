@@ -115,7 +115,7 @@ const persister = createSyncStoragePersister({
  * when SQLite is not available (web, tests, or it failed to open): then the
  * single saved text below is used, as before.
  */
-const rowStore: RowStore | null = (() => {
+let rowStore: RowStore | null = (() => {
   const db = openCacheDb();
   if (!db) return null;
   try {
@@ -138,13 +138,22 @@ function storedUserId() {
 /** Whose data the cache holds. One person's lists are never shown to the next. */
 let owner: string | null = storedUserId();
 
+export function cacheOwner() {
+  return owner;
+}
+
+/** A query marked `meta: { persist: false }` (search results) is never saved to the phone. */
+function isSaved(query: Query) {
+  return query.meta?.persist !== false;
+}
+
 /**
  * What is written to the phone: everything loaded, and every change not yet
  * answered. That includes one on its way right now: if the app is closed
  * before the answer arrives, it is sent again next time.
  */
 const WHAT_TO_SAVE = {
-  shouldDehydrateQuery: (query: Query) => query.state.status === "success",
+  shouldDehydrateQuery: (query: Query) => query.state.status === "success" && isSaved(query),
   shouldDehydrateMutation: (mutation: Mutation) => mutation.state.status === "pending",
 };
 
@@ -266,12 +275,12 @@ function restoreRows(store: RowStore) {
   try {
     copy = store.load();
   } catch {
-    store.clear();
+    clearRows();
     return;
   }
   const usable = copy.owner === owner && Date.now() - copy.savedAt < MAX_AGE_MS;
   if (!usable) {
-    if (copy.owner !== null) store.clear();
+    if (copy.owner !== null) clearRows();
     return;
   }
   restoring = true;
@@ -292,9 +301,22 @@ function restoreRows(store: RowStore) {
     });
   } catch {
     queryClient.clear();
-    store.clear();
+    clearRows();
   } finally {
     restoring = false;
+  }
+}
+
+/**
+ * Empties the tables. If even that fails (a damaged file), the tables are not
+ * used for the rest of this run: the app keeps working from memory and saves
+ * the single text instead.
+ */
+function clearRows() {
+  try {
+    rowStore?.clear();
+  } catch {
+    rowStore = null;
   }
 }
 
@@ -309,13 +331,17 @@ function moveTextCopyToRows(store: RowStore) {
     const entries = queryClient
       .getQueryCache()
       .getAll()
-      .filter((query) => query.state.status === "success" && query.state.data !== undefined)
+      .filter((query) => query.state.status === "success" && query.state.data !== undefined && isSaved(query))
       .map((query) => ({ key: [...query.queryKey], value: query.state.data }));
+    // Rows left by an earlier run (the tables were used, then not) must not mix in.
+    store.clear();
     store.save(owner, entries, savedMutations());
     for (const entry of entries) store.adoptRestored(entry.key, entry.value);
     persister.removeClient();
   } catch {
-    // Kept as text: the next start tries again.
+    // The text stays the saved copy for this run too (so nothing newer lands
+    // in the tables while the text is still there); the next start tries again.
+    rowStore = null;
   }
   return true;
 }
@@ -370,6 +396,7 @@ restore();
 // same data (the trip screen asks every few seconds) writes nothing.
 const lastData = new WeakMap<Query, unknown>();
 queryClient.getQueryCache().subscribe((event) => {
+  if (!isSaved(event.query)) return;
   if (event.type === "removed") {
     if (rowStore) markDirty(event.query.queryKey, undefined);
     return save();
@@ -403,7 +430,7 @@ export function setCacheOwner(userId: string | null) {
   outboxDirty = false;
   queryClient.clear();
   persister.removeClient();
-  rowStore?.clear();
+  clearRows();
   if (userId) adoptLegacyCache(userId);
 }
 
@@ -413,7 +440,7 @@ export function clearOfflineData() {
   outboxDirty = false;
   queryClient.clear();
   persister.removeClient();
-  rowStore?.clear();
+  clearRows();
   const userId = owner ?? storedUserId();
   if (userId) storage.removeItem(`${LEGACY_PREFIX}${userId}`);
 }
@@ -443,5 +470,6 @@ export const qk = {
   trips: (homeId: string) => ["trips", homeId] as const,
   icons: (homeId: string) => ["icons", homeId] as const,
   locks: (homeId: string) => ["locks", homeId] as const,
+  asks: (homeId: string) => ["asks", homeId] as const,
   notificationPrefs: () => ["notificationPrefs"] as const,
 };

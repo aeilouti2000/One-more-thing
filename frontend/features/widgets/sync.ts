@@ -1,10 +1,10 @@
+import { loadHomeItems } from "@/features/sync/engine";
 import { translate } from "@/constants/i18n";
 import { fetchMyHousehold } from "@/features/homes/api/homes";
 import type { Household } from "@/features/homes/types/household";
 import {
   addItem,
   clearItemsLater,
-  fetchHomeItems,
   markItemBought,
 } from "@/features/items/api/items";
 import { fetchLists, listLabel, type HomeList } from "@/features/items/api/lists";
@@ -122,7 +122,7 @@ async function sendActions(household: Household, userId: string): Promise<Sent> 
   const actions = readWidgetActions();
   if (actions.length === 0) return sent;
 
-  const itemsResult = await fetchHomeItems(household.id);
+  const itemsResult = await loadHomeItems(household.id);
   if (itemsResult.error || itemsResult.offline) {
     sent.retry = true;
     return sent;
@@ -230,7 +230,7 @@ async function runSync(): Promise<{ retry: boolean }> {
       : { done: [], retry: false };
 
   const [itemsResult, listsResult, pinsResult] = await Promise.all([
-    fetchHomeItems(household.id),
+    loadHomeItems(household.id),
     fetchLists(household.id),
     fetchPins(household.id),
   ]);
@@ -238,7 +238,7 @@ async function runSync(): Promise<{ retry: boolean }> {
   if (!readSession()) {
     publishSignedOut();
   } else if (fresh && readSession()?.user.id === user.id) {
-    // fetchHomeItems saved this copy, so the app opens with what the widget shows.
+    // The sync saved this copy, so the app opens with what the widget shows.
     publishWidgets({
       user,
       household,

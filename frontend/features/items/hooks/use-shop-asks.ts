@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { isOpenAsk, type ShopAsk } from "@/features/items/api/shop-asks";
 import { onListChanged } from "@/features/items/utils/list-sync";
-import { onSynced, syncHome } from "@/features/sync/engine";
+import { qk, readCache, writeCache } from "@/features/offline/query-client";
+import { onSynced, requireFullSync, syncHome } from "@/features/sync/engine";
 
 /**
  * The home's open "Anything missing?" questions, shared by the list (which
@@ -26,7 +27,15 @@ let inflight: { homeId: string; run: Promise<void> } | null = null;
  * ended). A check that started before it would put the older state back.
  */
 let localVersion = 0;
+/** When the last change was made here; a sync that left before it is older. */
+let lastLocalChangeAt = 0;
 const listeners = new Set<() => void>();
+
+/** The questions the last sync brought for a home (kept with the saved copy). */
+function savedAsks(homeId: string) {
+  const asks = (readCache<ShopAsk[]>(qk.asks(homeId)) ?? []).filter((ask) => isOpenAsk(ask));
+  return asks.length ? asks : NONE;
+}
 
 function publish(next: State) {
   state = next;
@@ -46,7 +55,9 @@ function sameAsks(a: ShopAsk[], b: ShopAsk[]) {
 
 export function refreshShopAsks(homeId: string, options?: { force?: boolean }): Promise<void> {
   if (state.homeId !== homeId) {
-    publish({ homeId, asks: NONE });
+    // After a restart or a home switch the sync may answer "nothing changed":
+    // start from what the last sync saved.
+    publish({ homeId, asks: savedAsks(homeId) });
     lastFetchAt = 0;
   }
   // A check for this home is already on its way; one for another home (the
@@ -72,14 +83,16 @@ export function refreshShopAsks(homeId: string, options?: { force?: boolean }): 
 
 /**
  * Every sync that changed something carries the home's open questions. One
- * that started before a change made here (an answer just given) is older and
- * is skipped.
+ * that left before a change made here (an answer just given) is older: it is
+ * not shown, and a fresh copy is asked for.
  */
-let syncSeen = localVersion;
-onSynced((homeId, answer) => {
+onSynced((homeId, answer, startedAt) => {
   if (!answer.asks || state.homeId !== homeId) return;
-  if (syncSeen !== localVersion) {
-    syncSeen = localVersion;
+  if (startedAt < lastLocalChangeAt) {
+    // Older than what was just done here, but it may carry a partner's answer:
+    // ask again for a full copy instead of showing or dropping it.
+    requireFullSync();
+    void syncHome(homeId);
     return;
   }
   const open = answer.asks.filter((ask) => isOpenAsk(ask));
@@ -95,14 +108,19 @@ export function refreshShopAsksIfShown(homeId: string) {
 export function adoptShopAsk(ask: ShopAsk) {
   if (state.homeId !== ask.homeId) return;
   localVersion += 1;
+  lastLocalChangeAt = Date.now();
   const rest = state.asks.filter((entry) => entry.id !== ask.id);
-  publish({ homeId: state.homeId, asks: isOpenAsk(ask) ? [ask, ...rest] : rest });
+  const next = isOpenAsk(ask) ? [ask, ...rest] : rest;
+  writeCache<ShopAsk[]>(qk.asks(ask.homeId), next);
+  publish({ homeId: state.homeId, asks: next });
 }
 
 export function dropShopAsk(askId: string) {
   if (!state.asks.some((ask) => ask.id === askId)) return;
   localVersion += 1;
+  lastLocalChangeAt = Date.now();
   const rest = state.asks.filter((ask) => ask.id !== askId);
+  if (state.homeId) writeCache<ShopAsk[]>(qk.asks(state.homeId), rest);
   publish({ homeId: state.homeId, asks: rest.length ? rest : NONE });
 }
 

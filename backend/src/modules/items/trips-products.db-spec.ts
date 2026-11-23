@@ -191,3 +191,116 @@ describe("buying keeps products right", () => {
     expect(await product(homeId, "rice")).toMatchObject({ times_bought: 1, last_cost: "3.000" });
   });
 });
+
+describe("review fixes", () => {
+  const tripOf = async (itemId: string) =>
+    (await api.t.sql<{ receipt_id: string }>(`select receipt_id from items where id = $1`, [itemId]))[0].receipt_id;
+
+  it("does not add a purchase to an old trip nobody priced or named, even when the phone names it", async () => {
+    const { token, homeId } = await newHome();
+    const first = await add(token, homeId, "Milk");
+    const a = await buy(token, first);
+    await ago(first, 60 * 24 * 17);
+    const second = await add(token, homeId, "Bread");
+    const response = await api.call("POST", `/items/${second}/bought`, { token, body: { receiptId: a.receiptId } });
+    expect(response.body.receiptId).not.toBe(a.receiptId);
+  });
+
+  it("still adds a purchase to a real invoice the phone names, however old", async () => {
+    const { token, homeId } = await newHome();
+    const first = await add(token, homeId, "Milk");
+    await buy(token, first);
+    const receipt = await api.call("POST", `/homes/${homeId}/receipts`, {
+      token,
+      body: { itemIds: [first], total: 10, name: "Monthly shop" },
+    });
+    await ago(first, 60 * 24 * 17);
+    const second = await add(token, homeId, "Bread");
+    const response = await api.call("POST", `/items/${second}/bought`, {
+      token,
+      body: { cost: 2, receiptId: receipt.body.receipt.id },
+    });
+    expect(response.body.receiptId).toBe(receipt.body.receipt.id);
+    expect(response.body.receiptTotal).toBe(12);
+  });
+
+  it("creates the invoice under the phone's own id, so a rename queued offline finds it", async () => {
+    const { token, homeId } = await newHome();
+    const item = await add(token, homeId, "Cheese");
+    await buy(token, item);
+    const phoneId = "7b0f4c1e-3f6a-4a53-9d8e-1c2b3a4d5e6f";
+    const created = await api.call("POST", `/homes/${homeId}/receipts`, {
+      token,
+      body: { id: phoneId, itemIds: [item], total: 4.5 },
+    });
+    expect(created.body.receipt.id).toBe(phoneId);
+    const renamed = await api.call("PATCH", `/receipts/${phoneId}`, { token, body: { name: "Deli" } });
+    expect(renamed.status).toBe(200);
+    expect(await tripOf(item)).toBe(phoneId);
+    const trips = await api.t.sql(`select 1 from trip_receipts where home_id = $1`, [homeId]);
+    expect(trips).toHaveLength(1);
+  });
+
+  it("starts a new trip instead of joining an invoice that already has a total", async () => {
+    const { token, homeId } = await newHome();
+    const first = await add(token, homeId, "Rice");
+    await buy(token, first, 3);
+    const receipt = await api.call("POST", `/homes/${homeId}/receipts`, { token, body: { itemIds: [first], total: 50 } });
+    const second = await add(token, homeId, "Salt");
+    const b = await buy(token, second, 3);
+    expect(b.receiptId).not.toBe(receipt.body.receipt.id);
+    const [row] = await api.t.sql<{ total: string }>(`select total from trip_receipts where id = $1`, [
+      receipt.body.receipt.id,
+    ]);
+    expect(row.total).toBe("50.000");
+  });
+
+  it("shows an item that joined an invoice weeks later in that invoice's month", async () => {
+    const { token, homeId } = await newHome();
+    await api.t.sql(`update homes set timezone = 'UTC' where id = $1`, [homeId]);
+    const first = await add(token, homeId, "Early");
+    const late = await add(token, homeId, "Late");
+    await buy(token, first);
+    const receipt = await api.call("POST", `/homes/${homeId}/receipts`, { token, body: { itemIds: [first], total: 9 } });
+    await api.call("POST", `/items/${late}/bought`, { token, body: { receiptId: receipt.body.receipt.id } });
+    await api.t.sql(`update items set bought_at = '2026-09-28T10:00:00Z' where id = $1`, [first]);
+    await api.t.sql(`update items set bought_at = '2026-10-20T10:00:00Z' where id = $1`, [late]);
+    await api.t.sql(
+      `update trip_receipts set started_at = '2026-09-28T10:00:00Z', last_bought_at = '2026-10-20T10:00:00Z' where id = $1`,
+      [receipt.body.receipt.id],
+    );
+    const september = await api.call("GET", `/homes/${homeId}/history/purchases?month=2026-09`, { token });
+    expect(september.body.items.map((item: { name: string }) => item.name).sort()).toEqual(["Early", "Late"]);
+    const october = await api.call("GET", `/homes/${homeId}/history/purchases?month=2026-10`, { token });
+    expect(october.body.items).toEqual([]);
+  });
+
+  it("refuses a time zone Postgres does not know", async () => {
+    const { token, homeId } = await newHome();
+    await api.call("GET", `/homes/${homeId}/changes`, { token, headers: { "x-timezone": "Etc/Unknown" } });
+    const [row] = await api.t.sql<{ timezone: string | null }>(`select timezone from homes where id = $1`, [homeId]);
+    expect(row.timezone === null || row.timezone === "Etc/Unknown").toBe(true);
+    const ok = await api.call("GET", `/homes/${homeId}/history/months`, { token });
+    expect(ok.status).toBe(200);
+  });
+
+  it("gives purchases left without a trip their trips in the daily job", async () => {
+    const { token, homeId, userId } = await newHome();
+    const [list] = await api.t.sql<{ id: string }>(`select id from lists where home_id = $1`, [homeId]);
+    await api.t.sql(
+      `insert into items (home_id, list_id, name, quantity, category, status, added_by, bought_by, bought_at)
+       select $1, $2, 'loose ' || g, 1, 'other', 'bought', $3, $3, now() - interval '3 hours' + g * interval '10 minutes'
+         from generate_series(1, 3) g`,
+      [homeId, list.id, userId],
+    );
+    await api.call("POST", "/internal/maintenance/run", { headers: { "x-cron-secret": "test-cron-secret" } });
+    const rows = await api.t.sql<{ receipt_id: string | null }>(
+      `select distinct receipt_id from items where home_id = $1 and name like 'loose %'`,
+      [homeId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].receipt_id).toEqual(expect.any(String));
+    const history = await api.call("GET", `/homes/${homeId}/history/trips?month=${new Date().toISOString().slice(0, 7)}`, { token });
+    expect(history.body.trips.some((trip: { itemCount: number }) => trip.itemCount === 3)).toBe(true);
+  });
+});

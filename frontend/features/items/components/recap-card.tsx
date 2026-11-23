@@ -1,5 +1,5 @@
 import { previousMonth } from "@/features/items/utils/insights";
-import { useOlderMonths } from "@/features/sync/month-purchases";
+import { useOlderMonths, withOlderMonths } from "@/features/sync/month-purchases";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
@@ -35,7 +35,7 @@ export function RecapCard({ purchases, now }: { purchases: Purchase[]; now: numb
   // The month before the recap's month may be older than the phone keeps: loaded once.
   const older = useOlderMonths(hidden ? null : homeId, month ? [month, previousMonth(month)] : []);
   const recap = useMemo(
-    () => (hidden || !month ? null : summarizeRecap([...purchases, ...older], month)),
+    () => (hidden || !month ? null : summarizeRecap(withOlderMonths(purchases, older), month)),
     [hidden, month, older, purchases],
   );
   if (!recap || !month || !homeId || recap.items === 0) return null;

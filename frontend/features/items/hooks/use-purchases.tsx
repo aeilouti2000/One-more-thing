@@ -1,4 +1,4 @@
-import { loadHomeItems } from "@/features/sync/engine";
+import { loadHomeItems, requireFullSync } from "@/features/sync/engine";
 import {
   createContext,
   useCallback,
@@ -260,8 +260,12 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   /** After a refused change the screen goes back to what the server has. */
   const settle = useCallback(
     async (result: Result, changed = true): Promise<Result> => {
-      if (result.error) await refresh();
-      else if (changed) emitListChanged();
+      if (result.error) {
+        // What this phone shows was refused: only a full copy puts it right
+        // ("what changed" would answer "nothing").
+        requireFullSync();
+        await refresh();
+      } else if (changed) emitListChanged();
       return { error: result.error };
     },
     [refresh],

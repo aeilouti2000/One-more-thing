@@ -38,10 +38,12 @@ export class TripsService {
       // not create one each: buyers of the same list take turns here.
       await manager.query("select pg_advisory_xact_lock(hashtext($1))", [`trip:${listId}`]);
       // Within 90 minutes on either side: requests sent at the same moment can
-      // reach here in either order, each with its own start time.
+      // reach here in either order, each with its own start time. An invoice
+      // with a total is closed: its total would not include this purchase.
       const recent: { id: string }[] = await manager.query(
         `select id from trip_receipts
           where home_id = $1 and list_id = $2
+            and total is null
             and last_bought_at >= $3 and started_at <= $4
           order by last_bought_at desc
           limit 1`,

@@ -58,9 +58,14 @@ export class MaintenanceService {
       for (const home of homes) {
         cursor = home.id;
         result.homes += 1;
-        const cleaned = await this.cleanHome(home);
-        result.monthsCleaned += cleaned.months;
-        result.itemsDeleted += cleaned.items;
+        try {
+          const cleaned = await this.cleanHome(home);
+          result.monthsCleaned += cleaned.months;
+          result.itemsDeleted += cleaned.items;
+        } catch (error) {
+          // One home's problem must not stop everyone else's clean-up.
+          this.logger.warn(`Clean-up of a home failed: ${error instanceof Error ? error.message : "unknown"}`);
+        }
         if (Date.now() - started >= budgetMs) {
           result.next = cursor;
           return result;
@@ -164,6 +169,48 @@ export class MaintenanceService {
     }
   }
 
+  /**
+   * Purchases without a trip get one, grouped like migration 027 did (same home
+   * and list, each within 90 minutes of the one before). There should be none:
+   * this covers purchases served by a server from before trips were rows, such
+   * as the old instance during the deploy that added them.
+   */
+  async attachLoosePurchases() {
+    return this.dataSource.transaction(async (manager) => {
+      const [{ count }] = await manager.query(
+        `select count(*)::int as count from items where status = 'bought' and receipt_id is null and bought_at is not null`,
+      );
+      if (count === 0) return 0;
+      await manager.query(`
+        create temp table loose_item on commit drop as
+        with loose as (
+          select id, home_id, list_id, bought_at,
+                 case when lag(bought_at) over w is null
+                        or bought_at - lag(bought_at) over w > interval '90 minutes' then 1 else 0 end as starts
+            from items
+           where status = 'bought' and receipt_id is null and bought_at is not null
+          window w as (partition by home_id, list_id order by bought_at, id)
+        )
+        select id as item_id, home_id, list_id, bought_at,
+               sum(starts) over (partition by home_id, list_id order by bought_at, id) as grp
+          from loose`);
+      await manager.query(`
+        create temp table loose_trip on commit drop as
+        select home_id, list_id, grp, gen_random_uuid() as trip_id,
+               min(bought_at) as started_at, max(bought_at) as last_bought_at
+          from loose_item group by home_id, list_id, grp`);
+      await manager.query(`
+        insert into trip_receipts (id, home_id, list_id, created_at, started_at, last_bought_at)
+        select trip_id, home_id, list_id, started_at, started_at, last_bought_at from loose_trip`);
+      await manager.query(`
+        update items i set receipt_id = t.trip_id
+          from loose_item s join loose_trip t using (home_id, list_id, grp)
+         where i.id = s.item_id`);
+      this.logger.log(`Gave ${count} purchase(s) without a trip their trips`);
+      return count as number;
+    });
+  }
+
   /** Deletes the files of deleted photos and icons (recorded by triggers in storage_trash). */
   async emptyStorageTrash() {
     if (!this.storage) return 0;
@@ -196,6 +243,7 @@ export class MaintenanceService {
         [MARKER_DAYS],
       );
     });
+    await this.attachLoosePurchases();
     await this.emptyStorageTrash();
     await this.dataSource.query(`delete from refresh_tokens where expires_at < now() - interval '1 day'`);
     await this.dataSource.query(`delete from email_codes where expires_at < now() - interval '1 day'`);
