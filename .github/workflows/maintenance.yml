@@ -1,0 +1,45 @@
+# Daily clean-up: months older than each home's plan keeps are saved as totals
+# and their purchases deleted; old deletion markers, expired sign-in tokens and
+# codes are removed. See backend/src/modules/maintenance.
+#
+# Uses the same secrets as pins-tick.yml: API_BASE_URL and CRON_SECRET.
+name: Maintenance
+
+on:
+  schedule:
+    # 01:30 UTC, a quiet hour in the Middle East (04:30 in Amman).
+    - cron: "30 1 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: maintenance
+  cancel-in-progress: false
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Run the clean-up until every home is done
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$API_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::warning::API_BASE_URL or CRON_SECRET is not set; skipping."
+            exit 0
+          fi
+          after=""
+          for round in $(seq 1 200); do
+            url="${API_BASE_URL%/}/api/internal/maintenance/run"
+            [ -n "$after" ] && url="$url?after=$after"
+            body=$(curl --fail-with-body --silent --show-error \
+              --retry 2 --retry-delay 20 --retry-all-errors --max-time 120 \
+              -X POST -H "x-cron-secret: $CRON_SECRET" "$url")
+            echo "$body"
+            after=$(printf '%s' "$body" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("next") or "")')
+            [ -z "$after" ] && exit 0
+          done
+          echo "::warning::Stopped after 200 rounds; tomorrow's run continues."

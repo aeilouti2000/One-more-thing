@@ -20,6 +20,7 @@ Owner's instructions for this run (2026-11-23):
 | 7 Trips and products on every purchase | Done | Buy, bulk buy, undo, price change, pricing a trip, moving and deleting keep trips and products right, in one transaction. Release-on-read removed. 11 end-to-end tests |
 | 8 History endpoints | Done | Purchases (month, list, category, search, cursor), trips, one trip, month totals, months list. 11 end-to-end tests |
 | 9 Plans | Done | `early` plan (12 months, sets 20, pins 15, 100 icon images); every home response carries `plan`; sets and pins read their limits from it |
+| 10 Clean-up job | Done | `POST /api/internal/maintenance/run` (cron secret, advisory lock, ~20 s per call, `next` to continue) and `.github/workflows/maintenance.yml` daily at 01:30 UTC. Also removes old deletion markers (raising `sync_floor`), expired tokens and codes, finished questions. 6 end-to-end tests |
 
 ## Differences from the spec, decided during the build
 
@@ -37,3 +38,5 @@ These follow the spec's intent; the spec will be updated to match before the rel
 10. **No CSV export endpoint**: the CSV's column names are translated on the phone, so the app keeps building it from the month's purchases (`history/purchases` pages).
 11. **A purchase belongs to the month its trip started** (the app's existing rule), for lists and totals alike, so they always agree.
 12. **Month totals for months older than the plan keeps** are still shown (from saved totals, or summed while the purchases are in the grace period), marked `archived`.
+13. **The clean-up job also removes expired sign-in tokens, email codes and finished shopping questions**, which nothing removed before.
+14. **Every home's `plan_changed_at` starts at the deploy time**, so the job deletes nothing for the first 30 days. Nothing is older than 12 months before September 2027 anyway.
