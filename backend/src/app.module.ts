@@ -28,6 +28,7 @@ import { TripReceipt } from "./modules/items/entities/trip-receipt.entity";
 import { ItemImage } from "./modules/items/entities/item-image.entity";
 import { ItemsModule } from "./modules/items/items.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
+import { SyncModule } from "./modules/sync/sync.module";
 import { PushToken } from "./modules/notifications/entities/push-token.entity";
 import { User } from "./users/user.entity";
 
@@ -81,6 +82,7 @@ import { User } from "./users/user.entity";
     HomesModule,
     ItemsModule,
     NotificationsModule,
+    SyncModule,
   ],
   controllers: [HealthController, AppReleaseController, LegalController],
   providers: [{ provide: APP_GUARD, useClass: UserThrottlerGuard }],

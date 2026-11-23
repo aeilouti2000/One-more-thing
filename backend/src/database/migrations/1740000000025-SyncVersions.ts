@@ -61,6 +61,10 @@ export class SyncVersions1740000000025 implements MigrationInterface {
           end if;
           return old;
         end if;
+        -- An update that changes nothing is not a change: no number, nothing to send.
+        if tg_op = 'UPDATE' and new is not distinct from old then
+          return new;
+        end if;
         update homes set version = version + 1 where id = new.home_id returning version into v;
         new.version := coalesce(v, new.version);
         return new;

@@ -104,6 +104,27 @@ export class ShopLocksService {
     });
   }
 
+  /**
+   * Who is shopping each list of the home right now, for the changes answer.
+   * Expired locks are removed first: a lock ends by time, not by a write, and
+   * removing it is what moves the home's change counter so phones notice.
+   */
+  async removeExpired(homeId: string) {
+    await this.locks.delete({ homeId, heartbeatAt: LessThan(this.cutoff()) });
+  }
+
+  async homeLocks(viewerId: string, homeId: string, together: boolean): Promise<ShopLockView[]> {
+    const rows = await this.locks.find({ where: { homeId }, order: { startedAt: "ASC" } });
+    const byList = new Map<string, ListShopLock[]>();
+    for (const row of rows) {
+      if (this.isStale(row)) continue;
+      byList.set(row.listId, [...(byList.get(row.listId) ?? []), row]);
+    }
+    return Promise.all(
+      [...byList].map(([listId, listRows]) => this.toView(viewerId, listId, listRows, together)),
+    );
+  }
+
   async heartbeat(userId: string, homeId: string, listId: string): Promise<ShopLockView> {
     const home = await this.homes.getOne(userId, homeId);
     await this.requireList(homeId, listId);

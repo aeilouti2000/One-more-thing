@@ -76,5 +76,16 @@ import { ShopLocksService } from "./services/shop-locks.service";
     { provide: PINS_REPOSITORY, useClass: TypeormPinsRepository },
     { provide: CATEGORIES_REPOSITORY, useClass: TypeormCategoriesRepository },
   ],
+  exports: [
+    ItemsService,
+    PinsService,
+    CategoriesService,
+    ShopLocksService,
+    ShopAsksService,
+    SetsService,
+    ItemImagesService,
+    ITEMS_REPOSITORY,
+    LISTS_REPOSITORY,
+  ],
 })
 export class ItemsModule {}

@@ -48,6 +48,14 @@ describe("change counter triggers", () => {
     expect(rows.map((row) => Number(row.version))).toEqual([1, 2, 3, 4, 5].map((n) => before + n));
   });
 
+  it("does not count an update that changes nothing", async () => {
+    const home = await seedHome(t, "noop");
+    const item = await addItem(home, "Salt");
+    const before = await homeVersion(home.homeId);
+    await t.sql(`update items set quantity = quantity where id = $1`, [item.id]);
+    expect(await homeVersion(home.homeId)).toBe(before);
+  });
+
   it("leaves a deletion marker with the next number", async () => {
     const home = await seedHome(t, "delete");
     const item = await addItem(home, "Bread");
