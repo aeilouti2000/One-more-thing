@@ -1,0 +1,14 @@
+[
+  ["Tomatoes", "tomatoes"],
+  ["  Tomatoes  ", "tomatoes"],
+  ["TOMATOES", "tomatoes"],
+  ["Chicken   breast", "chicken breast"],
+  ["Chicken\tbreast\n", "chicken breast"],
+  ["خُبْز", "خبز"],
+  ["خبز", "خبز"],
+  ["حليب نادك كامل الدسم", "حليب نادك كامل الدسم"],
+  ["حلـــيب", "حليب"],
+  ["قَهْوَة  عربية", "قهوة عربية"],
+  ["Café", "café"],
+  ["", ""]
+]

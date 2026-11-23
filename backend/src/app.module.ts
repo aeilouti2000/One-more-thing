@@ -8,33 +8,9 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RefreshToken } from "./modules/auth/entities/refresh-token.entity";
 import { type AppConfig, validateEnv } from "./config/env";
-import { ItemSortOrder1740000000006 } from "./database/migrations/1740000000006-ItemSortOrder";
-import { CustomCategories1740000000008 } from "./database/migrations/1740000000008-CustomCategories";
-import { ItemCosts1740000000009 } from "./database/migrations/1740000000009-ItemCosts";
-import { SoftDeleteLists1740000000010 } from "./database/migrations/1740000000010-SoftDeleteLists";
-import { ListShopLocks1740000000011 } from "./database/migrations/1740000000011-ListShopLocks";
-import { TripReceipts1740000000012 } from "./database/migrations/1740000000012-TripReceipts";
-import { EmailAndGoogle1740000000013 } from "./database/migrations/1740000000013-EmailAndGoogle";
 import { LegalController } from "./legal/legal.controller";
-import { ItemImages1740000000014 } from "./database/migrations/1740000000014-ItemImages";
-import { PinLists1740000000015 } from "./database/migrations/1740000000015-PinLists";
-import { PinMonthDay1740000000016 } from "./database/migrations/1740000000016-PinMonthDay";
-import { HomeNotifications1740000000017 } from "./database/migrations/1740000000017-HomeNotifications";
-import { NamedInvoices1740000000018 } from "./database/migrations/1740000000018-NamedInvoices";
-import { PrefsBudgetTrips1740000000019 } from "./database/migrations/1740000000019-PrefsBudgetTrips";
-import { TripsTogether1740000000020 } from "./database/migrations/1740000000020-TripsTogether";
-import { OncePinsInterval1740000000021 } from "./database/migrations/1740000000021-OncePinsInterval";
-import { RotateRefreshTokens1740000000022 } from "./database/migrations/1740000000022-RotateRefreshTokens";
-import { MemberAndListIndexes1740000000023 } from "./database/migrations/1740000000023-MemberAndListIndexes";
-import { LaterAsksSets1740000000024 } from "./database/migrations/1740000000024-LaterAsksSets";
+import { MIGRATIONS } from "./database/migrations";
 import { EmailCode } from "./modules/auth/entities/email-code.entity";
-import { ShoppingLists1740000000007 } from "./database/migrations/1740000000007-ShoppingLists";
-import { ManyHomes1740000000005 } from "./database/migrations/1740000000005-ManyHomes";
-import { ShoppingTrip1740000000004 } from "./database/migrations/1740000000004-ShoppingTrip";
-import { AddPushTokens1740000000003 } from "./database/migrations/1740000000003-AddPushTokens";
-import { AddItemUrgent1740000000002 } from "./database/migrations/1740000000002-AddItemUrgent";
-import { DropEmailConfirmation1740000000001 } from "./database/migrations/1740000000001-DropEmailConfirmation";
-import { Init1740000000000 } from "./database/migrations/1740000000000-Init";
 import { AppReleaseController } from "./app-release.controller";
 import { HealthController } from "./health.controller";
 import { HomeMember } from "./modules/homes/entities/home-member.entity";
@@ -90,33 +66,10 @@ import { User } from "./users/user.entity";
             ShopAsk,
             ItemSet,
           ],
-          migrations: [
-            Init1740000000000,
-            DropEmailConfirmation1740000000001,
-            AddItemUrgent1740000000002,
-            AddPushTokens1740000000003,
-            ShoppingTrip1740000000004,
-            ManyHomes1740000000005,
-            ItemSortOrder1740000000006,
-            ShoppingLists1740000000007,
-            CustomCategories1740000000008,
-            ItemCosts1740000000009,
-            SoftDeleteLists1740000000010,
-            ListShopLocks1740000000011,
-            TripReceipts1740000000012,
-            EmailAndGoogle1740000000013,
-            ItemImages1740000000014,
-            PinLists1740000000015,
-            PinMonthDay1740000000016,
-            HomeNotifications1740000000017,
-            NamedInvoices1740000000018,
-            PrefsBudgetTrips1740000000019,
-            TripsTogether1740000000020,
-            OncePinsInterval1740000000021,
-            RotateRefreshTokens1740000000022,
-            MemberAndListIndexes1740000000023,
-            LaterAsksSets1740000000024,
-          ],
+          migrations: MIGRATIONS,
+          // One transaction per migration, so a migration can opt out (an index
+          // built "concurrently" cannot run inside a transaction).
+          migrationsTransactionMode: "each" as const,
           migrationsRun: true,
           // Any query slower than this is written to the log with its SQL.
           maxQueryExecutionTime: 200,

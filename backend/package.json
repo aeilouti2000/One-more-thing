@@ -9,7 +9,8 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "test:db": "jest --runInBand --config jest.db.config.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",
