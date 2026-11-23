@@ -40,6 +40,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { AppText } from "@/components/ui/AppText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
@@ -1429,7 +1430,7 @@ function TripBody() {
         }
       />
 
-      <FormMessage message={actionError ?? error} />
+      <ToastMessage message={actionError ?? error} />
 
       {partnersNow.length > 0 ? (
         <View className="mb-3 flex-row">

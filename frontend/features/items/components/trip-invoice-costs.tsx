@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
 import { ReceiptSourceModal } from "@/features/items/components/receipt-source-modal";
 import { usePurchases } from "@/features/items/hooks/use-purchases";
@@ -172,7 +172,7 @@ export function TripInvoiceCosts({
           borderColor={chipBorder}
         />
       </View>
-      {sheet === null ? <FormMessage message={scanner.error ?? error} /> : null}
+      {sheet === null ? <ToastMessage message={scanner.error ?? error} /> : null}
 
       <CostEntrySheet
         visible={sheet === "items"}

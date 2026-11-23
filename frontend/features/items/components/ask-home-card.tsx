@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { firstName } from "@/features/items/api/shop-locks";
 import type { ShopAsk } from "@/features/items/api/shop-asks";
 import { NeedsInternetTag, useNeedsInternet } from "@/features/offline/components/needs-internet";
@@ -125,7 +125,7 @@ export function AskHomeCard({ ask, asking, error, onAsk }: AskHomeCardProps) {
             </View>
           </Pressable>
         </View>
-        <FormMessage message={error} />
+        <ToastMessage message={error} />
       </View>
     );
   }

@@ -10,6 +10,7 @@ import { AppText } from "@/components/ui/AppText";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { FoldPaneEmpty, FoldSplit } from "@/components/ui/FoldSplit";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { HomeIcon } from "@/components/ui/HomeIcon";
 import { IconSheet } from "@/components/ui/IconSheet";
 import { Screen, useSwipeSlideStyle } from "@/components/ui/Screen";
@@ -644,8 +645,8 @@ export default function HistoryScreen() {
           <View>
             {band}
             <SlideRow rowKey="header" index={0} still>
-              <FormMessage message={message} onDismiss={() => setMessage(null)} />
-              <FormMessage message={notice} tone="success" onDismiss={() => setNotice(null)} />
+              <ToastMessage message={message} onDismiss={() => setMessage(null)} />
+              <ToastMessage message={notice} tone="success" onDismiss={() => setNotice(null)} />
               {page.header}
             </SlideRow>
           </View>

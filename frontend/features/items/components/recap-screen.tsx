@@ -6,7 +6,7 @@ import { Pressable, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { headerActionStyle, iconSize } from "@/constants/theme";
@@ -129,7 +129,7 @@ function RecapBody() {
         }
       />
 
-      <FormMessage message={shareError} />
+      <ToastMessage message={shareError} />
 
       {recap.items === 0 ? (
         <EmptyState title={t("recapEmpty", { month: name })} message={t("recapEmptyBody")} />

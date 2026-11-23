@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { useAuth } from "@/features/auth/providers/auth-provider";
@@ -183,7 +183,7 @@ export default function TripsSettingsScreen() {
           </CardBlock>
         </HostOnly>
 
-        <FormMessage message={error} />
+        <ToastMessage message={error} />
       </SettingsSection>
     </Screen>
   );

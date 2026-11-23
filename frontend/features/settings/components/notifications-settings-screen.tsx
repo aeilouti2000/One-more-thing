@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppState, Linking, Pressable, Switch, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { useAuth } from "@/features/auth/providers/auth-provider";
@@ -224,7 +224,7 @@ export default function NotificationsSettingsScreen() {
                 />
               </View>
             ))}
-            <FormMessage message={prefsError} />
+            <ToastMessage message={prefsError} />
           </CardBlock>
       </SettingsSection>
     </Screen>

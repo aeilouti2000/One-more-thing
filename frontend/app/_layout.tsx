@@ -16,6 +16,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { BlurScreen } from "@/components/ui/BlurBackdrop";
 import { DragOverlayProvider } from "@/components/ui/DragOverlay";
 import { TabBlurProvider } from "@/components/ui/TabBlurTarget";
+import { ToastHost } from "@/components/ui/ToastHost";
 import { ForceUpdate } from "@/components/ui/ForceUpdate";
 import { LaunchIntro } from "@/components/ui/LaunchIntro";
 import { ProblemScreen } from "@/components/ui/ProblemScreen";
@@ -214,6 +215,7 @@ export default function RootLayout() {
                   </DragOverlayProvider>
                   <SyncSheet />
                   <OfflineNotices />
+                  <ToastHost />
                   <AppLaunchIntro />
                   <WidgetPublisher />
                 </GestureHandlerRootView>

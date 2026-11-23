@@ -67,6 +67,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { ListsHeaderIcon } from "@/components/ui/ListsHeaderIcon";
 import { Screen, SwipeSlideContent } from "@/components/ui/Screen";
 import { ShimmerBlock } from "@/components/ui/ShimmerBlock";
@@ -1408,7 +1409,7 @@ export default function ItemsScreen() {
         </>
       )}
 
-      <FormMessage
+      <ToastMessage
         message={isConfirmingDelete ? error : (actionError ?? error)}
       />
 

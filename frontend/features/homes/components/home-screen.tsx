@@ -17,6 +17,7 @@ import { AppTextField } from "@/components/ui/AppTextField";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
@@ -540,7 +541,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
                 : t("homesCount", { count: homeCards.length })
             }
           />
-          <FormMessage message={error} />
+          <ToastMessage message={error} />
           <View className="gap-3">
             {homeCards.map((home) => {
               const current = home.id === household?.id;
@@ -582,7 +583,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
         floating={floating}
       >
         {header}
-        <FormMessage message={error} />
+        <ToastMessage message={error} />
         {household ? (
           <View className="gap-5">
             <CurrentHomeCard
@@ -656,7 +657,7 @@ export default function HomeScreen({ view = "hub" }: { view?: HomeView } = {}) {
           }
         >
           {header}
-          <FormMessage message={error} />
+          <ToastMessage message={error} />
           {household ? (
             <View className="gap-6">
               <InviteCodeCard

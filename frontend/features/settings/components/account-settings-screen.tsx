@@ -7,7 +7,7 @@ import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { withAlpha } from "@/constants/theme";
@@ -256,7 +256,7 @@ export default function AccountSettingsScreen() {
           ) : null}
         </View>
         {googleError && !isConfirmingUnlink ? (
-          <FormMessage message={googleError} />
+          <ToastMessage message={googleError} />
         ) : null}
       </View>
 

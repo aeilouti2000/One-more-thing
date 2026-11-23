@@ -3,7 +3,7 @@ import { View } from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppText } from "@/components/ui/AppText";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { firstName } from "@/features/items/api/shop-locks";
 import type { ShopAsk, ShopAskReply } from "@/features/items/api/shop-asks";
 import { useI18n } from "@/providers/LanguageProvider";
@@ -66,7 +66,7 @@ export function ShopAskCard({ ask, busy, error, onAdd, onReply }: ShopAskCardPro
           />
         </View>
       </View>
-      <FormMessage message={error} />
+      <ToastMessage message={error} />
     </Animated.View>
   );
 }

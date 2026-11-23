@@ -1,7 +1,7 @@
 import { InlinePane } from "@/components/ui/InlinePane";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { ItemSheetForm, ItemSheetToggle } from "@/features/items/components/item-sheet-form";
 import { CostEntrySheet } from "@/features/items/components/cost-entry-sheet";
 import {
@@ -29,6 +29,8 @@ import { useHousehold } from "@/features/homes/hooks/use-household";
 import { usePurchaseActions } from "@/features/items/hooks/use-purchases";
 import { formatMoney } from "@/features/items/utils/currency";
 import { createPin, deletePin, fetchPins } from "@/features/items/api/pins";
+import { localizeMessage } from "@/constants/i18n";
+import { showToast } from "@/lib/toast";
 import { parseQuantity } from "@/lib/validation";
 import { useI18n } from "@/providers/LanguageProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -238,7 +240,7 @@ export function ItemDetailCard({
     if (photoChanged && photoTarget) {
       // Upload in the background; the row shows a spinner until it lands.
       void setItemPhoto(photoTarget, photoDraft ?? null).then((upload) => {
-        if (upload.error) Alert.alert(t("itemPhoto"), upload.error);
+        if (upload.error) showToast(localizeMessage(upload.error));
       });
     }
     setPhotoDraft(undefined);

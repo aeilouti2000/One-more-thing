@@ -19,6 +19,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SheetField } from "@/components/ui/SheetField";
@@ -190,7 +191,7 @@ function SetsBody() {
         showBack
       />
 
-      <FormMessage message={error} />
+      <ToastMessage message={error} />
 
       {isLoading && sets.length === 0 ? (
         <View className="gap-3">

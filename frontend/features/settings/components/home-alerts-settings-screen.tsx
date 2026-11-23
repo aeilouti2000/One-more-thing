@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Switch, View } from "react-native";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { useAuth } from "@/features/auth/providers/auth-provider";
@@ -96,7 +96,7 @@ export default function HomeAlertsSettingsScreen() {
                 />
               )}
             </View>
-            <FormMessage message={error} />
+            <ToastMessage message={error} />
           </CardBlock>
         </HostOnly>
       </SettingsSection>

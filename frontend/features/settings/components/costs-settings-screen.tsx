@@ -9,6 +9,7 @@ import { AppText } from "@/components/ui/AppText";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SheetField } from "@/components/ui/SheetField";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { iconSize } from "@/constants/theme";
@@ -170,7 +171,7 @@ export default function CostsSettingsScreen() {
                 />
               )}
             </View>
-            <FormMessage message={costError} />
+            <ToastMessage message={costError} />
           </CardBlock>
         </HostOnly>
 
@@ -353,7 +354,7 @@ export default function CostsSettingsScreen() {
                   />
                 </View>
               </View>
-              <FormMessage message={exportError} />
+              <ToastMessage message={exportError} />
             </CardBlock>
           </>
         ) : null}

@@ -18,7 +18,7 @@ import { GlassFill } from "@/components/ui/BlurBackdrop";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FloatMessage } from "@/components/ui/FloatMessage";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { ShimmerBlock } from "@/components/ui/ShimmerBlock";
@@ -466,7 +466,7 @@ function PinsBody() {
         showBack={showBack}
         splitJoin={splitJoin}
       />
-      {isAdding ? null : <FormMessage message={error} />}
+      {isAdding ? null : <ToastMessage message={error} />}
 
       {pins.length > 0 ? (
         <View className="mb-4">

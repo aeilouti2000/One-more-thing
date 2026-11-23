@@ -11,7 +11,6 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
-import { Alert } from "react-native";
 import {
   addItem as insertItem,
   cachedItems,
@@ -40,7 +39,8 @@ import {
   type NewItemInput,
   type UpdateItemInput,
 } from "@/features/items/api/items";
-import { translate } from "@/constants/i18n";
+import { localizeMessage, translate } from "@/constants/i18n";
+import { showToast } from "@/lib/toast";
 import {
   emitListChanged,
   onListChanged,
@@ -325,7 +325,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       if (photo) {
         // The sheet closes now; the upload follows the item (also offline).
         void setItemPhoto(id, photo).then((upload) => {
-          if (upload.error) Alert.alert(translate("itemPhoto"), upload.error);
+          if (upload.error) showToast(localizeMessage(upload.error));
         });
       }
       // A shared list is when alerts start to matter: ask once, softly.

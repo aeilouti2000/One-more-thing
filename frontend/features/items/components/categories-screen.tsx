@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { AppText } from "@/components/ui/AppText";
-import { FormMessage } from "@/components/ui/FormMessage";
+import { ToastMessage } from "@/components/ui/ToastMessage";
 import { HomeIcon } from "@/components/ui/HomeIcon";
 import { IconSheet } from "@/components/ui/IconSheet";
 import { Screen } from "@/components/ui/Screen";
@@ -88,7 +88,7 @@ function CategoriesBody() {
         showBack={showBack}
         splitJoin={splitJoin}
       />
-      <FormMessage message={error} />
+      <ToastMessage message={error} />
 
       <View
         className="mb-4 overflow-hidden rounded-3xl"

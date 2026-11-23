@@ -2271,6 +2271,9 @@ const englishToKey: Record<string, TranslationKey> = {
 };
 
 export function localizeMessage(message: string) {
+  // The bare fallbacks from lib/api read as code; say it in plain words.
+  if (message === "Request failed") return translate("errorNetwork");
+  if (/^Request failed \(\d+\)$/.test(message)) return translate("errorGeneric");
   const key = englishToKey[message];
   return key ? translate(key) : message;
 }
