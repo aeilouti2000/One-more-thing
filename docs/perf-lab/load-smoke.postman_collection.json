@@ -1,0 +1,110 @@
+{
+  "info": {
+    "name": "One More Thing - step 12 load smoke test (local lab only)",
+    "description": "Checks, once and with assertions, the three requests the load test (load-test.mjs) repeats: changes, a History page by cursor, and mark bought. Run against the LOCAL API on omt_perf only. The access token is signed in the collection's pre-request script with the local API's JWT_ACCESS_SECRET, in the payload the API makes ({ sub, email, iat, exp }, HS256).\n\npostman collection run docs/perf-lab/load-smoke.postman_collection.json --env-var baseUrl=http://127.0.0.1:3997/api --env-var jwtSecret=... --env-var homeId=... --env-var userId=... --env-var email=...",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Sign a short-lived access token for the lab user, exactly as the API's auth service would.",
+          "if (!pm.variables.get('accessToken')) {",
+          "  const b64url = (words) => CryptoJS.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+          "  const enc = (obj) => b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+          "  const now = Math.floor(Date.now() / 1000);",
+          "  const head = enc({ alg: 'HS256', typ: 'JWT' });",
+          "  const body = enc({ sub: pm.variables.get('userId'), email: pm.variables.get('email'), iat: now, exp: now + 900 });",
+          "  const sig = b64url(CryptoJS.HmacSHA256(head + '.' + body, pm.variables.get('jwtSecret')));",
+          "  pm.collectionVariables.set('accessToken', head + '.' + body + '.' + sig);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Changes: first open (full copy)",
+      "request": { "method": "GET", "url": "{{baseUrl}}/homes/{{homeId}}/changes" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json();",
+        "pm.test('full copy with a version', () => { pm.expect(body.full).to.eql(true); pm.expect(body.version).to.be.a('number'); });",
+        "pm.test('under 200 ms', () => pm.expect(pm.response.responseTime).to.be.below(200));",
+        "pm.collectionVariables.set('version', body.version);",
+        "const needed = body.items.filter((item) => item.status === 'needed');",
+        "pm.test('has a needed item to buy', () => pm.expect(needed.length).to.be.above(0));",
+        "pm.collectionVariables.set('itemId', needed[0].id);"
+      ] } }]
+    },
+    {
+      "name": "Changes: nothing changed",
+      "request": { "method": "GET", "url": "{{baseUrl}}/homes/{{homeId}}/changes?since={{version}}" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.to.have.status(200));",
+        "pm.test('only the version comes back', () => pm.expect(pm.response.json()).to.eql({ version: Number(pm.collectionVariables.get('version')), full: false }));",
+        "pm.test('under 200 ms', () => pm.expect(pm.response.responseTime).to.be.below(200));"
+      ] } }]
+    },
+    {
+      "name": "History: purchases, last month, page 1",
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+          "const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1);",
+          "pm.collectionVariables.set('month', d.toISOString().slice(0, 7));"
+        ] } },
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.test('a full page of 30 and a cursor', () => { pm.expect(body.items.length).to.eql(30); pm.expect(body.next).to.be.a('string'); });",
+          "pm.test('under 200 ms', () => pm.expect(pm.response.responseTime).to.be.below(200));",
+          "pm.collectionVariables.set('before', body.next);"
+        ] } }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/homes/{{homeId}}/history/purchases?month={{month}}" }
+    },
+    {
+      "name": "History: purchases, page 2 by cursor",
+      "request": { "method": "GET", "url": "{{baseUrl}}/homes/{{homeId}}/history/purchases?month={{month}}&before={{before}}" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json();",
+        "pm.test('older rows than page 1', () => pm.expect(new Date(body.items[0].boughtAt) <= new Date(pm.collectionVariables.get('before').split('_')[0])).to.eql(true));",
+        "pm.test('under 200 ms', () => pm.expect(pm.response.responseTime).to.be.below(200));"
+      ] } }]
+    },
+    {
+      "name": "Mark bought",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/items/{{itemId}}/bought",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{ \"cost\": 2.5 }" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+        "const body = pm.response.json();",
+        "pm.test('bought and on a trip', () => { pm.expect(body.status).to.eql('bought'); pm.expect(body.receiptId).to.be.a('string'); });",
+        "pm.test('under 200 ms', () => pm.expect(pm.response.responseTime).to.be.below(200));"
+      ] } }]
+    },
+    {
+      "name": "Changes: the purchase arrives",
+      "request": { "method": "GET", "url": "{{baseUrl}}/homes/{{homeId}}/changes?since={{version}}" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json();",
+        "pm.test('the bought item, its trip and its product come back', () => {",
+        "  const item = body.items.find((row) => row.id === pm.collectionVariables.get('itemId'));",
+        "  pm.expect(item.status).to.eql('bought');",
+        "  pm.expect(body.trips.map((t) => t.id)).to.include(item.receiptId);",
+        "  pm.expect(body.products.length).to.be.above(0);",
+        "});",
+        "pm.test('under 200 ms', () => pm.expect(pm.response.responseTime).to.be.below(200));"
+      ] } }]
+    }
+  ]
+}
