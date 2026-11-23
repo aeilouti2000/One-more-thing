@@ -7,7 +7,10 @@ import { HttpExceptionFilter } from "./common/http-exception.filter";
 import { requestLog } from "./common/request-log";
 
 /** Everything main.ts sets on the app, shared with the API tests. */
-export function configureApp(app: NestExpressApplication, options: { log?: boolean } = {}) {
+export function configureApp(
+  app: NestExpressApplication,
+  options: { log?: boolean } = {},
+): ConfigService<AppConfig, true> {
   // Render's proxy is in front: take the client IP from X-Forwarded-For (one
   // hop), so rate limits apply per user instead of to everyone at once.
   app.set("trust proxy", 1);
