@@ -2,6 +2,8 @@
 // when it starts. Used to rehearse migrations on a copy of a database.
 //
 //   DATABASE_URL=postgres://omt:omt@localhost:5432/omt_rehearsal npx ts-node --transpile-only scripts/migrate.ts
+//
+// MIGRATE_UNTIL=<name> stops before that migration (to seed data in between).
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { MIGRATIONS } from "../src/database/migrations";
@@ -12,7 +14,9 @@ async function main() {
   const dataSource = new DataSource({
     type: "postgres",
     url,
-    migrations: MIGRATIONS,
+    migrations: process.env.MIGRATE_UNTIL
+      ? MIGRATIONS.slice(0, MIGRATIONS.findIndex((migration) => migration.name === process.env.MIGRATE_UNTIL))
+      : MIGRATIONS,
     migrationsTransactionMode: "each",
     logging: ["error", "migration"],
   });

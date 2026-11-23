@@ -57,7 +57,7 @@ export type BoughtCostEntry = {
   cost?: number | null;
 };
 
-type ItemResponse = {
+export type ItemResponse = {
   id: string;
   name: string;
   quantity: number;
@@ -71,6 +71,8 @@ type ItemResponse = {
   receiptTotal?: number | string | null;
   receiptName?: string | null;
   imageId?: string | null;
+  imageHash?: string | null;
+  sortOrder?: number;
   listId?: string;
   listName?: string;
   addedByName: string;
@@ -86,7 +88,7 @@ type ItemResponse = {
   laterUntil?: string | null;
 };
 
-function toPurchase(item: ItemResponse): Purchase {
+export function toPurchase(item: ItemResponse): Purchase {
   const quantity = Number(item.quantity);
   const cost =
     item.cost === null || item.cost === undefined
@@ -113,6 +115,8 @@ function toPurchase(item: ItemResponse): Purchase {
           : null,
     receiptName: item.receiptName ?? null,
     imageId: item.imageId ?? null,
+    imageHash: item.imageHash ?? null,
+    ...(typeof item.sortOrder === "number" ? { sortOrder: item.sortOrder } : {}),
     listId: item.listId,
     listName: item.listName,
     addedByName: item.addedByName,

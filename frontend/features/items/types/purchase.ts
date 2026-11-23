@@ -19,6 +19,10 @@ export type Purchase = {
   receiptName?: string | null;
   /** Server photo id (see itemImageUrl). */
   imageId?: string | null;
+  /** Blurred placeholder shown while the photo loads (thumbhash). */
+  imageHash?: string | null;
+  /** Place in its list: items are ordered by (sortOrder, createdAt newest first). */
+  sortOrder?: number;
   /** Local photo shown while it uploads (and until the next refresh). */
   localImageUri?: string;
   photoUploading?: boolean;

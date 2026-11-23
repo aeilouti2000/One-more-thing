@@ -28,6 +28,7 @@ export type ItemView = {
   notes: string | null;
   status: "needed" | "bought";
   urgent: boolean;
+  sortOrder: number;
   cost: number | null;
   /** Trip receipt this item was priced under (trip-total mode). */
   receiptId: string | null;
@@ -36,6 +37,7 @@ export type ItemView = {
   receiptName: string | null;
   /** Photo id; load it from GET /item-images/:imageId. */
   imageId: string | null;
+  imageHash: string | null;
   addedBy: string;
   boughtBy: string | null;
   addedByName: string;
@@ -51,11 +53,6 @@ export type ItemView = {
   /** When it returns by itself; null with laterAt = only by hand. */
   laterUntil: Date | null;
 };
-
-/**
- * A list being read returns its home's due Later items at most this often. The
- * timer does it every minute anyway; this only covers a server that just woke.
- */
 
 /** The furthest ahead an item can be parked. */
 const MAX_LATER_MS = 366 * 24 * 60 * 60_000;
@@ -984,6 +981,8 @@ export class ItemsService {
       notes: row.notes,
       status: row.status,
       urgent: row.urgent,
+      /** Place in its list; the app orders by (sortOrder, createdAt desc) like the server. */
+      sortOrder: row.sortOrder,
       cost: row.cost === null || row.cost === undefined ? null : Number(row.cost),
       receiptId: row.receiptId ?? null,
       receiptTotal: receiptAmount(row.receiptId ? receiptsById.get(row.receiptId) : undefined),

@@ -27,7 +27,7 @@ export type Pin = {
   listId: string | null;
 };
 
-type PinResponse = {
+export type PinResponse = {
   id: string;
   name: string;
   quantity: number;
@@ -45,7 +45,7 @@ function utcOffsetMin() {
   return -new Date().getTimezoneOffset();
 }
 
-function toPin(row: PinResponse): Pin {
+export function toPin(row: PinResponse): Pin {
   const quantity = Number(row.quantity);
   return {
     id: row.id,

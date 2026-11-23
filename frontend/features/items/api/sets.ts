@@ -29,13 +29,13 @@ export type ItemSet = {
   items: SetItem[];
 };
 
-type SetResponse = {
+export type SetResponse = {
   id: string;
   name: string;
   items: { name: string; quantity: number; unit: string | null; category: PurchaseCategory }[];
 };
 
-function toSet(row: SetResponse): ItemSet {
+export function toSet(row: SetResponse): ItemSet {
   return {
     id: row.id,
     name: row.name,

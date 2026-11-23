@@ -289,5 +289,11 @@ export const qk = {
   categories: (homeId: string) => ["categories", homeId] as const,
   pins: (homeId: string) => ["pins", homeId] as const,
   sets: (homeId: string) => ["sets", homeId] as const,
+  /** Version and window of the last sync, saved with the copy it describes (see features/sync). */
+  syncState: (homeId: string) => ["syncState", homeId] as const,
+  products: (homeId: string) => ["products", homeId] as const,
+  trips: (homeId: string) => ["trips", homeId] as const,
+  icons: (homeId: string) => ["icons", homeId] as const,
+  locks: (homeId: string) => ["locks", homeId] as const,
   notificationPrefs: () => ["notificationPrefs"] as const,
 };
