@@ -1,6 +1,6 @@
 # Build progress: performance refactor
 
-Branch `perf-refactor`, local only, never pushed. One commit per finished step.
+Branch `perf-refactor`, merged into `main` and deployed on 2026-11-23 (see "Release 2.9.3" at the end). One commit per finished step.
 
 Owner's instructions for this run (2026-11-23):
 
@@ -27,7 +27,7 @@ Owner's instructions for this run (2026-11-23):
 | 14 Products and month totals in the app | Done | Suggestions, recent picks and last prices read the synced products (proven identical to the full-history results by a test); the recap card, recap screen and cost-settings export load months older than the phone's window from History. Spending summary, trip forecast and widget need no change: they only use this month and last |
 | 16 Photos in the app | Done | Rows load the 256 px thumbnail (`?size=thumb`), viewers the full photo; thumbhash placeholder while loading. To check on a device: the image cache follows the redirect (the requested address is stable, so it should) |
 | 17 Redraws and start-up | Done | Items context split into data and actions (`usePurchaseActions` for components that only act; the detail card uses it). Start-up already opens from the saved copy (session, household, items): no change needed. The four Readex Pro fonts are embedded at build time (`expo-font` plugin in `app.json`; needs the new APK), `useFonts` stays as the fallback |
-| 19 SQLite tables (cut line) | Built, **needs a device test before it ships** | The saved copy moves from one text to tables: item/product/trip lists one row per entry (only changed objects are written), small entries one row each, pending changes one row each. First start moves the old text into the tables before removing it. Falls back to the old text if SQLite can't open (web, tests). 8 tests on real SQLite (`node:sqlite`). Screens still read the same in-memory cache |
+| 19 SQLite tables (cut line) | Done, tested on an emulator (see "Release 2.9.3") | The saved copy moves from one text to tables: item/product/trip lists one row per entry (only changed objects are written), small entries one row each, pending changes one row each. First start moves the old text into the tables before removing it. Falls back to the old text if SQLite can't open (web, tests). 8 tests on real SQLite (`node:sqlite`). Screens still read the same in-memory cache |
 | 11b Icons on the server | Done | Migration 031 `home_icons`; emoji or 192 px WebP image per category or shop name; `GET/PUT/DELETE /homes/:id/icons`, `PUT …/icons/image`, `GET /icons/:imageId`; icons in the changes answer; trash and category-delete triggers. 7 end-to-end tests, 13 shared emoji cases |
 | 12 Lab and load test | Done | Lab rebuilt through the migrations (027: 20 min 51 s, 028: ~3 min 50 s at 4.9 M purchases; production 0.19 s). A lab file per new query (`docs/perf-lab/s12-*.sql`). Found and fixed one missing index (migration 032, trip lookups by last purchase: 658 → 3 pages per purchase), with a test. Load test (Node script; Postman's performance runner needs a login, the Postman smoke collection passes): all scenarios pass, except 2 runs of mark bought slowed by other work on this machine. Results in the decision log, "Step 12 results" |
 
@@ -62,3 +62,34 @@ These follow the spec's intent; the spec will be updated to match before the rel
 25. **Emoji check without `Intl.Segmenter`** in the app: the phone's JavaScript engine (Hermes) may not support it; the app's check is tested against the same shared cases as the server's.
 26. **`spending-summary.tsx` removed**: the month hero replaced it.
 27. **Migration 032 `TripLastBoughtIndex`** (step 12): `trip_receipts (home_id, last_bought_at desc)`. Finding the open trip on every purchase read every trip of the home (658 pages in the lab; 3 with the index); the changes endpoint's trip read too (655 → 105). A new migration rather than a change to 027, because development and rehearsal databases already ran 027.
+
+## Release 2.9.3 (2026-11-23)
+
+The owner asked for a strict test of everything, then the release. What was checked, in order:
+
+**Automatic checks, on the released commit `03db8ed`**
+
+- Backend: 125 unit tests; 73 database tests on Postgres 16 and again on Postgres 18 (production's version).
+- App: 153 tests, type-check and lint clean.
+
+**Production data, on a private copy** (fresh backup `~/omt-release-backup/prod-before-2.9.3-20261123-2158.dump`, restored into a throwaway Postgres 18, push tokens deleted first so no phone could be notified)
+
+- The old server and the new server were asked the same questions for all 18 homes. The 399 items, lists, pins, sets, categories and questions came back identical through the endpoints 2.9.2 uses. One difference, on purpose: two items created in the same millisecond now always come in the same order (tie broken by id).
+- Month totals from the new History endpoints equal the app's own rule in 16 of 16 home-months.
+- All 255 purchases that had no trip got one. Migrations plus start-up took 0.86 s.
+- The clean-up job deleted nothing except 10 expired sign-in tokens.
+
+**The app on a throwaway emulator** (Expo Go, local backend): sign-up, sync and order, History (ring, month arrows, category bar, an older month from the server), Invoices and a trip, a shop icon, adding offline then force-stop then reopen then reconnect (sent once), the SQLite file read directly (rows as expected), an upgrade from a 2.9.2 saved copy with a change waiting (moved into tables, sent once), and a change the server refuses (the phone says so and goes back to the server's state).
+
+**Two independent reviews** of the whole change found one blocker (a refused change was never rolled back on the phone) and a list of smaller problems; all fixed in `03db8ed` with tests, except "retry once on a database deadlock" (rare, the phone already retries).
+
+**Release**
+
+- `main` fast-forwarded to `03db8ed` and pushed; Render deploy `dep-dc29ccjm8hqs73b6dro0` live at 19:39 UTC.
+- Production after the deploy: 33 migrations, 399 items, 72 trips, 230 products, 18 homes on the `early` plan, 0 purchases without a trip, no errors and no 5xx in the logs.
+- Photos stay in the database (`STORAGE_DRIVER` not set) until the owner creates the R2 bucket.
+- APK 2.9.3 (versionCode 51, EAS build `f2a5c4eb`, built from `03db8ed`): https://expo.dev/artifacts/eas/ymPkuJMaiF15cppMBmcas8qzsIXVVNNNrF0iO5-Bs74.apk
+- That exact APK was installed on the throwaway emulator and tried against production with a test account (no email): log in, create a home, add, buy, History, cold start, add while offline then kill and reopen (kept, sent once after reconnecting). The test account and its home were deleted afterwards; production is back to 25 users, 18 homes, 399 items.
+- Render: `APP_LATEST_VERSION=2.9.3` and `APP_DOWNLOAD_URL` set to the new APK (deploy `dep-dc2a6s6tlv9c73cpkjhg`). `APP_MIN_VERSION` stays 2.6.0, so the update is offered, not forced.
+
+Still open after the release: the A52 before/after measurements (steps 1 and 18), the uptime monitor, the R2 bucket and photo copy, closing the database to the public internet, and the clean-up migration (step 25) once nobody is on 2.9.2.
