@@ -7,7 +7,6 @@ import { NotificationsService } from "../../notifications/services/notifications
 import {
   ItemSet,
   SET_ITEM_LIMIT,
-  SET_LIMIT,
   type SetItem,
 } from "../entities/item-set.entity";
 import { ITEMS_REPOSITORY, type IItemsRepository } from "../repo/items-repo/items.repository";
@@ -58,10 +57,11 @@ export class SetsService {
       return toView(already);
     }
     const count = await this.sets.count({ where: { homeId } });
-    if (count >= SET_LIMIT) {
+    const limit = (await this.homes.planOf(homeId)).limits.sets;
+    if (count >= limit) {
       throw new DomainError(
         "SET_LIMIT",
-        `You can save up to ${SET_LIMIT} sets.`,
+        `You can save up to ${limit} sets.`,
         HttpStatus.CONFLICT,
       );
     }

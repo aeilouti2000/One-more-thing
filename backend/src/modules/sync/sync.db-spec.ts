@@ -41,6 +41,11 @@ describe("GET /homes/:homeId/changes", () => {
     expect(first.body.items.map((item: { name: string }) => item.name)).toEqual(["Milk"]);
     expect(first.body.lists).toHaveLength(1);
     expect(first.body.home.id).toBe(homeId);
+    expect(first.body.home.plan).toEqual({
+      id: "early",
+      until: null,
+      limits: { historyMonths: 12, photosPerHome: null, iconImages: 100, sets: 20, pinsPerList: 15 },
+    });
     expect(first.body.categories.length).toBeGreaterThan(0);
 
     const quiet = await changes(token, homeId, first.body.version);

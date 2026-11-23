@@ -1,3 +1,4 @@
+import { type HomePlan, planOf } from "../../plans/plans";
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { isUniqueViolation } from "../../../common/db-errors";
 import { DomainError } from "../../../common/domain.error";
@@ -203,6 +204,12 @@ export class HomesService {
       throw new DomainError("MEMBER_NOT_FOUND", "Member not found", HttpStatus.NOT_FOUND);
     }
     return { removed: true };
+  }
+
+  /** What the home's plan allows (see modules/plans/plans.ts). */
+  async planOf(homeId: string): Promise<HomePlan> {
+    const row = await this.homes.loadPlan(homeId);
+    return planOf(row ?? {});
   }
 
   async requireMembership(userId: string, homeId?: string) {

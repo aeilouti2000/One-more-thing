@@ -18,6 +18,8 @@ Owner's instructions for this run (2026-11-23):
 | 5 Name key | Done | Server `nameKey` and app `normalizeName` checked against one shared list |
 | 6 Changes endpoint | Done | `GET /api/homes/:homeId/changes?since=N`; 10 end-to-end tests on a throwaway database |
 | 7 Trips and products on every purchase | Done | Buy, bulk buy, undo, price change, pricing a trip, moving and deleting keep trips and products right, in one transaction. Release-on-read removed. 11 end-to-end tests |
+| 8 History endpoints | Done | Purchases (month, list, category, search, cursor), trips, one trip, month totals, months list. 11 end-to-end tests |
+| 9 Plans | Done | `early` plan (12 months, sets 20, pins 15, 100 icon images); every home response carries `plan`; sets and pins read their limits from it |
 
 ## Differences from the spec, decided during the build
 
@@ -31,3 +33,7 @@ These follow the spec's intent; the spec will be updated to match before the rel
 6. **The trigger skips updates that change nothing**, so identical rows are never resent.
 7. **Migrations now run one transaction each** (`migrationsTransactionMode: "each"`), needed for the index built "concurrently".
 8. **Deleting a purchase leaves its product as it is** (count and last price), so suggestions keep it. Only undo takes a purchase back off its product.
+9. **No "Scanned" tag on receipt cards**: a scanned receipt leaves no trace in the database (checked).
+10. **No CSV export endpoint**: the CSV's column names are translated on the phone, so the app keeps building it from the month's purchases (`history/purchases` pages).
+11. **A purchase belongs to the month its trip started** (the app's existing rule), for lists and totals alike, so they always agree.
+12. **Month totals for months older than the plan keeps** are still shown (from saved totals, or summed while the purchases are in the grace period), marked `archived`.

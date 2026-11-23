@@ -1,3 +1,4 @@
+import { PLANS } from "../plans/plans";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { noticeCopy, shopAskCopy, wantedItems } from "../notifications/services/notifications.service";
 import { SET_ITEM_LIMIT } from "./entities/item-set.entity";
@@ -29,7 +30,10 @@ describe("Later shelf", () => {
       where.id.value.map((id) => ({ id, homeId: "h1" })),
     ),
   };
-  const homes = { requireMembership: jest.fn(async () => ({ homeId: "h1" })) };
+  const homes = {
+    requireMembership: jest.fn(async () => ({ homeId: "h1" })),
+    planOf: jest.fn(async () => ({ id: "early", until: null, limits: PLANS.early })),
+  };
   const notifications = { notifyLaterBack: jest.fn() };
   const trips = { attachNewPurchases: jest.fn(async () => undefined), refreshTimes: jest.fn(async () => undefined) };
   const products = {
@@ -128,7 +132,10 @@ describe("Sets", () => {
     findActiveById: jest.fn(async (id: string) => ({ id })),
     findFirstActive: jest.fn(async () => ({ id: "l1" })),
   };
-  const homes = { requireMembership: jest.fn(async () => ({ homeId: "h1" })) };
+  const homes = {
+    requireMembership: jest.fn(async () => ({ homeId: "h1" })),
+    planOf: jest.fn(async () => ({ id: "early", until: null, limits: PLANS.early })),
+  };
   const items = {
     withNames: jest.fn(async (rows: Row[]) => rows.map((row) => ({ ...row, addedByName: "Ahmad" }))),
   };

@@ -1,3 +1,4 @@
+import { PLANS } from "../plans/plans";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { ItemsService } from "./services/items.service";
 
@@ -47,7 +48,10 @@ describe("Changes sent again after being offline", () => {
       return list;
     }),
   };
-  const homes = { requireMembership: jest.fn(async () => ({ homeId: "h1" })) };
+  const homes = {
+    requireMembership: jest.fn(async () => ({ homeId: "h1" })),
+    planOf: jest.fn(async () => ({ id: "early", until: null, limits: PLANS.early })),
+  };
   const notifications = { notifyItemAdded: jest.fn(), notifyItemUrgent: jest.fn() };
   const categories = { assertUsable: jest.fn(async () => undefined) };
   const receipts = { find: jest.fn(async () => []) };

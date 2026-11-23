@@ -3,7 +3,7 @@ import { DomainError } from "../../../common/domain.error";
 import { HomesService } from "../../homes/services/homes.service";
 import { NotificationsService } from "../../notifications/services/notifications.service";
 import type { ItemCategory } from "../entities/item.entity";
-import { PIN_LIMIT, type Pin, type PinInterval } from "../entities/pin.entity";
+import { type Pin, type PinInterval } from "../entities/pin.entity";
 import {
   ITEMS_REPOSITORY,
   type IItemsRepository,
@@ -190,10 +190,11 @@ export class PinsService {
 
   private async assertRoom(homeId: string, listId: string, exceptPinId?: string) {
     const count = await this.pins.countOnList(homeId, listId, exceptPinId);
-    if (count >= PIN_LIMIT) {
+    const limit = (await this.homes.planOf(homeId)).limits.pinsPerList;
+    if (count >= limit) {
       throw new DomainError(
         "PIN_LIMIT",
-        `You can pin up to ${PIN_LIMIT} items per list.`,
+        `You can pin up to ${limit} items per list.`,
         HttpStatus.CONFLICT,
       );
     }

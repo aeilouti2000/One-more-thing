@@ -1,3 +1,4 @@
+import { PLANS } from "../plans/plans";
 import { nextMonthDay, nextPinDue } from "./utils/shopping";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { PinsService } from "./services/pins.service";
@@ -40,7 +41,10 @@ describe("PinsService lists", () => {
     findFirstActive: jest.fn(async () => lists[0]),
     findActiveById: jest.fn(async (id: string) => lists.find((list) => list.id === id) ?? null),
   };
-  const homes = { requireMembership: jest.fn(async () => ({ homeId: "h1" })) };
+  const homes = {
+    requireMembership: jest.fn(async () => ({ homeId: "h1" })),
+    planOf: jest.fn(async () => ({ id: "early", until: null, limits: PLANS.early })),
+  };
   const categories = { assertUsable: jest.fn(async () => undefined) };
   const notifications = { notifyPinDue: jest.fn(async (..._args: unknown[]) => undefined) };
   const service = new PinsService(

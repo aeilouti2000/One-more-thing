@@ -23,6 +23,20 @@ export class Home {
   @Column({ name: "invite_code", unique: true })
   inviteCode: string;
 
+  /** The home's plan (see modules/plans/plans.ts). Changed by hand until billing exists. */
+  @Column({ type: "text", default: "early" })
+  plan: string;
+
+  @Column({ name: "plan_until", type: "timestamptz", nullable: true })
+  planUntil: Date | null;
+
+  @Column({ name: "plan_changed_at", type: "timestamptz", default: () => "now()" })
+  planChangedAt: Date;
+
+  /** IANA time zone, set by the first phone that syncs (see common/home-time.ts). */
+  @Column({ type: "text", nullable: true })
+  timezone: string | null;
+
   @Column({ name: "costs_enabled", type: "boolean", default: false })
   costsEnabled: boolean;
 

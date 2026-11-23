@@ -1,3 +1,4 @@
+import { planOf } from "../../../plans/plans";
 import { randomBytes } from "crypto";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -22,6 +23,13 @@ export class TypeormHomesRepository implements IHomesRepository {
 
   resolveActive(userId: string) {
     return this.resolveActiveMembership(userId);
+  }
+
+  loadPlan(homeId: string) {
+    return this.dataSource.getRepository(Home).findOne({
+      where: { id: homeId },
+      select: { plan: true, planUntil: true },
+    });
   }
 
   loadHome(homeId: string) {
@@ -302,6 +310,7 @@ export class TypeormHomesRepository implements IHomesRepository {
       tripEstimate: home.tripEstimate !== false,
       tripAskHome: home.tripAskHome !== false,
       monthlyRecap: home.monthlyRecap !== false,
+      plan: planOf(home),
       members: rows.map((row) => ({
         id: row.id,
         role: row.role,

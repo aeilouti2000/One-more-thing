@@ -29,6 +29,7 @@ import { ItemImage } from "./modules/items/entities/item-image.entity";
 import { ItemsModule } from "./modules/items/items.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { SyncModule } from "./modules/sync/sync.module";
+import { HistoryModule } from "./modules/history/history.module";
 import { PushToken } from "./modules/notifications/entities/push-token.entity";
 import { User } from "./users/user.entity";
 
@@ -83,6 +84,7 @@ import { User } from "./users/user.entity";
     ItemsModule,
     NotificationsModule,
     SyncModule,
+    HistoryModule,
   ],
   controllers: [HealthController, AppReleaseController, LegalController],
   providers: [{ provide: APP_GUARD, useClass: UserThrottlerGuard }],
