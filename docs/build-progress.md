@@ -25,6 +25,7 @@ Owner's instructions for this run (2026-11-23):
 | 13 App sync engine | Done | `features/sync`: one request per tick replaces the full item reload, the 3 s lock poll and the 15 s question poll; writes the existing cache entries in their shapes; version saved with the copy; falls back to the old endpoint on a 404. 8 merge tests. Not yet tried on a device |
 | 14 Products and month totals in the app | Done | Suggestions, recent picks and last prices read the synced products (proven identical to the full-history results by a test); the recap card, recap screen and cost-settings export load months older than the phone's window from History. Spending summary, trip forecast and widget need no change: they only use this month and last |
 | 16 Photos in the app | Done | Rows load the 256 px thumbnail (`?size=thumb`), viewers the full photo; thumbhash placeholder while loading. To check on a device: the image cache follows the redirect (the requested address is stable, so it should) |
+| 17 Redraws and start-up | Done | Items context split into data and actions (`usePurchaseActions` for components that only act; the detail card uses it). Start-up already opens from the saved copy (session, household, items): no change needed. The four Readex Pro fonts are embedded at build time (`expo-font` plugin in `app.json`; needs the new APK), `useFonts` stays as the fallback |
 | 11b Icons on the server | Done | Migration 031 `home_icons`; emoji or 192 px WebP image per category or shop name; `GET/PUT/DELETE /homes/:id/icons`, `PUT …/icons/image`, `GET /icons/:imageId`; icons in the changes answer; trash and category-delete triggers. 7 end-to-end tests, 13 shared emoji cases |
 
 ## Differences from the spec, decided during the build
@@ -52,3 +53,4 @@ These follow the spec's intent; the spec will be updated to match before the rel
 19. **Icon images also work before storage is configured**: in `db` mode the 192 px WebP is kept in `home_icons.data`.
 20. **Item rows carry `sortOrder`**: a changes answer can't carry list positions through array order, so the app sorts with the server's rule (place, then newest first).
 21. **Helpers run in parallel** (owner's request): step 12 and steps 15b+15 are built by two helper threads in their own checkouts and merged into this branch when done.
+22. **Lab migration time at scale**: migrations 027–031 took 24.7 minutes on the 5-million-item lab (027 rewrites every purchase). On production's 399 items they take 0.19 s, and they run once.

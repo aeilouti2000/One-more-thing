@@ -56,7 +56,17 @@
           }
         }
       ],
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/readex-pro/400Regular/ReadexPro_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/readex-pro/500Medium/ReadexPro_500Medium.ttf",
+            "./node_modules/@expo-google-fonts/readex-pro/600SemiBold/ReadexPro_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/readex-pro/700Bold/ReadexPro_700Bold.ttf"
+          ]
+        }
+      ],
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",

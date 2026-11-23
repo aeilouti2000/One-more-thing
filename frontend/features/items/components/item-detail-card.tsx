@@ -26,7 +26,7 @@ import { FormSheetModal } from "@/components/ui/FormSheetModal";
 import { withAlpha } from "@/constants/theme";
 import { useCategoryLabel } from "@/features/items/providers/categories-provider";
 import { useHousehold } from "@/features/homes/hooks/use-household";
-import { usePurchases } from "@/features/items/hooks/use-purchases";
+import { usePurchaseActions } from "@/features/items/hooks/use-purchases";
 import { formatMoney } from "@/features/items/utils/currency";
 import { createPin, deletePin, fetchPins } from "@/features/items/api/pins";
 import { parseQuantity } from "@/lib/validation";
@@ -51,7 +51,8 @@ export function ItemDetailCard({
   onDelete,
   presentation = "sheet",
 }: ItemDetailCardProps) {
-  const { updateItem, updateCost, markBought, setItemPhoto } = usePurchases();
+  // Actions only: the card does not redraw when other items change.
+  const { updateItem, updateCost, markBought, setItemPhoto } = usePurchaseActions();
   // Keep showing the last item while the sheet slides closed; otherwise the
   // body flips to the empty edit form for a frame when the parent clears it.
   const [lastPurchase, setLastPurchase] = useState<Purchase | null>(purchaseProp);

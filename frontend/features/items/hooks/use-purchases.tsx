@@ -158,7 +158,17 @@ type UsePurchasesResult = {
  */
 type BuyOptions = { joinInvoice?: boolean };
 
-const PurchasesContext = createContext<UsePurchasesResult | null>(null);
+type DataKeys = "purchases" | "needed" | "later" | "bought" | "getById" | "isLoading" | "error";
+type PurchasesData = Pick<UsePurchasesResult, DataKeys>;
+type PurchaseActions = Omit<UsePurchasesResult, DataKeys>;
+
+/**
+ * Two contexts: the items change with every tick of a trip, the actions almost
+ * never. A component that only acts (a sheet, a button) reads the actions and
+ * does not redraw when an item changes.
+ */
+const PurchasesDataContext = createContext<PurchasesData | null>(null);
+const PurchasesActionsContext = createContext<PurchaseActions | null>(null);
 
 function toEntries(entries: BoughtCostEntry[] | string[]): BoughtCostEntry[] {
   if (entries.length === 0) return [];
@@ -587,7 +597,7 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     [purchases],
   );
 
-  const value = useMemo<UsePurchasesResult>(
+  const dataValue = useMemo<PurchasesData>(
     () => ({
       purchases,
       needed,
@@ -596,6 +606,12 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       getById,
       isLoading: isHomeLoading || isLoading,
       error,
+    }),
+    [purchases, needed, later, bought, getById, isHomeLoading, isLoading, error],
+  );
+
+  const actions = useMemo<PurchaseActions>(
+    () => ({
       refresh,
       addItem,
       setItemPhoto,
@@ -619,14 +635,6 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       bringBackMany,
     }),
     [
-      purchases,
-      needed,
-      later,
-      bought,
-      getById,
-      isHomeLoading,
-      isLoading,
-      error,
       refresh,
       addItem,
       setItemPhoto,
@@ -652,25 +660,39 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <PurchasesContext.Provider value={value}>
-      {children}
-    </PurchasesContext.Provider>
+    <PurchasesActionsContext.Provider value={actions}>
+      <PurchasesDataContext.Provider value={dataValue}>{children}</PurchasesDataContext.Provider>
+    </PurchasesActionsContext.Provider>
   );
+}
+
+/** Only the actions: does not redraw when items change. */
+export function usePurchaseActions(): PurchaseActions {
+  const actions = useContext(PurchasesActionsContext);
+  if (!actions) {
+    throw new Error("usePurchaseActions must be used within PurchasesProvider");
+  }
+  return actions;
+}
+
+function useBoth(name: string): UsePurchasesResult {
+  const data = useContext(PurchasesDataContext);
+  const actions = useContext(PurchasesActionsContext);
+  if (!data || !actions) {
+    throw new Error(`${name} must be used within PurchasesProvider`);
+  }
+  return useMemo(() => ({ ...data, ...actions }), [data, actions]);
 }
 
 /** The same data without refreshing on focus; for sheets and small helpers. */
 export function usePurchasesData(): UsePurchasesResult {
-  const value = useContext(PurchasesContext);
-  if (!value) {
-    throw new Error("usePurchasesData must be used within PurchasesProvider");
-  }
-  return value;
+  return useBoth("usePurchasesData");
 }
 
 export function usePurchases(): UsePurchasesResult {
-  const value = useContext(PurchasesContext);
+  const value = useBoth("usePurchases");
   const { isLoading: isHomeLoading } = useHousehold();
-  const refresh = value?.refresh;
+  const refresh = value.refresh;
 
   useFocusEffect(
     useCallback(() => {
@@ -678,10 +700,6 @@ export function usePurchases(): UsePurchasesResult {
       void refresh();
     }, [isHomeLoading, refresh]),
   );
-
-  if (!value) {
-    throw new Error("usePurchases must be used within PurchasesProvider");
-  }
 
   return value;
 }
