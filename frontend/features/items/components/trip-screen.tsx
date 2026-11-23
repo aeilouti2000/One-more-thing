@@ -1442,15 +1442,6 @@ function TripBody() {
         </View>
       ) : null}
 
-      {askEnabled && (myAsk || tripItems.length > 0) ? (
-        <AskHomeCard
-          ask={myAsk}
-          asking={isAsking}
-          error={askError}
-          onAsk={() => void askTheHome()}
-        />
-      ) : null}
-
       {showDock ? (
         // Holds the trip card's place in the list; the card itself floats above.
         <View
@@ -1460,6 +1451,19 @@ function TripBody() {
             dockSlotY.value = event.nativeEvent.layout.y;
           }}
         />
+      ) : null}
+
+      {askEnabled && (myAsk || tripItems.length > 0) ? (
+        // Sits under the trip card; mb-2 plus the card's own mb-3 keeps the
+        // same 20px gap the trip card leaves above the list.
+        <View className="mb-2">
+          <AskHomeCard
+            ask={myAsk}
+            asking={isAsking}
+            error={askError}
+            onAsk={() => void askTheHome()}
+          />
+        </View>
       ) : null}
 
       {tipVisible && activeItems.length > 0 ? (
